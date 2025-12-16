@@ -371,7 +371,7 @@ export class CreateStyle {
         if (rule.nested && rule.nested.length > 0) {
             for (const nestedRule of rule.nested) {
                 const nestedSelector = nestedRule.selector.startsWith('&')
-                    ? nestedRule.selector.replace('&', rule.selector)
+                    ? nestedRule.selector.replace(/&/g, rule.selector)
                     : `${rule.selector} ${nestedRule.selector}`;
                 css += `\n${indent}${nestedSelector} {\n${this.stylesToString(nestedRule.styles, indent + '    ')}\n${indent}}\n`;
             }

@@ -611,7 +611,7 @@ const FormValidationDemo = () => {
 
   const emailError = computed([email], (e) => {
     if (!e) return '';
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? '' : 'Invalid email format';
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? '' : 'Invalid email format';
   });
 
   const passwordError = computed([password], (p) => {
