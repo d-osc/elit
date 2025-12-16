@@ -82,35 +82,3 @@ jobs:
           npm publish --tag ${{ steps.extract_tag.outputs.npm_tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        continue-on-error: true
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.extract_tag.outputs.git_tag }}
-          release_name: Release ${{ steps.extract_tag.outputs.git_tag }}
-          body: |
-            ## 📦 Published to NPM
-
-            **Version:** `${{ steps.extract_tag.outputs.version }}`
-            **NPM Tag:** `${{ steps.extract_tag.outputs.npm_tag }}`
-
-            ### Installation
-
-            ```bash
-            # Install latest
-            npm install elit
-
-            # Install specific version
-            npm install elit@${{ steps.extract_tag.outputs.version }}
-
-            # Install from tag
-            npm install elit@${{ steps.extract_tag.outputs.npm_tag }}
-            ```
-
-            ### Changes
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-          draft: false
-          prerelease: ${{ steps.extract_tag.outputs.npm_tag != 'latest' }}
