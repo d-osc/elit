@@ -31,6 +31,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/d-osc/elit"
+  },
+  "bugs": {
+    "url": "https://github.com/d-osc/elit/issues"
+  },
+  "homepage": "https://github.com/d-osc/elit#readme",
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.0.0",
