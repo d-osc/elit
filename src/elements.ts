@@ -1,0 +1,162 @@
+/**
+ * Elit - Element Factories
+ */
+
+import type { VNode, Child, Props, ElementFactory } from './types';
+
+export const createElementFactory = (tag: string): ElementFactory => {
+    return function(this: any, props?: Props | Child | null, ...rest: Child[]): VNode {
+        if (arguments.length === 0) {
+            return { tagName: tag, props: {}, children: [] };
+        }
+
+        let actualProps: Props = {};
+        let startIndex = 1;
+
+        const isState = props && typeof props === 'object' && 'value' in props && 'subscribe' in props;
+        const isVNode = props && typeof props === 'object' && 'tagName' in props;
+        const isChild = typeof props !== 'object' || Array.isArray(props) || props === null || isState || isVNode;
+
+        if (isChild) {
+            actualProps = {};
+            startIndex = 0;
+        } else {
+            actualProps = props as Props;
+        }
+
+        const args: Child[] = startIndex === 0 ? [props as Child, ...rest] : rest;
+
+        if (args.length === 0) {
+            return { tagName: tag, props: actualProps, children: [] };
+        }
+
+        if (args.length === 1) {
+            const child = args[0];
+            if (child == null || child === false) {
+                return { tagName: tag, props: actualProps, children: [] };
+            }
+            if (Array.isArray(child)) {
+                const flatChildren: Child[] = [];
+                const len = child.length;
+                for (let j = 0; j < len; j++) {
+                    const c = child[j];
+                    if (c != null && c !== false) {
+                        flatChildren.push(c);
+                    }
+                }
+                return { tagName: tag, props: actualProps, children: flatChildren };
+            }
+            return { tagName: tag, props: actualProps, children: [child] };
+        }
+
+        const flatChildren: Child[] = [];
+        for (let i = 0; i < args.length; i++) {
+            const child: Child = args[i];
+            if (child == null || child === false) continue;
+
+            if (Array.isArray(child)) {
+                const len = child.length;
+                for (let j = 0; j < len; j++) {
+                    const c = child[j];
+                    if (c != null && c !== false) {
+                        flatChildren.push(c);
+                    }
+                }
+            } else {
+                flatChildren.push(child);
+            }
+        }
+
+        return { tagName: tag, props: actualProps, children: flatChildren };
+    } as ElementFactory;
+};
+
+// HTML Tags
+const tags = [
+    'html', 'head', 'body', 'title', 'base', 'link', 'meta', 'style',
+    'address', 'article', 'aside', 'footer', 'header', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'main', 'nav', 'section',
+    'blockquote', 'dd', 'div', 'dl', 'dt', 'figcaption', 'figure', 'hr', 'li', 'ol', 'p', 'pre', 'ul',
+    'a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q',
+    'rp', 'rt', 'ruby', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'wbr',
+    'area', 'audio', 'img', 'map', 'track', 'video',
+    'embed', 'iframe', 'object', 'param', 'picture', 'portal', 'source',
+    'canvas', 'noscript', 'script',
+    'del', 'ins',
+    'caption', 'col', 'colgroup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr',
+    'button', 'datalist', 'fieldset', 'form', 'input', 'label', 'legend', 'meter',
+    'optgroup', 'option', 'output', 'progress', 'select', 'textarea',
+    'details', 'dialog', 'menu', 'summary',
+    'slot', 'template'
+] as const;
+
+// SVG Tags
+const svgTags = [
+    'svg', 'circle', 'rect', 'path', 'line', 'polyline', 'polygon', 'ellipse', 'g', 'text', 'tspan',
+    'defs', 'linearGradient', 'radialGradient', 'stop', 'pattern', 'mask', 'clipPath', 'use', 'symbol',
+    'marker', 'image', 'foreignObject', 'animate', 'animateTransform', 'animateMotion', 'set', 'filter',
+    'feBlend', 'feColorMatrix', 'feComponentTransfer', 'feComposite', 'feConvolveMatrix', 'feDiffuseLighting',
+    'feDisplacementMap', 'feFlood', 'feGaussianBlur', 'feMorphology', 'feOffset', 'feSpecularLighting',
+    'feTile', 'feTurbulence'
+] as const;
+
+// MathML Tags
+const mathTags = [
+    'math', 'mi', 'mn', 'mo', 'ms', 'mtext', 'mrow', 'mfrac', 'msqrt', 'mroot', 'msub', 'msup'
+] as const;
+
+type Elements = {
+    [K in typeof tags[number]]: ElementFactory;
+} & {
+    [K in typeof svgTags[number] as `svg${Capitalize<K>}`]: ElementFactory;
+} & {
+    [K in typeof mathTags[number] as `math${Capitalize<K>}`]: ElementFactory;
+} & {
+    varElement: ElementFactory;
+};
+
+const elements: Partial<Elements> = {};
+
+tags.forEach(tag => {
+    (elements as any)[tag] = createElementFactory(tag);
+});
+
+svgTags.forEach(tag => {
+    const name = 'svg' + tag.charAt(0).toUpperCase() + tag.slice(1);
+    (elements as any)[name] = createElementFactory(tag);
+});
+
+mathTags.forEach(tag => {
+    const name = 'math' + tag.charAt(0).toUpperCase() + tag.slice(1);
+    (elements as any)[name] = createElementFactory(tag);
+});
+
+(elements as any).varElement = createElementFactory('var');
+
+// Export all element factories
+export const {
+    html, head, body, title, base, link, meta, style,
+    address, article, aside, footer, header, h1, h2, h3, h4, h5, h6, main, nav, section,
+    blockquote, dd, div, dl, dt, figcaption, figure, hr, li, ol, p, pre, ul,
+    a, abbr, b, bdi, bdo, br, cite, code, data, dfn, em, i, kbd, mark, q,
+    rp, rt, ruby, s, samp, small, span, strong, sub, sup, time, u, wbr,
+    area, audio, img, map, track, video,
+    embed, iframe, object, param, picture, portal, source,
+    canvas, noscript, script,
+    del, ins,
+    caption, col, colgroup, table, tbody, td, tfoot, th, thead, tr,
+    button, datalist, fieldset, form, input, label, legend, meter,
+    optgroup, option, output, progress, select, textarea,
+    details, dialog, menu, summary,
+    slot, template,
+    svgSvg, svgCircle, svgRect, svgPath, svgLine, svgPolyline, svgPolygon, svgEllipse, svgG, svgText, svgTspan,
+    svgDefs, svgLinearGradient, svgRadialGradient, svgStop, svgPattern, svgMask, svgClipPath, svgUse, svgSymbol,
+    svgMarker, svgImage, svgForeignObject, svgAnimate, svgAnimateTransform, svgAnimateMotion, svgSet, svgFilter,
+    svgFeBlend, svgFeColorMatrix, svgFeComponentTransfer, svgFeComposite, svgFeConvolveMatrix, svgFeDiffuseLighting,
+    svgFeDisplacementMap, svgFeFlood, svgFeGaussianBlur, svgFeMorphology, svgFeOffset, svgFeSpecularLighting,
+    svgFeTile, svgFeTurbulence,
+    mathMath, mathMi, mathMn, mathMo, mathMs, mathMtext, mathMrow, mathMfrac, mathMsqrt, mathMroot, mathMsub, mathMsup,
+    varElement
+} = elements as Elements;
+
+// Export elements object for dynamic access
+export { elements };

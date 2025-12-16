@@ -1,0 +1,42 @@
+{
+  "name": "elit",
+  "version": "0.1.0",
+  "description": "Optimized lightweight library for creating DOM elements with reactive state",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm,iife --dts --clean --global-name DomLib",
+    "dev": "tsup src/index.ts --format cjs,esm,iife --dts --watch --global-name DomLib",
+    "typecheck": "tsc --noEmit",
+    "docs:dev": "npm run --prefix docs dev",
+    "docs:build": "npm run --prefix docs build",
+    "docs:preview": "npm run --prefix docs preview",
+    "docs:deploy": "npm run docs:build && gh-pages -d docs/dist"
+  },
+  "keywords": [
+    "dom",
+    "virtual-dom",
+    "reactive",
+    "state-management",
+    "ui",
+    "framework"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
