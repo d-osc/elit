@@ -611,7 +611,13 @@ const FormValidationDemo = () => {
 
   const emailError = computed([email], (e) => {
     if (!e) return '';
-    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? '' : 'Invalid email format';
+    // Simple validation: check for @ and . without regex quantifiers to avoid ReDoS
+    const atIndex = e.indexOf('@');
+    const dotIndex = e.lastIndexOf('.');
+    if (atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < e.length - 1 && !e.includes(' ')) {
+      return '';
+    }
+    return 'Invalid email format';
   });
 
   const passwordError = computed([password], (p) => {
