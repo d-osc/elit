@@ -39,12 +39,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/oangsa/elit.git"
+    "url": "https://github.com/d-osc/elit.git"
   },
   "bugs": {
-    "url": "https://github.com/oangsa/elit/issues"
+    "url": "https://github.com/d-osc/elit/issues"
   },
-  "homepage": "https://github.com/oangsa/elit#readme",
+  "homepage": "https://github.com/d-osc/elit#readme",
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.0.0",
