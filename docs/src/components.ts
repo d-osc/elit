@@ -5,6 +5,7 @@ import {
 import type { Router } from 'elit';
 import { codeBlock } from './highlight';
 import { t, switchLang, currentLang } from './i18n';
+import { currentTheme, toggleTheme } from './theme';
 
 // Header Component
 export const Logo = (router: Router) =>
@@ -24,6 +25,13 @@ export const Header = (router: Router) =>
         reactive(currentLang, () => routerLink(router, { to: '/api' }, t('nav.api'))),
         reactive(currentLang, () => routerLink(router, { to: '/blog' }, t('nav.blog'))),
         a({ href: 'https://github.com/d-osc/elit', target: '_blank' }, 'GitHub'),
+        button({
+          className: 'btn-theme',
+          onclick: toggleTheme,
+          title: 'Toggle theme'
+        },
+          reactive(currentTheme, (theme) => span(theme === 'dark' ? '☀️' : '🌙'))
+        ),
         button({ className: 'btn-lang', onclick: switchLang },
           reactive(currentLang, () => span(t('lang.switch')))
         )

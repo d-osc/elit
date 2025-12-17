@@ -4,7 +4,8 @@
       "Bash(npm install:*)",
       "Bash(npm run docs:build:*)",
       "Bash(npm run build:*)",
-      "Bash(npm whoami:*)"
+      "Bash(npm whoami:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

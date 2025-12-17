@@ -3,7 +3,7 @@ import { CreateStyle } from 'elit';
 // Create styles using CreateStyle
 export const styles = new CreateStyle();
 
-// CSS Variables
+// CSS Variables - Dark Theme (default)
 export const primary = styles.addVar('primary', '#6366f1');
 export const primaryDark = styles.addVar('primary-dark', '#4f46e5');
 export const bg = styles.addVar('bg', '#0f0f0f');
@@ -13,6 +13,20 @@ export const textColor = styles.addVar('text', '#fafafa');
 export const textMuted = styles.addVar('text-muted', '#a1a1aa');
 export const border = styles.addVar('border', '#27272a');
 
+// Light Theme Variables
+styles.add({
+  '[data-theme="light"]': {
+    '--primary': '#6366f1',
+    '--primary-dark': '#4f46e5',
+    '--bg': '#ffffff',
+    '--bg-card': '#f9fafb',
+    '--bg-code': '#f3f4f6',
+    '--text': '#0f0f0f',
+    '--text-muted': '#52525b',
+    '--border': '#e5e7eb'
+  }
+});
+
 // Base styles
 styles.addTag('*', { margin: 0, padding: 0, boxSizing: 'border-box' });
 styles.addTag('html', { scrollBehavior: 'smooth' });
@@ -20,7 +34,8 @@ styles.addTag('body', {
   fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   background: styles.var(bg),
   color: styles.var(textColor),
-  lineHeight: 1.6
+  lineHeight: 1.6,
+  transition: 'background-color 0.3s ease, color 0.3s ease'
 });
 
 styles.addTag('a', {
@@ -58,7 +73,15 @@ styles.addClass('header', {
   background: 'rgba(15, 15, 15, 0.8)',
   backdropFilter: 'blur(10px)',
   borderBottom: `1px solid ${styles.var(border)}`,
-  zIndex: 100
+  zIndex: 100,
+  transition: 'background-color 0.3s ease, border-color 0.3s ease'
+});
+
+// Light theme header
+styles.add({
+  '[data-theme="light"] .header': {
+    background: 'rgba(255, 255, 255, 0.8)'
+  }
 });
 
 styles.addClass('header-inner', {
@@ -100,6 +123,28 @@ styles.addClass('btn-lang', {
   transition: 'all 0.2s'
 });
 styles.addPseudoClass('hover', { color: styles.var(textColor), borderColor: styles.var(primary) }, '.btn-lang');
+
+// Theme toggle button
+styles.addClass('btn-theme', {
+  background: styles.var(bgCode),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '6px',
+  padding: '0.4rem 0.6rem',
+  color: styles.var(textMuted),
+  cursor: 'pointer',
+  fontSize: '1.25rem',
+  transition: 'all 0.2s',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '36px',
+  height: '36px'
+});
+styles.addPseudoClass('hover', {
+  color: styles.var(textColor),
+  borderColor: styles.var(primary),
+  transform: 'rotate(180deg)'
+}, '.btn-theme');
 
 // Hero
 styles.addClass('hero', { padding: '8rem 0 4rem', textAlign: 'center' });
@@ -159,7 +204,7 @@ styles.addClass('feature-card', {
   border: `1px solid ${styles.var(border)}`,
   borderRadius: '12px',
   padding: '1.5rem',
-  transition: 'border-color 0.2s'
+  transition: 'border-color 0.2s, background-color 0.3s ease'
 });
 styles.addPseudoClass('hover', { borderColor: styles.var(primary) }, '.feature-card');
 
@@ -390,20 +435,37 @@ styles.addClass('badge-type', { background: '#f59e0b', color: 'white' });
 styles.addClass('badge-method', { background: '#06b6d4', color: 'white' });
 styles.addClass('badge-instance', { background: '#ec4899', color: 'white' });
 
-// Syntax highlighting colors
-styles.addClass('sh-keyword', { color: '#c792ea' });      // const, let, import, export, function, return, if, else
-styles.addClass('sh-string', { color: '#c3e88d' });       // strings
-styles.addClass('sh-number', { color: '#f78c6c' });       // numbers
-styles.addClass('sh-comment', { color: '#546e7a', fontStyle: 'italic' });  // comments
-styles.addClass('sh-function', { color: '#82aaff' });     // function names
-styles.addClass('sh-class', { color: '#ffcb6b' });        // class names, types
-styles.addClass('sh-property', { color: '#f07178' });     // object properties
-styles.addClass('sh-operator', { color: '#89ddff' });     // operators: =, =>, +, -, etc.
-styles.addClass('sh-punctuation', { color: '#89ddff' });  // brackets, braces, parentheses
-styles.addClass('sh-tag', { color: '#f07178' });          // HTML/JSX tags
-styles.addClass('sh-attr', { color: '#ffcb6b' });         // attributes
-styles.addClass('sh-variable', { color: '#eeffff' });     // variables
-styles.addClass('sh-builtin', { color: '#82aaff' });      // built-in functions like console, document
+// Syntax highlighting colors - Dark Theme
+styles.addClass('sh-keyword', { color: '#c792ea', transition: 'color 0.3s ease' });      // const, let, import, export, function, return, if, else
+styles.addClass('sh-string', { color: '#c3e88d', transition: 'color 0.3s ease' });       // strings
+styles.addClass('sh-number', { color: '#f78c6c', transition: 'color 0.3s ease' });       // numbers
+styles.addClass('sh-comment', { color: '#546e7a', fontStyle: 'italic', transition: 'color 0.3s ease' });  // comments
+styles.addClass('sh-function', { color: '#82aaff', transition: 'color 0.3s ease' });     // function names
+styles.addClass('sh-class', { color: '#ffcb6b', transition: 'color 0.3s ease' });        // class names, types
+styles.addClass('sh-property', { color: '#f07178', transition: 'color 0.3s ease' });     // object properties
+styles.addClass('sh-operator', { color: '#89ddff', transition: 'color 0.3s ease' });     // operators: =, =>, +, -, etc.
+styles.addClass('sh-punctuation', { color: '#89ddff', transition: 'color 0.3s ease' });  // brackets, braces, parentheses
+styles.addClass('sh-tag', { color: '#f07178', transition: 'color 0.3s ease' });          // HTML/JSX tags
+styles.addClass('sh-attr', { color: '#ffcb6b', transition: 'color 0.3s ease' });         // attributes
+styles.addClass('sh-variable', { color: '#eeffff', transition: 'color 0.3s ease' });     // variables
+styles.addClass('sh-builtin', { color: '#82aaff', transition: 'color 0.3s ease' });      // built-in functions like console, document
+
+// Syntax highlighting colors - Light Theme
+styles.add({
+  '[data-theme="light"] .sh-keyword': { color: '#9333ea' },      // purple-600
+  '[data-theme="light"] .sh-string': { color: '#16a34a' },       // green-600
+  '[data-theme="light"] .sh-number': { color: '#ea580c' },       // orange-600
+  '[data-theme="light"] .sh-comment': { color: '#64748b' },      // slate-500
+  '[data-theme="light"] .sh-function': { color: '#2563eb' },     // blue-600
+  '[data-theme="light"] .sh-class': { color: '#d97706' },        // amber-600
+  '[data-theme="light"] .sh-property': { color: '#dc2626' },     // red-600
+  '[data-theme="light"] .sh-operator': { color: '#0891b2' },     // cyan-600
+  '[data-theme="light"] .sh-punctuation': { color: '#0891b2' },  // cyan-600
+  '[data-theme="light"] .sh-tag': { color: '#dc2626' },          // red-600
+  '[data-theme="light"] .sh-attr': { color: '#d97706' },         // amber-600
+  '[data-theme="light"] .sh-variable': { color: '#1e293b' },     // slate-800
+  '[data-theme="light"] .sh-builtin': { color: '#2563eb' }       // blue-600
+});
 
 // Stats Section
 styles.addClass('stats', {
@@ -488,7 +550,7 @@ styles.addClass('why-card', {
   borderRadius: '12px',
   padding: '1.5rem',
   textAlign: 'center',
-  transition: 'border-color 0.2s, transform 0.2s'
+  transition: 'border-color 0.2s, transform 0.2s, background-color 0.3s ease'
 });
 styles.addPseudoClass('hover', { borderColor: styles.var(primary), transform: 'translateY(-4px)' }, '.why-card');
 styles.addClass('why-icon', { fontSize: '2rem', display: 'block', marginBottom: '1rem' });
@@ -496,7 +558,11 @@ styles.descendant('.why-card', 'h3', { marginBottom: '0.5rem', fontSize: '1.1rem
 styles.descendant('.why-card', 'p', { color: styles.var(textMuted), fontSize: '0.9rem', margin: 0 });
 
 // Code Comparison Section
-styles.addClass('comparison', { padding: '4rem 0', background: styles.var(bgCard) });
+styles.addClass('comparison', {
+  padding: '4rem 0',
+  background: styles.var(bgCard),
+  transition: 'background-color 0.3s ease'
+});
 styles.addClass('comparison-grid', {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, 1fr)',
@@ -580,7 +646,7 @@ styles.addClass('blog-card', {
   border: `1px solid ${styles.var(border)}`,
   borderRadius: '12px',
   padding: '2rem',
-  transition: 'transform 0.2s, box-shadow 0.2s',
+  transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s ease',
   cursor: 'pointer'
 });
 
