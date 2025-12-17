@@ -5,7 +5,7 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { watch } from 'chokidar';
-import { readFile, stat } from 'fs/promises';
+import { readFile, stat, realpath } from 'fs/promises';
 import { join, extname, relative, resolve, normalize, sep } from 'path';
 import { lookup } from 'mime-types';
 import type { DevServerOptions, DevServer, HMRMessage } from './types';
@@ -45,8 +45,16 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
     filePath = filePath.split('?')[0];
 
     // Resolve file path and validate it's within root directory
-    const rootDir = resolve(config.root);
-    const fullPath = resolve(join(config.root, filePath));
+    const rootDir = await realpath(resolve(config.root)); // canonical root
+    let fullPath;
+    try {
+      fullPath = await realpath(resolve(join(config.root, filePath))); // canonical file path
+    } catch {
+      // If realpath fails (file does not exist or not accessible), return 404 right away
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('404 Not Found');
+      return;
+    }
 
     // Security: Prevent path traversal attacks
     // Ensure the resolved path is within the root directory
@@ -65,7 +73,14 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
 
       if (stats.isDirectory()) {
         // Try index.html in directory
-        const indexPath = resolve(join(fullPath, 'index.html'));
+        let indexPath;
+        try {
+          indexPath = await realpath(resolve(join(fullPath, 'index.html')));
+        } catch {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('404 Not Found');
+          return;
+        }
 
         // Security: Validate index path is still within root
         if (!indexPath.startsWith(rootDir + sep) && indexPath !== rootDir) {
@@ -98,9 +113,16 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
   // Serve file helper
   async function serveFile(filePath: string, res: ServerResponse) {
     try {
-      // Security: Final validation - ensure path is within root directory
-      const rootDir = resolve(config.root);
-      const resolvedPath = resolve(filePath);
+      // Security: Final validation - ensure path is within root directory (canonicalized)
+      const rootDir = await realpath(resolve(config.root));
+      let resolvedPath;
+      try {
+        resolvedPath = await realpath(resolve(filePath));
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+        return;
+      }
 
       if (!resolvedPath.startsWith(rootDir + sep) && resolvedPath !== rootDir) {
         if (config.logging) {
