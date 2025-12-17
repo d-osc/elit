@@ -6,7 +6,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { watch } from 'chokidar';
 import { readFile, stat } from 'fs/promises';
-import { join, extname, relative } from 'path';
+import { join, extname, relative, resolve, normalize, sep } from 'path';
 import { lookup } from 'mime-types';
 import type { DevServerOptions, DevServer, HMRMessage } from './types';
 import { Router } from './router';
@@ -44,8 +44,20 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
     // Remove query string
     filePath = filePath.split('?')[0];
 
-    // Resolve file path
-    const fullPath = join(config.root, filePath);
+    // Resolve file path and validate it's within root directory
+    const rootDir = resolve(config.root);
+    const fullPath = resolve(join(config.root, filePath));
+
+    // Security: Prevent path traversal attacks
+    // Ensure the resolved path is within the root directory
+    if (!fullPath.startsWith(rootDir + sep) && fullPath !== rootDir) {
+      if (config.logging) {
+        console.log(`[403] Path traversal attempt: ${filePath}`);
+      }
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('403 Forbidden');
+      return;
+    }
 
     try {
       // Check if file exists
@@ -53,7 +65,15 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
 
       if (stats.isDirectory()) {
         // Try index.html in directory
-        const indexPath = join(fullPath, 'index.html');
+        const indexPath = resolve(join(fullPath, 'index.html'));
+
+        // Security: Validate index path is still within root
+        if (!indexPath.startsWith(rootDir + sep) && indexPath !== rootDir) {
+          res.writeHead(403, { 'Content-Type': 'text/plain' });
+          res.end('403 Forbidden');
+          return;
+        }
+
         try {
           await stat(indexPath);
           return serveFile(indexPath, res);

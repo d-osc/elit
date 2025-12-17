@@ -95,12 +95,17 @@ export class Router {
     const paramNames: string[] = [];
 
     // Convert /users/:id/posts/:postId to regex
-    const pattern = path
-      .replace(/\//g, '\\/')
-      .replace(/:(\w+)/g, (_, paramName) => {
-        paramNames.push(paramName);
-        return '([^\\/]+)';
-      });
+    // First escape all regex special characters except colons (for params)
+    let pattern = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Then escape forward slashes for regex
+    pattern = pattern.replace(/\//g, '\\/');
+
+    // Finally convert parameter placeholders to capture groups
+    pattern = pattern.replace(/:(\w+)/g, (_, paramName) => {
+      paramNames.push(paramName);
+      return '([^\\/]+)';
+    });
 
     return {
       pattern: new RegExp(`^${pattern}$`),
