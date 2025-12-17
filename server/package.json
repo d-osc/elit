@@ -50,13 +50,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/oangsa/elit.git",
-    "directory": "server"
+    "url": "https://github.com/d-osc/elit.git"
   },
-  "homepage": "https://github.com/oangsa/elit/tree/main/server#readme",
   "bugs": {
-    "url": "https://github.com/oangsa/elit/issues"
+    "url": "https://github.com/d-osc/elit/issues"
   },
+  "homepage": "https://github.com/d-osc/elit#readme",
   "dependencies": {
     "chokidar": "^4.0.3",
     "mime-types": "^2.1.35",
