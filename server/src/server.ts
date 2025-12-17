@@ -44,11 +44,28 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
     // Remove query string
     filePath = filePath.split('?')[0];
 
+    // Security: Prevent path traversal and absolute path access _before_ fs operations
+    // Disallow absolute paths and directory traversal attempts
+    // Normalize to forward slashes to avoid Windows bypasses
+    const normalizedPath = normalize(filePath).replace(/\\/g, '/');
+    if (
+      normalizedPath.includes('..') ||
+      normalizedPath.startsWith('/') || // absolute path (after normalization)
+      normalizedPath.includes('\0')
+    ) {
+      if (config.logging) {
+        console.log(`[403] Rejected suspicious path: ${filePath}`);
+      }
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('403 Forbidden');
+      return;
+    }
+
     // Resolve file path and validate it's within root directory
     const rootDir = await realpath(resolve(config.root)); // canonical root
     let fullPath;
     try {
-      fullPath = await realpath(resolve(join(config.root, filePath))); // canonical file path
+      fullPath = await realpath(resolve(join(config.root, normalizedPath))); // canonical file path
     } catch {
       // If realpath fails (file does not exist or not accessible), return 404 right away
       res.writeHead(404, { 'Content-Type': 'text/plain' });
