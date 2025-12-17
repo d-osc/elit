@@ -9,7 +9,7 @@ export interface BlogPostDetail {
 }
 
 // Import individual blog posts
-import { blog1, blog2, blog3, blog4, blog5, blog6, blog7, blog8, blog9, blog10, blog11, blog12, blog13, blog14, blog15 } from './blogs';
+import { blog1, blog2, blog3, blog4, blog5, blog6, blog7, blog8, blog9, blog10, blog11, blog12, blog13, blog14, blog15, blog16, blog17, blog18 } from './blogs';
 
 // Export all blog posts
 export const blogPostsDetail: BlogPostDetail[] = [
@@ -27,5 +27,8 @@ export const blogPostsDetail: BlogPostDetail[] = [
   blog12,
   blog13,
   blog14,
-  blog15
+  blog15,
+  blog16,
+  blog17,
+  blog18
 ];

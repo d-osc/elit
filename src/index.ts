@@ -35,6 +35,13 @@ export {
     debounce
 } from './state';
 
+// Shared State (for use with @elit/server)
+export {
+    createSharedState,
+    sharedStateManager,
+    SharedState
+} from './shared-state';
+
 // Reactive Helpers
 export {
     reactive,
@@ -136,12 +143,17 @@ export const renderVNode = (container: string | HTMLElement, json: VNodeJson): H
 export const renderVNodeToString = (json: VNodeJson, options?: { pretty?: boolean; indent?: number }): string =>
     domNode.renderVNodeToString(json, options);
 
+// DOM utilities
+export * from './dom';
+
 // Browser export
 import { elements, createElementFactory } from './elements';
 import { createState, computed, effect, batchRender, renderChunked, createVirtualList, lazy, cleanupUnused, throttle, debounce } from './state';
+import { createSharedState, sharedStateManager } from './shared-state';
 import { reactive, reactiveAs, text, bindValue, bindChecked } from './reactive';
 import { CreateStyle } from './CreateStyle';
 import { createRouter, createRouterView, routerLink } from './router';
+import * as domUtils from './dom';
 
 if (typeof window !== 'undefined') {
     Object.assign(window, {
@@ -155,6 +167,8 @@ if (typeof window !== 'undefined') {
         createState,
         computed,
         effect,
+        createSharedState,
+        sharedStateManager,
         reactive,
         reactiveAs,
         text,
@@ -178,6 +192,7 @@ if (typeof window !== 'undefined') {
         createRouter,
         createRouterView,
         routerLink,
-        ...elements
+        ...elements,
+        ...domUtils
     });
 }

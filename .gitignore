@@ -6,3 +6,7 @@ coverage
 .nyc_output
 .env
 .npmrc
+nul
+
+# License copied during build
+server/LICENSE

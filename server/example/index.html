@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elit HMR Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #app {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+
+    p {
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+
+    .counter {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin: 30px 0;
+    }
+
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .count {
+      font-size: 3rem;
+      font-weight: bold;
+      color: #667eea;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .status {
+      margin-top: 30px;
+      padding: 12px;
+      background: #f0f9ff;
+      border-left: 4px solid #0ea5e9;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #0c4a6e;
+    }
+
+    .status.connected {
+      background: #f0fdf4;
+      border-left-color: #22c55e;
+      color: #14532d;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Load Elit from CDN or local build -->
+  <script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>
+
+  <!-- Your app code -->
+  <script type="module">
+    const { div, h1, h2, p, button, span, domNode, createState, reactive } = window;
+
+    // Create state
+    const count = createState(0);
+    const hmrStatus = createState('Connecting...');
+
+    // Build UI
+    const app = div({ className: 'app-container' },
+      h1('🔥 Elit + HMR'),
+      p('This is a live example of Elit with Hot Module Replacement. Try editing this file and see the changes instantly!'),
+
+      div({ className: 'counter' },
+        button({ onclick: () => count.value-- }, '−'),
+        reactive(count, value =>
+          span({ className: 'count' }, value)
+        ),
+        button({ onclick: () => count.value++ }, '+')
+      ),
+
+      reactive(count, value =>
+        p({ style: 'text-align: center; margin-top: 20px; color: #666;' },
+          value === 0 ? 'Start counting!' :
+          value > 0 ? `You clicked ${value} time${value > 1 ? 's' : ''}! 🎉` :
+          `Negative ${Math.abs(value)}! Going backwards? 🔄`
+        )
+      ),
+
+      reactive(hmrStatus, status =>
+        div({
+          className: status.includes('Connected') ? 'status connected' : 'status'
+        }, `HMR Status: ${status}`)
+      )
+    );
+
+    // Render
+    domNode.render('#app', app);
+
+    // HMR Status listener
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        hmrStatus.value = 'Connected ✓';
+      }, 500);
+    });
+
+    console.log('🎨 App initialized!');
+    console.log('👀 Try editing this file and watch the magic happen!');
+  </script>
+</body>
+</html>

@@ -5,7 +5,11 @@
       "Bash(npm run docs:build:*)",
       "Bash(npm run build:*)",
       "Bash(npm whoami:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(ls:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -476,7 +476,7 @@ styles.addClass('stats', {
 });
 styles.addClass('stats-grid', {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  gridTemplateColumns: 'repeat(5, 1fr)',
   gap: '2rem',
   textAlign: 'center'
 });
@@ -583,6 +583,33 @@ styles.add({ '.comparison-header.elit': { background: styles.var(primary), color
 styles.add({ '.comparison-header.vanilla': { background: '#374151', color: styles.var(textMuted) } });
 styles.addClass('comparison-code', { margin: 0, padding: '1rem', fontSize: '0.85rem', minHeight: '280px' });
 
+// Featured Blogs Section
+styles.addClass('featured-blogs', { padding: '4rem 0' });
+styles.addClass('blogs-grid', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: '1.5rem'
+});
+styles.addClass('blog-icon', {
+  fontSize: '2.5rem',
+  marginBottom: '1rem',
+  display: 'block'
+});
+styles.addClass('blog-description', {
+  color: styles.var(textMuted),
+  marginBottom: '1rem',
+  fontSize: '0.95rem',
+  lineHeight: 1.6
+});
+styles.addClass('blog-link', {
+  color: styles.var(primary),
+  fontWeight: 500,
+  display: 'inline-block',
+  marginTop: '1rem',
+  transition: 'color 0.2s'
+});
+styles.addPseudoClass('hover', { color: styles.var(primaryDark) }, '.blog-link');
+
 // API Overview Section
 styles.addClass('api-overview', { padding: '4rem 0' });
 styles.addClass('api-grid', {
@@ -617,7 +644,8 @@ styles.mediaMaxWidth('1024px', {
   '.stats-grid': { gridTemplateColumns: 'repeat(2, 1fr)' },
   '.why-grid': { gridTemplateColumns: 'repeat(2, 1fr)' },
   '.api-grid': { gridTemplateColumns: 'repeat(3, 1fr)' },
-  '.quick-start-content': { gridTemplateColumns: '1fr' }
+  '.quick-start-content': { gridTemplateColumns: '1fr' },
+  '.blogs-grid': { gridTemplateColumns: 'repeat(2, 1fr)' }
 });
 
 styles.mediaMaxWidth('768px', {
@@ -628,7 +656,8 @@ styles.mediaMaxWidth('768px', {
   '.stat-number': { fontSize: '2rem' },
   '.why-grid': { gridTemplateColumns: '1fr' },
   '.api-grid': { gridTemplateColumns: 'repeat(2, 1fr)' },
-  '.blog-grid': { gridTemplateColumns: '1fr' }
+  '.blog-grid': { gridTemplateColumns: '1fr' },
+  '.blogs-grid': { gridTemplateColumns: '1fr' }
 });
 
 // Blog Styles

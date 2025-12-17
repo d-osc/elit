@@ -5,62 +5,27 @@
 import type { VNode, Child, Props, ElementFactory } from './types';
 
 export const createElementFactory = (tag: string): ElementFactory => {
-    return function(this: any, props?: Props | Child | null, ...rest: Child[]): VNode {
-        if (arguments.length === 0) {
-            return { tagName: tag, props: {}, children: [] };
-        }
-
-        let actualProps: Props = {};
-        let startIndex = 1;
+    return function(props?: Props | Child | null, ...rest: Child[]): VNode {
+        if (!arguments.length) return { tagName: tag, props: {}, children: [] };
 
         const isState = props && typeof props === 'object' && 'value' in props && 'subscribe' in props;
         const isVNode = props && typeof props === 'object' && 'tagName' in props;
         const isChild = typeof props !== 'object' || Array.isArray(props) || props === null || isState || isVNode;
 
-        if (isChild) {
-            actualProps = {};
-            startIndex = 0;
-        } else {
-            actualProps = props as Props;
-        }
+        const actualProps: Props = isChild ? {} : props as Props;
+        const args: Child[] = isChild ? [props as Child, ...rest] : rest;
 
-        const args: Child[] = startIndex === 0 ? [props as Child, ...rest] : rest;
-
-        if (args.length === 0) {
-            return { tagName: tag, props: actualProps, children: [] };
-        }
-
-        if (args.length === 1) {
-            const child = args[0];
-            if (child == null || child === false) {
-                return { tagName: tag, props: actualProps, children: [] };
-            }
-            if (Array.isArray(child)) {
-                const flatChildren: Child[] = [];
-                const len = child.length;
-                for (let j = 0; j < len; j++) {
-                    const c = child[j];
-                    if (c != null && c !== false) {
-                        flatChildren.push(c);
-                    }
-                }
-                return { tagName: tag, props: actualProps, children: flatChildren };
-            }
-            return { tagName: tag, props: actualProps, children: [child] };
-        }
+        if (!args.length) return { tagName: tag, props: actualProps, children: [] };
 
         const flatChildren: Child[] = [];
-        for (let i = 0; i < args.length; i++) {
-            const child: Child = args[i];
+        for (let i = 0, len = args.length; i < len; i++) {
+            const child = args[i];
             if (child == null || child === false) continue;
 
             if (Array.isArray(child)) {
-                const len = child.length;
-                for (let j = 0; j < len; j++) {
+                for (let j = 0, cLen = child.length; j < cLen; j++) {
                     const c = child[j];
-                    if (c != null && c !== false) {
-                        flatChildren.push(c);
-                    }
+                    c != null && c !== false && flatChildren.push(c);
                 }
             } else {
                 flatChildren.push(child);

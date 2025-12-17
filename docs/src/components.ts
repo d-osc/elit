@@ -81,16 +81,16 @@ export const Features = () =>
   );
 
 // Quick Start Section
-const quickStartCode = `import { div, h1, button, createState, reactive, domNode } from 'elit';
+const quickStartCode = `import { div, h1, button, span, createState, reactive, domNode } from 'elit';
 
 // Create reactive state
 const count = createState(0);
 
-// Build UI
+// Build UI with reactive updates
 const app = div({ className: 'app' },
-  h1('Hello Elit!'),
+  h1('Hello Elit! 👋'),
   reactive(count, value =>
-    div(
+    div({ className: 'counter' },
       button({ onclick: () => count.value-- }, '-'),
       span(\` \${value} \`),
       button({ onclick: () => count.value++ }, '+')
@@ -254,7 +254,7 @@ export const Stats = () =>
     reactive(currentLang, () =>
       div({ className: 'container stats-grid' },
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '~5KB'),
+          span({ className: 'stat-number' }, '~10KB'),
           span({ className: 'stat-label' }, t('stats.size'))
         ),
         div({ className: 'stat' },
@@ -266,12 +266,81 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.elements'))
         ),
         div({ className: 'stat' },
+          span({ className: 'stat-number' }, '18+'),
+          span({ className: 'stat-label' }, t('stats.tutorials'))
+        ),
+        div({ className: 'stat' },
           span({ className: 'stat-number' }, '100%'),
           span({ className: 'stat-label' }, t('stats.typescript'))
         )
       )
     )
   );
+
+// Featured Blogs Component
+export const FeaturedBlogs = (router: Router) => {
+  // Featured blog posts
+  const featuredBlogPosts = [
+    {
+      id: '18',
+      title: { en: 'Complete Guide to @elit/server', th: 'คู่มือครบวงจร @elit/server' },
+      description: {
+        en: 'Learn everything about @elit/server - REST API, middleware, WebSocket, and production deployment',
+        th: 'เรียนรู้ทุกอย่างเกี่ยวกับ @elit/server - REST API, middleware, WebSocket และการ deploy แบบ production'
+      },
+      tags: ['@elit/server', 'REST API', 'Full Stack'],
+      icon: '🚀'
+    },
+    {
+      id: '17',
+      title: { en: 'Hot Module Replacement with Elit', th: 'Hot Module Replacement กับ Elit' },
+      description: {
+        en: 'Master HMR for instant development feedback without page refresh. Boost your productivity!',
+        th: 'เชี่ยวชาญ HMR เพื่อรับ feedback แบบทันทีโดยไม่ต้อง refresh หน้า เพิ่มประสิทธิภาพการพัฒนา!'
+      },
+      tags: ['HMR', 'Development', 'Workflow'],
+      icon: '⚡'
+    },
+    {
+      id: '16',
+      title: { en: 'Building Real-time Blog with Shared State', th: 'สร้าง Blog แบบ Real-time ด้วย Shared State' },
+      description: {
+        en: 'Build a real-time blog application with WebSocket-based state synchronization',
+        th: 'สร้างแอพ blog แบบ real-time ด้วยการซิงค์ state ผ่าน WebSocket'
+      },
+      tags: ['Shared State', 'Real-time', 'WebSocket'],
+      icon: '🔄'
+    }
+  ];
+
+  return section({ className: 'featured-blogs container' },
+    reactive(currentLang, () => h2({ className: 'section-title' }, t('blogs.title'))),
+    reactive(currentLang, () => p({ className: 'section-subtitle' }, t('blogs.subtitle'))),
+    reactive(currentLang, () =>
+      div({ className: 'blogs-grid' },
+        ...featuredBlogPosts.map(blog =>
+          div({ className: 'blog-card' },
+            div({ className: 'blog-icon' }, blog.icon),
+            h3(blog.title[currentLang.value]),
+            p({ className: 'blog-description' }, blog.description[currentLang.value]),
+            div({ className: 'blog-tags' },
+              ...blog.tags.slice(0, 3).map(tag =>
+                span({ className: 'blog-tag' }, tag)
+              )
+            ),
+            routerLink(router, {
+              to: `/blog/${blog.id}`,
+              className: 'blog-link'
+            }, t('blogs.readMore') + ' →')
+          )
+        )
+      )
+    ),
+    div({ style: 'text-align: center; margin-top: 2rem;' },
+      reactive(currentLang, () => routerLink(router, { to: '/blog', className: 'btn btn-secondary' }, t('blogs.viewAll')))
+    )
+  );
+};
 
 // Footer Component
 export const Footer = () =>

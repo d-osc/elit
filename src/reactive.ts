@@ -16,65 +16,67 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
     const isVNodeResult = initialResult && typeof initialResult === 'object' && 'tagName' in initialResult;
     const initialIsNull = initialResult == null || initialResult === false;
 
-    state.subscribe(() => {
-        if (rafId) cancelAnimationFrame(rafId);
+    const updateElement = () => {
+        if (!elementRef && !placeholder) return;
 
-        rafId = requestAnimationFrame(() => {
-            if (!elementRef && !placeholder) return;
+        const newResult = renderFn(state.value);
+        const resultIsNull = newResult == null || newResult === false;
 
-            const newResult = renderFn(state.value);
-            const resultIsNull = newResult == null || newResult === false;
+        if (resultIsNull) {
+            if (isInDOM && elementRef) {
+                placeholder = document.createComment('reactive');
+                elementRef.parentNode?.replaceChild(placeholder, elementRef);
+                isInDOM = false;
+            }
+        } else {
+            if (!isInDOM && placeholder && elementRef) {
+                placeholder.parentNode?.replaceChild(elementRef, placeholder);
+                placeholder = null;
+                isInDOM = true;
+            }
 
-            if (resultIsNull) {
-                if (isInDOM && elementRef) {
-                    placeholder = document.createComment('reactive');
-                    elementRef.parentNode?.replaceChild(placeholder, elementRef);
-                    isInDOM = false;
-                }
-            } else {
-                if (!isInDOM && placeholder && elementRef) {
-                    placeholder.parentNode?.replaceChild(elementRef, placeholder);
-                    placeholder = null;
-                    isInDOM = true;
-                }
+            if (elementRef) {
+                const fragment = document.createDocumentFragment();
 
-                if (elementRef) {
-                    const fragment = document.createDocumentFragment();
+                if (isVNodeResult && newResult && typeof newResult === 'object' && 'tagName' in newResult) {
+                    const { props, children } = newResult as VNode;
 
-                    if (isVNodeResult && newResult && typeof newResult === 'object' && 'tagName' in newResult) {
-                        const vnode = newResult as VNode;
+                    for (const key in props) {
+                        const value = props[key];
+                        if (key === 'ref') continue;
 
-                        const props = vnode.props;
-                        for (const key in props) {
-                            const value = props[key];
-                            if (key === 'ref') continue;
-
-                            if (key === 'class' || key === 'className') {
-                                (elementRef as HTMLElement).className = Array.isArray(value) ? value.join(' ') : (value || '');
-                            } else if (key === 'style' && typeof value === 'object') {
-                                const s = (elementRef as HTMLElement).style;
-                                for (const k in value) (s as any)[k] = value[k];
-                            } else if (key.startsWith('on')) {
-                                (elementRef as any)[key.toLowerCase()] = value;
-                            } else if (value != null && value !== false) {
-                                elementRef.setAttribute(key, String(value === true ? '' : value));
-                            } else {
-                                elementRef.removeAttribute(key);
-                            }
+                        if (key === 'class' || key === 'className') {
+                            (elementRef as HTMLElement).className = Array.isArray(value) ? value.join(' ') : (value || '');
+                        } else if (key === 'style' && typeof value === 'object') {
+                            const s = (elementRef as HTMLElement).style;
+                            for (const k in value) (s as any)[k] = value[k];
+                        } else if (key.startsWith('on')) {
+                            (elementRef as any)[key.toLowerCase()] = value;
+                        } else if (value != null && value !== false) {
+                            elementRef.setAttribute(key, String(value === true ? '' : value));
+                        } else {
+                            elementRef.removeAttribute(key);
                         }
-
-                        for (const child of vnode.children) {
-                            domNode.renderToDOM(child, fragment);
-                        }
-                    } else {
-                        domNode.renderToDOM(newResult, fragment);
                     }
 
-                    elementRef.textContent = '';
-                    elementRef.appendChild(fragment);
-                    domNode.getElementCache().set(elementRef, true);
+                    for (const child of children) {
+                        domNode.renderToDOM(child, fragment);
+                    }
+                } else {
+                    domNode.renderToDOM(newResult, fragment);
                 }
+
+                elementRef.textContent = '';
+                elementRef.appendChild(fragment);
+                domNode.getElementCache().set(elementRef, true);
             }
+        }
+    };
+
+    state.subscribe(() => {
+        rafId && cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+            updateElement();
             rafId = null;
         });
     });

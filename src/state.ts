@@ -42,9 +42,9 @@ export const cleanupUnused = (root: HTMLElement): number =>
     domNode.cleanupUnusedElements(root);
 
 // Throttle helper
-export const throttle = <T extends any[]>(fn: (...args: T) => void, delay: number): (...args: T) => void => {
+export const throttle = <T extends any[]>(fn: (...args: T) => void, delay: number) => {
     let timer: NodeJS.Timeout | null = null;
-    return (...args: T): void => {
+    return (...args: T) => {
         if (!timer) {
             timer = setTimeout(() => {
                 timer = null;
@@ -55,10 +55,10 @@ export const throttle = <T extends any[]>(fn: (...args: T) => void, delay: numbe
 };
 
 // Debounce helper
-export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: number): (...args: T) => void => {
+export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: number) => {
     let timer: NodeJS.Timeout | null = null;
-    return (...args: T): void => {
-        if (timer) clearTimeout(timer);
+    return (...args: T) => {
+        timer && clearTimeout(timer);
         timer = setTimeout(() => fn(...args), delay);
     };
 };

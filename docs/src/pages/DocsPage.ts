@@ -30,8 +30,18 @@ const Docs = () =>
           h2({ id: 'installation' }, t('docs.installation')),
           p(t('docs.installNpm')),
           codeExample('npm install elit'),
+
+          h3('Bundle Size'),
+          p('Elit is extremely lightweight - only 30KB minified (~10KB gzipped)'),
+          ul(
+            li('ESM: 29KB minified'),
+            li('CJS: 30KB minified'),
+            li('IIFE: 30KB minified'),
+            li('Tree-shakeable: Import only what you need')
+          ),
+
           p(t('docs.installCdn')),
-          codeExample(`<script src="https://unpkg.com/elit/dist/index.iife.js"></script>`),
+          codeExample(`<script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>`),
 
           h2({ id: 'elements' }, t('docs.elements')),
           p(t('docs.elements.desc')),
@@ -256,7 +266,35 @@ const list = createVirtualList(container, items, renderItem, 50);
 
 // Throttle/debounce
 const throttled = throttle(fn, 100);
-const debounced = debounce(fn, 300);`)
+const debounced = debounce(fn, 300);`),
+
+          h3('DOM Utilities'),
+          p('Elit provides convenient helper functions for common DOM operations:'),
+          codeExample(`import { doc, el, els, createEl, elId, elClass, fragment } from 'elit';
+
+// Query selectors (bound to document)
+const element = el('.my-class');        // querySelector
+const elements = els('.my-class');      // querySelectorAll
+const byId = elId('my-id');            // getElementById
+const byClass = elClass('my-class');   // getElementsByClassName
+
+// Create elements
+const div = createEl('div');           // createElement
+const frag = fragment();               // createDocumentFragment
+
+// Access document
+doc.title = 'New Title';`),
+
+          h3('Performance Optimizations'),
+          p('Elit is built with performance in mind:'),
+          ul(
+            li('Direct DOM manipulation - no virtual DOM overhead'),
+            li('Optimized rendering with RAF batching'),
+            li('Smart children rendering with automatic fragment usage'),
+            li('Efficient attribute updates using charCode checks'),
+            li('Minimal function closures and memory allocation'),
+            li('Tree-shakeable ES modules for optimal bundle size')
+          )
         )
       )
     )

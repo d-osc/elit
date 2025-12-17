@@ -26,6 +26,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'stats.size': 'Gzipped Size',
     'stats.deps': 'Dependencies',
     'stats.elements': 'Element Factories',
+    'stats.tutorials': 'Tutorials',
     'stats.typescript': 'TypeScript',
 
     // Features
@@ -125,6 +126,12 @@ const translations: Record<Lang, Record<string, string>> = {
     'apiPage.returns': 'Returns',
     'apiPage.example': 'Example',
 
+    // Featured Blogs
+    'blogs.title': 'Latest Tutorials',
+    'blogs.subtitle': 'Learn Elit with step-by-step guides and real-world examples',
+    'blogs.viewAll': 'View All Tutorials',
+    'blogs.readMore': 'Read More',
+
     // Language
     'lang.switch': 'ไทย'
   },
@@ -147,6 +154,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'stats.size': 'ขนาด Gzipped',
     'stats.deps': 'Dependencies',
     'stats.elements': 'Element Factories',
+    'stats.tutorials': 'บทความสอน',
     'stats.typescript': 'TypeScript',
 
     // Features
@@ -245,6 +253,12 @@ const translations: Record<Lang, Record<string, string>> = {
     'apiPage.parameters': 'พารามิเตอร์',
     'apiPage.returns': 'ค่าที่ return',
     'apiPage.example': 'ตัวอย่าง',
+
+    // Featured Blogs
+    'blogs.title': 'บทความล่าสุด',
+    'blogs.subtitle': 'เรียนรู้ Elit ด้วยคู่มือทีละขั้นตอนและตัวอย่างการใช้งานจริง',
+    'blogs.viewAll': 'ดูบทความทั้งหมด',
+    'blogs.readMore': 'อ่านเพิ่มเติม',
 
     // Language
     'lang.switch': 'EN'

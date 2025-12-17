@@ -12,111 +12,87 @@ export class DomNode {
     }
 
     renderToDOM(vNode: Child, parent: HTMLElement | SVGElement | DocumentFragment): void {
-        if (vNode == null || vNode === false) {
-            return;
-        }
+        if (vNode == null || vNode === false) return;
+
         if (typeof vNode !== 'object') {
             parent.appendChild(document.createTextNode(String(vNode)));
             return;
         }
 
-        const tagName = vNode.tagName;
-        const isSVG = tagName === 'svg' || tagName[0] === 's' && tagName[1] === 'v' && tagName[2] === 'g' ||
+        const { tagName, props, children } = vNode;
+        const isSVG = tagName === 'svg' || (tagName[0] === 's' && tagName[1] === 'v' && tagName[2] === 'g') ||
             (parent as any).namespaceURI === 'http://www.w3.org/2000/svg';
 
         const el = isSVG
             ? document.createElementNS('http://www.w3.org/2000/svg', tagName.replace('svg', '').toLowerCase() || tagName)
             : document.createElement(tagName);
 
-        const props = vNode.props;
         for (const key in props) {
             const value = props[key];
             if (value == null || value === false) continue;
 
             const c = key.charCodeAt(0);
-            if (c === 99) {
-                if (key.length < 6 || key[5] === 'N') {
-                    const classValue = Array.isArray(value) ? value.join(' ') : value;
-                    if (isSVG) {
-                        (el as SVGElement).setAttribute('class', classValue);
-                    } else {
-                        (el as HTMLElement).className = classValue;
-                    }
-                    continue;
-                }
-            } else if (c === 115 && key.length === 5) {
+            // class or className (c=99)
+            if (c === 99 && (key.length < 6 || key[5] === 'N')) {
+                const classValue = Array.isArray(value) ? value.join(' ') : value;
+                isSVG ? (el as SVGElement).setAttribute('class', classValue) : (el as HTMLElement).className = classValue;
+            }
+            // style (s=115)
+            else if (c === 115 && key.length === 5) {
                 if (typeof value === 'string') {
                     (el as HTMLElement).style.cssText = value;
                 } else {
                     const s = (el as HTMLElement).style;
                     for (const k in value) (s as any)[k] = value[k];
                 }
-                continue;
-            } else if (c === 111 && key.charCodeAt(1) === 110) {
-                (el as any)[key.toLowerCase()] = value;
-                continue;
-            } else if (c === 100 && key.length > 20) {
-                (el as HTMLElement).innerHTML = value.__html;
-                continue;
-            } else if (c === 114 && key.length === 3) {
-                setTimeout(() => {
-                    if (typeof value === 'function') {
-                        value(el as HTMLElement);
-                    } else if (value && 'current' in value) {
-                        value.current = el as HTMLElement;
-                    }
-                }, 0);
-                continue;
             }
-
-            isSVG ? (el as SVGElement).setAttributeNS(null, key, value === true ? '' : String(value))
-                : el.setAttribute(key, value === true ? '' : String(value));
+            // on* events (o=111, n=110)
+            else if (c === 111 && key.charCodeAt(1) === 110) {
+                (el as any)[key.toLowerCase()] = value;
+            }
+            // dangerouslySetInnerHTML (d=100)
+            else if (c === 100 && key.length > 20) {
+                (el as HTMLElement).innerHTML = value.__html;
+            }
+            // ref (r=114)
+            else if (c === 114 && key.length === 3) {
+                setTimeout(() => {
+                    typeof value === 'function' ? value(el as HTMLElement) : (value.current = el as HTMLElement);
+                }, 0);
+            }
+            else {
+                el.setAttribute(key, value === true ? '' : String(value));
+            }
         }
 
-        const children = vNode.children;
         const len = children.length;
-
-        if (len === 0) {
+        if (!len) {
             parent.appendChild(el);
             return;
         }
 
+        const renderChildren = (target: HTMLElement | SVGElement | DocumentFragment) => {
+            for (let i = 0; i < len; i++) {
+                const child = children[i];
+                if (child == null || child === false) continue;
+
+                if (Array.isArray(child)) {
+                    for (let j = 0, cLen = child.length; j < cLen; j++) {
+                        const c = child[j];
+                        c != null && c !== false && this.renderToDOM(c, target);
+                    }
+                } else {
+                    this.renderToDOM(child, target);
+                }
+            }
+        };
+
         if (len > 30) {
             const fragment = document.createDocumentFragment();
-            for (let i = 0; i < len; i++) {
-                const child = children[i];
-                if (child == null || child === false) continue;
-
-                if (Array.isArray(child)) {
-                    const childLen = child.length;
-                    for (let j = 0; j < childLen; j++) {
-                        const c = child[j];
-                        if (c != null && c !== false) {
-                            this.renderToDOM(c, fragment);
-                        }
-                    }
-                } else {
-                    this.renderToDOM(child, fragment);
-                }
-            }
+            renderChildren(fragment);
             el.appendChild(fragment);
         } else {
-            for (let i = 0; i < len; i++) {
-                const child = children[i];
-                if (child == null || child === false) continue;
-
-                if (Array.isArray(child)) {
-                    const childLen = child.length;
-                    for (let j = 0; j < childLen; j++) {
-                        const c = child[j];
-                        if (c != null && c !== false) {
-                            this.renderToDOM(c, el);
-                        }
-                    }
-                } else {
-                    this.renderToDOM(child, el);
-                }
-            }
+            renderChildren(el);
         }
 
         parent.appendChild(el);
@@ -260,11 +236,9 @@ export class DomNode {
         let updateTimer: NodeJS.Timeout | null = null;
         const { throttle = 0, deep = false } = options;
 
-        const notify = (): void => {
-            listeners.forEach(fn => fn(value));
-        };
+        const notify = () => listeners.forEach(fn => fn(value));
 
-        const scheduleUpdate = (): void => {
+        const scheduleUpdate = () => {
             if (throttle > 0) {
                 if (!updateTimer) {
                     updateTimer = setTimeout(() => {
@@ -280,22 +254,19 @@ export class DomNode {
         return {
             get value() { return value; },
             set value(newValue: T) {
-                const changed = deep
-                    ? JSON.stringify(value) !== JSON.stringify(newValue)
-                    : value !== newValue;
-
+                const changed = deep ? JSON.stringify(value) !== JSON.stringify(newValue) : value !== newValue;
                 if (changed) {
                     value = newValue;
                     scheduleUpdate();
                 }
             },
-            subscribe(fn: (value: T) => void): () => void {
+            subscribe(fn: (value: T) => void) {
                 listeners.add(fn);
-                return () => { listeners.delete(fn); };
+                return () => listeners.delete(fn);
             },
-            destroy(): void {
+            destroy() {
                 listeners.clear();
-                if (updateTimer) clearTimeout(updateTimer);
+                updateTimer && clearTimeout(updateTimer);
             }
         };
     }

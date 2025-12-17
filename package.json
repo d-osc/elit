@@ -13,8 +13,8 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm,iife --dts --clean --global-name DomLib",
-    "dev": "tsup src/index.ts --format cjs,esm,iife --dts --watch --global-name DomLib",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "docs:dev": "npm run --prefix docs dev",
     "docs:build": "npm run --prefix docs build",
@@ -23,22 +23,28 @@
   },
   "keywords": [
     "dom",
-    "virtual-dom",
     "reactive",
     "state-management",
     "ui",
-    "framework"
+    "framework",
+    "typescript",
+    "lightweight",
+    "ssr",
+    "router",
+    "css-in-js",
+    "virtual-scrolling",
+    "zero-dependency"
   ],
   "author": "",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/d-osc/elit"
+    "url": "https://github.com/oangsa/elit.git"
   },
   "bugs": {
-    "url": "https://github.com/d-osc/elit/issues"
+    "url": "https://github.com/oangsa/elit/issues"
   },
-  "homepage": "https://github.com/d-osc/elit#readme",
+  "homepage": "https://github.com/oangsa/elit#readme",
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.0.0",
@@ -46,6 +52,7 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ]
 }
