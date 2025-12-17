@@ -1,4 +1,4 @@
-name: Publish @elit/server to NPM
+name: Publish elit-server to NPM
 
 on:
   push:
@@ -85,7 +85,7 @@ jobs:
         run: |
           cp LICENSE server/LICENSE
 
-      - name: Publish @elit/server to NPM
+      - name: Publish elit-server to NPM
         run: |
           cd server
           npm publish --tag ${{ steps.extract_tag.outputs.npm_tag }} --provenance --access public
@@ -96,18 +96,18 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.extract_tag.outputs.git_tag }}
-          name: "@elit/server v${{ steps.extract_tag.outputs.version }}"
+          name: "elit-server v${{ steps.extract_tag.outputs.version }}"
           body: |
-            ## @elit/server v${{ steps.extract_tag.outputs.version }}
+            ## elit-server v${{ steps.extract_tag.outputs.version }}
 
             Development server with Hot Module Replacement for Elit
 
-            **NPM Package:** [@elit/server](https://www.npmjs.com/package/@elit/server)
+            **NPM Package:** [elit-server](https://www.npmjs.com/package/elit-server)
             **NPM Tag:** `${{ steps.extract_tag.outputs.npm_tag }}`
 
             ### Installation
             ```bash
-            npm install @elit/server@${{ steps.extract_tag.outputs.npm_tag }}
+            npm install elit-server@${{ steps.extract_tag.outputs.npm_tag }}
             ```
 
             ### Features

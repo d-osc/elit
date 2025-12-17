@@ -1,5 +1,5 @@
 /**
- * Built-in middleware for @elit/server
+ * Built-in middleware for elit-server
  */
 
 import type { Middleware, RouteContext } from './router';

@@ -1,4 +1,4 @@
-# @elit/server
+# elit-server
 
 🔥 Development server with Hot Module Replacement (HMR) for Elit applications.
 
@@ -17,7 +17,7 @@
 ## Installation
 
 ```bash
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 ```
 
 ## Quick Start
@@ -44,7 +44,7 @@ npx elit-dev --silent
 ### Programmatic Usage
 
 ```typescript
-import { createDevServer } from '@elit/server';
+import { createDevServer } from 'elit-server';
 
 const server = createDevServer({
   port: 3000,
@@ -100,9 +100,9 @@ The HMR client is automatically injected into HTML files. You can also use it pr
 
 ```typescript
 // Import from main package or /client
-import { hmr } from '@elit/server';
+import { hmr } from 'elit-server';
 // or
-import hmr from '@elit/server/client';
+import hmr from 'elit-server/client';
 
 // Accept HMR updates
 if (hmr.enabled) {
@@ -129,7 +129,7 @@ hmr.reload();
 
 ```typescript
 import { div, h1, createState, reactive, domNode } from 'elit';
-import { hmr } from '@elit/server';
+import { hmr } from 'elit-server';
 
 const count = createState(0);
 
@@ -200,7 +200,7 @@ my-elit-app/
 **src/app.ts:**
 ```typescript
 import { div, h1, domNode } from 'elit';
-import hmr from '@elit/server/client';
+import hmr from 'elit-server/client';
 
 const app = div(h1('Hello Elit!'));
 domNode.render('#app', app);
@@ -234,12 +234,12 @@ The dev server automatically serves:
 
 ## REST API
 
-@elit/server includes a built-in REST API router for building backend APIs alongside your frontend application.
+elit-server includes a built-in REST API router for building backend APIs alongside your frontend application.
 
 ### Quick Start
 
 ```typescript
-import { createDevServer, Router, cors, logger, json } from '@elit/server';
+import { createDevServer, Router, cors, logger, json } from 'elit-server';
 
 // Create API router
 const api = new Router();
@@ -316,7 +316,7 @@ import {
   bodyLimit,      // Body size limiting
   cacheControl,   // Cache headers
   security        // Security headers
-} from '@elit/server';
+} from 'elit-server';
 
 const api = new Router();
 
@@ -353,7 +353,7 @@ api.use(security());
 ### Response Helpers
 
 ```typescript
-import { json, text, html, status } from '@elit/server';
+import { json, text, html, status } from 'elit-server';
 
 // JSON response
 api.get('/api/data', (ctx) => {
@@ -415,14 +415,14 @@ node server/example/api-example.js
 
 ## Shared State
 
-@elit/server includes a powerful shared state system that allows real-time synchronization between backend and frontend over WebSocket.
+elit-server includes a powerful shared state system that allows real-time synchronization between backend and frontend over WebSocket.
 
 ### Quick Start
 
 **Backend (Node.js):**
 
 ```typescript
-import { createDevServer } from '@elit/server';
+import { createDevServer } from 'elit-server';
 
 const server = createDevServer({
   port: 3000
@@ -448,7 +448,7 @@ setInterval(() => {
 
 ```html
 <script type="module">
-import { stateManager } from '@elit/server/state';
+import { stateManager } from 'elit-server/state';
 
 // Auto-connects to WebSocket
 const counter = stateManager.create('counter', 0);
@@ -481,7 +481,7 @@ const userProfile = server.state.create('profile', {
 **Client-side:**
 
 ```typescript
-import { stateManager } from '@elit/server/state';
+import { stateManager } from 'elit-server/state';
 
 // Create with default value
 const chat = stateManager.create('chat', []);
@@ -544,7 +544,7 @@ todoList.update(todos => [...todos, {
 }]);
 
 // Client-side
-import { stateManager } from '@elit/server/state';
+import { stateManager } from 'elit-server/state';
 
 const todos = stateManager.create('todos', []);
 
@@ -580,7 +580,7 @@ node server/example/state-example.js
 ### Custom Middleware
 
 ```typescript
-import { createDevServer } from '@elit/server';
+import { createDevServer } from 'elit-server';
 
 const server = createDevServer({
   middleware: [

@@ -8,7 +8,7 @@ Get up and running with Elit in 5 minutes! 🚀
 npm install elit
 
 # Optional: Development server with HMR
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 ```
 
 ## Your First Elit App
@@ -214,7 +214,7 @@ const App = div(
 ```javascript
 import { createSharedState, reactive } from 'elit';
 
-// Create shared state (auto-connects to @elit/server)
+// Create shared state (auto-connects to elit-server)
 const counter = createSharedState('counter', 0);
 const messages = createSharedState('messages', []);
 
@@ -236,7 +236,7 @@ const App = div(
 **Backend (server.js):**
 
 ```javascript
-const { createDevServer } = require('@elit/server');
+const { createDevServer } = require('elit-server');
 
 const server = createDevServer({ port: 3000 });
 
@@ -284,10 +284,10 @@ const virtualList = createVirtualList(
 );
 ```
 
-### REST API with @elit/server
+### REST API with elit-server
 
 ```javascript
-const { createDevServer, Router, cors, logger } = require('@elit/server');
+const { createDevServer, Router, cors, logger } = require('elit-server');
 
 const api = new Router();
 api.use(cors());

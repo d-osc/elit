@@ -1,6 +1,6 @@
 /**
  * Shared State for Elit
- * Integrates with @elit/server for real-time state synchronization
+ * Integrates with elit-server for real-time state synchronization
  */
 
 import type { State } from './types';
@@ -16,7 +16,7 @@ interface StateMessage {
 }
 
 /**
- * Shared State - syncs with @elit/server
+ * Shared State - syncs with elit-server
  */
 export class SharedState<T = any> {
   private localState: State<T>;
@@ -177,7 +177,7 @@ export class SharedState<T = any> {
 }
 
 /**
- * Create a shared state that syncs with @elit/server
+ * Create a shared state that syncs with elit-server
  */
 export function createSharedState<T>(
   key: string,

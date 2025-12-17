@@ -283,12 +283,12 @@ export const FeaturedBlogs = (router: Router) => {
   const featuredBlogPosts = [
     {
       id: '18',
-      title: { en: 'Complete Guide to @elit/server', th: 'คู่มือครบวงจร @elit/server' },
+      title: { en: 'Complete Guide to elit-server', th: 'คู่มือครบวงจร elit-server' },
       description: {
-        en: 'Learn everything about @elit/server - REST API, middleware, WebSocket, and production deployment',
-        th: 'เรียนรู้ทุกอย่างเกี่ยวกับ @elit/server - REST API, middleware, WebSocket และการ deploy แบบ production'
+        en: 'Learn everything about elit-server - REST API, middleware, WebSocket, and production deployment',
+        th: 'เรียนรู้ทุกอย่างเกี่ยวกับ elit-server - REST API, middleware, WebSocket และการ deploy แบบ production'
       },
-      tags: ['@elit/server', 'REST API', 'Full Stack'],
+      tags: ['elit-server', 'REST API', 'Full Stack'],
       icon: '🚀'
     },
     {

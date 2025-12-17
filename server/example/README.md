@@ -1,6 +1,6 @@
-# @elit/server Examples
+# elit-server Examples
 
-This directory contains examples demonstrating the features of @elit/server.
+This directory contains examples demonstrating the features of elit-server.
 
 ## Examples
 

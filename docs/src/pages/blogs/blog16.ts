@@ -12,10 +12,10 @@ export const blog16: BlogPostDetail = {
   },
   date: '2024-04-10',
   author: 'n-devs',
-  tags: ['Tutorial', 'Shared State', '@elit/server', 'Real-time', 'WebSocket'],
+  tags: ['Tutorial', 'Shared State', 'elit-server', 'Real-time', 'WebSocket'],
   content: {
     en: div(
-      p('Learn how to build a full-featured blog application with ', strong('real-time synchronization'), ' using Elit\'s Shared State and @elit/server. This tutorial demonstrates WebSocket state synchronization, REST API integration, and reactive UI updates across multiple clients.'),
+      p('Learn how to build a full-featured blog application with ', strong('real-time synchronization'), ' using Elit\'s Shared State and elit-server. This tutorial demonstrates WebSocket state synchronization, REST API integration, and reactive UI updates across multiple clients.'),
 
       h2('What We\'ll Build'),
       ul(
@@ -50,7 +50,7 @@ export const blog16: BlogPostDetail = {
       h2('Step 1: Setup Backend Server'),
       p('Create ', code('server.js'), ':'),
 
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger } = require('elit-server');
 
 // Create API router
 const api = new Router();
@@ -513,7 +513,7 @@ api.post('/api/posts', authMiddleware, async (ctx) => {
 });`))),
 
       h3('3. Rate Limiting'),
-      pre(code(...codeBlock(`const { rateLimit } = require('@elit/server');
+      pre(code(...codeBlock(`const { rateLimit } = require('elit-server');
 
 api.use(rateLimit({
   max: 100,      // Max 100 requests
@@ -583,7 +583,7 @@ console.log('WebSocket status:', posts.isConnected());`))),
       p('Next steps: Add authentication, persist to database, add comments, implement markdown support, and deploy to production!')
     ),
     th: div(
-      p('เรียนรู้วิธีสร้าง blog application แบบเต็มรูปแบบพร้อม ', strong('การซิงโครไนซ์แบบ real-time'), ' โดยใช้ Shared State ของ Elit และ @elit/server บทเรียนนี้สาธิตการซิงโครไนซ์ state ผ่าน WebSocket, การผสานรวม REST API และการอัปเดต UI แบบ reactive ข้ามหลาย clients'),
+      p('เรียนรู้วิธีสร้าง blog application แบบเต็มรูปแบบพร้อม ', strong('การซิงโครไนซ์แบบ real-time'), ' โดยใช้ Shared State ของ Elit และ elit-server บทเรียนนี้สาธิตการซิงโครไนซ์ state ผ่าน WebSocket, การผสานรวม REST API และการอัปเดต UI แบบ reactive ข้ามหลาย clients'),
 
       h2('สิ่งที่เราจะสร้าง'),
       ul(
@@ -618,7 +618,7 @@ console.log('WebSocket status:', posts.isConnected());`))),
       h2('ขั้นตอนที่ 1: ตั้งค่า Backend Server'),
       p('สร้าง ', code('server.js'), ':'),
 
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger } = require('elit-server');
 
 // สร้าง API router
 const api = new Router();
@@ -793,7 +793,7 @@ const postsCollection = client.db('blog').collection('posts');`))),
 };`))),
 
       h3('3. Rate Limiting'),
-      pre(code(...codeBlock(`const { rateLimit } = require('@elit/server');
+      pre(code(...codeBlock(`const { rateLimit } = require('elit-server');
 
 api.use(rateLimit({
   max: 100,      // สูงสุด 100 requests

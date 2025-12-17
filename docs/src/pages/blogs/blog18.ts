@@ -7,18 +7,18 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog18: BlogPostDetail = {
   id: '18',
   title: {
-    en: 'Complete Guide to @elit/server',
-    th: 'คู่มือครบวงจร @elit/server'
+    en: 'Complete Guide to elit-server',
+    th: 'คู่มือครบวงจร elit-server'
   },
   date: '2024-04-15',
   author: 'n-devs',
-  tags: ['Tutorial', '@elit/server', 'REST API', 'Middleware', 'Full Stack'],
+  tags: ['Tutorial', 'elit-server', 'REST API', 'Middleware', 'Full Stack'],
   content: {
     en: div(
-      p('Learn everything about ', strong('@elit/server'), ' - the zero-configuration development server built for Elit. This comprehensive guide covers ', em('HMR, REST API, middleware, shared state, WebSocket'), ', and production deployment.'),
+      p('Learn everything about ', strong('elit-server'), ' - the zero-configuration development server built for Elit. This comprehensive guide covers ', em('HMR, REST API, middleware, shared state, WebSocket'), ', and production deployment.'),
 
-      h2('What is @elit/server?'),
-      p('@elit/server is a full-featured development server that provides:'),
+      h2('What is elit-server?'),
+      p('elit-server is a full-featured development server that provides:'),
       ul(
         li('🔥 ', strong('Hot Module Replacement'), ' - Instant updates without refresh'),
         li('🌐 ', strong('REST API Router'), ' - Express-like routing with regex parameters'),
@@ -31,18 +31,18 @@ export const blog18: BlogPostDetail = {
 
       h2('Installation'),
       pre(code(...codeBlock(`# Install as dev dependency
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 
 # Or with yarn
-yarn add -D @elit/server
+yarn add -D elit-server
 
 # Or with pnpm
-pnpm add -D @elit/server`))),
+pnpm add -D elit-server`))),
 
       h2('Quick Start'),
       h3('1. Basic Server'),
       p('Create ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
 
 // Create server with defaults
 const server = createDevServer({
@@ -72,7 +72,7 @@ npx elit-dev --port 8080 --root ./public --no-open --silent`))),
 
       h2('REST API Router'),
       h3('Basic Routing'),
-      pre(code(...codeBlock(`const { Router } = require('@elit/server');
+      pre(code(...codeBlock(`const { Router } = require('elit-server');
 
 const api = new Router();
 
@@ -155,7 +155,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
 
       h2('Middleware'),
       h3('Built-in Middleware'),
-      p('@elit/server includes these middleware out of the box:'),
+      p('elit-server includes these middleware out of the box:'),
 
       pre(code(...codeBlock(`const {
   cors,         // CORS headers
@@ -166,7 +166,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
   cacheControl, // Cache headers
   compress,     // Gzip compression
   security      // Security headers
-} = require('@elit/server');
+} = require('elit-server');
 
 api.use(cors());
 api.use(logger());
@@ -437,7 +437,7 @@ http://localhost:3000/images/logo.png`))),
 });`))),
 
       h2('Complete Example: Todo API'),
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('elit-server');
 
 // In-memory database
 let todos = [
@@ -641,7 +641,7 @@ state.onChange((newValue, oldValue) => {
 
       h2('Comparison with Other Servers'),
       pre(code(...codeBlock(`┌──────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature          │ @elit/server│ Express      │ Fastify        │
+│ Feature          │ elit-server│ Express      │ Fastify        │
 ├──────────────────┼─────────────┼──────────────┼────────────────┤
 │ HMR Built-in     │ ✅          │ ❌           │ ❌             │
 │ WebSocket        │ ✅ Built-in │ 🔧 ws package│ 🔧 Plugin      │
@@ -654,7 +654,7 @@ state.onChange((newValue, oldValue) => {
 └──────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('Conclusion'),
-      p('@elit/server provides everything you need for full-stack development with Elit:'),
+      p('elit-server provides everything you need for full-stack development with Elit:'),
       ul(
         li('🔥 ', strong('Zero configuration'), ' - Works out of the box'),
         li('⚡ ', strong('Fast development'), ' - HMR for instant feedback'),
@@ -666,13 +666,13 @@ state.onChange((newValue, oldValue) => {
 
       p('Get started today and experience the fastest way to build full-stack applications with Elit! 🚀'),
 
-      p('For more examples, check out the ', a({ href: 'https://github.com/oangsa/elit/tree/main/server/example' }, '@elit/server examples'), '.')
+      p('For more examples, check out the ', a({ href: 'https://github.com/oangsa/elit/tree/main/server/example' }, 'elit-server examples'), '.')
     ),
     th: div(
-      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('@elit/server'), ' - development server แบบไม่ต้องตั้งค่าที่สร้างมาสำหรับ Elit คู่มือครบวงจรนี้ครอบคลุม ', em('HMR, REST API, middleware, shared state, WebSocket'), ' และการ deploy แบบ production'),
+      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('elit-server'), ' - development server แบบไม่ต้องตั้งค่าที่สร้างมาสำหรับ Elit คู่มือครบวงจรนี้ครอบคลุม ', em('HMR, REST API, middleware, shared state, WebSocket'), ' และการ deploy แบบ production'),
 
-      h2('@elit/server คืออะไร?'),
-      p('@elit/server เป็น development server ที่มีฟีเจอร์ครบครันที่ให้:'),
+      h2('elit-server คืออะไร?'),
+      p('elit-server เป็น development server ที่มีฟีเจอร์ครบครันที่ให้:'),
       ul(
         li('🔥 ', strong('Hot Module Replacement'), ' - อัปเดตทันทีโดยไม่ต้อง refresh'),
         li('🌐 ', strong('REST API Router'), ' - Routing แบบ Express พร้อม regex parameters'),
@@ -685,18 +685,18 @@ state.onChange((newValue, oldValue) => {
 
       h2('การติดตั้ง'),
       pre(code(...codeBlock(`# ติดตั้งเป็น dev dependency
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 
 # หรือด้วย yarn
-yarn add -D @elit/server
+yarn add -D elit-server
 
 # หรือด้วย pnpm
-pnpm add -D @elit/server`))),
+pnpm add -D elit-server`))),
 
       h2('เริ่มต้นอย่างรวดเร็ว'),
       h3('1. Server พื้นฐาน'),
       p('สร้าง ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
 
 // สร้าง server ด้วยค่าเริ่มต้น
 const server = createDevServer({
@@ -726,7 +726,7 @@ npx elit-dev --port 8080 --root ./public --no-open --silent`))),
 
       h2('REST API Router'),
       h3('Routing พื้นฐาน'),
-      pre(code(...codeBlock(`const { Router } = require('@elit/server');
+      pre(code(...codeBlock(`const { Router } = require('elit-server');
 
 const api = new Router();
 
@@ -782,7 +782,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
 
       h2('Middleware'),
       h3('Middleware ในตัว'),
-      p('@elit/server มี middleware เหล่านี้ในตัว:'),
+      p('elit-server มี middleware เหล่านี้ในตัว:'),
 
       pre(code(...codeBlock(`const {
   cors,         // CORS headers
@@ -793,7 +793,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
   cacheControl, // Cache headers
   compress,     // Gzip compression
   security      // Security headers
-} = require('@elit/server');
+} = require('elit-server');
 
 api.use(cors());
 api.use(logger());
@@ -921,7 +921,7 @@ counter.onChange((newValue, oldValue) => {
 counter.value++;`))),
 
       h2('ตัวอย่างครบถ้วน: Todo API'),
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('@elit/server');
+      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('elit-server');
 
 // ฐานข้อมูลใน memory
 let todos = [
@@ -1026,7 +1026,7 @@ CMD ["node", "server.js"]`))),
       ),
 
       h2('สรุป'),
-      p('@elit/server ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack ด้วย Elit:'),
+      p('elit-server ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack ด้วย Elit:'),
       ul(
         li('🔥 ', strong('ไม่ต้องตั้งค่า'), ' - ทำงานได้ทันที'),
         li('⚡ ', strong('พัฒนาเร็ว'), ' - HMR สำหรับ feedback ทันที'),

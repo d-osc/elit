@@ -1,5 +1,5 @@
 {
-  "name": "@elit/server",
+  "name": "elit-server",
   "version": "0.1.0",
   "description": "Development server with Hot Module Replacement for Elit",
   "main": "dist/index.js",

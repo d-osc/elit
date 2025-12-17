@@ -401,7 +401,7 @@ const link = routerLink(router, { to: '/about' }, 'About Page');
 
 ## Shared State
 
-**Requires @elit/server**
+**Requires elit-server**
 
 ### createSharedState
 

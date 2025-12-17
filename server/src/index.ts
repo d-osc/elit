@@ -1,5 +1,5 @@
 /**
- * @elit/server - Development server with Hot Module Replacement
+ * elit-server - Development server with Hot Module Replacement
  */
 
 export { createDevServer } from './server';

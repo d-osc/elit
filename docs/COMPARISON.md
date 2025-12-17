@@ -14,12 +14,12 @@ How does Elit compare to React, Vue, Svelte, and other popular libraries?
 | **Built-in Router** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Built-in State** | ✅ | ❌ (useState) | ✅ (ref/reactive) | ✅ (stores) | ✅ (signals) | ❌ |
 | **SSR Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Dev Server** | ✅ (@elit/server) | ❌ | ❌ (Vite) | ❌ (Vite) | ❌ (Vite) | ❌ |
+| **Dev Server** | ✅ (elit-server) | ❌ | ❌ (Vite) | ❌ (Vite) | ❌ (Vite) | ❌ |
 | **Build Step Required** | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Learning Curve** | Easy | Medium | Medium | Easy | Medium | Easy |
 | **Runtime Performance** | ⚡⚡⚡ | ⚡⚡ | ⚡⚡⚡ | ⚡⚡⚡ | ⚡⚡⚡ | ⚡⚡⚡ |
 | **HMR Built-in** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **REST API Built-in** | ✅ (@elit/server) | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **REST API Built-in** | ✅ (elit-server) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Real-time Sync** | ✅ (Shared State) | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 *Svelte sizes are for compiled output

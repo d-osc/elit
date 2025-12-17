@@ -1,5 +1,5 @@
 /**
- * REST API Example with @elit/server
+ * REST API Example with elit-server
  */
 
 const { createDevServer, Router, cors, logger, errorHandler, json } = require('../dist/index.js');

@@ -35,7 +35,7 @@ export {
     debounce
 } from './state';
 
-// Shared State (for use with @elit/server)
+// Shared State (for use with elit-server)
 export {
     createSharedState,
     sharedStateManager,

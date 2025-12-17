@@ -40,7 +40,7 @@ Thank you for your interest in contributing to Elit! We welcome contributions fr
 # Build elit core library
 npm run build
 
-# Build @elit/server
+# Build elit-server
 cd server && npm run build
 
 # Watch mode for development
@@ -54,7 +54,7 @@ cd server && npm run dev
 # Type check elit
 npm run typecheck
 
-# Type check @elit/server
+# Type check elit-server
 cd server && npm run typecheck
 ```
 
@@ -67,7 +67,7 @@ elit/
 │   ├── state.ts           # Reactive state management
 │   ├── reactive.ts        # Reactive rendering
 │   ├── router.ts          # Client-side router
-│   ├── shared-state.ts    # Shared state (with @elit/server)
+│   ├── shared-state.ts    # Shared state (with elit-server)
 │   └── ...
 ├── server/                # Development server package
 │   ├── src/
@@ -246,7 +246,7 @@ We welcome contributions in these areas:
 
 - 🎨 **Examples**: Add more example applications
 - 🔌 **Integrations**: Integration with other tools/frameworks
-- 🛠️ **Middleware**: New middleware for @elit/server
+- 🛠️ **Middleware**: New middleware for elit-server
 - 🎯 **Developer Tools**: Browser extensions, CLI tools
 
 ### Community
@@ -271,7 +271,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-### @elit/server
+### elit-server
 
 ```bash
 # Update version in server/package.json

@@ -19,10 +19,10 @@ The core library for building reactive web applications.
 - [API Reference](./API.md)
 - [Bundle: ~10KB gzipped](https://bundlephobia.com/package/elit)
 
-### @elit/server
+### elit-server
 Development server with HMR, REST API, and real-time features.
 
-- [@elit/server Documentation](../server/README.md)
+- [elit-server Documentation](../server/README.md)
 - [Examples](../server/example/README.md)
 
 ## Guides
@@ -73,7 +73,7 @@ Development server with HMR, REST API, and real-time features.
    - Hydration
    - SEO optimization
 
-9. **[@elit/server Integration](./guides/server.md)** *(coming soon)*
+9. **[elit-server Integration](./guides/server.md)** *(coming soon)*
    - HMR setup
    - REST API
    - Middleware
@@ -92,7 +92,7 @@ Development server with HMR, REST API, and real-time features.
 - [Router SPA](./examples/router-spa.md) *(coming soon)* - Single Page Application
 
 ### Integration Examples
-- [REST API](../server/example/api-example.js) - Full REST API with @elit/server
+- [REST API](../server/example/api-example.js) - Full REST API with elit-server
 - [SSR](./examples/ssr.md) *(coming soon)* - Server-side rendering
 - [TypeScript](./examples/typescript.md) *(coming soon)* - Full type safety
 
@@ -118,7 +118,7 @@ Want to contribute? Check out the [Contributing Guide](../CONTRIBUTING.md)!
 ## Community
 
 - 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 📦 [npm - @elit/server](https://www.npmjs.com/package/@elit/server)
+- 📦 [npm - elit-server](https://www.npmjs.com/package/elit-server)
 - 🐙 [GitHub Repository](https://github.com/oangsa/elit)
 - 🐛 [Issue Tracker](https://github.com/oangsa/elit/issues)
 - 💬 Discord Community *(coming soon)*

@@ -663,7 +663,7 @@ reactive(doubled, d => div(d));
 ```
 
 ### 6. Leverage Built-in Features
-- Use `@elit/server` for HMR and development
+- Use `elit-server` for HMR and development
 - Use built-in router instead of external routing library
 - Use `createSharedState` for real-time features
 
@@ -672,7 +672,7 @@ reactive(doubled, d => div(d));
 ## Migration Checklist
 
 - [ ] Install Elit: `npm install elit`
-- [ ] Install dev server: `npm install --save-dev @elit/server`
+- [ ] Install dev server: `npm install --save-dev elit-server`
 - [ ] Convert components one by one
 - [ ] Replace state management (useState/ref → createState)
 - [ ] Replace computed values (useMemo/computed → computed)

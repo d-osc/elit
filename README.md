@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Bundle Size](https://img.shields.io/badge/bundle%20size-~10KB%20gzipped-success)](https://bundlephobia.com/package/elit)
 
-> **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [API](#api) | [Examples](#examples) | [@elit/server](./server/README.md)
+> **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [API](#api) | [Examples](#examples) | [elit-server](./server/README.md)
 
 ## Why Elit?
 
@@ -25,7 +25,7 @@
 npm install elit
 
 # Optional: Install dev server with HMR
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 ```
 
 ## Features
@@ -35,7 +35,7 @@ npm install --save-dev @elit/server
 - 🎯 **Ultra Lightweight**: Just 30KB minified, ~10KB gzipped - optimized for performance
 - ⚡ **Reactive State**: Built-in reactive state management with `createState`
 - 🔄 **Computed Values**: Automatic dependency tracking with `computed`
-- 🌐 **Shared State**: Real-time state sync with `@elit/server` (optional)
+- 🌐 **Shared State**: Real-time state sync with `elit-server` (optional)
 - 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle` - full CSS features support
 - 🛣️ **Client-Side Router**: Hash and history mode routing with dynamic parameters
 - 📱 **Virtual Scrolling**: Handle 100k+ items efficiently with built-in virtual list
@@ -46,7 +46,7 @@ npm install --save-dev @elit/server
 - 🎮 **DOM Utilities**: Convenient helper functions for common DOM operations
 - 🔌 **No Build Required**: Works directly in browsers via CDN
 
-### Development Server (@elit/server)
+### Development Server (elit-server)
 
 - ⚡ **Hot Module Replacement (HMR)**: Instant updates without page refresh
 - 🌐 **REST API Router**: Built-in routing system with regex parameters
@@ -67,7 +67,7 @@ Get started instantly with hot module replacement:
 ```bash
 # Install Elit and dev server
 npm install elit
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 
 # Start dev server
 npx elit-dev
@@ -183,12 +183,12 @@ const inputEl = input({ type: 'text', ...bindValue(message) });
 
 ### Shared State (Real-time Sync)
 
-**Requires `@elit/server`** - Shared state syncs automatically between backend and frontend via WebSocket:
+**Requires `elit-server`** - Shared state syncs automatically between backend and frontend via WebSocket:
 
 ```typescript
 import { createSharedState, reactive } from 'elit';
 
-// Create shared state (auto-connects to @elit/server)
+// Create shared state (auto-connects to elit-server)
 const counter = createSharedState('counter', 0);
 const todos = createSharedState('todos', []);
 
@@ -209,10 +209,10 @@ counter.onChange((newValue, oldValue) => {
 counter.value++;
 ```
 
-**Backend (Node.js with @elit/server):**
+**Backend (Node.js with elit-server):**
 
 ```javascript
-const { createDevServer } = require('@elit/server');
+const { createDevServer } = require('elit-server');
 
 const server = createDevServer({ port: 3000 });
 
@@ -229,12 +229,12 @@ counter.onChange((newValue, oldValue) => {
 counter.value++;
 ```
 
-### @elit/server - Development Server
+### elit-server - Development Server
 
 Full-featured development server with HMR, REST API, and real-time features:
 
 ```javascript
-const { createDevServer, Router, cors, logger } = require('@elit/server');
+const { createDevServer, Router, cors, logger } = require('elit-server');
 
 // Create REST API router
 const api = new Router();
@@ -299,7 +299,7 @@ const {
   cacheControl,   // Cache headers
   compress,       // Gzip compression
   security        // Security headers
-} = require('@elit/server');
+} = require('elit-server');
 
 api.use(cors({ origin: '*' }));
 api.use(logger());
@@ -627,16 +627,16 @@ The core library for building reactive web applications.
 npm install elit
 ```
 
-### @elit/server
-[![npm version](https://img.shields.io/npm/v/@elit/server.svg)](https://www.npmjs.com/package/@elit/server)
+### elit-server
+[![npm version](https://img.shields.io/npm/v/elit-server.svg)](https://www.npmjs.com/package/elit-server)
 
 Development server with HMR, REST API, and real-time state synchronization.
 
 ```bash
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 ```
 
-[View @elit/server documentation →](./server/README.md)
+[View elit-server documentation →](./server/README.md)
 
 ## Documentation
 
@@ -662,9 +662,9 @@ npm install --save-dev @elit/server
 - 🔧 Performance utilities (throttle, debounce, virtual scrolling)
 - 🖥️ SSR capabilities with renderToString
 - 🎮 DOM utility functions
-- 🌐 Shared state integration with @elit/server
+- 🌐 Shared state integration with elit-server
 
-**New Package - @elit/server v0.1.0:**
+**New Package - elit-server v0.1.0:**
 - ⚡ Hot Module Replacement (HMR) with WebSocket
 - 🌐 REST API router with regex-based parameters
 - 🔧 Middleware stack (CORS, logging, error handling, rate limiting, compression, security)
@@ -689,7 +689,7 @@ Check out the example applications in the repository:
 ## Links
 
 - 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 📦 [npm - @elit/server](https://www.npmjs.com/package/@elit/server)
+- 📦 [npm - elit-server](https://www.npmjs.com/package/elit-server)
 - 🐙 [GitHub Repository](https://github.com/oangsa/elit)
 - 📚 Documentation (coming soon)
 - 💬 Discord Community (coming soon)

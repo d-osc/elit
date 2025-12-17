@@ -1,5 +1,5 @@
 /**
- * REST API Router for @elit/server
+ * REST API Router for elit-server
  */
 
 import type { IncomingMessage, ServerResponse } from 'http';

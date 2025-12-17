@@ -1,6 +1,6 @@
-# Building a Real-time Blog with Elit and @elit/server
+# Building a Real-time Blog with Elit and elit-server
 
-Learn how to build a full-featured blog application with **real-time synchronization** using Elit's Shared State and @elit/server in under 30 minutes!
+Learn how to build a full-featured blog application with **real-time synchronization** using Elit's Shared State and elit-server in under 30 minutes!
 
 ## What We'll Build
 
@@ -16,7 +16,7 @@ Learn how to build a full-featured blog application with **real-time synchroniza
 
 ```bash
 npm install elit
-npm install --save-dev @elit/server
+npm install --save-dev elit-server
 ```
 
 ## Project Structure
@@ -62,7 +62,7 @@ When one client updates the state, all other clients receive the update instantl
 Create `server.js`:
 
 ```javascript
-const { createDevServer, Router, cors, logger } = require('@elit/server');
+const { createDevServer, Router, cors, logger } = require('elit-server');
 
 // Create API router
 const api = new Router();
@@ -729,7 +729,7 @@ const validatePost = (post) => {
 ### 3. Add Rate Limiting
 
 ```javascript
-const { rateLimit } = require('@elit/server');
+const { rateLimit } = require('elit-server');
 api.use(rateLimit({ max: 100, window: 60000 }));
 ```
 
@@ -757,7 +757,7 @@ Find the complete working example in:
 
 - [Quick Start Guide](../QUICK_START.md)
 - [API Reference](../API.md)
-- [@elit/server Documentation](../../server/README.md)
+- [elit-server Documentation](../../server/README.md)
 
 ---
 

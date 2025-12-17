@@ -1,5 +1,5 @@
 /**
- * Shared State Example with @elit/server
+ * Shared State Example with elit-server
  * Demonstrates real-time state sync between backend and frontend
  */
 
