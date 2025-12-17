@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "bin": {
+    "elit": "./dist/cli-main.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -35,6 +38,21 @@
       "types": "./dist/style.d.ts",
       "import": "./dist/style.mjs",
       "require": "./dist/style.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.js"
+    },
+    "./hmr": {
+      "types": "./dist/hmr.d.ts",
+      "import": "./dist/hmr.mjs",
+      "require": "./dist/hmr.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "import": "./dist/build.mjs",
+      "require": "./dist/build.js"
     }
   },
   "scripts": {
@@ -58,7 +76,17 @@
     "router",
     "css-in-js",
     "virtual-scrolling",
-    "zero-dependency"
+    "hmr",
+    "hot-module-replacement",
+    "dev-server",
+    "development",
+    "websocket",
+    "rest-api",
+    "shared-state",
+    "real-time",
+    "build",
+    "bundler",
+    "esbuild"
   ],
   "author": "",
   "license": "MIT",
@@ -70,8 +98,17 @@
     "url": "https://github.com/d-osc/elit/issues"
   },
   "homepage": "https://github.com/d-osc/elit#readme",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "esbuild": "^0.24.2",
+    "mime-types": "^2.1.35",
+    "open": "^11.0.0",
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
+    "@types/mime-types": "^2.1.4",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.13",
     "terser": "^5.44.1",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
