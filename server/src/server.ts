@@ -98,9 +98,22 @@ export function createDevServer(options: DevServerOptions = {}): DevServer {
   // Serve file helper
   async function serveFile(filePath: string, res: ServerResponse) {
     try {
-      let content = await readFile(filePath);
-      const ext = extname(filePath);
-      const mimeType = lookup(filePath) || 'application/octet-stream';
+      // Security: Final validation - ensure path is within root directory
+      const rootDir = resolve(config.root);
+      const resolvedPath = resolve(filePath);
+
+      if (!resolvedPath.startsWith(rootDir + sep) && resolvedPath !== rootDir) {
+        if (config.logging) {
+          console.log(`[403] Attempted to serve file outside root: ${filePath}`);
+        }
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('403 Forbidden');
+        return;
+      }
+
+      let content = await readFile(resolvedPath);
+      const ext = extname(resolvedPath);
+      const mimeType = lookup(resolvedPath) || 'application/octet-stream';
 
       // Inject HMR client for HTML files
       if (ext === '.html') {
