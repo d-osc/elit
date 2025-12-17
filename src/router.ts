@@ -3,7 +3,7 @@
  */
 
 import type { VNode, Child, Props, State } from './types';
-import { domNode } from './DomNode';
+import { domNode } from './dom';
 
 export interface Route {
     path: string;

@@ -10,6 +10,31 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.mjs",
+      "require": "./dist/dom.js"
+    },
+    "./el": {
+      "types": "./dist/el.d.ts",
+      "import": "./dist/el.mjs",
+      "require": "./dist/el.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.mjs",
+      "require": "./dist/router.js"
+    },
+    "./state": {
+      "types": "./dist/state.d.ts",
+      "import": "./dist/state.mjs",
+      "require": "./dist/state.js"
+    },
+    "./style": {
+      "types": "./dist/style.d.ts",
+      "import": "./dist/style.mjs",
+      "require": "./dist/style.js"
     }
   },
   "scripts": {
@@ -47,6 +72,7 @@
   "homepage": "https://github.com/d-osc/elit#readme",
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "terser": "^5.44.1",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   },
