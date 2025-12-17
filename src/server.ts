@@ -463,10 +463,16 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '' }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
-  const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => ({
-    root: client.root,
-    basePath: client.basePath ? '/' + client.basePath.replace(/^\/+|\/+$/g, '') : ''
-  }));
+  const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
+    let basePath = client.basePath || '';
+    if (basePath) {
+      // Remove leading/trailing slashes safely without ReDoS vulnerability
+      while (basePath.startsWith('/')) basePath = basePath.slice(1);
+      while (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
+      basePath = basePath ? '/' + basePath : '';
+    }
+    return { root: client.root, basePath };
+  });
 
   // HTTP Server
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
