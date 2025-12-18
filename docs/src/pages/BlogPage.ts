@@ -19,20 +19,20 @@ interface BlogPost {
 // Map blog excerpts from actual blog data
 const blogExcerpts: Record<string, { en: string; th: string }> = {
   '1': {
-    en: 'We\'re excited to introduce Elit - a modern, lightweight library (~5KB gzipped) for building reactive web applications with zero dependencies.',
-    th: 'เรารู้สึกตื่นเต้นที่จะแนะนำ Elit - ไลบรารีสมัยใหม่ที่มีน้ำหนักเบา (~5KB gzipped) สำหรับสร้างเว็บแอปพลิเคชันแบบ reactive'
+    en: 'Introducing Elit 2.0 - A full-stack TypeScript framework (~10KB gzipped) with built-in dev server, HMR, build tool, and REST API. Zero dependencies, maximum productivity.',
+    th: 'แนะนำ Elit 2.0 - Full-stack TypeScript framework (~10KB gzipped) พร้อม dev server, HMR, build tool และ REST API ไม่มี dependencies เพิ่มประสิทธิภาพสูงสุด'
   },
   '16': {
-    en: 'Build a full-featured real-time blog application with Elit\'s Shared State and elit-server. Learn WebSocket-based state synchronization for instant updates across all clients.',
-    th: 'สร้างแอพ blog แบบ real-time ด้วย Shared State ของ Elit และ elit-server เรียนรู้การซิงค์ state ผ่าน WebSocket เพื่ออัปเดตแบบทันทีทุกคน'
+    en: 'Build a full-featured real-time blog application with Elit\'s Shared State. Learn WebSocket-based state synchronization with the built-in dev server for instant updates across all clients.',
+    th: 'สร้างแอพ blog แบบ real-time ด้วย Shared State ของ Elit เรียนรู้การซิงค์ state ผ่าน WebSocket พร้อม dev server ในตัวเพื่ออัปเดตแบบทันทีทุกคน'
   },
   '17': {
-    en: 'Master Hot Module Replacement with elit-server for instant development feedback without page refresh. Boost your productivity with state preservation and seamless updates.',
-    th: 'เชี่ยวชาญ Hot Module Replacement ด้วย elit-server เพื่อรับ feedback แบบทันทีโดยไม่ต้อง refresh หน้า เพิ่มประสิทธิภาพด้วย state preservation'
+    en: 'Master Hot Module Replacement with Elit\'s built-in dev server for instant development feedback. Use npx elit dev for automatic HMR, state preservation, and seamless updates.',
+    th: 'เชี่ยวชาญ Hot Module Replacement ด้วย dev server ในตัวของ Elit ใช้ npx elit dev สำหรับ HMR อัตโนมัติ state preservation และอัปเดตแบบราบรื่น'
   },
   '18': {
-    en: 'Complete guide to elit-server covering REST API, middleware stack, WebSocket support, Shared State, and production deployment. Everything you need to build full-stack applications.',
-    th: 'คู่มือครบวงจร elit-server ครอบคลุม REST API, middleware, WebSocket, Shared State และการ deploy แบบ production ทุกอย่างที่ต้องการสำหรับสร้างแอพ full-stack'
+    en: 'Complete guide to Elit 2.0 covering CLI tools, REST API, middleware stack, WebSocket support, build system, and production deployment. Everything you need for full-stack applications.',
+    th: 'คู่มือครบวงจร Elit 2.0 ครอบคลุม CLI tools, REST API, middleware, WebSocket, build system และการ deploy production ทุกอย่างที่ต้องการสำหรับแอพ full-stack'
   }
 };
 

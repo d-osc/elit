@@ -15,13 +15,15 @@ const Docs = () =>
         nav({ className: 'docs-sidebar' },
           div({ className: 'docs-nav' },
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('installation')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.installation')),
+            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('devserver')?.scrollIntoView({ behavior: 'smooth' }) }, 'Dev Server & Build'),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('elements')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.elements')),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('state')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.state')),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('reactive')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.reactive')),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('createstyle')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.createstyle')),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('ssr')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.ssr')),
             a({ href: 'javascript:void(0)', onclick: () => document.getElementById('routing')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.routing')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('performance')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.performance'))
+            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('performance')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.performance')),
+            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('deployment')?.scrollIntoView({ behavior: 'smooth' }) }, 'Deployment')
           )
         )
       ),
@@ -42,6 +44,129 @@ const Docs = () =>
 
           p(t('docs.installCdn')),
           codeExample(`<script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>`),
+
+          h2({ id: 'devserver' }, t('docs.devServer')),
+          p(t('docs.devServer.desc')),
+
+          h3('CLI Commands'),
+          p('Elit provides a powerful CLI for development and production:'),
+          codeExample(`# Development server with HMR
+npx elit dev
+
+# Production build
+npx elit build
+
+# Preview production build
+npx elit preview`),
+
+          h3('Configuration File'),
+          p('Create elit.config.mjs (or .ts, .js, .json) in your project root:'),
+          codeExample(`import { defineConfig } from 'elit';
+import { resolve } from 'path';
+
+export default defineConfig({
+  dev: {
+    port: 3000,
+    host: 'localhost',
+    root: './src',
+    basePath: '/',
+    open: true
+  },
+  build: {
+    entry: './src/main.ts',
+    outDir: './dist',
+    format: 'esm',
+    minify: true,
+    platform: 'browser',
+    basePath: '/app',
+    copy: [
+      {
+        from: 'index.html',
+        to: 'index.html',
+        transform: (content, config) => {
+          // Inject base tag from basePath
+          return content;
+        }
+      }
+    ]
+  },
+  preview: {
+    port: 4173,
+    basePath: '/app'
+  }
+});`),
+
+          h3('Dev Server Features'),
+          p('Programmatic API for advanced use cases:'),
+          codeExample(`import { createDevServer } from 'elit';
+
+const server = await createDevServer({
+  port: 3000,
+  open: true,
+  clients: [
+    {
+      basePath: '/app',
+      root: './src',
+      watch: ['src/**/*.ts'],
+      ignore: ['node_modules/**']
+    }
+  ]
+});`),
+
+          h3('Build Tool'),
+          p('Automatic client/server code separation with esbuild:'),
+          codeExample(`import { build } from 'elit';
+
+await build({
+  entry: './src/main.ts',
+  outDir: './dist',
+  minify: true,
+  platform: 'browser', // auto-externals Node.js modules
+  basePath: '/app',
+  copy: [
+    { from: 'index.html', to: 'index.html' },
+    { from: 'assets', to: 'assets' }
+  ],
+  onBuildEnd: (result) => {
+    console.log(\`✅ Built in \${result.buildTime}ms\`);
+  }
+});`),
+
+          h3('REST API Router'),
+          p('Built-in server-side routing with middleware:'),
+          codeExample(`import { ServerRouter, json, cors, logger } from 'elit';
+
+const api = new ServerRouter();
+
+// Middleware
+api.use(cors());
+api.use(logger());
+
+// Routes
+api.get('/users/:id', async (ctx) => {
+  const user = await db.getUser(ctx.params.id);
+  return json({ user });
+});
+
+api.post('/users', async (ctx) => {
+  const data = await ctx.json();
+  return json({ user: data }, 201);
+});
+
+// Use with dev server
+createDevServer({ api });`),
+
+          h3('Shared State'),
+          p('Real-time state synchronization via WebSocket:'),
+          codeExample(`import { StateManager, SharedState } from 'elit';
+
+// Server-side
+const stateManager = new StateManager();
+const counter = stateManager.create('counter', 0);
+
+// Client-side
+const counter = new SharedState('counter', 0);
+counter.value++; // syncs to all clients`),
 
           h2({ id: 'elements' }, t('docs.elements')),
           p(t('docs.elements.desc')),
@@ -294,7 +419,163 @@ doc.title = 'New Title';`),
             li('Efficient attribute updates using charCode checks'),
             li('Minimal function closures and memory allocation'),
             li('Tree-shakeable ES modules for optimal bundle size')
-          )
+          ),
+
+          h2({ id: 'deployment' }, 'Deployment'),
+          p('Deploy your Elit application to production with these popular platforms:'),
+
+          h3('Vercel'),
+          p('Deploy to Vercel with zero configuration:'),
+          codeExample(`# Install Vercel CLI
+npm i -g vercel
+
+# Build your app
+npm run build
+
+# Deploy
+vercel --prod
+
+# Or use vercel.json for configuration:
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false
+}`),
+
+          h3('Netlify'),
+          p('Deploy to Netlify using their CLI or Git integration:'),
+          codeExample(`# Install Netlify CLI
+npm i -g netlify-cli
+
+# Build and deploy
+npm run build
+netlify deploy --prod --dir=dist
+
+# Or use netlify.toml:
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200`),
+
+          h3('GitHub Pages'),
+          p('Deploy to GitHub Pages with GitHub Actions:'),
+          codeExample(`# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm run build
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist`),
+
+          h3('Docker'),
+          p('Containerize your Elit application:'),
+          codeExample(`# Dockerfile
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+# nginx.conf
+server {
+  listen 80;
+  location / {
+    root /usr/share/nginx/html;
+    index index.html;
+    try_files $uri $uri/ /index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+
+    # Cache static assets
+    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+      expires 1y;
+      add_header Cache-Control "public, immutable";
+    }
+  }
+}`),
+
+          h3('Node.js Production Server'),
+          p('Serve your production build with Node.js:'),
+          codeExample(`// server.js
+import { createServer } from 'http';
+import { readFileSync, statSync } from 'fs';
+import { resolve, extname } from 'path';
+import { lookup } from 'mime-types';
+import { gzipSync } from 'zlib';
+
+const port = process.env.PORT || 3000;
+const dist = resolve('./dist');
+
+createServer((req, res) => {
+  let path = req.url === '/' ? '/index.html' : req.url;
+  const filePath = resolve(dist, path.slice(1));
+
+  try {
+    const content = readFileSync(filePath);
+    const mimeType = lookup(filePath) || 'text/html';
+    const ext = extname(filePath);
+
+    // Cache headers
+    const cacheControl = ext === '.html'
+      ? 'no-cache'
+      : 'public, max-age=31536000, immutable';
+
+    // Gzip compression
+    const compressible = /^(text|application\\/(javascript|json))/.test(mimeType);
+    const compressed = compressible ? gzipSync(content) : content;
+
+    res.writeHead(200, {
+      'Content-Type': mimeType,
+      'Cache-Control': cacheControl,
+      ...(compressible && { 'Content-Encoding': 'gzip' })
+    });
+    res.end(compressed);
+  } catch {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+}).listen(port, () => console.log(\`Server running on port \${port}\`));`),
+
+          h3('Environment Variables'),
+          p('Use environment variables for different deployment environments:'),
+          codeExample(`// .env.production
+VITE_API_URL=https://api.example.com
+VITE_ENV=production
+
+// Access in your code
+const apiUrl = import.meta.env.VITE_API_URL;
+const isProd = import.meta.env.VITE_ENV === 'production';
+
+// Build with environment
+npm run build --mode production`)
         )
       )
     )

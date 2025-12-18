@@ -3,7 +3,7 @@
  * Main CLI for Elit
  */
 
-import { loadConfig, mergeConfig } from './config';
+import { loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
 import type { DevServerOptions, BuildOptions } from './types';
@@ -75,6 +75,15 @@ async function runBuild(args: string[]) {
         ? mergeConfig(config.build, cliOptions)
         : cliOptions as BuildOptions;
 
+    // Load environment variables
+    const mode = process.env.MODE || 'production';
+    const env = loadEnv(mode);
+
+    // Inject env into build options if not already set
+    if (!options.env) {
+        options.env = env;
+    }
+
     if (!options.entry) {
         console.error('Error: Entry file is required');
         console.error('Specify in config file or use --entry <file>');
@@ -104,6 +113,7 @@ async function runPreview(args: string[]) {
         port: mergedOptions.port || 4173,
         host: mergedOptions.host || 'localhost',
         root: 'dist',
+        basePath: mergedOptions.basePath,
         open: mergedOptions.open ?? true,
         logging: mergedOptions.logging ?? true
     };
@@ -194,8 +204,8 @@ function parseBuildArgs(args: string[]): Partial<BuildOptions> {
     return options;
 }
 
-function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; open: boolean; logging: boolean }> {
-    const options: Partial<{ port: number; host: string; open: boolean; logging: boolean }> = {};
+function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; basePath: string; open: boolean; logging: boolean }> {
+    const options: Partial<{ port: number; host: string; basePath: string; open: boolean; logging: boolean }> = {};
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -210,6 +220,11 @@ function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string;
             case '-h':
             case '--host':
                 options.host = next;
+                i++;
+                break;
+            case '-b':
+            case '--base-path':
+                options.basePath = next;
                 i++;
                 break;
             case '--no-open':
@@ -254,10 +269,11 @@ Build Options:
   --silent               Disable logging
 
 Preview Options:
-  -p, --port <number>    Port to run server on (default: 4173)
-  -h, --host <string>    Host to bind to (default: localhost)
-  --no-open              Don't open browser automatically
-  --silent               Disable logging
+  -p, --port <number>      Port to run server on (default: 4173)
+  -h, --host <string>      Host to bind to (default: localhost)
+  -b, --base-path <path>   Base path for the application
+  --no-open                Don't open browser automatically
+  --silent                 Disable logging
 
 Config File:
   Create elit.config.ts, elit.config.js, or elit.config.json in project root

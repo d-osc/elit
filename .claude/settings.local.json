@@ -27,7 +27,16 @@
       "Bash(taskkill //F //PID 48888)",
       "Bash(taskkill //F //PID 24200)",
       "Bash(taskkill //F //PID 44188)",
-      "Bash(taskkill //F //PID 50184)"
+      "Bash(taskkill //F //PID 50184)",
+      "Bash(taskkill //F //PID 50404)",
+      "Bash(test:*)",
+      "Bash(npx elit:*)",
+      "Bash(node ../dist/cli.js build:*)",
+      "Bash(node --import tsx:*)",
+      "Bash(npx esbuild:*)",
+      "Bash(npm run preview:*)",
+      "Bash(taskkill /F /PID 51748)",
+      "Bash(taskkill //F //PID 51748)"
     ]
   }
 }

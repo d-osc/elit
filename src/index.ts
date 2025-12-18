@@ -40,5 +40,5 @@ export { build } from './build';
 export type { BuildOptions, BuildResult } from './types';
 
 // Config
-export { loadConfig, mergeConfig } from './config';
+export { loadConfig, mergeConfig, defineConfig, loadEnv } from './config';
 export type { ElitConfig } from './config';

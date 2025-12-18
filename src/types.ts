@@ -158,12 +158,22 @@ export interface BuildOptions {
     format?: 'esm' | 'cjs' | 'iife';
     /** Global name for IIFE format */
     globalName?: string;
+    /** Target platform */
+    platform?: 'browser' | 'node' | 'neutral';
+    /** Base path for the application (injected into HTML) */
+    basePath?: string;
     /** External dependencies (not bundled) */
     external?: string[];
     /** Enable tree shaking */
     treeshake?: boolean;
     /** Enable logging */
     logging?: boolean;
+    /** Environment variables to inject (prefix with VITE_ for client access) */
+    env?: Record<string, string>;
+    /** Copy static files after build */
+    copy?: Array<{ from: string; to: string; transform?: (content: string, config: BuildOptions) => string }>;
+    /** Post-build hook */
+    onBuildEnd?: (result: BuildResult) => void | Promise<void>;
 }
 
 export interface BuildResult {

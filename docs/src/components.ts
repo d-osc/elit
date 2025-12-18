@@ -81,25 +81,31 @@ export const Features = () =>
   );
 
 // Quick Start Section
-const quickStartCode = `import { div, h1, button, span, createState, reactive, dom } from 'elit';
+const quickStartCode = `// 1. Install Elit
+npm install elit
 
-// Create reactive state
+// 2. Start dev server with HMR
+npx elit dev
+
+// 3. Create your app (src/main.ts)
+import { div, h1, button, createState, reactive, dom } from 'elit';
+
 const count = createState(0);
 
-// Build UI with reactive updates
 const app = div({ className: 'app' },
-  h1('Hello Elit! 👋'),
+  h1('Elit 2.0 🚀'),
   reactive(count, value =>
     div({ className: 'counter' },
       button({ onclick: () => count.value-- }, '-'),
-      span(\` \${value} \`),
+      span(\` Count: \${value} \`),
       button({ onclick: () => count.value++ }, '+')
     )
   )
 );
 
-// Render to DOM
-dom.render('#app', app);`;
+dom.render('#app', app);
+
+// Hot reload automatically on save!`;
 
 export const QuickStart = (router: Router) =>
   section({ className: 'quick-start container' },
@@ -224,7 +230,10 @@ const apiCategoryKeys = [
   { icon: '🔄', key: 'reactive', count: '6' },
   { icon: '🎨', key: 'styling', count: '30+' },
   { icon: '🛤️', key: 'router', count: '8' },
-  { icon: '🚀', key: 'performance', count: '6' }
+  { icon: '🚀', key: 'performance', count: '6' },
+  { icon: '🔥', key: 'devServer', count: '10+' },
+  { icon: '📦', key: 'build', count: '5' },
+  { icon: '🌐', key: 'restApi', count: '12+' }
 ];
 
 export const ApiOverview = (router: Router) =>
@@ -262,12 +271,12 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.deps'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '100+'),
-          span({ className: 'stat-label' }, t('stats.elements'))
+          span({ className: 'stat-number' }, 'v2.0.0'),
+          span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '18+'),
-          span({ className: 'stat-label' }, t('stats.tutorials'))
+          span({ className: 'stat-number' }, '15+'),
+          span({ className: 'stat-label' }, t('stats.features'))
         ),
         div({ className: 'stat' },
           span({ className: 'stat-number' }, '100%'),
@@ -350,7 +359,7 @@ export const Footer = () =>
         p(
           t('footer.license'), ' | ',
           a({ href: 'https://github.com/d-osc/elit' }, 'GitHub'),
-          ' | ', t('footer.builtWith'), ' | ',
+          ' | ', t('footer.builtWith'), ' v2.0.0 | ',
           'Created by ', a({ href: 'https://github.com/n-devs', target: '_blank' }, 'n-devs')
         )
       )

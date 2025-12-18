@@ -15,9 +15,17 @@ export interface ElitConfig {
     preview?: {
         port?: number;
         host?: string;
+        basePath?: string;
         open?: boolean;
         logging?: boolean;
     };
+}
+
+/**
+ * Helper function for type-safe config definition
+ */
+export function defineConfig(config: ElitConfig): ElitConfig {
+    return config;
 }
 
 const CONFIG_FILES = [
@@ -27,6 +35,52 @@ const CONFIG_FILES = [
     'elit.config.cjs',
     'elit.config.json'
 ];
+
+/**
+ * Load environment variables from .env files
+ */
+export function loadEnv(mode: string = 'development', cwd: string = process.cwd()): Record<string, string> {
+    const env: Record<string, string> = { MODE: mode };
+
+    // Load .env files in priority order
+    const envFiles = [
+        `.env.${mode}.local`,
+        `.env.${mode}`,
+        `.env.local`,
+        `.env`
+    ];
+
+    for (const file of envFiles) {
+        const filePath = resolve(cwd, file);
+        if (existsSync(filePath)) {
+            const content = readFileSync(filePath, 'utf-8');
+            const lines = content.split('\n');
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                // Skip empty lines and comments
+                if (!trimmed || trimmed.startsWith('#')) continue;
+
+                const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+                if (match) {
+                    const [, key, value] = match;
+                    // Remove quotes if present
+                    let cleanValue = value.trim();
+                    if ((cleanValue.startsWith('"') && cleanValue.endsWith('"')) ||
+                        (cleanValue.startsWith("'") && cleanValue.endsWith("'"))) {
+                        cleanValue = cleanValue.slice(1, -1);
+                    }
+                    // Only set if not already set (priority order)
+                    if (!(key in env)) {
+                        env[key] = cleanValue;
+                    }
+                }
+            }
+        }
+    }
+
+    return env;
+}
 
 /**
  * Load elit config from current directory

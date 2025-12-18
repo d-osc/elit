@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx server.ts",
-    "build": "node --import tsx ../src/build.ts --entry src/main.ts --outDir dist",
-    "preview": "node --import tsx server.ts"
+    "dev": "npx tsx ../src/cli.ts dev",
+    "build": "npx tsx ../src/cli.ts build",
+    "preview": "npx tsx ../src/cli.ts preview"
   },
   "dependencies": {
     "elit": "file:.."

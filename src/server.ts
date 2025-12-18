@@ -285,9 +285,35 @@ export function cacheControl(options: { maxAge?: number; public?: boolean } = {}
 
 export function compress(): Middleware {
   return async (ctx, next) => {
-    if ((ctx.req.headers['accept-encoding'] || '').includes('gzip')) {
-      ctx.res.setHeader('Content-Encoding', 'gzip');
+    const acceptEncoding = ctx.req.headers['accept-encoding'] || '';
+    if (!acceptEncoding.includes('gzip')) {
+      await next();
+      return;
     }
+
+    // Store original end method
+    const originalEnd = ctx.res.end.bind(ctx.res);
+    const chunks: Buffer[] = [];
+
+    // Intercept response data
+    ctx.res.write = ((chunk: any) => {
+      chunks.push(Buffer.from(chunk));
+      return true;
+    }) as any;
+
+    ctx.res.end = ((chunk?: any) => {
+      if (chunk) chunks.push(Buffer.from(chunk));
+
+      const buffer = Buffer.concat(chunks);
+      const { gzipSync } = require('zlib');
+      const compressed = gzipSync(buffer);
+
+      ctx.res.setHeader('Content-Encoding', 'gzip');
+      ctx.res.setHeader('Content-Length', compressed.length);
+      originalEnd(compressed);
+      return ctx.res;
+    }) as any;
+
     await next();
   };
 }
@@ -758,8 +784,30 @@ export function createDevServer(options: DevServerOptions): DevServer {
         content = Buffer.from(html);
       }
 
-      res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-cache, no-store, must-revalidate' });
-      res.end(content);
+      // Set cache headers based on file type
+      const cacheControl = ext === '.html' || ext === '.ts' || ext === '.tsx'
+        ? 'no-cache, no-store, must-revalidate'  // Don't cache HTML/TS files in dev
+        : 'public, max-age=31536000, immutable'; // Cache static assets for 1 year
+
+      const headers: any = {
+        'Content-Type': mimeType,
+        'Cache-Control': cacheControl
+      };
+
+      // Apply gzip compression for text-based files
+      const compressible = /^(text\/|application\/(javascript|json|xml))/.test(mimeType);
+
+      if (compressible && content.length > 1024) {
+        const { gzipSync } = require('zlib');
+        const compressed = gzipSync(content);
+        headers['Content-Encoding'] = 'gzip';
+        headers['Content-Length'] = compressed.length;
+        res.writeHead(200, headers);
+        res.end(compressed);
+      } else {
+        res.writeHead(200, headers);
+        res.end(content);
+      }
 
       if (config.logging) console.log(`[200] ${relative(client.root, filePath)}`);
     } catch (error) {
