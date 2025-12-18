@@ -5,25 +5,31 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog4: BlogPostDetail = {
   id: '4',
   title: {
-    en: 'Elit vs React vs Other Frameworks: A Comprehensive Comparison',
-    th: 'เปรียบเทียบ Elit กับ React และ Frameworks อื่นๆ อย่างครบถ้วน'
+    en: 'Elit 2.0 vs React vs Other Frameworks: A Comprehensive Comparison',
+    th: 'เปรียบเทียบ Elit 2.0 กับ React และ Frameworks อื่นๆ อย่างครบถ้วน'
   },
   date: '2024-02-10',
   author: 'n-devs',
-  tags: ['Comparison', 'Frameworks', 'Performance', 'React', 'Vue', 'Svelte'],
+  tags: ['Comparison', 'Frameworks', 'Performance', 'React', 'Vue', 'Svelte', 'Full Stack'],
   content: {
     en: div(
       p('Choosing the right framework is crucial for your project. Let\'s compare Elit with popular alternatives to help you make an informed decision.'),
 
-      h2('Elit'),
+      h2('Elit 2.0'),
       h3('Strengths:'),
       ul(
-        li('Extremely lightweight (~5KB gzipped) - smallest bundle size'),
+        li('Full-stack framework (~10KB gzipped) - complete solution'),
         li('Zero dependencies - no npm bloat'),
+        li('Complete CLI tooling (npx elit dev/build/preview)'),
+        li('Built-in dev server with HMR'),
+        li('Integrated build system powered by esbuild'),
+        li('REST API router with middleware support'),
+        li('WebSocket support with Shared State'),
         li('Direct DOM manipulation - no virtual DOM overhead'),
         li('Simple learning curve - plain JavaScript/TypeScript'),
         li('Built-in reactive state management'),
-        li('Excellent for performance-critical applications'),
+        li('Environment variables support (.env files)'),
+        li('Gzip compression and smart caching'),
         li('SSR support out of the box'),
         li('Tree-shakeable - import only what you need')
       ),
@@ -173,34 +179,44 @@ export const blog4: BlogPostDetail = {
         li('No component abstraction')
       ),
 
-      h2('When to Choose Elit?'),
-      p('Elit is ideal when you need:'),
+      h2('When to Choose Elit 2.0?'),
+      p('Elit 2.0 is ideal when you need:'),
       ul(
-        li('Minimal bundle size for fast load times'),
+        li('Full-stack framework with minimal bundle size'),
+        li('Complete CLI tools for development workflow'),
+        li('Built-in REST API and WebSocket support'),
         li('Direct DOM control without framework overhead'),
         li('Simple reactive state management'),
         li('SSR support without complexity'),
-        li('A lightweight alternative to vanilla JS with better DX'),
+        li('Fast build times with integrated esbuild'),
+        li('A lightweight alternative with better DX than vanilla JS'),
         li('Performance-critical applications (games, real-time apps)'),
-        li('Progressive enhancement of existing sites')
+        li('Progressive enhancement of existing sites'),
+        li('Projects where you want frontend + backend in one framework')
       ),
 
       h2('Conclusion'),
-      p('Each framework has its place. React excels in large applications with big teams. Vue offers great balance and DX. Svelte and Solid provide excellent performance with modern approaches. Qwik optimizes for initial load. Elit shines when you need minimal overhead, direct control, and reactive features without the baggage of larger frameworks.'),
+      p('Each framework has its place. React excels in large applications with big teams. Vue offers great balance and DX. Svelte and Solid provide excellent performance with modern approaches. Qwik optimizes for initial load. Elit 2.0 shines as a full-stack solution when you need complete CLI tools, built-in API/WebSocket support, minimal overhead, direct control, and reactive features without the baggage of larger frameworks.'),
       p('Choose based on your project needs, team expertise, and performance requirements.')
     ),
     th: div(
       p('การเลือก framework ที่เหมาะสมเป็นสิ่งสำคัญสำหรับโปรเจกต์ของคุณ มาเปรียบเทียบ Elit กับทางเลือกยอดนิยมเพื่อช่วยให้คุณตัดสินใจได้อย่างรอบคอบ'),
 
-      h2('Elit'),
+      h2('Elit 2.0'),
       h3('จุดแข็ง:'),
       ul(
-        li('มีน้ำหนักเบามาก (~5KB gzipped) - ขนาด bundle เล็กที่สุด'),
+        li('Full-stack framework (~10KB gzipped) - โซลูชันครบวงจร'),
         li('ไม่มี dependencies - ไม่มี npm bloat'),
+        li('เครื่องมือ CLI ครบชุด (npx elit dev/build/preview)'),
+        li('Dev server พร้อม HMR ในตัว'),
+        li('ระบบ build แบบบูรณาการด้วย esbuild'),
+        li('REST API router พร้อม middleware'),
+        li('รองรับ WebSocket พร้อม Shared State'),
         li('จัดการ DOM โดยตรง - ไม่มี virtual DOM overhead'),
         li('เรียนรู้ง่าย - JavaScript/TypeScript ธรรมดา'),
         li('มีระบบจัดการ state แบบ reactive ในตัว'),
-        li('เหมาะสำหรับแอปพลิเคชันที่ต้องการประสิทธิภาพสูง'),
+        li('รองรับ environment variables (ไฟล์ .env)'),
+        li('Gzip compression และ smart caching'),
         li('รองรับ SSR ในตัว'),
         li('Tree-shakeable - import เฉพาะที่ต้องการ')
       ),
@@ -350,20 +366,24 @@ export const blog4: BlogPostDetail = {
         li('ไม่มี component abstraction')
       ),
 
-      h2('เมื่อไหร่ควรเลือก Elit?'),
-      p('Elit เหมาะเมื่อคุณต้องการ:'),
+      h2('เมื่อไหร่ควรเลือก Elit 2.0?'),
+      p('Elit 2.0 เหมาะเมื่อคุณต้องการ:'),
       ul(
-        li('ขนาด bundle น้อยที่สุดเพื่อโหลดเร็ว'),
+        li('Full-stack framework ที่มีขนาด bundle น้อย'),
+        li('เครื่องมือ CLI ครบครันสำหรับ workflow การพัฒนา'),
+        li('รองรับ REST API และ WebSocket ในตัว'),
         li('ควบคุม DOM โดยตรงโดยไม่มี framework overhead'),
         li('ระบบจัดการ state แบบ reactive ที่เรียบง่าย'),
         li('รองรับ SSR โดยไม่ซับซ้อน'),
-        li('ทางเลือกเบาสำหรับ vanilla JS ที่มี DX ดีกว่า'),
+        li('Build ได้เร็วด้วย esbuild ที่บูรณาการ'),
+        li('ทางเลือกเบาที่มี DX ดีกว่า vanilla JS'),
         li('แอปพลิเคชันที่ต้องการประสิทธิภาพสูง (เกม, แอปเรียลไทม์)'),
-        li('Progressive enhancement ของเว็บไซต์ที่มีอยู่')
+        li('Progressive enhancement ของเว็บไซต์ที่มีอยู่'),
+        li('โปรเจกต์ที่ต้องการ frontend + backend ใน framework เดียว')
       ),
 
       h2('สรุป'),
-      p('แต่ละ framework มีที่ของตัวเอง React เหมาะกับแอปพลิเคชันขนาดใหญ่และทีมใหญ่ Vue ให้ความสมดุลและ DX ที่ดี Svelte และ Solid ให้ประสิทธิภาพยอดเยี่ยมด้วยแนวทางสมัยใหม่ Qwik เพิ่มประสิทธิภาพการโหลดครั้งแรก Elit โดดเด่นเมื่อคุณต้องการ overhead น้อยที่สุด ควบคุมโดยตรง และฟีเจอร์ reactive โดยไม่มีภาระของ frameworks ใหญ่'),
+      p('แต่ละ framework มีที่ของตัวเอง React เหมาะกับแอปพลิเคชันขนาดใหญ่และทีมใหญ่ Vue ให้ความสมดุลและ DX ที่ดี Svelte และ Solid ให้ประสิทธิภาพยอดเยี่ยมด้วยแนวทางสมัยใหม่ Qwik เพิ่มประสิทธิภาพการโหลดครั้งแรก Elit 2.0 โดดเด่นเป็นโซลูชันแบบ full-stack เมื่อคุณต้องการเครื่องมือ CLI ครบครัน รองรับ API/WebSocket ในตัว overhead น้อยที่สุด ควบคุมโดยตรง และฟีเจอร์ reactive โดยไม่มีภาระของ frameworks ใหญ่'),
       p('เลือกตามความต้องการของโปรเจกต์ ความเชี่ยวชาญของทีม และความต้องการด้านประสิทธิภาพ')
     )
   }

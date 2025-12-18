@@ -779,6 +779,25 @@ export function createDevServer(options: DevServerOptions): DevServer {
 </script>`;
         const hmrScript = `<script>(function(){const ws=new WebSocket('ws://${config.host}:${config.port}${client.basePath}');ws.onopen=()=>console.log('[Elit HMR] Connected');ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{console.log('[Elit HMR] Disconnected - Retrying...');setTimeout(()=>window.location.reload(),1000)};ws.onerror=(e)=>console.error('[Elit HMR] WebSocket error:',e)})();</script>`;
         let html = content.toString();
+
+        // Inject base tag if basePath is configured and not '/'
+        if (client.basePath && client.basePath !== '/') {
+          const baseTag = `<base href="${client.basePath}/">`;
+          // Check if base tag already exists
+          if (!html.includes('<base')) {
+            // Try to inject after viewport meta tag
+            if (html.includes('<meta name="viewport"')) {
+              html = html.replace(
+                /<meta name="viewport"[^>]*>/,
+                (match) => `${match}\n  ${baseTag}`
+              );
+            } else if (html.includes('<head>')) {
+              // If no viewport, inject right after <head>
+              html = html.replace('<head>', `<head>\n  ${baseTag}`);
+            }
+          }
+        }
+
         html = html.includes('</head>') ? html.replace('</head>', `${importMap}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
         content = Buffer.from(html);

@@ -7,72 +7,114 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog18: BlogPostDetail = {
   id: '18',
   title: {
-    en: 'Complete Guide to elit-server',
-    th: 'คู่มือครบวงจร elit-server'
+    en: 'Complete Guide to Elit 2.0',
+    th: 'คู่มือครบวงจร Elit 2.0'
   },
   date: '2024-04-15',
   author: 'n-devs',
-  tags: ['Tutorial', 'elit-server', 'REST API', 'Middleware', 'Full Stack'],
+  tags: ['Tutorial', 'Elit 2.0', 'CLI', 'Build System', 'Full Stack'],
   content: {
     en: div(
-      p('Learn everything about ', strong('elit-server'), ' - the zero-configuration development server built for Elit. This comprehensive guide covers ', em('HMR, REST API, middleware, shared state, WebSocket'), ', and production deployment.'),
+      p('Learn everything about ', strong('Elit 2.0'), ' - the complete full-stack TypeScript framework. This comprehensive guide covers ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ', and production deployment.'),
 
-      h2('What is elit-server?'),
-      p('elit-server is a full-featured development server that provides:'),
+      h2('What is Elit 2.0?'),
+      p('Elit 2.0 is a complete full-stack TypeScript framework that provides:'),
       ul(
+        li('⚡ ', strong('CLI Tools'), ' - npx elit dev/build/preview for complete workflow'),
+        li('🏗️ ', strong('Build System'), ' - Integrated esbuild with optimizations'),
         li('🔥 ', strong('Hot Module Replacement'), ' - Instant updates without refresh'),
         li('🌐 ', strong('REST API Router'), ' - Express-like routing with regex parameters'),
         li('🔧 ', strong('Middleware Stack'), ' - Built-in middleware (CORS, logging, rate limiting, etc.)'),
         li('🔄 ', strong('Shared State'), ' - Real-time WebSocket state synchronization'),
-        li('📁 ', strong('Static Files'), ' - Automatic MIME type detection'),
+        li('📁 ', strong('Static Files'), ' - Automatic MIME type detection with gzip'),
         li('🎯 ', strong('Zero Config'), ' - Works out of the box'),
-        li('📦 ', strong('Lightweight'), ' - Minimal dependencies (chokidar, ws, mime-types)')
+        li('📦 ', strong('Lightweight'), ' - ~10KB gzipped, minimal dependencies')
       ),
 
       h2('Installation'),
-      pre(code(...codeBlock(`# Install as dev dependency
-npm install --save-dev elit-server
+      pre(code(...codeBlock(`# Install Elit 2.0
+npm install elit
 
-# Or with yarn
-yarn add -D elit-server
-
-# Or with pnpm
-pnpm add -D elit-server`))),
+# No additional packages needed - everything is integrated!`))),
 
       h2('Quick Start'),
-      h3('1. Basic Server'),
-      p('Create ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
-
-// Create server with defaults
-const server = createDevServer({
-  port: 3000,
-  root: './public'
-});
-
-console.log('Server running at http://localhost:3000');`))),
-
-      h3('2. Using CLI'),
-      pre(code(...codeBlock(`# Start server (default port 3000)
-npx elit-dev
+      h3('1. Development Server'),
+      p('Start the dev server with HMR:'),
+      pre(code(...codeBlock(`# Start dev server (default port 3000)
+npx elit dev
 
 # Custom configuration
-npx elit-dev --port 8080 --root ./dist
+npx elit dev --port 8080 --root ./public
 
 # All options
-npx elit-dev --port 8080 --root ./public --no-open --silent`))),
+npx elit dev --port 8080 --root ./public --no-open --silent`))),
 
       p('CLI Options:'),
       ul(
-        li(code('--port'), ' - Port number (default: 3000)'),
-        li(code('--root'), ' - Root directory (default: ./public)'),
-        li(code('--open'), ' - Open browser (default: true)'),
-        li(code('--silent'), ' - Disable logging (default: false)')
+        li(code('--port, -p'), ' - Port number (default: 3000)'),
+        li(code('--host, -h'), ' - Host to bind to (default: localhost)'),
+        li(code('--root, -r'), ' - Root directory'),
+        li(code('--no-open'), ' - Don\'t open browser'),
+        li(code('--silent'), ' - Disable logging')
       ),
+
+      h3('2. Build for Production'),
+      p('Build your application:'),
+      pre(code(...codeBlock(`# Build with config file
+npx elit build
+
+# Build with CLI options
+npx elit build --entry src/app.ts --out-dir dist
+
+# All build options
+npx elit build --entry src/app.ts --out-dir dist --format esm --sourcemap`))),
+
+      p('Build Options:'),
+      ul(
+        li(code('--entry, -e'), ' - Entry file (required)'),
+        li(code('--out-dir, -o'), ' - Output directory (default: dist)'),
+        li(code('--format, -f'), ' - Output format: esm, cjs, iife (default: esm)'),
+        li(code('--no-minify'), ' - Disable minification'),
+        li(code('--sourcemap'), ' - Generate sourcemap'),
+        li(code('--silent'), ' - Disable logging')
+      ),
+
+      h3('3. Preview Production Build'),
+      p('Preview your production build:'),
+      pre(code(...codeBlock(`# Preview (default port 4173)
+npx elit preview
+
+# Custom configuration
+npx elit preview --port 5000 --root dist`))),
+
+      h3('4. Configuration File'),
+      p('Create ', code('elit.config.ts'), ' for advanced configuration:'),
+      pre(code(...codeBlock(`import { defineConfig } from 'elit';
+
+export default defineConfig({
+  dev: {
+    port: 3000,
+    clients: [
+      { root: './public', basePath: '/' }
+    ]
+  },
+  build: {
+    entry: 'src/app.ts',
+    outDir: 'dist',
+    format: 'esm',
+    minify: true,
+    sourcemap: false
+  },
+  preview: {
+    port: 4173,
+    root: 'dist'
+  }
+});`))),
 
       h2('REST API Router'),
       h3('Basic Routing'),
-      pre(code(...codeBlock(`const { Router } = require('elit-server');
+      p('Create APIs using the built-in Router:'),
+      pre(code(...codeBlock(`import { Router, createDevServer } from 'elit';
 
 const api = new Router();
 
@@ -100,9 +142,10 @@ api.delete('/api/users/:id', (ctx) => {
   return { success: true, deleted: id };
 });
 
-// Pass router to server
+// Use with dev server
 const server = createDevServer({
   port: 3000,
+  root: './public',
   api
 });`))),
 
@@ -153,11 +196,39 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
   return { success: true, data };
 });`))),
 
+      h2('Environment Variables'),
+      p('Elit 2.0 has built-in environment variables support:'),
+      h3('Loading .env Files'),
+      pre(code(...codeBlock(`# .env
+VITE_API_URL=https://api.example.com
+VITE_APP_NAME=My App
+DATABASE_URL=postgres://localhost/mydb
+
+# .env.production
+VITE_API_URL=https://api.production.com
+MODE=production`))),
+
+      p('Environment variables are automatically loaded with this priority:'),
+      ul(
+        li(code('.env.[mode].local'), ' - Mode-specific local (highest priority)'),
+        li(code('.env.[mode]'), ' - Mode-specific'),
+        li(code('.env.local'), ' - Local'),
+        li(code('.env'), ' - Default (lowest priority)')
+      ),
+
+      h3('Using in Build'),
+      p('Variables prefixed with ', code('VITE_'), ' are injected into client code:'),
+      pre(code(...codeBlock(`// Access in your frontend code
+console.log(import.meta.env.VITE_API_URL);
+console.log(import.meta.env.MODE);
+console.log(import.meta.env.DEV);
+console.log(import.meta.env.PROD);`))),
+
       h2('Middleware'),
       h3('Built-in Middleware'),
-      p('elit-server includes these middleware out of the box:'),
+      p('Elit 2.0 includes these middleware out of the box:'),
 
-      pre(code(...codeBlock(`const {
+      pre(code(...codeBlock(`import {
   cors,         // CORS headers
   logger,       // Request logging
   errorHandler, // Error handling
@@ -166,7 +237,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
   cacheControl, // Cache headers
   compress,     // Gzip compression
   security      // Security headers
-} = require('elit-server');
+} from 'elit';
 
 api.use(cors());
 api.use(logger());
@@ -531,42 +602,62 @@ const todosState = server.state.create('todos', {
 console.log('Todo API running at http://localhost:3000');`))),
 
       h2('Production Deployment'),
-      h3('Environment Variables'),
-      pre(code(...codeBlock(`// Use environment variables
-const server = createDevServer({
-  port: process.env.PORT || 3000,
-  root: process.env.ROOT || './dist',
-  logging: process.env.NODE_ENV !== 'production',
-  hmr: process.env.NODE_ENV === 'development'
-});`))),
+      h3('Build Workflow'),
+      pre(code(...codeBlock(`# 1. Build your application
+npx elit build --entry src/app.ts --out-dir dist
 
-      h3('Process Management'),
-      pre(code(...codeBlock(`// Graceful shutdown
-let isShuttingDown = false;
+# 2. Preview locally before deployment
+npx elit preview --port 4173 --root dist
 
-const shutdown = async () => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
+# 3. Deploy the dist folder to your hosting provider`))),
 
-  console.log('Shutting down...');
+      h3('Deploy to Vercel'),
+      pre(code(...codeBlock(`# Install Vercel CLI
+npm i -g vercel
 
-  try {
-    await Promise.race([
-      server.close(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      )
-    ]);
-    console.log('Server closed');
-  } catch (error) {
-    console.log('Force closing...');
+# Build
+npx elit build
+
+# Deploy
+vercel --prod
+
+# Or use vercel.json:
+{
+  "buildCommand": "npx elit build",
+  "outputDirectory": "dist"
+}`))),
+
+      h3('Deploy to Netlify'),
+      pre(code(...codeBlock(`# Install Netlify CLI
+npm i -g netlify-cli
+
+# Build
+npx elit build
+
+# Deploy
+netlify deploy --prod --dir=dist
+
+# Or use netlify.toml:
+[build]
+  command = "npx elit build"
+  publish = "dist"`))),
+
+      h3('Deploy to GitHub Pages'),
+      p('For GitHub Pages, set the ', code('basePath'), ' in your config:'),
+      pre(code(...codeBlock(`// elit.config.ts
+export default defineConfig({
+  build: {
+    entry: 'src/app.ts',
+    outDir: 'dist'
+  },
+  preview: {
+    basePath: '/your-repo-name'
   }
+});
 
-  process.exit(0);
-};
-
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);`))),
+# Build and deploy
+npx elit build
+# Then commit and push dist folder or use gh-pages`))),
 
       h3('Docker Deployment'),
       pre(code(...codeBlock(`# Dockerfile
@@ -579,9 +670,13 @@ RUN npm ci --production
 
 COPY . .
 
-EXPOSE 3000
+# Build the application
+RUN npx elit build
 
-CMD ["node", "server.js"]`))),
+EXPOSE 4173
+
+# Preview the production build
+CMD ["npx", "elit", "preview", "--port", "4173"]`))),
 
       pre(code(...codeBlock(`# docker-compose.yml
 version: '3.8'
@@ -590,11 +685,33 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "4173:4173"
     environment:
       - NODE_ENV=production
-      - PORT=3000
     restart: unless-stopped`))),
+
+      h3('Node.js Production Server'),
+      p('For a custom Node.js production server:'),
+      pre(code(...codeBlock(`// server.js
+import { createDevServer } from 'elit';
+
+const server = createDevServer({
+  port: process.env.PORT || 3000,
+  root: './dist',
+  logging: false,
+  hmr: false,
+  open: false
+});
+
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('Shutting down...');
+  await server.close();
+  process.exit(0);
+};
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);`))),
 
       h2('Best Practices'),
       ul(
@@ -639,94 +756,170 @@ state.onChange((newValue, oldValue) => {
   console.log('State changed:', { oldValue, newValue });
 });`))),
 
-      h2('Comparison with Other Servers'),
+      h2('Comparison with Other Frameworks'),
       pre(code(...codeBlock(`┌──────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature          │ elit-server│ Express      │ Fastify        │
+│ Feature          │ Elit 2.0    │ Vite + React │ Next.js        │
 ├──────────────────┼─────────────┼──────────────┼────────────────┤
-│ HMR Built-in     │ ✅          │ ❌           │ ❌             │
-│ WebSocket        │ ✅ Built-in │ 🔧 ws package│ 🔧 Plugin      │
-│ Shared State     │ ✅ Built-in │ ❌           │ ❌             │
-│ Middleware       │ ✅ Built-in │ ✅ Extensive │ ✅ Extensive   │
-│ Router           │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
-│ Static Files     │ ✅ Built-in │ 🔧 Middleware│ 🔧 Plugin      │
-│ Setup Time       │ 0 config    │ Manual       │ Manual         │
-│ Dev Experience   │ ⭐⭐⭐⭐⭐   │ ⭐⭐⭐       │ ⭐⭐⭐⭐       │
+│ CLI Tools        │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
+│ Build System     │ ✅ esbuild  │ ✅ esbuild   │ ✅ Turbopack   │
+│ HMR Built-in     │ ✅          │ ✅           │ ✅             │
+│ REST API         │ ✅ Built-in │ ❌           │ ✅ API Routes  │
+│ WebSocket        │ ✅ Built-in │ ❌           │ 🔧 External    │
+│ Shared State     │ ✅ Built-in │ 🔧 Redux/etc │ 🔧 External    │
+│ Middleware       │ ✅ Built-in │ ❌           │ ✅ Built-in    │
+│ Static Files     │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
+│ Size (gzipped)   │ ~10KB       │ ~45KB        │ ~90KB          │
+│ Setup Time       │ 0 config    │ npx create   │ npx create     │
+│ Learning Curve   │ ⭐⭐        │ ⭐⭐⭐⭐     │ ⭐⭐⭐⭐⭐      │
 └──────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('Conclusion'),
-      p('elit-server provides everything you need for full-stack development with Elit:'),
+      p('Elit 2.0 provides everything you need for full-stack TypeScript development:'),
       ul(
+        li('⚡ ', strong('Complete CLI'), ' - dev, build, preview in one package'),
+        li('🏗️ ', strong('Integrated build'), ' - No separate bundler setup needed'),
         li('🔥 ', strong('Zero configuration'), ' - Works out of the box'),
         li('⚡ ', strong('Fast development'), ' - HMR for instant feedback'),
         li('🌐 ', strong('Full REST API'), ' - Express-like routing'),
         li('🔧 ', strong('Rich middleware'), ' - All essentials included'),
         li('🔄 ', strong('Real-time sync'), ' - WebSocket shared state'),
-        li('📦 ', strong('Production ready'), ' - Deploy with confidence')
+        li('📦 ', strong('Production ready'), ' - Deploy anywhere'),
+        li('🎯 ', strong('Lightweight'), ' - Only ~10KB gzipped')
       ),
 
-      p('Get started today and experience the fastest way to build full-stack applications with Elit! 🚀'),
+      p('Get started today and experience the fastest way to build full-stack TypeScript applications! 🚀'),
 
-      p('For more examples, check out the ', a({ href: 'https://github.com/oangsa/elit/tree/main/server/example' }, 'elit-server examples'), '.')
+      p('For more information, visit the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit GitHub repository'), '.')
     ),
     th: div(
-      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('elit-server'), ' - development server แบบไม่ต้องตั้งค่าที่สร้างมาสำหรับ Elit คู่มือครบวงจรนี้ครอบคลุม ', em('HMR, REST API, middleware, shared state, WebSocket'), ' และการ deploy แบบ production'),
+      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('Elit 2.0'), ' - full-stack TypeScript framework ที่สมบูรณ์ คู่มือครบวงจรนี้ครอบคลุม ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ' และการ deploy แบบ production'),
 
-      h2('elit-server คืออะไร?'),
-      p('elit-server เป็น development server ที่มีฟีเจอร์ครบครันที่ให้:'),
+      h2('Elit 2.0 คืออะไร?'),
+      p('Elit 2.0 เป็น full-stack TypeScript framework ที่สมบูรณ์ที่ให้:'),
       ul(
+        li('⚡ ', strong('CLI Tools'), ' - npx elit dev/build/preview สำหรับ workflow ที่สมบูรณ์'),
+        li('🏗️ ', strong('Build System'), ' - esbuild ที่รวมไว้พร้อมการ optimize'),
         li('🔥 ', strong('Hot Module Replacement'), ' - อัปเดตทันทีโดยไม่ต้อง refresh'),
         li('🌐 ', strong('REST API Router'), ' - Routing แบบ Express พร้อม regex parameters'),
         li('🔧 ', strong('Middleware Stack'), ' - Middleware ในตัว (CORS, logging, rate limiting, etc.)'),
         li('🔄 ', strong('Shared State'), ' - การซิงโครไนซ์ state แบบ real-time ผ่าน WebSocket'),
-        li('📁 ', strong('Static Files'), ' - ตรวจจับ MIME type อัตโนมัติ'),
+        li('📁 ', strong('Static Files'), ' - ตรวจจับ MIME type อัตโนมัติพร้อม gzip'),
         li('🎯 ', strong('ไม่ต้องตั้งค่า'), ' - ทำงานได้ทันที'),
-        li('📦 ', strong('น้ำหนักเบา'), ' - Dependencies น้อย (chokidar, ws, mime-types)')
+        li('📦 ', strong('น้ำหนักเบา'), ' - ~10KB gzipped, dependencies น้อย')
       ),
 
       h2('การติดตั้ง'),
-      pre(code(...codeBlock(`# ติดตั้งเป็น dev dependency
-npm install --save-dev elit-server
+      pre(code(...codeBlock(`# ติดตั้ง Elit 2.0
+npm install elit
 
-# หรือด้วย yarn
-yarn add -D elit-server
-
-# หรือด้วย pnpm
-pnpm add -D elit-server`))),
+# ไม่ต้องติดตั้ง packages เพิ่ม - ทุกอย่างรวมอยู่แล้ว!`))),
 
       h2('เริ่มต้นอย่างรวดเร็ว'),
-      h3('1. Server พื้นฐาน'),
-      p('สร้าง ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
-
-// สร้าง server ด้วยค่าเริ่มต้น
-const server = createDevServer({
-  port: 3000,
-  root: './public'
-});
-
-console.log('Server ทำงานที่ http://localhost:3000');`))),
-
-      h3('2. ใช้ CLI'),
-      pre(code(...codeBlock(`# เริ่ม server (port เริ่มต้น 3000)
-npx elit-dev
+      h3('1. Development Server'),
+      p('เริ่ม dev server พร้อม HMR:'),
+      pre(code(...codeBlock(`# เริ่ม dev server (port เริ่มต้น 3000)
+npx elit dev
 
 # กำหนดค่าเอง
-npx elit-dev --port 8080 --root ./dist
+npx elit dev --port 8080 --root ./public
 
 # ตัวเลือกทั้งหมด
-npx elit-dev --port 8080 --root ./public --no-open --silent`))),
+npx elit dev --port 8080 --root ./public --no-open --silent`))),
 
       p('ตัวเลือก CLI:'),
       ul(
-        li(code('--port'), ' - หมายเลข Port (เริ่มต้น: 3000)'),
-        li(code('--root'), ' - ไดเรกทอรีหลัก (เริ่มต้น: ./public)'),
-        li(code('--open'), ' - เปิด browser (เริ่มต้น: true)'),
-        li(code('--silent'), ' - ปิด logging (เริ่มต้น: false)')
+        li(code('--port, -p'), ' - หมายเลข Port (เริ่มต้น: 3000)'),
+        li(code('--host, -h'), ' - Host ที่จะ bind (เริ่มต้น: localhost)'),
+        li(code('--root, -r'), ' - ไดเรกทอรีหลัก'),
+        li(code('--no-open'), ' - ไม่เปิด browser'),
+        li(code('--silent'), ' - ปิด logging')
       ),
+
+      h3('2. Build สำหรับ Production'),
+      p('Build แอปพลิเคชันของคุณ:'),
+      pre(code(...codeBlock(`# Build ด้วย config file
+npx elit build
+
+# Build ด้วย CLI options
+npx elit build --entry src/app.ts --out-dir dist
+
+# ตัวเลือก build ทั้งหมด
+npx elit build --entry src/app.ts --out-dir dist --format esm --sourcemap`))),
+
+      p('ตัวเลือก Build:'),
+      ul(
+        li(code('--entry, -e'), ' - ไฟล์ Entry (จำเป็น)'),
+        li(code('--out-dir, -o'), ' - ไดเรกทอรี Output (เริ่มต้น: dist)'),
+        li(code('--format, -f'), ' - Output format: esm, cjs, iife (เริ่มต้น: esm)'),
+        li(code('--no-minify'), ' - ปิด minification'),
+        li(code('--sourcemap'), ' - สร้าง sourcemap'),
+        li(code('--silent'), ' - ปิด logging')
+      ),
+
+      h3('3. Preview Production Build'),
+      p('ดูตัวอย่าง production build:'),
+      pre(code(...codeBlock(`# Preview (port เริ่มต้น 4173)
+npx elit preview
+
+# กำหนดค่าเอง
+npx elit preview --port 5000 --root dist`))),
+
+      h3('4. ไฟล์กำหนดค่า'),
+      p('สร้าง ', code('elit.config.ts'), ' สำหรับการกำหนดค่าขั้นสูง:'),
+      pre(code(...codeBlock(`import { defineConfig } from 'elit';
+
+export default defineConfig({
+  dev: {
+    port: 3000,
+    clients: [
+      { root: './public', basePath: '/' }
+    ]
+  },
+  build: {
+    entry: 'src/app.ts',
+    outDir: 'dist',
+    format: 'esm',
+    minify: true,
+    sourcemap: false
+  },
+  preview: {
+    port: 4173,
+    root: 'dist'
+  }
+});`))),
+
+      h2('Environment Variables'),
+      p('Elit 2.0 มีการรองรับ environment variables ในตัว:'),
+      h3('โหลดไฟล์ .env'),
+      pre(code(...codeBlock(`# .env
+VITE_API_URL=https://api.example.com
+VITE_APP_NAME=My App
+DATABASE_URL=postgres://localhost/mydb
+
+# .env.production
+VITE_API_URL=https://api.production.com
+MODE=production`))),
+
+      p('Environment variables ถูกโหลดอัตโนมัติตามลำดับความสำคัญ:'),
+      ul(
+        li(code('.env.[mode].local'), ' - Local เฉพาะ mode (ความสำคัญสูงสุด)'),
+        li(code('.env.[mode]'), ' - เฉพาะ mode'),
+        li(code('.env.local'), ' - Local'),
+        li(code('.env'), ' - ค่าเริ่มต้น (ความสำคัญต่ำสุด)')
+      ),
+
+      h3('ใช้ใน Build'),
+      p('ตัวแปรที่ขึ้นต้นด้วย ', code('VITE_'), ' จะถูก inject เข้าไปใน client code:'),
+      pre(code(...codeBlock(`// เข้าถึงใน frontend code
+console.log(import.meta.env.VITE_API_URL);
+console.log(import.meta.env.MODE);
+console.log(import.meta.env.DEV);
+console.log(import.meta.env.PROD);`))),
 
       h2('REST API Router'),
       h3('Routing พื้นฐาน'),
-      pre(code(...codeBlock(`const { Router } = require('elit-server');
+      p('สร้าง APIs ด้วย Router ในตัว:'),
+      pre(code(...codeBlock(`import { Router, createDevServer } from 'elit';
 
 const api = new Router();
 
@@ -754,9 +947,10 @@ api.delete('/api/users/:id', (ctx) => {
   return { success: true, deleted: id };
 });
 
-// ส่ง router ไปยัง server
+// ใช้กับ dev server
 const server = createDevServer({
   port: 3000,
+  root: './public',
   api
 });`))),
 
@@ -782,9 +976,9 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
 
       h2('Middleware'),
       h3('Middleware ในตัว'),
-      p('elit-server มี middleware เหล่านี้ในตัว:'),
+      p('Elit 2.0 มี middleware เหล่านี้ในตัว:'),
 
-      pre(code(...codeBlock(`const {
+      pre(code(...codeBlock(`import {
   cors,         // CORS headers
   logger,       // Request logging
   errorHandler, // Error handling
@@ -793,7 +987,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
   cacheControl, // Cache headers
   compress,     // Gzip compression
   security      // Security headers
-} = require('elit-server');
+} from 'elit';
 
 api.use(cors());
 api.use(logger());
@@ -921,7 +1115,7 @@ counter.onChange((newValue, oldValue) => {
 counter.value++;`))),
 
       h2('ตัวอย่างครบถ้วน: Todo API'),
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('elit-server');
+      pre(code(...codeBlock(`import { createDevServer, Router, cors, logger, rateLimit } from 'elit';
 
 // ฐานข้อมูลใน memory
 let todos = [
@@ -979,14 +1173,62 @@ const todosState = server.state.create('todos', {
 console.log('Todo API ทำงานที่ http://localhost:3000');`))),
 
       h2('การ Deploy แบบ Production'),
-      h3('Environment Variables'),
-      pre(code(...codeBlock(`// ใช้ environment variables
-const server = createDevServer({
-  port: process.env.PORT || 3000,
-  root: process.env.ROOT || './dist',
-  logging: process.env.NODE_ENV !== 'production',
-  hmr: process.env.NODE_ENV === 'development'
-});`))),
+      h3('Build Workflow'),
+      pre(code(...codeBlock(`# 1. Build แอปพลิเคชัน
+npx elit build --entry src/app.ts --out-dir dist
+
+# 2. Preview ก่อน deploy
+npx elit preview --port 4173 --root dist
+
+# 3. Deploy โฟลเดอร์ dist ไปยัง hosting provider`))),
+
+      h3('Deploy ไปยัง Vercel'),
+      pre(code(...codeBlock(`# ติดตั้ง Vercel CLI
+npm i -g vercel
+
+# Build
+npx elit build
+
+# Deploy
+vercel --prod
+
+# หรือใช้ vercel.json:
+{
+  "buildCommand": "npx elit build",
+  "outputDirectory": "dist"
+}`))),
+
+      h3('Deploy ไปยัง Netlify'),
+      pre(code(...codeBlock(`# ติดตั้ง Netlify CLI
+npm i -g netlify-cli
+
+# Build
+npx elit build
+
+# Deploy
+netlify deploy --prod --dir=dist
+
+# หรือใช้ netlify.toml:
+[build]
+  command = "npx elit build"
+  publish = "dist"`))),
+
+      h3('Deploy ไปยัง GitHub Pages'),
+      p('สำหรับ GitHub Pages ตั้งค่า ', code('basePath'), ' ใน config:'),
+      pre(code(...codeBlock(`// elit.config.ts
+export default defineConfig({
+  build: {
+    entry: 'src/app.ts',
+    outDir: 'dist'
+  },
+  preview: {
+    basePath: '/your-repo-name'
+  }
+});
+
+# Build และ deploy
+npx elit build
+# จากนั้น commit และ push โฟลเดอร์ dist หรือใช้ gh-pages`))),
 
       h3('Docker Deployment'),
       pre(code(...codeBlock(`# Dockerfile
@@ -999,9 +1241,48 @@ RUN npm ci --production
 
 COPY . .
 
-EXPOSE 3000
+# Build แอปพลิเคชัน
+RUN npx elit build
 
-CMD ["node", "server.js"]`))),
+EXPOSE 4173
+
+# Preview production build
+CMD ["npx", "elit", "preview", "--port", "4173"]`))),
+
+      pre(code(...codeBlock(`# docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "4173:4173"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped`))),
+
+      h3('Node.js Production Server'),
+      p('สำหรับ Node.js production server แบบกำหนดเอง:'),
+      pre(code(...codeBlock(`// server.js
+import { createDevServer } from 'elit';
+
+const server = createDevServer({
+  port: process.env.PORT || 3000,
+  root: './dist',
+  logging: false,
+  hmr: false,
+  open: false
+});
+
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('กำลังปิด...');
+  await server.close();
+  process.exit(0);
+};
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);`))),
 
       h2('แนวทางปฏิบัติที่ดี'),
       ul(
@@ -1025,18 +1306,40 @@ CMD ["node", "server.js"]`))),
         li('🗜️ เปิดใช้งาน gzip compression สำหรับ API responses')
       ),
 
+      h2('เปรียบเทียบกับ Frameworks อื่น'),
+      pre(code(...codeBlock(`┌──────────────────┬─────────────┬──────────────┬────────────────┐
+│ Feature          │ Elit 2.0    │ Vite + React │ Next.js        │
+├──────────────────┼─────────────┼──────────────┼────────────────┤
+│ CLI Tools        │ ✅ ในตัว    │ ✅ ในตัว     │ ✅ ในตัว       │
+│ Build System     │ ✅ esbuild  │ ✅ esbuild   │ ✅ Turbopack   │
+│ HMR Built-in     │ ✅          │ ✅           │ ✅             │
+│ REST API         │ ✅ ในตัว    │ ❌           │ ✅ API Routes  │
+│ WebSocket        │ ✅ ในตัว    │ ❌           │ 🔧 External    │
+│ Shared State     │ ✅ ในตัว    │ 🔧 Redux/etc │ 🔧 External    │
+│ Middleware       │ ✅ ในตัว    │ ❌           │ ✅ ในตัว       │
+│ Static Files     │ ✅ ในตัว    │ ✅ ในตัว     │ ✅ ในตัว       │
+│ Size (gzipped)   │ ~10KB       │ ~45KB        │ ~90KB          │
+│ Setup Time       │ 0 config    │ npx create   │ npx create     │
+│ Learning Curve   │ ⭐⭐        │ ⭐⭐⭐⭐     │ ⭐⭐⭐⭐⭐      │
+└──────────────────┴─────────────┴──────────────┴────────────────┘`))),
+
       h2('สรุป'),
-      p('elit-server ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack ด้วย Elit:'),
+      p('Elit 2.0 ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack TypeScript:'),
       ul(
+        li('⚡ ', strong('CLI สมบูรณ์'), ' - dev, build, preview ในแพ็กเกจเดียว'),
+        li('🏗️ ', strong('Build รวมอยู่'), ' - ไม่ต้องตั้งค่า bundler แยก'),
         li('🔥 ', strong('ไม่ต้องตั้งค่า'), ' - ทำงานได้ทันที'),
         li('⚡ ', strong('พัฒนาเร็ว'), ' - HMR สำหรับ feedback ทันที'),
         li('🌐 ', strong('REST API เต็มรูปแบบ'), ' - Routing แบบ Express'),
         li('🔧 ', strong('Middleware หลากหลาย'), ' - มีสิ่งที่จำเป็นทั้งหมด'),
         li('🔄 ', strong('Sync แบบ Real-time'), ' - WebSocket shared state'),
-        li('📦 ', strong('พร้อม Production'), ' - Deploy ได้อย่างมั่นใจ')
+        li('📦 ', strong('พร้อม Production'), ' - Deploy ได้ทุกที่'),
+        li('🎯 ', strong('น้ำหนักเบา'), ' - เพียง ~10KB gzipped')
       ),
 
-      p('เริ่มต้นวันนี้และสัมผัสวิธีที่เร็วที่สุดในการสร้าง full-stack applications ด้วย Elit! 🚀')
+      p('เริ่มต้นวันนี้และสัมผัสวิธีที่เร็วที่สุดในการสร้าง full-stack TypeScript applications! 🚀'),
+
+      p('สำหรับข้อมูลเพิ่มเติม เยี่ยมชม ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit GitHub repository'), '.')
     )
   }
 };

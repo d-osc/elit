@@ -7,15 +7,15 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog17: BlogPostDetail = {
   id: '17',
   title: {
-    en: 'Hot Module Replacement with Elit and elit-server',
-    th: 'Hot Module Replacement กับ Elit และ elit-server'
+    en: 'Hot Module Replacement with Elit 2.0',
+    th: 'Hot Module Replacement กับ Elit 2.0'
   },
   date: '2024-04-12',
   author: 'n-devs',
-  tags: ['Tutorial', 'HMR', 'elit-server', 'Development', 'Workflow'],
+  tags: ['Tutorial', 'HMR', 'CLI', 'Development', 'Workflow'],
   content: {
     en: div(
-      p('Learn how to use ', strong('Hot Module Replacement (HMR)'), ' with elit-server for an instant development experience. See your changes reflected in the browser ', em('without page refresh'), ' - preserving application state and speeding up your development workflow dramatically.'),
+      p('Learn how to use ', strong('Hot Module Replacement (HMR)'), ' with Elit 2.0\'s built-in dev server for an instant development experience. See your changes reflected in the browser ', em('without page refresh'), ' - preserving application state and speeding up your development workflow dramatically.'),
 
       h2('What is HMR?'),
       p('Hot Module Replacement (HMR) is a development feature that updates your application in the browser as you edit files, without requiring a full page refresh. This means:'),
@@ -27,8 +27,8 @@ export const blog17: BlogPostDetail = {
         li('💾 ', strong('Form data preserved'), ' - No loss of input data during development')
       ),
 
-      h2('How HMR Works in elit-server'),
-      p('The elit-server HMR implementation uses WebSocket to communicate file changes:'),
+      h2('How HMR Works in Elit 2.0'),
+      p('Elit 2.0\'s built-in HMR uses WebSocket to communicate file changes:'),
 
       pre(code(...codeBlock(`┌──────────────┐         WebSocket         ┌──────────────┐
 │   Browser    │◄──────────────────────────►│   Server     │
@@ -43,23 +43,10 @@ export const blog17: BlogPostDetail = {
 └──────────────┘                            └──────────────┘`))),
 
       h2('Quick Start'),
-      h3('1. Install elit-server'),
-      pre(code(...codeBlock(`npm install --save-dev elit-server`))),
+      h3('1. Install Elit 2.0'),
+      pre(code(...codeBlock(`npm install elit`))),
 
-      h3('2. Create Development Server'),
-      p('Create ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
-
-// Create server with HMR enabled (default)
-const server = createDevServer({
-  port: 3000,
-  root: './public',
-  logging: true
-});
-
-console.log('🔥 HMR enabled at http://localhost:3000');`))),
-
-      h3('3. Create Your App'),
+      h3('2. Create Your App'),
       p('Create ', code('public/index.html'), ':'),
       pre(code(...codeBlock(`<!DOCTYPE html>
 <html lang="en">
@@ -95,8 +82,13 @@ dom.render('#app', App);
 
 console.log('✅ App loaded with HMR');`))),
 
-      h3('4. Start Development'),
-      pre(code(...codeBlock(`node server.js`))),
+      h3('3. Start Development Server'),
+      p('Simply run the Elit CLI dev command - HMR is enabled by default:'),
+      pre(code(...codeBlock(`# Start dev server with HMR (port 3000 by default)
+npx elit dev
+
+# Or with custom options
+npx elit dev --port 8080 --root ./public`))),
 
       p('Now try editing ', code('app.js'), ' - changes appear instantly without page refresh! 🎉'),
 
@@ -257,25 +249,37 @@ export const button = styles.class('button', {
 
       h2('HMR Configuration'),
 
-      h3('Customize HMR Behavior'),
-      pre(code(...codeBlock(`const server = createDevServer({
-  port: 3000,
-  root: './public',
-  logging: true,
+      h3('Using Configuration File'),
+      p('Create ', code('elit.config.ts'), ' to customize HMR behavior:'),
+      pre(code(...codeBlock(`import { defineConfig } from 'elit';
 
-  // Watch additional directories
-  watchDirs: ['./src', './components'],
-
-  // Ignore patterns
-  ignore: ['node_modules', '*.test.js', 'dist']
+export default defineConfig({
+  dev: {
+    port: 3000,
+    root: './public',
+    logging: true,
+    open: true,
+    clients: [
+      {
+        root: './public',
+        basePath: '/',
+        // Files are automatically watched in the root directory
+      }
+    ]
+  }
 });`))),
 
-      h3('Disable HMR (if needed)'),
-      pre(code(...codeBlock(`// Disable HMR for specific environments
-const server = createDevServer({
-  port: 3000,
-  hmr: process.env.NODE_ENV === 'development' // Only in dev
-});`))),
+      h3('CLI Options'),
+      p('Configure HMR through CLI arguments:'),
+      pre(code(...codeBlock(`# Start dev server with custom configuration
+npx elit dev --port 3000 --root ./public --no-open
+
+# Available options:
+# --port, -p     Port number (default: 3000)
+# --host, -h     Host to bind to (default: localhost)
+# --root, -r     Root directory to serve
+# --no-open      Don't open browser automatically
+# --silent       Disable logging`))),
 
       h2('Debugging HMR'),
 
@@ -441,18 +445,20 @@ export default TodoApp;
       h2('Comparison with Other Solutions'),
 
       pre(code(...codeBlock(`┌────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature        │ elit-server│ Vite         │ Webpack HMR    │
+│ Feature        │ Elit 2.0    │ Vite         │ Webpack HMR    │
 ├────────────────┼─────────────┼──────────────┼────────────────┤
 │ Setup Time     │ 0 config    │ Minimal      │ Complex        │
 │ Update Speed   │ < 100ms     │ < 50ms       │ 200-500ms      │
 │ State Preserve │ ✅ Built-in │ ✅ Built-in  │ ⚠️  Manual     │
 │ WebSocket      │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
-│ Framework      │ Elit-native │ Framework    │ Framework      │
-│                │             │ agnostic     │ agnostic       │
+│ CLI Commands   │ ✅ Built-in │ ✅ Built-in  │ ⚠️  External   │
+│ Build Tool     │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
+│ Framework      │ Full-stack  │ Framework    │ Framework      │
+│                │ integrated  │ agnostic     │ agnostic       │
 └────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('Conclusion'),
-      p('Hot Module Replacement transforms your development experience by providing instant feedback without page refreshes. With elit-server, HMR is enabled out of the box with zero configuration, allowing you to focus on building your application.'),
+      p('Hot Module Replacement transforms your development experience by providing instant feedback without page refreshes. With Elit 2.0, HMR is enabled out of the box with zero configuration through the built-in CLI (', code('npx elit dev'), '), allowing you to focus on building your application.'),
 
       p('Key benefits:'),
       ul(
@@ -463,12 +469,12 @@ export default TodoApp;
         li('💪 ', strong('Production-ready'), ' - Automatically disabled in production')
       ),
 
-      p('Start using HMR today and experience the difference! Try editing your components while your app is running and watch the magic happen. 🔥✨'),
+      p('Start using HMR today and experience the difference! Simply run ', code('npx elit dev'), ' and try editing your components while your app is running - watch the magic happen. 🔥✨'),
 
-      p('For more information, check out the ', a({ href: 'https://github.com/oangsa/elit' }, 'elit-server documentation'), '.')
+      p('For more information, check out the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit documentation'), '.')
     ),
     th: div(
-      p('เรียนรู้วิธีใช้ ', strong('Hot Module Replacement (HMR)'), ' กับ elit-server เพื่อประสบการณ์การพัฒนาที่รวดเร็ว ดูการเปลี่ยนแปลงสะท้อนใน browser ', em('โดยไม่ต้อง refresh หน้าเว็บ'), ' - รักษา state ของแอปและเพิ่มความเร็วในการพัฒนาอย่างมาก'),
+      p('เรียนรู้วิธีใช้ ', strong('Hot Module Replacement (HMR)'), ' กับ dev server ในตัวของ Elit 2.0 เพื่อประสบการณ์การพัฒนาที่รวดเร็ว ดูการเปลี่ยนแปลงสะท้อนใน browser ', em('โดยไม่ต้อง refresh หน้าเว็บ'), ' - รักษา state ของแอปและเพิ่มความเร็วในการพัฒนาอย่างมาก'),
 
       h2('HMR คืออะไร?'),
       p('Hot Module Replacement (HMR) คือฟีเจอร์การพัฒนาที่อัปเดตแอปพลิเคชันใน browser ขณะที่คุณแก้ไขไฟล์ โดยไม่ต้อง refresh หน้าเว็บทั้งหมด หมายความว่า:'),
@@ -480,8 +486,8 @@ export default TodoApp;
         li('💾 ', strong('รักษาข้อมูล Form'), ' - ไม่สูญเสียข้อมูลที่กรอกระหว่างพัฒนา')
       ),
 
-      h2('HMR ทำงานอย่างไรใน elit-server'),
-      p('การทำงานของ HMR ใน elit-server ใช้ WebSocket สื่อสารการเปลี่ยนแปลงไฟล์:'),
+      h2('HMR ทำงานอย่างไรใน Elit 2.0'),
+      p('HMR ในตัวของ Elit 2.0 ใช้ WebSocket สื่อสารการเปลี่ยนแปลงไฟล์:'),
 
       pre(code(...codeBlock(`┌──────────────┐         WebSocket         ┌──────────────┐
 │   Browser    │◄──────────────────────────►│   Server     │
@@ -496,23 +502,10 @@ export default TodoApp;
 └──────────────┘                            └──────────────┘`))),
 
       h2('เริ่มต้นอย่างรวดเร็ว'),
-      h3('1. ติดตั้ง elit-server'),
-      pre(code(...codeBlock(`npm install --save-dev elit-server`))),
+      h3('1. ติดตั้ง Elit 2.0'),
+      pre(code(...codeBlock(`npm install elit`))),
 
-      h3('2. สร้าง Development Server'),
-      p('สร้าง ', code('server.js'), ':'),
-      pre(code(...codeBlock(`const { createDevServer } = require('elit-server');
-
-// สร้าง server พร้อม HMR เปิดใช้งาน (default)
-const server = createDevServer({
-  port: 3000,
-  root: './public',
-  logging: true
-});
-
-console.log('🔥 HMR เปิดใช้งานที่ http://localhost:3000');`))),
-
-      h3('3. สร้างแอป'),
+      h3('2. สร้างแอป'),
       p('สร้าง ', code('public/index.html'), ':'),
       pre(code(...codeBlock(`<!DOCTYPE html>
 <html lang="th">
@@ -548,8 +541,13 @@ dom.render('#app', App);
 
 console.log('✅ แอปโหลดพร้อม HMR');`))),
 
-      h3('4. เริ่มการพัฒนา'),
-      pre(code(...codeBlock(`node server.js`))),
+      h3('3. เริ่ม Development Server'),
+      p('เพียงรัน Elit CLI คำสั่ง dev - HMR เปิดใช้งานโดยอัตโนมัติ:'),
+      pre(code(...codeBlock(`# เริ่ม dev server พร้อม HMR (port เริ่มต้น 3000)
+npx elit dev
+
+# หรือใช้ตัวเลือกกำหนดเอง
+npx elit dev --port 8080 --root ./public`))),
 
       p('ตอนนี้ลองแก้ไข ', code('app.js'), ' - การเปลี่ยนแปลงจะปรากฏทันทีโดยไม่ต้อง refresh หน้า! 🎉'),
 
@@ -649,18 +647,37 @@ import { userState, todosState } from './state.js';
 
       h2('การกำหนดค่า HMR'),
 
-      h3('ปรับแต่งพฤติกรรม HMR'),
-      pre(code(...codeBlock(`const server = createDevServer({
-  port: 3000,
-  root: './public',
-  logging: true,
+      h3('ใช้ไฟล์กำหนดค่า'),
+      p('สร้าง ', code('elit.config.ts'), ' เพื่อปรับแต่งพฤติกรรม HMR:'),
+      pre(code(...codeBlock(`import { defineConfig } from 'elit';
 
-  // ติดตาม directories เพิ่มเติม
-  watchDirs: ['./src', './components'],
-
-  // Ignore patterns
-  ignore: ['node_modules', '*.test.js', 'dist']
+export default defineConfig({
+  dev: {
+    port: 3000,
+    root: './public',
+    logging: true,
+    open: true,
+    clients: [
+      {
+        root: './public',
+        basePath: '/',
+        // ไฟล์ถูกติดตามโดยอัตโนมัติใน root directory
+      }
+    ]
+  }
 });`))),
+
+      h3('ตัวเลือก CLI'),
+      p('กำหนดค่า HMR ผ่าน CLI arguments:'),
+      pre(code(...codeBlock(`# เริ่ม dev server ด้วยการกำหนดค่าเอง
+npx elit dev --port 3000 --root ./public --no-open
+
+# ตัวเลือกที่มี:
+# --port, -p     หมายเลข Port (เริ่มต้น: 3000)
+# --host, -h     Host ที่จะ bind (เริ่มต้น: localhost)
+# --root, -r     Root directory ที่จะ serve
+# --no-open      ไม่เปิด browser อัตโนมัติ
+# --silent       ปิด logging`))),
 
       h2('การ Debug HMR'),
 
@@ -741,7 +758,7 @@ export const deleteTodo = (id) => {
       ),
 
       h2('สรุป'),
-      p('Hot Module Replacement เปลี่ยนประสบการณ์การพัฒนาของคุณโดยให้ feedback ทันทีโดยไม่ต้อง refresh หน้า ด้วย elit-server, HMR เปิดใช้งานโดยอัตโนมัติโดยไม่ต้องกำหนดค่า ช่วยให้คุณมุ่งเน้นการสร้างแอปพลิเคชัน'),
+      p('Hot Module Replacement เปลี่ยนประสบการณ์การพัฒนาของคุณโดยให้ feedback ทันทีโดยไม่ต้อง refresh หน้า ด้วย Elit 2.0, HMR เปิดใช้งานโดยอัตโนมัติโดยไม่ต้องกำหนดค่าผ่าน CLI ในตัว (', code('npx elit dev'), ') ช่วยให้คุณมุ่งเน้นการสร้างแอปพลิเคชัน'),
 
       p('ประโยชน์หลัก:'),
       ul(
@@ -752,7 +769,7 @@ export const deleteTodo = (id) => {
         li('💪 ', strong('พร้อม Production'), ' - ปิดการใช้งานโดยอัตโนมัติใน production')
       ),
 
-      p('เริ่มใช้ HMR วันนี้และสัมผัสความแตกต่าง! ลองแก้ไข components ของคุณขณะที่แอปกำลังทำงานและดูความมหัศจรรย์เกิดขึ้น 🔥✨')
+      p('เริ่มใช้ HMR วันนี้และสัมผัสความแตกต่าง! เพียงรัน ', code('npx elit dev'), ' และลองแก้ไข components ของคุณขณะที่แอปกำลังทำงาน - ดูความมหัศจรรย์เกิดขึ้น 🔥✨')
     )
   }
 };

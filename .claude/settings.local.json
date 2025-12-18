@@ -36,7 +36,9 @@
       "Bash(npx esbuild:*)",
       "Bash(npm run preview:*)",
       "Bash(taskkill /F /PID 51748)",
-      "Bash(taskkill //F //PID 51748)"
+      "Bash(taskkill //F //PID 51748)",
+      "Bash(node dist/cli.js dev:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }
