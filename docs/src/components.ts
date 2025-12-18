@@ -81,7 +81,7 @@ export const Features = () =>
   );
 
 // Quick Start Section
-const quickStartCode = `import { div, h1, button, span, createState, reactive, domNode } from 'elit';
+const quickStartCode = `import { div, h1, button, span, createState, reactive, dom } from 'elit';
 
 // Create reactive state
 const count = createState(0);
@@ -99,7 +99,7 @@ const app = div({ className: 'app' },
 );
 
 // Render to DOM
-domNode.render('#app', app);`;
+dom.render('#app', app);`;
 
 export const QuickStart = (router: Router) =>
   section({ className: 'quick-start container' },
@@ -132,7 +132,7 @@ export const QuickStart = (router: Router) =>
             div({ className: 'step-number' }, '4'),
             div({ className: 'step-content' },
               h3(t('quickstart.render')),
-              pre(code(...codeBlock('domNode.render("#app", app);')))
+              pre(code(...codeBlock('dom.render("#app", app);')))
             )
           )
         )

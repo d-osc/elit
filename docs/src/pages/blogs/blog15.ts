@@ -32,7 +32,7 @@ export const blog15: BlogPostDetail = {
       h2('Rendering Methods'),
       h3('render() - Basic Rendering'),
       p('The render() method converts a VNode to DOM and appends it to a container:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h1, p } from 'elit';
 
 // Create a VNode
@@ -42,15 +42,15 @@ const vnode = div(
 );
 
 // Render to element by ID
-domNode.render('app', vnode);
+dom.render('app', vnode);
 
 // Or render to element reference
 const container = document.getElementById('app');
-domNode.render(container, vnode);`))),
+dom.render(container, vnode);`))),
 
       h3('batchRender() - Batch Multiple VNodes'),
       p('Use batchRender() to efficiently render multiple VNodes at once:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h2, p } from 'elit';
 
 // Create array of VNodes
@@ -62,14 +62,14 @@ const items = [
 ];
 
 // Batch render with automatic chunking for large arrays
-domNode.batchRender('container', items);
+dom.batchRender('container', items);
 
 // For 3000+ items, automatically uses RAF chunking
 // For smaller arrays, renders immediately with DocumentFragment`))),
 
       h3('renderChunked() - Progressive Rendering'),
       p('Use renderChunked() for progressive rendering with progress tracking:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, p } from 'elit';
 
 // Generate large array of VNodes
@@ -78,7 +78,7 @@ const items = Array.from({ length: 50000 }, (_, i) =>
 );
 
 // Render in chunks with progress callback
-domNode.renderChunked(
+dom.renderChunked(
   'container',
   items,
   5000, // Chunk size
@@ -92,16 +92,16 @@ domNode.renderChunked(
 
       h3('renderToDOM() - Low-Level Rendering'),
       p('Use renderToDOM() for direct rendering to any DOM element:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, span } from 'elit';
 
 // Create a DocumentFragment
 const fragment = document.createDocumentFragment();
 
 // Render multiple VNodes to fragment
-domNode.renderToDOM(div('Item 1'), fragment);
-domNode.renderToDOM(div('Item 2'), fragment);
-domNode.renderToDOM(span('Item 3'), fragment);
+dom.renderToDOM(div('Item 1'), fragment);
+dom.renderToDOM(div('Item 2'), fragment);
+dom.renderToDOM(span('Item 3'), fragment);
 
 // Append fragment to DOM in one operation
 document.body.appendChild(fragment);`))),
@@ -109,7 +109,7 @@ document.body.appendChild(fragment);`))),
       h2('Server-Side Rendering'),
       h3('renderToString() - VNode to HTML'),
       p('Convert VNodes to HTML strings for SSR:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h1, p, a } from 'elit';
 
 const vnode = div({ className: 'page' },
@@ -119,12 +119,12 @@ const vnode = div({ className: 'page' },
 );
 
 // Convert to HTML string
-const html = domNode.renderToString(vnode);
+const html = dom.renderToString(vnode);
 console.log(html);
 // Output: <div class="page"><h1>Welcome</h1><p>This is server-rendered content</p><a href="/about">About Us</a></div>
 
 // With pretty printing
-const prettyHtml = domNode.renderToString(vnode, {
+const prettyHtml = dom.renderToString(vnode, {
   pretty: true,
   indent: 0
 });
@@ -139,7 +139,7 @@ console.log(prettyHtml);
       h3('SSR with Express'),
       p('Integrate with Express for server-side rendering:'),
       pre(code(...codeBlock(`import express from 'express';
-import { domNode } from 'elit';
+import { dom } from 'elit';
 import { div, h1, p } from 'elit';
 
 const app = express();
@@ -150,7 +150,7 @@ app.get('/', (req, res) => {
     p('This HTML was generated on the server')
   );
 
-  const html = domNode.renderToString(vnode);
+  const html = dom.renderToString(vnode);
 
   res.send(\`
     <!DOCTYPE html>
@@ -174,7 +174,7 @@ app.listen(3000, () => {
       h2('JSON Utilities'),
       h3('jsonToVNode() - JSON to VNode'),
       p('Convert JSON structures to VNodes:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // JSON structure
 const jsonData = {
@@ -196,14 +196,14 @@ const jsonData = {
 };
 
 // Convert to VNode
-const vnode = domNode.jsonToVNode(jsonData);
+const vnode = dom.jsonToVNode(jsonData);
 
 // Render to DOM
-domNode.render('app', vnode);`))),
+dom.render('app', vnode);`))),
 
       h3('renderJson() - Render JSON Directly'),
       p('Render JSON structures directly to DOM:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 const jsonData = {
   tag: 'article',
@@ -217,11 +217,11 @@ const jsonData = {
 };
 
 // Render JSON to DOM directly
-domNode.renderJson('container', jsonData);`))),
+dom.renderJson('container', jsonData);`))),
 
       h3('renderJsonToString() - JSON to HTML'),
       p('Convert JSON structures to HTML strings:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 const jsonData = {
   tag: 'div',
@@ -232,7 +232,7 @@ const jsonData = {
   ]
 };
 
-const html = domNode.renderJsonToString(jsonData, {
+const html = dom.renderJsonToString(jsonData, {
   pretty: true,
   indent: 2
 });
@@ -241,7 +241,7 @@ console.log(html);`))),
 
       h3('vNodeJsonToVNode() - VNode JSON Format'),
       p('Work with VNode JSON structures:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 const vnodeJson = {
   tagName: 'div',
@@ -259,13 +259,13 @@ const vnodeJson = {
   ]
 };
 
-const vnode = domNode.vNodeJsonToVNode(vnodeJson);
-domNode.render('app', vnode);`))),
+const vnode = dom.vNodeJsonToVNode(vnodeJson);
+dom.render('app', vnode);`))),
 
       h2('Virtual Scrolling'),
       h3('createVirtualList() - Large Lists'),
       p('Efficiently render large lists with virtual scrolling:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, span, strong } from 'elit';
 
 // Generate large dataset
@@ -279,7 +279,7 @@ const items = Array.from({ length: 100000 }, (_, i) => ({
 const container = document.getElementById('list-container');
 
 // Create virtual list
-const virtualList = domNode.createVirtualList(
+const virtualList = dom.createVirtualList(
   container,
   items,
   (item, index) => div({ className: 'list-item' },
@@ -295,12 +295,12 @@ const virtualList = domNode.createVirtualList(
 
       h3('Custom Virtual List Configuration'),
       p('Customize virtual list behavior:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, img, h3, p } from 'elit';
 
 const products = [/* large product array */];
 
-const virtualList = domNode.createVirtualList(
+const virtualList = dom.createVirtualList(
   document.getElementById('products'),
   products,
   (product) => div({ className: 'product-card' },
@@ -316,10 +316,10 @@ const virtualList = domNode.createVirtualList(
       h2('Lazy Loading'),
       h3('lazy() - Lazy Load Components'),
       p('Lazy load components for code splitting:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Define lazy-loaded component
-const LazyDashboard = domNode.lazy(async () => {
+const LazyDashboard = dom.lazy(async () => {
   // Simulate dynamic import
   const module = await import('./Dashboard');
   return module.Dashboard;
@@ -328,17 +328,17 @@ const LazyDashboard = domNode.lazy(async () => {
 // Use lazy component
 async function renderApp() {
   const dashboard = await LazyDashboard();
-  domNode.render('app', dashboard);
+  dom.render('app', dashboard);
 }
 
 renderApp();`))),
 
       h3('Lazy Loading with Loading State'),
       p('Show loading indicator while component loads:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, p } from 'elit';
 
-const LazyChart = domNode.lazy(async () => {
+const LazyChart = dom.lazy(async () => {
   const module = await import('./Chart');
   return module.Chart;
 });
@@ -349,20 +349,20 @@ async function renderChart() {
 
   if (typeof chart === 'object' && 'tagName' in chart) {
     // Still loading
-    domNode.render('chart-container', chart);
+    dom.render('chart-container', chart);
   } else {
     // Loaded
-    domNode.render('chart-container', chart);
+    dom.render('chart-container', chart);
   }
 }`))),
 
       h2('State Management'),
       h3('createState() - Reactive State'),
       p('Create reactive state with DomNode:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Create state
-const count = domNode.createState(0);
+const count = dom.createState(0);
 
 // Read value
 console.log(count.value); // 0
@@ -387,15 +387,15 @@ count.destroy();`))),
 
       h3('State with Options'),
       p('Configure state behavior with options:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Throttled updates
-const throttledState = domNode.createState(0, {
+const throttledState = dom.createState(0, {
   throttle: 100 // Update at most every 100ms
 });
 
 // Deep comparison for objects
-const user = domNode.createState(
+const user = dom.createState(
   { name: 'John', age: 30 },
   { deep: true }
 );
@@ -406,13 +406,13 @@ user.value = { name: 'John', age: 31 }; // Triggers (age changed)`))),
 
       h3('computed() - Derived State'),
       p('Create computed values from multiple states:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
-const firstName = domNode.createState('John');
-const lastName = domNode.createState('Doe');
+const firstName = dom.createState('John');
+const lastName = dom.createState('Doe');
 
 // Computed full name
-const fullName = domNode.computed(
+const fullName = dom.computed(
   [firstName, lastName],
   (first, last) => \`\${first} \${last}\`
 );
@@ -425,12 +425,12 @@ console.log(fullName.value); // "Jane Doe"`))),
 
       h3('effect() - Side Effects'),
       p('Run side effects with the effect() helper:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
-const count = domNode.createState(0);
+const count = dom.createState(0);
 
 // Run effect immediately
-domNode.effect(() => {
+dom.effect(() => {
   console.log('Current count:', count.value);
 });
 
@@ -444,11 +444,11 @@ count.subscribe((value) => {
       h2('Head Management'),
       h3('renderToHead() - Modify Document Head'),
       p('Add elements to document head:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { meta, link, style, title } from 'elit';
 
 // Add multiple head elements
-domNode.renderToHead(
+dom.renderToHead(
   title('My App'),
   meta({ name: 'description', content: 'App description' }),
   meta({ property: 'og:title', content: 'My App' }),
@@ -458,30 +458,30 @@ domNode.renderToHead(
 
       h3('Helper Methods for Head'),
       p('Use convenience methods for common head operations:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Set page title
-domNode.setTitle('My Application');
+dom.setTitle('My Application');
 
 // Add stylesheet
-domNode.addLink({
+dom.addLink({
   rel: 'stylesheet',
   href: '/styles.css'
 });
 
 // Add meta tags
-domNode.addMeta({
+dom.addMeta({
   name: 'viewport',
   content: 'width=device-width, initial-scale=1'
 });
 
-domNode.addMeta({
+dom.addMeta({
   name: 'description',
   content: 'My application description'
 });
 
 // Add inline styles
-domNode.addStyle(\`
+dom.addStyle(\`
   body {
     font-family: system-ui, sans-serif;
     margin: 0;
@@ -491,22 +491,22 @@ domNode.addStyle(\`
       h2('Memory Management'),
       h3('cleanupUnusedElements()'),
       p('Clean up unused elements to free memory:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Render some content
 const container = document.getElementById('app');
-domNode.render(container, someVNode);
+dom.render(container, someVNode);
 
 // Later, clean up unused elements
-const removed = domNode.cleanupUnusedElements(container);
+const removed = dom.cleanupUnusedElements(container);
 console.log(\`Removed \${removed} unused elements\`);`))),
 
       h3('Element Cache'),
       p('Access the element cache for advanced use cases:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Get element cache
-const cache = domNode.getElementCache();
+const cache = dom.getElementCache();
 
 // Check if element is tracked
 const element = document.getElementById('my-element');
@@ -517,7 +517,7 @@ console.log('Element tracked:', isTracked);`))),
       h2('Advanced Patterns'),
       h3('Custom Rendering Pipeline'),
       p('Build custom rendering pipelines:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h1, p } from 'elit';
 
 class CustomRenderer {
@@ -538,7 +538,7 @@ class CustomRenderer {
     const processed = this.preprocess(vnode);
 
     // Use DomNode for actual rendering
-    domNode.render(this.container, processed);
+    dom.render(this.container, processed);
   }
 
   // Render with animation
@@ -558,7 +558,7 @@ renderer.renderWithFade(div(h1('Title'), p('Content')));`))),
 
       h3('Progressive Hydration'),
       p('Implement progressive hydration for SSR:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Server-rendered HTML is already in DOM
 // Progressively hydrate interactive components
@@ -580,7 +580,7 @@ class HydrationManager {
 
     // Replace server HTML with interactive component
     element.innerHTML = '';
-    domNode.render(element, vnode);
+    dom.render(element, vnode);
 
     this.hydratedComponents.add(id);
   }
@@ -655,7 +655,7 @@ class HydrationManager {
       h2('วิธีการ Rendering'),
       h3('render() - Rendering พื้นฐาน'),
       p('เมธอด render() แปลง VNode เป็น DOM และแนบไปยัง container:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h1, p } from 'elit';
 
 // สร้าง VNode
@@ -665,15 +665,15 @@ const vnode = div(
 );
 
 // Render ไปยัง element ด้วย ID
-domNode.render('app', vnode);
+dom.render('app', vnode);
 
 // หรือ render ไปยัง element reference
 const container = document.getElementById('app');
-domNode.render(container, vnode);`))),
+dom.render(container, vnode);`))),
 
       h3('batchRender() - Batch VNodes หลายตัว'),
       p('ใช้ batchRender() เพื่อ render VNodes หลายตัวอย่างมีประสิทธิภาพ:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h2, p } from 'elit';
 
 // สร้าง array ของ VNodes
@@ -685,14 +685,14 @@ const items = [
 ];
 
 // Batch render พร้อม automatic chunking สำหรับ arrays ขนาดใหญ่
-domNode.batchRender('container', items);
+dom.batchRender('container', items);
 
 // สำหรับ 3000+ items ใช้ RAF chunking โดยอัตโนมัติ
 // สำหรับ arrays เล็กกว่า render ทันทีด้วย DocumentFragment`))),
 
       h3('renderChunked() - Progressive Rendering'),
       p('ใช้ renderChunked() สำหรับ progressive rendering พร้อมติดตามความคืบหน้า:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, p } from 'elit';
 
 // สร้าง array ขนาดใหญ่ของ VNodes
@@ -701,7 +701,7 @@ const items = Array.from({ length: 50000 }, (_, i) =>
 );
 
 // Render เป็น chunks พร้อม progress callback
-domNode.renderChunked(
+dom.renderChunked(
   'container',
   items,
   5000, // ขนาด Chunk
@@ -715,16 +715,16 @@ domNode.renderChunked(
 
       h3('renderToDOM() - Low-Level Rendering'),
       p('ใช้ renderToDOM() สำหรับ rendering โดยตรงไปยัง DOM element ใดๆ:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, span } from 'elit';
 
 // สร้าง DocumentFragment
 const fragment = document.createDocumentFragment();
 
 // Render VNodes หลายตัวไปยัง fragment
-domNode.renderToDOM(div('รายการ 1'), fragment);
-domNode.renderToDOM(div('รายการ 2'), fragment);
-domNode.renderToDOM(span('รายการ 3'), fragment);
+dom.renderToDOM(div('รายการ 1'), fragment);
+dom.renderToDOM(div('รายการ 2'), fragment);
+dom.renderToDOM(span('รายการ 3'), fragment);
 
 // แนบ fragment ไปยัง DOM ในการทำงานครั้งเดียว
 document.body.appendChild(fragment);`))),
@@ -732,7 +732,7 @@ document.body.appendChild(fragment);`))),
       h2('Server-Side Rendering'),
       h3('renderToString() - VNode เป็น HTML'),
       p('แปลง VNodes เป็น HTML strings สำหรับ SSR:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, h1, p, a } from 'elit';
 
 const vnode = div({ className: 'page' },
@@ -742,12 +742,12 @@ const vnode = div({ className: 'page' },
 );
 
 // แปลงเป็น HTML string
-const html = domNode.renderToString(vnode);
+const html = dom.renderToString(vnode);
 console.log(html);
 // Output: <div class="page"><h1>ยินดีต้อนรับ</h1><p>นี่คือเนื้อหาที่ render จาก server</p><a href="/about">เกี่ยวกับเรา</a></div>
 
 // พร้อม pretty printing
-const prettyHtml = domNode.renderToString(vnode, {
+const prettyHtml = dom.renderToString(vnode, {
   pretty: true,
   indent: 0
 });
@@ -756,7 +756,7 @@ console.log(prettyHtml);`))),
       h3('SSR กับ Express'),
       p('ผสานกับ Express สำหรับ server-side rendering:'),
       pre(code(...codeBlock(`import express from 'express';
-import { domNode } from 'elit';
+import { dom } from 'elit';
 import { div, h1, p } from 'elit';
 
 const app = express();
@@ -767,7 +767,7 @@ app.get('/', (req, res) => {
     p('HTML นี้ถูกสร้างบน server')
   );
 
-  const html = domNode.renderToString(vnode);
+  const html = dom.renderToString(vnode);
 
   res.send(\`
     <!DOCTYPE html>
@@ -791,7 +791,7 @@ app.listen(3000, () => {
       h2('JSON Utilities'),
       h3('jsonToVNode() - JSON เป็น VNode'),
       p('แปลง JSON structures เป็น VNodes:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // JSON structure
 const jsonData = {
@@ -813,14 +813,14 @@ const jsonData = {
 };
 
 // แปลงเป็น VNode
-const vnode = domNode.jsonToVNode(jsonData);
+const vnode = dom.jsonToVNode(jsonData);
 
 // Render ไปยัง DOM
-domNode.render('app', vnode);`))),
+dom.render('app', vnode);`))),
 
       h3('renderJson() - Render JSON โดยตรง'),
       p('Render JSON structures โดยตรงไปยัง DOM:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 const jsonData = {
   tag: 'article',
@@ -834,11 +834,11 @@ const jsonData = {
 };
 
 // Render JSON ไปยัง DOM โดยตรง
-domNode.renderJson('container', jsonData);`))),
+dom.renderJson('container', jsonData);`))),
 
       h3('renderJsonToString() - JSON เป็น HTML'),
       p('แปลง JSON structures เป็น HTML strings:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 const jsonData = {
   tag: 'div',
@@ -849,7 +849,7 @@ const jsonData = {
   ]
 };
 
-const html = domNode.renderJsonToString(jsonData, {
+const html = dom.renderJsonToString(jsonData, {
   pretty: true,
   indent: 2
 });
@@ -859,7 +859,7 @@ console.log(html);`))),
       h2('Virtual Scrolling'),
       h3('createVirtualList() - Lists ขนาดใหญ่'),
       p('Render lists ขนาดใหญ่อย่างมีประสิทธิภาพด้วย virtual scrolling:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { div, span, strong } from 'elit';
 
 // สร้าง dataset ขนาดใหญ่
@@ -873,7 +873,7 @@ const items = Array.from({ length: 100000 }, (_, i) => ({
 const container = document.getElementById('list-container');
 
 // สร้าง virtual list
-const virtualList = domNode.createVirtualList(
+const virtualList = dom.createVirtualList(
   container,
   items,
   (item, index) => div({ className: 'list-item' },
@@ -890,10 +890,10 @@ const virtualList = domNode.createVirtualList(
       h2('Lazy Loading'),
       h3('lazy() - Lazy Load Components'),
       p('Lazy load components สำหรับ code splitting:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // กำหนด lazy-loaded component
-const LazyDashboard = domNode.lazy(async () => {
+const LazyDashboard = dom.lazy(async () => {
   // จำลอง dynamic import
   const module = await import('./Dashboard');
   return module.Dashboard;
@@ -902,7 +902,7 @@ const LazyDashboard = domNode.lazy(async () => {
 // ใช้ lazy component
 async function renderApp() {
   const dashboard = await LazyDashboard();
-  domNode.render('app', dashboard);
+  dom.render('app', dashboard);
 }
 
 renderApp();`))),
@@ -910,10 +910,10 @@ renderApp();`))),
       h2('State Management'),
       h3('createState() - Reactive State'),
       p('สร้าง reactive state ด้วย DomNode:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // สร้าง state
-const count = domNode.createState(0);
+const count = dom.createState(0);
 
 // อ่านค่า
 console.log(count.value); // 0
@@ -938,15 +938,15 @@ count.destroy();`))),
 
       h3('State พร้อม Options'),
       p('กำหนดค่าพฤติกรรม state ด้วย options:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Throttled updates
-const throttledState = domNode.createState(0, {
+const throttledState = dom.createState(0, {
   throttle: 100 // อัปเดตมากที่สุดทุก 100ms
 });
 
 // Deep comparison สำหรับ objects
-const user = domNode.createState(
+const user = dom.createState(
   { name: 'สมชาย', age: 30 },
   { deep: true }
 );
@@ -957,13 +957,13 @@ user.value = { name: 'สมชาย', age: 31 }; // Triggers (อายุเ�
 
       h3('computed() - Derived State'),
       p('สร้างค่า computed จาก states หลายตัว:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
-const firstName = domNode.createState('สมชาย');
-const lastName = domNode.createState('ใจดี');
+const firstName = dom.createState('สมชาย');
+const lastName = dom.createState('ใจดี');
 
 // Computed ชื่อเต็ม
-const fullName = domNode.computed(
+const fullName = dom.computed(
   [firstName, lastName],
   (first, last) => \`\${first} \${last}\`
 );
@@ -976,12 +976,12 @@ console.log(fullName.value); // "สมหญิง ใจดี"`))),
 
       h3('effect() - Side Effects'),
       p('รัน side effects ด้วย effect() helper:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
-const count = domNode.createState(0);
+const count = dom.createState(0);
 
 // รัน effect ทันที
-domNode.effect(() => {
+dom.effect(() => {
   console.log('นับปัจจุบัน:', count.value);
 });
 
@@ -995,11 +995,11 @@ count.subscribe((value) => {
       h2('Head Management'),
       h3('renderToHead() - แก้ไข Document Head'),
       p('เพิ่ม elements ไปยัง document head:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { meta, link, style, title } from 'elit';
 
 // เพิ่ม head elements หลายตัว
-domNode.renderToHead(
+dom.renderToHead(
   title('แอปของฉัน'),
   meta({ name: 'description', content: 'คำอธิบายแอป' }),
   meta({ property: 'og:title', content: 'แอปของฉัน' }),
@@ -1009,30 +1009,30 @@ domNode.renderToHead(
 
       h3('Helper Methods สำหรับ Head'),
       p('ใช้เมธอดที่สะดวกสำหรับการทำงาน head ทั่วไป:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // ตั้งค่า page title
-domNode.setTitle('แอปพลิเคชันของฉัน');
+dom.setTitle('แอปพลิเคชันของฉัน');
 
 // เพิ่ม stylesheet
-domNode.addLink({
+dom.addLink({
   rel: 'stylesheet',
   href: '/styles.css'
 });
 
 // เพิ่ม meta tags
-domNode.addMeta({
+dom.addMeta({
   name: 'viewport',
   content: 'width=device-width, initial-scale=1'
 });
 
-domNode.addMeta({
+dom.addMeta({
   name: 'description',
   content: 'คำอธิบายแอปพลิเคชันของฉัน'
 });
 
 // เพิ่ม inline styles
-domNode.addStyle(\`
+dom.addStyle(\`
   body {
     font-family: system-ui, sans-serif;
     margin: 0;
@@ -1042,14 +1042,14 @@ domNode.addStyle(\`
       h2('Memory Management'),
       h3('cleanupUnusedElements()'),
       p('ทำความสะอาด elements ที่ไม่ใช้เพื่อปลดปล่อย memory:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 
 // Render เนื้อหาบางส่วน
 const container = document.getElementById('app');
-domNode.render(container, someVNode);
+dom.render(container, someVNode);
 
 // ภายหลัง ทำความสะอาด elements ที่ไม่ใช้
-const removed = domNode.cleanupUnusedElements(container);
+const removed = dom.cleanupUnusedElements(container);
 console.log(\`ลบ \${removed} elements ที่ไม่ใช้\`);`))),
 
       h2('แนวทางปฏิบัติที่ดี'),

@@ -30,7 +30,7 @@ export const blog1: BlogPostDetail = {
       ),
 
       h2('Quick Example'),
-      pre(code(...codeBlock(`import { div, button, createState, reactive, domNode } from 'elit';
+      pre(code(...codeBlock(`import { div, button, createState, reactive, dom } from 'elit';
 
 const count = createState(0);
 
@@ -44,7 +44,7 @@ const app = div(
   )
 );
 
-domNode.render('#app', app);`))),
+dom.render('#app', app);`))),
 
       h2('Get Started'),
       p('Install Elit via npm:'),
@@ -69,7 +69,7 @@ domNode.render('#app', app);`))),
       ),
 
       h2('ตัวอย่างง่ายๆ'),
-      pre(code(...codeBlock(`import { div, button, createState, reactive, domNode } from 'elit';
+      pre(code(...codeBlock(`import { div, button, createState, reactive, dom } from 'elit';
 
 const count = createState(0);
 
@@ -83,7 +83,7 @@ const app = div(
   )
 );
 
-domNode.render('#app', app);`))),
+dom.render('#app', app);`))),
 
       h2('เริ่มต้นใช้งาน'),
       p('ติดตั้ง Elit ผ่าน npm:'),

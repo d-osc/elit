@@ -2,8 +2,11 @@ export type * from './types';
 export * from './dom';
 export * from './state';
 export * from './style';
-export * from './router';
 export * from './el';
+
+// Client-side Router
+export { createRouter, createRouterView, routerLink } from './router';
+export type { Router, Route, RouteParams, RouteLocation, RouterOptions } from './router';
 
 // Development Server
 export { createDevServer } from './server';
@@ -12,9 +15,9 @@ export { createDevServer } from './server';
 export { default as hmr } from './hmr';
 export type { HMRClient } from './hmr';
 
-// Router and API
-export { Router, json, text, html, status } from './server';
-export type { RouteContext, RouteHandler, Middleware, HttpMethod } from './server';
+// API Router (Server-side)
+export { ServerRouter, ServerRouter as ApiRouter, json, text as sendText, html, status } from './server';
+export type { ServerRouteContext, ServerRouteHandler, Middleware, HttpMethod } from './server';
 
 // Middleware
 export {

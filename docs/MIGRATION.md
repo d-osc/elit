@@ -412,9 +412,9 @@ document.body.appendChild(div);
 
 ```javascript
 // Elit
-import { div, domNode } from 'elit';
+import { div, dom } from 'elit';
 
-domNode.render('body',
+dom.render('body',
   div({ className: 'container' }, 'Hello')
 );
 ```

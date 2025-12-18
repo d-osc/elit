@@ -74,7 +74,7 @@ import type { Server } from 'http';
 import type { WebSocketServer } from 'ws';
 
 // Forward declarations to avoid circular dependency
-export type Router = import('./server').Router;
+export type Router = import('./server').ServerRouter;
 export type StateManager = import('./server').StateManager;
 
 export interface ClientConfig {
@@ -84,6 +84,10 @@ export interface ClientConfig {
     basePath: string;
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
+    /** Watch patterns for file changes */
+    watch?: string[];
+    /** Ignore patterns for file watching */
+    ignore?: string[];
 }
 
 export interface DevServerOptions {

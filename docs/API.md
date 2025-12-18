@@ -24,12 +24,12 @@ Complete API documentation for Elit library.
 
 The core rendering engine of Elit.
 
-### domNode
+### dom
 
 Main API for rendering VNodes to the DOM.
 
 ```typescript
-const domNode: {
+const dom: {
   render(selector: string | HTMLElement, vnode: VNode): void;
   renderToString(vnode: VNode, options?: RenderOptions): string;
   renderToHead(...vnodes: VNode[]): HTMLHeadElement | null;
@@ -51,13 +51,13 @@ const domNode: {
 **Basic Usage:**
 
 ```javascript
-import { domNode, div, h1 } from 'elit';
+import { dom, div, h1 } from 'elit';
 
 // Render to DOM
-domNode.render('#app', div(h1('Hello World')));
+dom.render('#app', div(h1('Hello World')));
 
 // Render to string (SSR)
-const html = domNode.renderToString(div(h1('Hello World')));
+const html = dom.renderToString(div(h1('Hello World')));
 ```
 
 ---
@@ -885,7 +885,7 @@ When loaded via `<script>` tag or CDN, all exports are available on `window`:
 ```html
 <script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>
 <script>
-  const { div, h1, button, createState, reactive, domNode } = window;
+  const { div, h1, button, createState, reactive, dom } = window;
 
   const count = createState(0);
 
@@ -894,7 +894,7 @@ When loaded via `<script>` tag or CDN, all exports are available on `window`:
     button({ onclick: () => count.value++ }, '+')
   );
 
-  domNode.render('#app', app);
+  dom.render('#app', app);
 </script>
 ```
 
@@ -908,7 +908,7 @@ When loaded via `<script>` tag or CDN, all exports are available on `window`:
 - Router: `createRouter`, `createRouterView`, `routerLink`
 - Styling: `CreateStyle`
 - DOM utilities: `el`, `els`, `elId`, `elClass`, `createEl`, `fragment`, `doc`
-- Core: `domNode`, `createElementFactory`
+- Core: `dom`, `createElementFactory`
 
 ---
 

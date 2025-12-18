@@ -594,7 +594,7 @@ export const PostForm = (postId, posts, router) => {
 Create `src/app.js`:
 
 ```javascript
-import { createSharedState, createRouter, createRouterView, domNode, div } from 'elit';
+import { createSharedState, createRouter, createRouterView, dom, div } from 'elit';
 import { container } from './styles';
 import { Header } from './components/Header';
 import { PostList } from './components/PostList';
@@ -648,7 +648,7 @@ const App = div({ className: container },
   createRouterView(router)
 );
 
-domNode.render('#app', App);
+dom.render('#app', App);
 
 console.log('📝 Blog app initialized!');
 ```

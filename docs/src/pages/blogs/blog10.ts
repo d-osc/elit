@@ -54,11 +54,11 @@ export const RouterView = createRouterView(router, {
 
       h3('Rendering the Router'),
       p('Use the RouterView component to render the current route:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { RouterView } from './router';
 
 // Render the app
-domNode.render('#app', RouterView());`))),
+dom.render('#app', RouterView());`))),
 
       h2('Route Configuration'),
       h3('Route Object Structure'),
@@ -516,7 +516,7 @@ router.beforeEach((to, from) => {
   createRouter,
   createRouterView,
   routerLink,
-  div, nav, ul, li, h1, p, domNode
+  div, nav, ul, li, h1, p, dom
 } from 'elit';
 
 // Pages
@@ -579,7 +579,7 @@ const App = () =>
   );
 
 // Render app
-domNode.render('#app', App());`))),
+dom.render('#app', App());`))),
 
       h2('Best Practices'),
       ul(
@@ -661,11 +661,11 @@ export const RouterView = createRouterView(router, {
 
       h3('Render Router'),
       p('ใช้ RouterView component เพื่อ render route ปัจจุบัน:'),
-      pre(code(...codeBlock(`import { domNode } from 'elit';
+      pre(code(...codeBlock(`import { dom } from 'elit';
 import { RouterView } from './router';
 
 // Render แอป
-domNode.render('#app', RouterView());`))),
+dom.render('#app', RouterView());`))),
 
       h2('การกำหนดค่า Route'),
       h3('โครงสร้าง Route Object'),

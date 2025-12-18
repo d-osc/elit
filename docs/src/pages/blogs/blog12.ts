@@ -738,7 +738,7 @@ const TodoApp = div({ className: 'todo-app' },
 );
 
 // Render
-domNode.render('#app', TodoApp);`))),
+dom.render('#app', TodoApp);`))),
 
       h2('Conclusion'),
       p('Elit\'s state management system provides a powerful, lightweight solution for building reactive applications. With createState, computed, effects, and performance helpers like batchRender and createVirtualList, you can build complex, performant applications with minimal overhead.'),

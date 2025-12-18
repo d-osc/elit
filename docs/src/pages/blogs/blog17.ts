@@ -75,7 +75,7 @@ console.log('🔥 HMR enabled at http://localhost:3000');`))),
 </html>`))),
 
       p('Create ', code('public/app.js'), ':'),
-      pre(code(...codeBlock(`import { div, h1, p, button, createState, reactive, domNode } from 'elit';
+      pre(code(...codeBlock(`import { div, h1, p, button, createState, reactive, dom } from 'elit';
 
 const count = createState(0);
 
@@ -91,7 +91,7 @@ const App = div({ id: 'app' },
   }, 'Increment')
 );
 
-domNode.render('#app', App);
+dom.render('#app', App);
 
 console.log('✅ App loaded with HMR');`))),
 
@@ -528,7 +528,7 @@ console.log('🔥 HMR เปิดใช้งานที่ http://localhost:3
 </html>`))),
 
       p('สร้าง ', code('public/app.js'), ':'),
-      pre(code(...codeBlock(`import { div, h1, p, button, createState, reactive, domNode } from 'elit';
+      pre(code(...codeBlock(`import { div, h1, p, button, createState, reactive, dom } from 'elit';
 
 const count = createState(0);
 
@@ -544,7 +544,7 @@ const App = div({ id: 'app' },
   }, 'เพิ่ม')
 );
 
-domNode.render('#app', App);
+dom.render('#app', App);
 
 console.log('✅ แอปโหลดพร้อม HMR');`))),
 

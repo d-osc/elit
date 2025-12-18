@@ -32,7 +32,7 @@ Create `index.html`:
 Create `app.js`:
 
 ```javascript
-import { div, h1, p, button, createState, reactive, domNode } from 'elit';
+import { div, h1, p, button, createState, reactive, dom } from 'elit';
 
 // Create reactive state
 const count = createState(0);
@@ -55,7 +55,7 @@ const app = div({ className: 'container' },
 );
 
 // Render to DOM
-domNode.render('#app', app);
+dom.render('#app', app);
 ```
 
 ## Start Development Server
@@ -342,7 +342,7 @@ res.send(`
 <body>
   <div id="app"></div>
   <script>
-    const { div, h1, button, createState, reactive, domNode } = window;
+    const { div, h1, button, createState, reactive, dom } = window;
 
     const count = createState(0);
 
@@ -353,7 +353,7 @@ res.send(`
       )
     );
 
-    domNode.render('#app', app);
+    dom.render('#app', app);
   </script>
 </body>
 </html>

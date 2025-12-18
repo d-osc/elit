@@ -2,9 +2,9 @@ import {
   div, h2, h3, section, pre, code, button, input, span, p, a, ul, li,
   table, thead, tbody, tr, th, td, form, label, select, option, textarea,
   createState, reactive, computed, text, bindValue, bindChecked,
-  CreateStyle, setTitle, addMeta,
+  CreateStyle,
   svgSvg, svgCircle, svgRect, svgPath,
-  jsonToVNode, renderToString
+  dom
 } from 'elit';
 import { codeBlock } from '../highlight';
 import { t, currentLang } from '../i18n';
@@ -441,7 +441,7 @@ const HeadManagementDemo = () => {
   const pageTitle = createState('Elit Docs');
 
   return div({ className: 'demo-section' },
-    h3('setTitle()'),
+    h3('dom.setTitle()'),
     div({ className: 'demo-result' },
       input({
         type: 'text',
@@ -450,21 +450,21 @@ const HeadManagementDemo = () => {
         oninput: (e: Event) => pageTitle.value = (e.target as HTMLInputElement).value
       }),
       button({
-        onclick: () => setTitle(pageTitle.value || 'Elit Docs'),
+        onclick: () => dom.setTitle(pageTitle.value || 'Elit Docs'),
         style: 'padding: 0.5rem 1rem; border-radius: 6px; border: none; background: var(--primary); color: white; cursor: pointer;'
       }, 'Set Title'),
       p({ style: 'margin-top: 0.5rem; color: var(--text-muted);' }, 'Check the browser tab!')
     ),
 
-    h3('addMeta()'),
+    h3('dom.addMeta()'),
     div({ className: 'demo-result' },
       button({
-        onclick: () => addMeta({ name: 'theme-color', content: '#6366f1' }),
+        onclick: () => dom.addMeta({ name: 'theme-color', content: '#6366f1' }),
         style: 'padding: 0.5rem 1rem; border-radius: 6px; border: none; background: var(--primary); color: white; cursor: pointer;'
       }, 'Add Theme Color Meta')
     ),
-    codeExample(`addMeta({ name: 'theme-color', content: '#6366f1' });
-addMeta({ name: 'description', content: 'My app description' });`)
+    codeExample(`dom.addMeta({ name: 'theme-color', content: '#6366f1' });
+dom.addMeta({ name: 'description', content: 'My app description' });`)
   );
 };
 
@@ -491,9 +491,9 @@ const JsonRenderingDemo = () => {
   };
 
   return div({ className: 'demo-section' },
-    h3('jsonToVNode()'),
+    h3('dom.jsonToVNode()'),
     div({ className: 'demo-result' },
-      jsonToVNode(jsonStructure)
+      dom.jsonToVNode(jsonStructure)
     ),
     codeExample(`const json = {
   tag: 'div',
@@ -504,12 +504,12 @@ const JsonRenderingDemo = () => {
   ]
 };
 
-const vnode = jsonToVNode(json);`),
+const vnode = dom.jsonToVNode(json);`),
 
-    h3('renderToString() - SSR'),
+    h3('dom.renderToString() - SSR'),
     div({ className: 'demo-result' },
       pre({ style: 'background: var(--bg-code); padding: 1rem; border-radius: 8px; overflow-x: auto;' },
-        code(renderToString(
+        code(dom.renderToString(
           div({ className: 'ssr-example' },
             p('This was rendered to string')
           ),
@@ -517,7 +517,7 @@ const vnode = jsonToVNode(json);`),
         ))
       )
     ),
-    codeExample(`const html = renderToString(
+    codeExample(`const html = dom.renderToString(
   div({ className: 'app' },
     p('Server rendered')
   ),
@@ -563,31 +563,31 @@ const ShoppingCartDemo = () => {
           items.length === 0
             ? p({ style: 'color: var(--text-muted);' }, 'Cart is empty')
             : table({ style: 'width: 100%; border-collapse: collapse; margin-bottom: 1rem;' },
-                thead(
+              thead(
+                tr(
+                  th({ style: 'text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Item'),
+                  th({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Price'),
+                  th({ style: 'text-align: center; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Qty'),
+                  th({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Subtotal')
+                )
+              ),
+              tbody(
+                ...items.map(item =>
                   tr(
-                    th({ style: 'text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Item'),
-                    th({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Price'),
-                    th({ style: 'text-align: center; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Qty'),
-                    th({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, 'Subtotal')
-                  )
-                ),
-                tbody(
-                  ...items.map(item =>
-                    tr(
-                      td({ style: 'padding: 0.5rem; border-bottom: 1px solid var(--border);' }, item.name),
-                      td({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, `$${item.price}`),
-                      td({ style: 'text-align: center; padding: 0.5rem; border-bottom: 1px solid var(--border);' },
-                        div({ style: 'display: flex; align-items: center; justify-content: center; gap: 0.5rem;' },
-                          button({ onclick: () => updateQty(item.id, -1), style: 'width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-code); color: var(--text); cursor: pointer;' }, '-'),
-                          span(String(item.qty)),
-                          button({ onclick: () => updateQty(item.id, 1), style: 'width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-code); color: var(--text); cursor: pointer;' }, '+')
-                        )
-                      ),
-                      td({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, `$${item.price * item.qty}`)
-                    )
+                    td({ style: 'padding: 0.5rem; border-bottom: 1px solid var(--border);' }, item.name),
+                    td({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, `$${item.price}`),
+                    td({ style: 'text-align: center; padding: 0.5rem; border-bottom: 1px solid var(--border);' },
+                      div({ style: 'display: flex; align-items: center; justify-content: center; gap: 0.5rem;' },
+                        button({ onclick: () => updateQty(item.id, -1), style: 'width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-code); color: var(--text); cursor: pointer;' }, '-'),
+                        span(String(item.qty)),
+                        button({ onclick: () => updateQty(item.id, 1), style: 'width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-code); color: var(--text); cursor: pointer;' }, '+')
+                      )
+                    ),
+                    td({ style: 'text-align: right; padding: 0.5rem; border-bottom: 1px solid var(--border);' }, `$${item.price * item.qty}`)
                   )
                 )
               )
+            )
         )
       ),
       div({ style: 'display: flex; justify-content: space-between; align-items: center;' },
@@ -675,7 +675,7 @@ const FormValidationDemo = () => {
 // Code Examples
 // ============================================
 
-const counterCodeExample = `import { div, h1, button, createState, reactive, domNode } from 'elit';
+const counterCodeExample = `import { div, h1, button, createState, reactive, dom } from 'elit';
 
 // Create reactive state
 const count = createState(0);
@@ -693,7 +693,7 @@ const app = div({ className: 'app' },
 );
 
 // Render to DOM
-domNode.render('#app', app);`;
+dom.render('#app', app);`;
 
 // ============================================
 // Main Examples Component

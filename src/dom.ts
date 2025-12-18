@@ -473,9 +473,9 @@ export class DomNode {
             return false;
         }
         return vNode.tagName === 'span' &&
-               vNode.props?.id &&
-               typeof vNode.props.id === 'string' &&
-               vNode.props.id.match(/^r[a-z0-9]{9}$/);
+            vNode.props?.id &&
+            typeof vNode.props.id === 'string' &&
+            vNode.props.id.match(/^r[a-z0-9]{9}$/);
     }
 
     private unwrapReactive(vNode: any): Child {
@@ -495,8 +495,8 @@ export class DomNode {
                 const props = child.props;
                 const hasNoProps = !props || Object.keys(props).length === 0;
                 const hasSingleStringChild = child.children &&
-                                             child.children.length === 1 &&
-                                             typeof child.children[0] === 'string';
+                    child.children.length === 1 &&
+                    typeof child.children[0] === 'string';
 
                 if (hasNoProps && hasSingleStringChild) {
                     return child.children[0];
@@ -835,4 +835,4 @@ export class DomNode {
     }
 }
 
-export const domNode = new DomNode();
+export const dom = new DomNode();

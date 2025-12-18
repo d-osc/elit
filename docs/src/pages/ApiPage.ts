@@ -30,19 +30,19 @@ const dom = new DomNode();
 dom.render('#app', div('Hello World'));`
     },
     {
-      name: 'domNode',
+      name: 'dom',
       badge: 'instance',
-      sig: 'const domNode: DomNode',
+      sig: 'const dom: DomNode',
       desc: 'Instance เริ่มต้นของ DomNode พร้อมใช้งาน',
       details: 'เป็น singleton instance ที่สร้างไว้ให้แล้ว ไม่จำเป็นต้องสร้างใหม่ เหมาะสำหรับการใช้งานทั่วไป',
-      example: `import { domNode, div } from 'elit';
+      example: `import { dom, div } from 'elit';
 
-domNode.render('#app', div('Hello'));`
+dom.render('#app', div('Hello'));`
     },
     {
       name: 'render',
       badge: 'method',
-      sig: 'domNode.render(rootElement: string | HTMLElement, vNode: VNode): HTMLElement',
+      sig: 'dom.render(rootElement: string | HTMLElement, vNode: VNode): HTMLElement',
       desc: 'Render VNode ไปยัง DOM element ที่กำหนด',
       details: 'ฟังก์ชันหลักสำหรับ render application ลงใน DOM รองรับทั้ง CSS selector string และ HTMLElement โดยตรง จะล้างเนื้อหาเดิมและแทนที่ด้วย VNode ใหม่',
       params: [
@@ -50,7 +50,7 @@ domNode.render('#app', div('Hello'));`
         { name: 'vNode', type: 'VNode', desc: 'Virtual DOM node ที่จะแสดงผล' }
       ],
       returns: 'HTMLElement ที่ถูก render',
-      example: `domNode.render('#app',
+      example: `dom.render('#app',
   div({ className: 'container' },
     h1('Welcome'),
     p('Hello World')
@@ -60,7 +60,7 @@ domNode.render('#app', div('Hello'));`
     {
       name: 'renderToDOM',
       badge: 'method',
-      sig: 'domNode.renderToDOM(vNode: Child, parent: HTMLElement | SVGElement | DocumentFragment): void',
+      sig: 'dom.renderToDOM(vNode: Child, parent: HTMLElement | SVGElement | DocumentFragment): void',
       desc: 'Render VNode เข้าไปใน parent element โดยไม่ล้างเนื้อหาเดิม',
       details: 'ใช้สำหรับ append VNode เข้าไปใน element ที่มีอยู่แล้ว ไม่ลบเนื้อหาเดิม เหมาะสำหรับการเพิ่ม element แบบ dynamic',
       params: [
@@ -68,7 +68,7 @@ domNode.render('#app', div('Hello'));`
         { name: 'parent', type: 'HTMLElement | SVGElement | DocumentFragment', desc: 'Element ที่จะเพิ่ม VNode เข้าไป' }
       ],
       example: `const container = document.getElementById('list');
-domNode.renderToDOM(li('New Item'), container);`
+dom.renderToDOM(li('New Item'), container);`
     },
     {
       name: 'renderToString',
@@ -1096,7 +1096,7 @@ inputRef.current?.focus();`
 };
 
 const vnode = jsonToVNode(json);
-domNode.render('#app', vnode);`
+dom.render('#app', vnode);`
     },
     {
       name: 'renderJson',

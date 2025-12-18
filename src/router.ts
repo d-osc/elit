@@ -3,7 +3,7 @@
  */
 
 import type { VNode, Child, Props, State } from './types';
-import { domNode } from './dom';
+import { dom } from './dom';
 
 export interface Route {
     path: string;
@@ -107,7 +107,7 @@ export function createRouter(options: RouterOptions): Router {
         return null;
     };
 
-    const currentRoute = domNode.createState<RouteLocation>(parseLocation(getCurrentPath()));
+    const currentRoute = dom.createState<RouteLocation>(parseLocation(getCurrentPath()));
 
     const navigate = (path: string, replace = false): void => {
         const location = parseLocation(path);

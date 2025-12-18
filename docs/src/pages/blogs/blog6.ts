@@ -114,7 +114,7 @@ export const Counter = () => {
       h2('Main Application'),
       h3('src/main.ts'),
       p('Set up your main application file:'),
-      pre(code(...codeBlock(`import { domNode, div, h1, p } from 'elit';
+      pre(code(...codeBlock(`import { dom, div, h1, p } from 'elit';
 import { Counter } from './components/Counter';
 import './style.css';
 
@@ -124,7 +124,7 @@ const app = div({ className: 'app' },
   Counter()
 );
 
-domNode.render('#app', app);`))),
+dom.render('#app', app);`))),
 
       h3('index.html'),
       p('Update your HTML entry point:'),
@@ -406,7 +406,7 @@ export const Counter = () => {
       h2('แอปพลิเคชันหลัก'),
       h3('src/main.ts'),
       p('ตั้งค่าไฟล์แอปพลิเคชันหลัก:'),
-      pre(code(...codeBlock(`import { domNode, div, h1, p } from 'elit';
+      pre(code(...codeBlock(`import { dom, div, h1, p } from 'elit';
 import { Counter } from './components/Counter';
 import './style.css';
 
@@ -416,7 +416,7 @@ const app = div({ className: 'app' },
   Counter()
 );
 
-domNode.render('#app', app);`))),
+dom.render('#app', app);`))),
 
       h3('index.html'),
       p('อัปเดต HTML entry point:'),

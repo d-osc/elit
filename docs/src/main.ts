@@ -1,4 +1,4 @@
-import { domNode, div, main, reactive } from 'elit';
+import { dom, div, main, reactive } from 'elit';
 import { injectStyles } from './styles';
 import { Header, Footer } from './components';
 import { router, RouterView } from './router';
@@ -17,4 +17,4 @@ const App = () =>
   );
 
 // Render
-domNode.render('#app', App());
+dom.render('#app', App());

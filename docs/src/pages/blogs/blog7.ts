@@ -274,7 +274,7 @@ function getBlogById(id: string) {
       p('After the server renders HTML, we need to "hydrate" it on the client to make it interactive:'),
 
       h3('public/js/hydrate.js'),
-      pre(code(...codeBlock(`import { domNode, createState, reactive } from 'elit';
+      pre(code(...codeBlock(`import { dom, createState, reactive } from 'elit';
 
 // Hydrate interactive components
 document.addEventListener('DOMContentLoaded', () => {
@@ -764,7 +764,7 @@ function getBlogById(id: string) {
       p('หลังจากเซิร์ฟเวอร์ render HTML แล้ว เราต้อง "hydrate" บน client เพื่อให้มีการโต้ตอบ:'),
 
       h3('public/js/hydrate.js'),
-      pre(code(...codeBlock(`import { domNode, createState, reactive } from 'elit';
+      pre(code(...codeBlock(`import { dom, createState, reactive } from 'elit';
 
 // Hydrate interactive components
 document.addEventListener('DOMContentLoaded', () => {

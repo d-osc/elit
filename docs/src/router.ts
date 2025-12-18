@@ -1,5 +1,5 @@
 import { createRouter, createRouterView, type RouteParams } from 'elit';
-import { HomePage, ExamplesPage, DocsPage, ApiPage, BlogPage, BlogDetailPage } from './pages';
+import { HomePage, ExamplesPage, DocsPage, ApiPage, BlogPage, BlogDetailPage } from './pages/index.ts';
 
 // Define routes
 const routes = [
@@ -14,6 +14,7 @@ const routes = [
 // Initialize router
 export const router = createRouter({
   mode: 'hash',
+  base: '/elit',
   routes
 });
 

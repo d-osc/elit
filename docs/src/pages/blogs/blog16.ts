@@ -171,7 +171,7 @@ console.log('✨ Shared State: "posts" ready for real-time sync\\n');`))),
       h2('Step 2: Create Main App'),
       p('Create ', code('src/app.js'), ' with shared state connection:'),
 
-      pre(code(...codeBlock(`import { createSharedState, createRouter, createRouterView, domNode, div } from 'elit';
+      pre(code(...codeBlock(`import { createSharedState, createRouter, createRouterView, dom, div } from 'elit';
 import { container } from './styles';
 import { Header } from './components/Header';
 import { PostList } from './components/PostList';
@@ -229,7 +229,7 @@ const App = div({ className: container },
   createRouterView(router)
 );
 
-domNode.render('#app', App);
+dom.render('#app', App);
 
 console.log('📝 Blog app initialized with real-time sync!');`))),
 
@@ -702,7 +702,7 @@ console.log('✨ Shared State: "posts" พร้อมสำหรับ real-ti
       h2('ขั้นตอนที่ 2: สร้าง Main App'),
       p('สร้าง ', code('src/app.js'), ' พร้อมการเชื่อมต่อ shared state:'),
 
-      pre(code(...codeBlock(`import { createSharedState, createRouter, createRouterView, domNode, div } from 'elit';
+      pre(code(...codeBlock(`import { createSharedState, createRouter, createRouterView, dom, div } from 'elit';
 import { container } from './styles';
 import { Header } from './components/Header';
 import { PostList } from './components/PostList';
@@ -736,7 +736,7 @@ const App = div({ className: container },
   createRouterView(router)
 );
 
-domNode.render('#app', App);
+dom.render('#app', App);
 
 console.log('📝 Blog app เริ่มต้นพร้อม real-time sync!');`))),
 

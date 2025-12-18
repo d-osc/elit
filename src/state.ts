@@ -3,29 +3,29 @@
  */
 
 import type { State, StateOptions, VNode, VirtualListController, Child, Props } from './types';
-import { domNode } from './dom';
+import { dom } from './dom';
 
 // State management helpers
 export const createState = <T>(initial: T, options?: StateOptions): State<T> =>
-    domNode.createState(initial, options);
+    dom.createState(initial, options);
 
 export const computed = <T extends any[], R>(
     states: { [K in keyof T]: State<T[K]> },
     fn: (...values: T) => R
-): State<R> => domNode.computed(states, fn);
+): State<R> => dom.computed(states, fn);
 
-export const effect = (fn: () => void): void => domNode.effect(fn);
+export const effect = (fn: () => void): void => dom.effect(fn);
 
 // Performance helpers
 export const batchRender = (container: string | HTMLElement, vNodes: VNode[]): HTMLElement =>
-    domNode.batchRender(container, vNodes);
+    dom.batchRender(container, vNodes);
 
 export const renderChunked = (
     container: string | HTMLElement,
     vNodes: VNode[],
     chunkSize?: number,
     onProgress?: (current: number, total: number) => void
-): HTMLElement => domNode.renderChunked(container, vNodes, chunkSize, onProgress);
+): HTMLElement => dom.renderChunked(container, vNodes, chunkSize, onProgress);
 
 export const createVirtualList = <T>(
     container: HTMLElement,
@@ -33,13 +33,13 @@ export const createVirtualList = <T>(
     renderItem: (item: T, index: number) => VNode,
     itemHeight?: number,
     bufferSize?: number
-): VirtualListController => domNode.createVirtualList(container, items, renderItem, itemHeight, bufferSize);
+): VirtualListController => dom.createVirtualList(container, items, renderItem, itemHeight, bufferSize);
 
 export const lazy = <T extends any[], R>(loadFn: () => Promise<(...args: T) => R>) =>
-    domNode.lazy(loadFn);
+    dom.lazy(loadFn);
 
 export const cleanupUnused = (root: HTMLElement): number =>
-    domNode.cleanupUnusedElements(root);
+    dom.cleanupUnusedElements(root);
 
 // Throttle helper
 export const throttle = <T extends any[]>(fn: (...args: T) => void, delay: number) => {
@@ -353,15 +353,15 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
                     }
 
                     for (const child of children) {
-                        domNode.renderToDOM(child, fragment);
+                        dom.renderToDOM(child, fragment);
                     }
                 } else {
-                    domNode.renderToDOM(newResult, fragment);
+                    dom.renderToDOM(newResult, fragment);
                 }
 
                 elementRef.textContent = '';
                 elementRef.appendChild(fragment);
-                domNode.getElementCache().set(elementRef, true);
+                dom.getElementCache().set(elementRef, true);
             }
         }
     };
@@ -418,11 +418,11 @@ export const reactiveAs = <T>(
                     elementRef.textContent = '';
                 } else {
                     (elementRef as HTMLElement).style.display = '';
-                    domNode.renderToDOM(newResult, fragment);
+                    dom.renderToDOM(newResult, fragment);
                     elementRef.textContent = '';
                     elementRef.appendChild(fragment);
                 }
-                domNode.getElementCache().set(elementRef, true);
+                dom.getElementCache().set(elementRef, true);
             }
             rafId = null;
         });
