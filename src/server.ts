@@ -405,7 +405,7 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
 
       return true;
     } catch (error) {
-      console.error(`[Proxy] Invalid proxy configuration for ${path}:`, error);
+      console.error('[Proxy] Invalid proxy configuration for %s:', path, error);
       return false;
     }
   };
