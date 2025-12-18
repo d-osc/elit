@@ -393,7 +393,7 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
 
       // Handle errors
       proxyReq.on('error', (error) => {
-        console.error(`[Proxy] Error proxying ${url} to ${target}:`, error.message);
+        console.error('[Proxy] Error proxying %s to %s:', url, target, error.message);
         if (!res.headersSent) {
           res.writeHead(502, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Bad Gateway', message: 'Proxy error' }));
