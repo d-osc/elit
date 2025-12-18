@@ -109,6 +109,7 @@ styles.addClass('logo-icon', {
 styles.addClass('nav', { display: 'flex', gap: '2rem', alignItems: 'center' });
 styles.descendant('.nav', 'a', { color: styles.var(textMuted), fontWeight: 500, transition: 'color 0.2s' });
 styles.addPseudoClass('hover', { color: styles.var(textColor) }, '.nav a');
+styles.add({ '.nav a.active': { color: styles.var(primary), fontWeight: 600 } });
 
 // Language button
 styles.addClass('btn-lang', {

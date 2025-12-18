@@ -1,6 +1,6 @@
 import {
   div, h1, h2, h3, h4, p, a, span, button, nav, header, footer, section,
-  code, pre, routerLink, reactive, img
+  code, pre, routerLink, reactive, img, computed
 } from 'elit';
 import type { Router } from 'elit';
 import { codeBlock } from './highlight';
@@ -14,16 +14,52 @@ export const Logo = (router: Router) =>
     span('Elit')
   );
 
-export const Header = (router: Router) =>
-  header({ className: 'header' },
+export const Header = (router: Router) => {
+  const isActive = (path: string, currentPath: string) => {
+    if (path === '/') return currentPath === '/';
+    return currentPath.startsWith(path);
+  };
+
+  // Computed state that combines currentLang and currentRoute
+  const navState = computed([currentLang, router.currentRoute], (lang, route) => ({
+    lang,
+    currentPath: route.path
+  }));
+
+  return header({ className: 'header' },
     div({ className: 'container header-inner' },
       Logo(router),
       nav({ className: 'nav' },
-        reactive(currentLang, () => routerLink(router, { to: '/' }, t('nav.home'))),
-        reactive(currentLang, () => routerLink(router, { to: '/examples' }, t('nav.examples'))),
-        reactive(currentLang, () => routerLink(router, { to: '/docs' }, t('nav.docs'))),
-        reactive(currentLang, () => routerLink(router, { to: '/api' }, t('nav.api'))),
-        reactive(currentLang, () => routerLink(router, { to: '/blog' }, t('nav.blog'))),
+        reactive(navState, (state) =>
+          routerLink(router, {
+            to: '/',
+            className: isActive('/', state.currentPath) ? 'active' : ''
+          }, t('nav.home'))
+        ),
+        reactive(navState, (state) =>
+          routerLink(router, {
+            to: '/examples',
+            className: isActive('/examples', state.currentPath) ? 'active' : ''
+          }, t('nav.examples'))
+        ),
+        reactive(navState, (state) =>
+          routerLink(router, {
+            to: '/docs',
+            className: isActive('/docs', state.currentPath) ? 'active' : ''
+          }, t('nav.docs'))
+        ),
+        reactive(navState, (state) =>
+          routerLink(router, {
+            to: '/api',
+            className: isActive('/api', state.currentPath) ? 'active' : ''
+          }, t('nav.api'))
+        ),
+        reactive(navState, (state) =>
+          routerLink(router, {
+            to: '/blog',
+            className: isActive('/blog', state.currentPath) ? 'active' : ''
+          }, t('nav.blog'))
+        ),
         a({ href: 'https://github.com/d-osc/elit', target: '_blank' }, 'GitHub'),
         button({
           className: 'btn-theme',
@@ -38,6 +74,7 @@ export const Header = (router: Router) =>
       )
     )
   );
+};
 
 // Hero Component
 export const Hero = (router: Router) =>
@@ -430,6 +467,104 @@ export const Stats = () =>
       )
     )
   );
+
+// Featured Examples Component
+export const FeaturedExamples = (router: Router) => {
+  // Top 3 featured examples - showcase most impressive demos
+  const featuredExamples = [
+    {
+      id: '3d-scene',
+      title: { en: '3D Scene', th: 'ฉาก 3D' },
+      description: {
+        en: 'Interactive 3D graphics with camera controls, lighting, and real-time transformations',
+        th: 'กราฟิก 3D แบบอินเทอร์แอคทีฟพร้อมการควบคุมกล้อง แสง และการแปลงแบบเรียลไทม์'
+      },
+      difficulty: 'advanced',
+      tags: ['3D', 'Canvas', 'Graphics'],
+      icon: '🎨',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: '#667eea'
+    },
+    {
+      id: 'ai-chat',
+      title: { en: 'AI Chat Assistant', th: 'ผู้ช่วย AI Chat' },
+      description: {
+        en: 'AI-powered chat with streaming responses, multiple conversations, and message history',
+        th: 'แชท AI พร้อมการตอบสนองแบบสตรีมมิ่ง การสนทนาหลายเธรด และประวัติข้อความ'
+      },
+      difficulty: 'advanced',
+      tags: ['AI', 'Chat', 'Streaming'],
+      icon: '🤖',
+      gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      color: '#f5576c'
+    },
+    {
+      id: 'rpg-game',
+      title: { en: 'RPG Game', th: 'เกม RPG' },
+      description: {
+        en: 'Turn-based RPG with combat system, character progression, inventory, and quests',
+        th: 'เกม RPG แบบเทิร์นพร้อมระบบการต่อสู้ การพัฒนาตัวละคร ของใช้ และเควส'
+      },
+      difficulty: 'advanced',
+      tags: ['Game', 'Combat', 'Progression'],
+      icon: '⚔️',
+      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      color: '#00f2fe'
+    }
+  ];
+
+  return section({ className: 'featured-examples container' },
+    reactive(currentLang, () => h2({ className: 'section-title' }, t('examples.title'))),
+    reactive(currentLang, () => p({ className: 'section-subtitle' }, t('examples.subtitle'))),
+    reactive(currentLang, () =>
+      div({ className: 'examples-grid' },
+        ...featuredExamples.map(example =>
+          div({ className: 'example-card' },
+            div({
+              className: 'example-header',
+              style: `background: ${example.gradient}; padding: 2rem; border-radius: 12px 12px 0 0; text-align: center;`
+            },
+              div({ style: 'font-size: 3rem; margin-bottom: 0.5rem;' }, example.icon),
+              h3({ style: 'color: white; margin: 0; font-size: 1.5rem;' }, example.title[currentLang.value])
+            ),
+            div({ className: 'example-body', style: 'padding: 1.5rem;' },
+              p({ className: 'example-description', style: 'margin-bottom: 1.5rem; line-height: 1.6;' },
+                example.description[currentLang.value]
+              ),
+              div({ className: 'example-tags', style: 'margin-bottom: 1.5rem;' },
+                ...example.tags.map(tag =>
+                  span({
+                    className: 'example-tag',
+                    style: 'background: rgba(0,0,0,0.05); padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; margin-right: 0.5rem;'
+                  }, tag)
+                )
+              ),
+              routerLink(router, {
+                to: `/examples/${example.id}`,
+                className: 'example-link',
+                style: `background: ${example.color}; color: white; display: inline-block; padding: 0.75rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; transition: transform 0.2s; width: 100%; text-align: center; box-sizing: border-box;`
+              }, t('examples.tryIt') + ' →')
+            )
+          )
+        )
+      )
+    ),
+    div({ style: 'text-align: center; margin-top: 3rem;' },
+      reactive(currentLang, () =>
+        div(
+          p({ style: 'margin-bottom: 1rem; color: #666; font-size: 0.95rem;' },
+            currentLang.value === 'en' ? '11 interactive examples available' : 'มี 11 ตัวอย่างแบบอินเทอร์แอคทีฟ'
+          ),
+          routerLink(router, {
+            to: '/examples',
+            className: 'btn btn-secondary',
+            style: 'padding: 0.875rem 2.5rem; font-size: 1.05rem;'
+          }, t('examples.viewAll'))
+        )
+      )
+    )
+  );
+};
 
 // Featured Blogs Component
 export const FeaturedBlogs = (router: Router) => {

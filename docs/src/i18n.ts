@@ -93,6 +93,12 @@ const translations: Record<Lang, Record<string, string>> = {
     'api.restApi': 'REST API',
     'api.restApi.desc': 'Server router, middleware stack',
 
+    // Examples
+    'examples.title': 'Interactive Examples',
+    'examples.subtitle': 'Explore real-world applications built with Elit',
+    'examples.viewAll': 'View All Examples',
+    'examples.tryIt': 'Try it',
+
     // Footer
     'footer.license': 'MIT License',
     'footer.builtWith': 'Built with Elit',
@@ -123,7 +129,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'docs.performance.desc': 'Utilities for handling large datasets:',
 
     // Examples Page
-    'examples.title': 'Examples',
+    'examples.page.title': 'Examples',
     'examples.livePreview': 'Live Preview',
     'examples.apiExamples': 'API Examples',
     'examples.realWorld': 'Real-world Examples',
@@ -268,6 +274,12 @@ const translations: Record<Lang, Record<string, string>> = {
     'api.restApi': 'REST API',
     'api.restApi.desc': 'Server router, middleware stack',
 
+    // Examples
+    'examples.title': 'ตัวอย่างแบบอินเทอร์แอคทีฟ',
+    'examples.subtitle': 'สำรวจแอปพลิเคชันในโลกจริงที่สร้างด้วย Elit',
+    'examples.viewAll': 'ดูตัวอย่างทั้งหมด',
+    'examples.tryIt': 'ลองใช้',
+
     // Footer
     'footer.license': 'MIT License',
     'footer.builtWith': 'สร้างด้วย Elit',
@@ -298,7 +310,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'docs.performance.desc': 'เครื่องมือสำหรับจัดการ datasets ขนาดใหญ่:',
 
     // Examples Page
-    'examples.title': 'ตัวอย่าง',
+    'examples.page.title': 'ตัวอย่าง',
     'examples.livePreview': 'แสดงผลจริง',
     'examples.apiExamples': 'ตัวอย่าง API',
     'examples.realWorld': 'ตัวอย่างการใช้งานจริง',
