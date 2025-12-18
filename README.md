@@ -1,27 +1,28 @@
 # Elit
 
-⚡ A full-stack TypeScript framework (~10KB gzipped) with built-in dev server, HMR, build tool, and REST API. Zero dependencies, maximum productivity.
+⚡ A lightweight TypeScript framework with built-in dev server, HMR, routing, and reactive state management. Minimal dependencies, maximum developer experience.
 
 [![npm version](https://img.shields.io/npm/v/elit.svg)](https://www.npmjs.com/package/elit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/badge/bundle%20size-~10KB%20gzipped-success)](https://bundlephobia.com/package/elit)
+[![Bundle Size](https://img.shields.io/badge/bundle%20size-lightweight-success)](https://bundlephobia.com/package/elit)
 
 > **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [CLI Tools](#cli-tools) | [API](#api) | [Deployment](#deployment)
 
 ## Why Elit?
 
-- **🎯 Tiny Bundle Size**: Only ~10KB gzipped (30KB minified) - no framework bloat
-- **📦 Zero Dependencies**: Pure TypeScript, no external dependencies
+- **🎯 Lightweight**: Minimal bundle size with tree-shaking support
 - **⚡ Lightning Fast**: Direct DOM manipulation - no virtual DOM overhead
 - **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
-- **🔄 Reactive State**: Simple but powerful reactive state management
+- **🔄 Reactive State**: Simple but powerful reactive state management with `createState` and `computed`
 - **🌲 Tree-Shakeable**: Import only what you need for optimal bundle size
 - **🚀 Full-Stack Ready**: Built-in dev server, HMR, build tool, and REST API
 - **🔥 Hot Module Replacement**: Instant development feedback with automatic HMR
-- **🏗️ Build System**: Integrated esbuild with automatic client/server separation
-- **🌐 REST API Router**: Built-in server-side routing with middleware stack
-- **🔌 WebSocket Support**: Real-time state synchronization out of the box
-- **🎨 Developer Experience**: CLI tools, zero config, and excellent tooling support
+- **🏗️ Build System**: Integrated esbuild for fast production builds
+- **🌐 ServerRouter**: Built-in server-side routing for REST APIs
+- **🔌 WebSocket Support**: Real-time communication via WebSocket
+- **🎨 CSS-in-JS**: Type-safe styling with `CreateStyle`
+- **🛣️ Client Router**: Hash and history mode routing with guards
+- **📦 Modular Exports**: Import from specific paths (`elit/dom`, `elit/router`, `elit/state`)
 
 ## Installation
 
@@ -102,17 +103,16 @@ export default defineConfig({
 - 📦 **Tree-Shakeable**: Import only what you need
 - 🎮 **DOM Utilities**: Convenient helper functions
 
-### Full-Stack Tools
+### Development Tools
 
-- 🔥 **Hot Module Replacement**: Instant development feedback
-- 🏗️ **Build System**: esbuild integration with automatic client/server separation
-- 🌐 **REST API Router**: Server-side routing with middleware stack
-- 🔧 **Middleware**: CORS, logging, error handling, rate limiting, compression, security
-- 🔄 **Shared State**: Real-time WebSocket state synchronization
-- 📊 **WebSocket Support**: Built-in WebSocket server
-- 📁 **Static File Server**: Gzip compression and cache headers
-- 🎯 **Zero Config**: Works out of the box with sensible defaults
-- 🔐 **Environment Variables**: Support for .env files with VITE_ prefix
+- 🔥 **Hot Module Replacement**: Instant development feedback with automatic reload
+- 🏗️ **Build System**: Integrated esbuild for fast production builds
+- 🌐 **ServerRouter**: Built-in REST API routing for server-side logic
+- 🔧 **Middleware Support**: Add custom middleware to the ServerRouter
+- 🔌 **WebSocket Server**: Built-in WebSocket support for real-time features
+- 📁 **Static File Server**: Efficient static file serving with proper MIME types
+- 🎯 **Smart Defaults**: Works with minimal configuration
+- 📦 **TypeScript Compilation**: Automatic TypeScript compilation with esbuild
 
 ## Quick Start
 
@@ -135,7 +135,7 @@ npm install elit
 Create `src/main.ts`:
 
 ```typescript
-import { div, h1, button, createState, reactive, domNode } from 'elit';
+import { div, h1, button, createState, reactive, dom } from 'elit';
 
 const count = createState(0);
 
@@ -149,7 +149,8 @@ const app = div({ className: 'app' },
   )
 );
 
-domNode.render('#app', app);
+// Render to DOM
+dom.render('#app', app);
 ```
 
 Create `index.html`:
@@ -184,7 +185,7 @@ npm install elit
 ```
 
 ```typescript
-import { div, h1, p, button, createState, reactive, domNode } from 'elit';
+import { div, h1, p, button, createState, reactive, dom } from 'elit';
 
 // Create reactive state
 const count = createState(0);
@@ -202,7 +203,7 @@ const app = div({ className: 'app' },
 );
 
 // Render to DOM
-domNode.render('#app', app);
+dom.render('#app', app);
 ```
 
 ### CDN Usage
@@ -216,7 +217,7 @@ domNode.render('#app', app);
 <body>
   <div id="app"></div>
   <script>
-    const { div, h1, button, createState, reactive, domNode } = window;
+    const { div, h1, button, createState, reactive, dom } = window;
 
     const count = createState(0);
     const app = div(
@@ -226,7 +227,7 @@ domNode.render('#app', app);
       )
     );
 
-    domNode.render('#app', app);
+    dom.render('#app', app);
   </script>
 </body>
 </html>
@@ -267,106 +268,142 @@ const deepState = createState({ nested: { value: 1 } }, { deep: true });
 ### Reactive Rendering
 
 ```typescript
-import { reactive, text, bindValue } from 'elit';
+import { reactive, text, bindValue, bindChecked } from 'elit';
 
 const message = createState('Hello');
+const isEnabled = createState(false);
 
 // Reactive element - re-renders when state changes
 const display = reactive(message, (value) =>
   div({ className: 'message' }, value)
 );
 
-// Reactive text
+// Reactive text node
 const label = text(message);
 
 // Two-way binding for inputs
 const inputEl = input({ type: 'text', ...bindValue(message) });
+const checkbox = input({ type: 'checkbox', ...bindChecked(isEnabled) });
 ```
 
 ### Shared State (Real-time Sync)
 
-**Requires `elit-server`** - Shared state syncs automatically between backend and frontend via WebSocket:
+Shared state automatically syncs between server and client via WebSocket:
+
+**Client-side:**
 
 ```typescript
 import { createSharedState, reactive } from 'elit';
 
-// Create shared state (auto-connects to elit-server)
+// Create shared state (auto-connects to WebSocket server)
 const counter = createSharedState('counter', 0);
-const todos = createSharedState('todos', []);
+const users = createSharedState('users', []);
 
 // Use with reactive rendering
 const app = div(
   reactive(counter.state, value =>
     div(`Counter: ${value}`)
   ),
-  button({ onclick: () => counter.value++ }, 'Increment')
+  button({ onclick: () => counter.set(counter.state.value + 1) }, 'Increment')
 );
 
 // Listen to changes
-counter.onChange((newValue, oldValue) => {
-  console.log(`${oldValue} → ${newValue}`);
+counter.onChange((newValue) => {
+  console.log('Counter changed to:', newValue);
 });
 
-// Update from any client - syncs to all
-counter.value++;
+// Update from any client - automatically syncs to all connected clients
+counter.set(10);
 ```
 
-**Backend (Node.js with elit-server):**
+**Server-side:**
 
-```javascript
-const { createDevServer } = require('elit-server');
+```typescript
+import { createDevServer, StateManager } from 'elit';
 
 const server = createDevServer({ port: 3000 });
 
-// Create matching shared states
-const counter = server.state.create('counter', { initial: 0 });
-const todos = server.state.create('todos', { initial: [] });
-
-// Listen to changes
-counter.onChange((newValue, oldValue) => {
-  console.log(`Counter: ${oldValue} → ${newValue}`);
-});
-
-// Update from backend - syncs to all clients
-counter.value++;
+// StateManager is built-in and handles WebSocket connections
+// All clients with matching shared state keys will sync automatically
 ```
 
-### elit-server - Development Server
+### Development Server with REST API
 
-Full-featured development server with HMR, REST API, and real-time features:
+Elit includes a built-in development server with HMR, WebSocket support, and REST API routing:
 
-```javascript
-const { createDevServer, Router, cors, logger } = require('elit-server');
+**Server Configuration (server.ts):**
+
+```typescript
+import { createDevServer, ServerRouter, cors, logger, json } from 'elit';
 
 // Create REST API router
-const api = new Router();
+const api = new ServerRouter();
 
 // Add middleware
-api.use(cors());
+api.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
 api.use(logger());
 
-// Define routes
+// Define API routes with helper functions
 api.get('/api/users', (ctx) => {
-  return { success: true, users: [...] };
+  json(ctx, { success: true, users: [] });
 });
 
-api.post('/api/users', (ctx) => {
+api.post('/api/users', async (ctx) => {
   const user = ctx.body;
-  return { success: true, user };
+  json(ctx, { success: true, user });
 });
 
-// Create server with API
+// Create development server
 const server = createDevServer({
   port: 3000,
-  root: __dirname,
-  api,
-  logging: true
+  root: './src',
+  open: true,
+  router: api
+});
+```
+
+**Available Middleware:**
+
+```typescript
+import {
+  cors,          // CORS headers
+  logger,        // Request logging
+  errorHandler,  // Error handling
+  rateLimit,     // Rate limiting
+  bodyLimit,     // Request body size limit
+  cacheControl,  // Cache headers
+  compress,      // Gzip compression
+  security       // Security headers
+} from 'elit';
+
+// Example usage
+api.use(cors({ origin: '*' }));
+api.use(logger({ format: 'detailed' }));
+api.use(rateLimit({ max: 100, windowMs: 60000 }));
+api.use(bodyLimit({ limit: 1024 * 1024 })); // 1MB
+api.use(compress());
+api.use(security());
+```
+
+**Helper Functions:**
+
+```typescript
+import { json, sendText, html, status } from 'elit';
+
+api.get('/api/data', (ctx) => {
+  json(ctx, { message: 'Hello' }); // JSON response
 });
 
-// Access shared state
-const counter = server.state.create('counter', {
-  initial: 0,
-  validate: (value) => typeof value === 'number'
+api.get('/text', (ctx) => {
+  sendText(ctx, 'Hello World'); // Text response
+});
+
+api.get('/page', (ctx) => {
+  html(ctx, '<h1>Hello</h1>'); // HTML response
+});
+
+api.get('/error', (ctx) => {
+  status(ctx, 404, 'Not Found'); // Custom status
 });
 ```
 
@@ -374,41 +411,16 @@ const counter = server.state.create('counter', {
 
 ```bash
 # Start dev server
-npx elit-dev
+npx elit dev
 
 # Custom port
-npx elit-dev --port 8080
+npx elit dev --port 8080
 
 # Custom root directory
-npx elit-dev --root ./public
+npx elit dev --root ./public
 
 # Disable auto-open browser
-npx elit-dev --no-open
-
-# Silent mode
-npx elit-dev --silent
-```
-
-**Middleware:**
-
-```javascript
-const {
-  cors,           // CORS headers
-  logger,         // Request logging
-  errorHandler,   // Error handling
-  rateLimit,      // Rate limiting
-  bodyLimit,      // Request body size limit
-  cacheControl,   // Cache headers
-  compress,       // Gzip compression
-  security        // Security headers
-} = require('elit-server');
-
-api.use(cors({ origin: '*' }));
-api.use(logger());
-api.use(rateLimit({ max: 100, window: 60000 }));
-api.use(bodyLimit(1024 * 1024)); // 1MB
-api.use(compress());
-api.use(security());
+npx elit dev --no-open
 ```
 
 ### Server-Side Rendering
@@ -478,7 +490,15 @@ const btn = button({ className: buttonClass }, 'Click me');
 ### Performance Utilities
 
 ```typescript
-import { batchRender, renderChunked, createVirtualList, throttle, debounce } from 'elit';
+import {
+  batchRender,
+  renderChunked,
+  createVirtualList,
+  throttle,
+  debounce,
+  lazy,
+  cleanupUnused
+} from 'elit';
 
 // Batch render multiple elements
 batchRender('#container', elements);
@@ -488,7 +508,7 @@ renderChunked('#container', largeArray, 5000, (current, total) => {
   console.log(`Rendered ${current}/${total}`);
 });
 
-// Virtual scrolling
+// Virtual scrolling for 100k+ items
 const virtualList = createVirtualList(
   container,
   items,
@@ -497,9 +517,61 @@ const virtualList = createVirtualList(
   5   // buffer size
 );
 
+// Lazy loading components
+const LazyComponent = lazy(() => import('./HeavyComponent'));
+
 // Throttle and debounce
 const throttledFn = throttle(handleScroll, 100);
 const debouncedFn = debounce(handleInput, 300);
+
+// Cleanup unused DOM elements
+const cleaned = cleanupUnused(rootElement);
+console.log(`Cleaned ${cleaned} elements`);
+```
+
+### Additional Features
+
+**DOM Utilities:**
+
+```typescript
+import { doc, el, els, createEl, elId, elClass, fragment } from 'elit';
+
+// Query selectors
+const element = el('.my-class');      // querySelector
+const elements = els('.my-class');    // querySelectorAll
+const byId = elId('my-id');          // getElementById
+const byClass = elClass('my-class'); // getElementsByClassName
+
+// Create elements
+const div = createEl('div');         // createElement
+const frag = fragment();             // createDocumentFragment
+
+// Access document
+doc.title = 'New Title';
+```
+
+**Effect System:**
+
+```typescript
+import { createState, effect } from 'elit';
+
+const count = createState(0);
+
+// Run side effects when state changes
+effect(() => {
+  console.log('Count is now:', count.value);
+});
+```
+
+**Reactive As (Advanced):**
+
+```typescript
+import { reactiveAs } from 'elit';
+
+// Use different reactive context
+const display = reactiveAs(customState, customContext, (value) =>
+  div(value)
+);
 ```
 
 ### JSON Rendering
@@ -530,33 +602,12 @@ renderVNode('#app', {
 ### Head Management
 
 ```typescript
-import { setTitle, addMeta, addLink, addStyle, renderToHead } from 'elit';
+import { setTitle, addMeta, addLink, addStyle } from 'elit';
 
 setTitle('My App');
 addMeta({ name: 'description', content: 'My awesome app' });
 addLink({ rel: 'stylesheet', href: '/styles.css' });
 addStyle('body { margin: 0; }');
-```
-
-### DOM Utilities
-
-Elit provides convenient DOM utility functions for common operations:
-
-```typescript
-import { doc, el, els, createEl, elId, elClass, fragment } from 'elit';
-
-// Query selectors (bound to document)
-const element = el('.my-class');           // querySelector
-const elements = els('.my-class');         // querySelectorAll
-const byId = elId('my-id');               // getElementById
-const byClass = elClass('my-class');      // getElementsByClassName
-
-// Create elements
-const div = createEl('div');              // createElement
-const frag = fragment();                  // createDocumentFragment
-
-// Access document object
-doc.title = 'New Title';
 ```
 
 ## Available Elements
@@ -618,7 +669,7 @@ When loaded via script tag, all exports are available on the `window` object:
 ```html
 <script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>
 <script>
-  const { div, span, createState, domNode } = window;
+  const { div, span, createState, dom } = window;
   // or use DomLib global namespace
   const app = DomLib.div('Hello');
 </script>
@@ -794,25 +845,27 @@ const isProd = import.meta.env.PROD;
 
 | Feature | Elit | Vite + React | Next.js | SvelteKit |
 |---------|----------|--------------|---------|-----------|
-| Bundle Size | 30KB | ~140KB+ | ~200KB+ | ~15KB* |
-| Zero Dependencies | ✅ | ❌ | ❌ | ❌ |
+| Runtime Size | Lightweight | ~140KB+ | ~200KB+ | ~15KB* |
+| Dependencies | Minimal (5) | Many | Many | Many |
 | Dev Server | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in |
 | HMR | ✅ | ✅ | ✅ | ✅ |
-| Build Tool | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in |
+| Build Tool | ✅ esbuild | ✅ Vite | ✅ Turbopack | ✅ Vite |
 | REST API | ✅ Built-in | ❌ | ✅ | ✅ |
+| Middleware | ✅ Built-in | ❌ | ✅ | ✅ |
+| WebSocket | ✅ Built-in | ❌ | ❌ | ❌ |
+| Shared State | ✅ Built-in | ❌ | ❌ | ❌ |
 | TypeScript | ✅ | ✅ | ✅ | ✅ |
 | SSR | ✅ | ❌ | ✅ | ✅ |
 | Learning Curve | Easy | Medium | Medium | Easy |
 
-*Svelte requires compilation
+*Svelte requires compilation step
 
 ## Documentation
 
-- 📚 [Full Documentation](https://github.com/oangsa/elit/docs)
-- ⚡ [Quick Start Guide](./docs/QUICK_START.md)
-- 📖 [API Reference](./docs/API.md)
-- 🔄 [Migration Guide](./docs/MIGRATION.md)
-- 🤝 [Contributing Guide](./CONTRIBUTING.md)
+- 📚 [Full Documentation](https://d-osc.github.io/elit)
+- ⚡ [Quick Start](https://d-osc.github.io/elit#/docs)
+- 📖 [API Reference](https://d-osc.github.io/elit#/api)
+- 🎮 [Interactive Examples](https://d-osc.github.io/elit#/examples)
 
 ## Changelog
 
@@ -854,11 +907,10 @@ Example applications demonstrating Elit features:
 
 ## Links
 
-- 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 📦 [npm - elit-server](https://www.npmjs.com/package/elit-server)
-- 🐙 [GitHub Repository](https://github.com/oangsa/elit)
-- 📚 Documentation (coming soon)
-- 💬 Discord Community (coming soon)
+- 📦 [npm Package](https://www.npmjs.com/package/elit)
+- 🐙 [GitHub Repository](https://github.com/d-osc/elit)
+- 📚 [Documentation](https://d-osc.github.io/elit)
+- 💬 Community & Issues: [GitHub Discussions](https://github.com/d-osc/elit/discussions)
 
 ## Contributing
 
