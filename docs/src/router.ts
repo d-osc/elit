@@ -1,10 +1,11 @@
 import { createRouter, createRouterView, type RouteParams } from 'elit';
-import { HomePage, ExamplesPage, DocsPage, ApiPage, BlogPage, BlogDetailPage } from './pages/index.ts';
+import { HomePage, ExamplesListPage, ExampleDetailPage, DocsPage, ApiPage, BlogPage, BlogDetailPage } from './pages/index.ts';
 
 // Define routes
 const routes = [
   { path: '/', component: () => HomePage(router) },
-  { path: '/examples', component: () => ExamplesPage() },
+  { path: '/examples', component: () => ExamplesListPage(router) },
+  { path: '/examples/:id', component: (params: RouteParams) => ExampleDetailPage(router, params.id) },
   { path: '/docs', component: () => DocsPage() },
   { path: '/api', component: () => ApiPage() },
   { path: '/blog', component: () => BlogPage(router) },

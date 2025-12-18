@@ -6,7 +6,7 @@
 import { loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
-import type { DevServerOptions, BuildOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
 const COMMANDS = ['dev', 'build', 'preview', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
@@ -71,29 +71,84 @@ async function runBuild(args: string[]) {
     const cliOptions = parseBuildArgs(args);
     const config = await loadConfig();
 
-    const options = config?.build
-        ? mergeConfig(config.build, cliOptions)
-        : cliOptions as BuildOptions;
-
     // Load environment variables
     const mode = process.env.MODE || 'production';
     const env = loadEnv(mode);
 
-    // Inject env into build options if not already set
-    if (!options.env) {
-        options.env = env;
-    }
+    // Check if config has build array or single build
+    if (config?.build) {
+        const builds = Array.isArray(config.build) ? config.build : [config.build];
 
-    if (!options.entry) {
-        console.error('Error: Entry file is required');
-        console.error('Specify in config file or use --entry <file>');
-        process.exit(1);
-    }
+        // If CLI options provided, merge with first build or use as standalone
+        if (Object.keys(cliOptions).length > 0) {
+            const options = mergeConfig(builds[0] || {}, cliOptions) as BuildOptions;
 
-    try {
-        await build(options);
-    } catch (error) {
-        process.exit(1);
+            if (!options.env) {
+                options.env = env;
+            }
+
+            if (!options.entry) {
+                console.error('Error: Entry file is required');
+                console.error('Specify in config file or use --entry <file>');
+                process.exit(1);
+            }
+
+            try {
+                await build(options);
+            } catch (error) {
+                process.exit(1);
+            }
+        } else {
+            // Run all builds from config
+            console.log(`Building ${builds.length} ${builds.length === 1 ? 'entry' : 'entries'}...\n`);
+
+            for (let i = 0; i < builds.length; i++) {
+                const buildConfig = builds[i];
+
+                if (!buildConfig.env) {
+                    buildConfig.env = env;
+                }
+
+                if (!buildConfig.entry) {
+                    console.error(`Error: Entry file is required for build #${i + 1}`);
+                    process.exit(1);
+                }
+
+                console.log(`[${i + 1}/${builds.length}] Building ${buildConfig.entry}...`);
+
+                try {
+                    await build(buildConfig);
+                } catch (error) {
+                    console.error(`Build #${i + 1} failed`);
+                    process.exit(1);
+                }
+
+                if (i < builds.length - 1) {
+                    console.log(''); // Empty line between builds
+                }
+            }
+
+            console.log(`\n✓ All ${builds.length} builds completed successfully`);
+        }
+    } else {
+        // No config, use CLI options only
+        const options = cliOptions as BuildOptions;
+
+        if (!options.env) {
+            options.env = env;
+        }
+
+        if (!options.entry) {
+            console.error('Error: Entry file is required');
+            console.error('Specify in config file or use --entry <file>');
+            process.exit(1);
+        }
+
+        try {
+            await build(options);
+        } catch (error) {
+            process.exit(1);
+        }
     }
 }
 
@@ -102,24 +157,70 @@ async function runPreview(args: string[]) {
     const config = await loadConfig();
 
     const previewConfig = config?.preview || {};
-    const mergedOptions = {
+    const mergedOptions: PreviewOptions = {
         ...previewConfig,
         ...Object.fromEntries(
             Object.entries(cliOptions).filter(([_, v]) => v !== undefined)
         )
     };
 
+    // Build DevServerOptions from PreviewOptions
     const options: DevServerOptions = {
         port: mergedOptions.port || 4173,
         host: mergedOptions.host || 'localhost',
-        root: mergedOptions.root || config?.build?.outDir || 'dist',
-        basePath: mergedOptions.basePath,
         open: mergedOptions.open ?? true,
         logging: mergedOptions.logging ?? true
     };
 
-    console.log('Starting preview server...');
-    console.log(`  Root:  ${options.root}`);
+    // Support both single root and clients array
+    if (mergedOptions.clients && mergedOptions.clients.length > 0) {
+        options.clients = mergedOptions.clients;
+        console.log('Starting preview server with multiple clients...');
+        console.log(`  Clients: ${mergedOptions.clients.length}`);
+        mergedOptions.clients.forEach((client, i) => {
+            console.log(`    ${i + 1}. ${client.basePath} -> ${client.root}`);
+        });
+    } else {
+        // Get outDir from build config (use first build if array)
+        const buildConfig = config?.build;
+        const defaultOutDir = Array.isArray(buildConfig) ? buildConfig[0]?.outDir : buildConfig?.outDir;
+
+        options.root = mergedOptions.root || defaultOutDir || 'dist';
+        options.basePath = mergedOptions.basePath;
+        console.log('Starting preview server...');
+        console.log(`  Root:  ${options.root}`);
+    }
+
+    // Add global proxy if configured
+    if (mergedOptions.proxy && mergedOptions.proxy.length > 0) {
+        options.proxy = mergedOptions.proxy;
+    }
+
+    // Add global worker if configured
+    if (mergedOptions.worker && mergedOptions.worker.length > 0) {
+        options.worker = mergedOptions.worker;
+    }
+
+    // Add API router if configured
+    if (mergedOptions.api) {
+        options.api = mergedOptions.api;
+    }
+
+    // Add HTTPS if configured
+    if (mergedOptions.https) {
+        options.https = mergedOptions.https;
+    }
+
+    // Add middleware if configured
+    if (mergedOptions.middleware) {
+        options.middleware = mergedOptions.middleware;
+    }
+
+    // Add SSR if configured
+    if (mergedOptions.ssr) {
+        options.ssr = mergedOptions.ssr;
+    }
+
     const devServer = createDevServer(options);
 
     const shutdown = async () => {
@@ -274,6 +375,11 @@ Build Options:
   --sourcemap            Generate sourcemap
   --silent               Disable logging
 
+Note: Build configuration supports both single and multiple builds:
+      - Single build: build: { entry: 'src/app.ts', outDir: 'dist' }
+      - Multiple builds: build: [{ entry: 'src/app1.ts' }, { entry: 'src/app2.ts' }]
+      When using array, all builds run sequentially.
+
 Preview Options:
   -p, --port <number>      Port to run server on (default: 4173)
   -h, --host <string>      Host to bind to (default: localhost)
@@ -282,8 +388,63 @@ Preview Options:
   --no-open                Don't open browser automatically
   --silent                 Disable logging
 
+Note: Preview mode has full feature parity with dev mode:
+      - Single root and multi-client configurations (use clients[] in config)
+      - REST API endpoints (use api option in config)
+      - Proxy forwarding and Web Workers
+      - HTTPS support, custom middleware, and SSR
+
 Config File:
   Create elit.config.ts, elit.config.js, or elit.config.json in project root
+
+Proxy Configuration:
+  Configure proxy in the config file to forward requests to backend servers.
+  Supports both global proxy (applies to all clients) and client-specific proxy.
+
+  Options:
+    - context: Path prefix to match (required, e.g., '/api', '/graphql')
+    - target: Backend server URL (required, e.g., 'http://localhost:8080')
+    - changeOrigin: Change the origin header to match target (default: false)
+    - pathRewrite: Rewrite request paths (e.g., { '^/api': '/v1/api' })
+    - headers: Add custom headers to proxied requests
+    - ws: Enable WebSocket proxying (default: false)
+
+  Proxy Priority:
+    1. Client-specific proxy (defined in clients[].proxy)
+    2. Global proxy (defined in dev.proxy)
+    The first matching proxy configuration will be used.
+
+Worker Configuration:
+  Configure Web Workers in the config file for background processing.
+  Supports both global workers (applies to all clients) and client-specific workers.
+
+  Options:
+    - path: Worker script path relative to root directory (required)
+    - name: Worker name/identifier (optional, defaults to filename)
+    - type: Worker type - 'module' (ESM) or 'classic' (default: 'module')
+
+  Worker Priority:
+    1. Client-specific workers (defined in clients[].worker)
+    2. Global workers (defined in dev.worker or preview.worker)
+    Both global and client-specific workers will be loaded.
+
+API and Middleware Configuration:
+  Configure REST API endpoints and custom middleware per client or globally.
+  Supports both global configuration and client-specific configuration.
+
+  Client-specific API and Middleware:
+    - Each client can have its own API router (clients[].api)
+    - Each client can have its own middleware chain (clients[].middleware)
+    - Client-specific configuration is isolated to that client's routes
+    - API paths are automatically prefixed with the client's basePath
+      Example: If basePath is '/app1' and route is '/api/health',
+               the full path will be '/app1/api/health'
+
+  Priority:
+    1. Client-specific middleware runs first (defined in clients[].middleware)
+    2. Global middleware runs second (defined in dev.middleware or preview.middleware)
+    3. Client-specific API routes are matched (defined in clients[].api)
+    4. Global API routes are matched (defined in dev.api or preview.api)
 
 Examples:
   elit dev
@@ -297,16 +458,194 @@ Config file example (elit.config.ts):
     dev: {
       port: 3000,
       clients: [
-        { root: './public', basePath: '/' }
+        {
+          root: './app1',
+          basePath: '/app1',
+          proxy: [
+            {
+              context: '/api',
+              target: 'http://localhost:8080',
+              changeOrigin: true
+            }
+          ],
+          worker: [
+            {
+              path: 'workers/data-processor.js',
+              name: 'dataProcessor',
+              type: 'module'
+            }
+          ],
+          // API routes are prefixed with basePath
+          // This route becomes: /app1/api/health
+          api: router()
+            .get('/api/health', (req, res) => {
+              res.json({ status: 'ok', app: 'app1' });
+            }),
+          middleware: [
+            (req, res, next) => {
+              console.log('App1 middleware:', req.url);
+              next();
+            }
+          ]
+        },
+        {
+          root: './app2',
+          basePath: '/app2',
+          proxy: [
+            {
+              context: '/graphql',
+              target: 'http://localhost:4000',
+              changeOrigin: true
+            }
+          ],
+          worker: [
+            {
+              path: 'workers/image-worker.js',
+              type: 'module'
+            }
+          ],
+          // API routes are prefixed with basePath
+          // This route becomes: /app2/api/status
+          api: router()
+            .get('/api/status', (req, res) => {
+              res.json({ status: 'running', app: 'app2' });
+            }),
+          middleware: [
+            (req, res, next) => {
+              console.log('App2 middleware:', req.url);
+              next();
+            }
+          ]
+        }
+      ],
+      // Global proxy (applies to all clients)
+      proxy: [
+        {
+          context: '/shared-api',
+          target: 'http://localhost:9000',
+          changeOrigin: true
+        }
+      ],
+      // Global workers (applies to all clients)
+      worker: [
+        {
+          path: 'workers/shared-worker.js',
+          name: 'sharedWorker',
+          type: 'module'
+        }
       ]
     },
+    // Single build configuration
     build: {
       entry: 'src/app.ts',
       outDir: 'dist',
       format: 'esm'
     },
+    // Alternative: Multiple builds
+    // build: [
+    //   {
+    //     entry: 'src/app1.ts',
+    //     outDir: 'dist/app1',
+    //     outFile: 'app1.js',
+    //     format: 'esm',
+    //     minify: true
+    //   },
+    //   {
+    //     entry: 'src/app2.ts',
+    //     outDir: 'dist/app2',
+    //     outFile: 'app2.js',
+    //     format: 'esm',
+    //     minify: true
+    //   },
+    //   {
+    //     entry: 'src/worker.ts',
+    //     outDir: 'dist/workers',
+    //     outFile: 'worker.js',
+    //     format: 'esm',
+    //     platform: 'browser'
+    //   }
+    // ],
     preview: {
-      port: 4173
+      port: 4173,
+      // Single client preview
+      root: 'dist',
+      basePath: '/app',
+      https: false,
+      // API router (import from elit/server)
+      api: router()
+        .get('/api/data', (req, res) => {
+          res.json({ message: 'Hello from preview API' });
+        }),
+      // Custom middleware
+      middleware: [
+        (req, res, next) => {
+          console.log('Preview request:', req.url);
+          next();
+        }
+      ],
+      // SSR render function
+      ssr: () => '<h1>Server-rendered content</h1>',
+      proxy: [
+        {
+          context: '/api',
+          target: 'http://localhost:8080'
+        }
+      ],
+      worker: [
+        {
+          path: 'workers/cache-worker.js',
+          type: 'module'
+        }
+      ]
+      // Multi-client preview (alternative)
+      // clients: [
+      //   {
+      //     root: './dist/app1',
+      //     basePath: '/app1',
+      //     proxy: [
+      //       {
+      //         context: '/api',
+      //         target: 'http://localhost:8080'
+      //       }
+      //     ],
+      //     worker: [
+      //       {
+      //         path: 'workers/app1-worker.js',
+      //         type: 'module'
+      //       }
+      //     ],
+      //     api: router()
+      //       .get('/api/health', (req, res) => {
+      //         res.json({ status: 'ok', app: 'app1' });
+      //       }),
+      //     middleware: [
+      //       (req, res, next) => {
+      //         console.log('App1 request:', req.url);
+      //         next();
+      //       }
+      //     ]
+      //   },
+      //   {
+      //     root: './dist/app2',
+      //     basePath: '/app2',
+      //     worker: [
+      //       {
+      //         path: 'workers/app2-worker.js',
+      //         type: 'module'
+      //       }
+      //     ],
+      //     api: router()
+      //       .get('/api/status', (req, res) => {
+      //         res.json({ status: 'running', app: 'app2' });
+      //       }),
+      //     middleware: [
+      //       (req, res, next) => {
+      //         console.log('App2 request:', req.url);
+      //         next();
+      //       }
+      //     ]
+      //   }
+      // ]
     }
   }
   `);

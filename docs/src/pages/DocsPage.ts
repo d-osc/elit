@@ -61,22 +61,63 @@ npx elit preview`),
 
           h3('Configuration File'),
           p('Create elit.config.mjs (or .ts, .js, .json) in your project root:'),
-          codeExample(`import { defineConfig } from 'elit';
+          codeExample(`import { router } from 'elit';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default {
   dev: {
     port: 3000,
     host: 'localhost',
     root: './src',
     basePath: '/',
-    open: true
+    open: true,
+    https: false,
+
+    // Proxy API requests to backend
+    proxy: [
+      {
+        context: '/api',
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        pathRewrite: { '^/api': '' }
+      }
+    ],
+
+    // Web Workers configuration
+    worker: [
+      {
+        path: 'workers/service-worker.js',
+        name: 'serviceWorker',
+        type: 'module'
+      }
+    ],
+
+    // REST API endpoints
+    api: router()
+      .get('/api/data', (req, res) => {
+        res.json({ message: 'Hello from API' });
+      })
+      .post('/api/data', (req, res) => {
+        res.json({ success: true });
+      }),
+
+    // Custom middleware
+    middleware: [
+      (req, res, next) => {
+        console.log('Request:', req.method, req.url);
+        next();
+      }
+    ]
   },
+
+  // Build configuration (single or array)
   build: {
     entry: './src/main.ts',
     outDir: './dist',
+    outFile: 'main.js',
     format: 'esm',
     minify: true,
+    sourcemap: false,
     platform: 'browser',
     basePath: '/app',
     copy: [
@@ -84,35 +125,102 @@ export default defineConfig({
         from: 'index.html',
         to: 'index.html',
         transform: (content, config) => {
-          // Inject base tag from basePath
-          return content;
+          return content.replace(
+            '<head>',
+            \`<head><base href="\${config.basePath}/">\`
+          );
         }
-      }
-    ]
+      },
+      { from: 'assets', to: 'assets' }
+    ],
+    onBuildEnd: (result) => {
+      console.log(\`✅ Build completed in \${result.buildTime}ms\`);
+    }
   },
+
   preview: {
     port: 4173,
     root: './dist',
-    basePath: '/app'
-  }
-});`),
+    basePath: '/app',
+    open: true,
+    https: false,
 
-          h3('Dev Server Features'),
-          p('Programmatic API for advanced use cases:'),
+    // Preview supports same features as dev
+    proxy: [...],
+    worker: [...],
+    api: router(),
+    middleware: [...]
+  }
+};`),
+
+          h3('Multi-Client Development'),
+          p('Develop multiple applications simultaneously on different paths:'),
+          codeExample(`export default {
+  dev: {
+    port: 3000,
+    // Multi-client configuration
+    clients: [
+      {
+        root: './app1',
+        basePath: '/app1',
+        watch: ['app1/**/*.ts'],
+        proxy: [
+          {
+            context: '/api',
+            target: 'http://localhost:8080'
+          }
+        ],
+        worker: [
+          {
+            path: 'workers/app1-worker.js',
+            type: 'module'
+          }
+        ],
+        // API routes prefixed with basePath: /app1/api/...
+        api: router()
+          .get('/api/health', (req, res) => {
+            res.json({ status: 'ok', app: 'app1' });
+          }),
+        middleware: [
+          (req, res, next) => {
+            console.log('App1:', req.url);
+            next();
+          }
+        ]
+      },
+      {
+        root: './app2',
+        basePath: '/app2',
+        watch: ['app2/**/*.ts'],
+        // Each client can have its own config
+        api: router()
+          .get('/api/status', (req, res) => {
+            res.json({ status: 'running', app: 'app2' });
+          })
+      }
+    ]
+  }
+};
+
+// Access:
+// http://localhost:3000/app1  -> serves app1
+// http://localhost:3000/app2  -> serves app2`),
+
+          h3('Dev Server API'),
+          p('Programmatic server control:'),
           codeExample(`import { createDevServer } from 'elit';
 
 const server = await createDevServer({
   port: 3000,
   open: true,
-  clients: [
-    {
-      basePath: '/app',
-      root: './src',
-      watch: ['src/**/*.ts'],
-      ignore: ['node_modules/**']
-    }
-  ]
-});`),
+  logging: true
+});
+
+// Stop server
+await server.stop();
+
+// Restart
+await server.restart();`),
 
           h3('Build Tool'),
           p('Automatic client/server code separation with esbuild:'),
@@ -132,6 +240,51 @@ await build({
     console.log(\`✅ Built in \${result.buildTime}ms\`);
   }
 });`),
+
+          h3('Multiple Builds'),
+          p('Build multiple entry points in a single command using array configuration:'),
+          codeExample(`// elit.config.mjs
+export default {
+  // Array of build configurations
+  build: [
+    {
+      entry: './src/main.ts',
+      outDir: './dist',
+      outFile: 'main.js',
+      format: 'esm',
+      minify: true,
+      basePath: '/app',
+      copy: [
+        { from: 'index.html', to: 'index.html' }
+      ]
+    },
+    {
+      entry: './src/admin.ts',
+      outDir: './dist',
+      outFile: 'admin.js',
+      format: 'esm',
+      minify: true,
+      basePath: '/admin'
+    },
+    {
+      entry: './src/worker.ts',
+      outDir: './dist/workers',
+      outFile: 'worker.js',
+      format: 'iife',
+      platform: 'browser'
+    }
+  ]
+};
+
+// Builds sequentially: [1/3], [2/3], [3/3]
+// npx elit build`),
+
+          p('CLI options override only the first build configuration:'),
+          codeExample(`# Override first build's minify option
+npx elit build --no-minify
+
+# Use config array for all builds
+npx elit build`),
 
           h3('REST API Router'),
           p('Built-in server-side routing with middleware:'),

@@ -16,3 +16,7 @@ export { blog15 } from './blog15';
 export { blog16 } from './blog16';
 export { blog17 } from './blog17';
 export { blog18 } from './blog18';
+export { blog19 } from './blog19';
+export { blog20 } from './blog20';
+export { blog21 } from './blog21';
+export { blog22 } from './blog22';

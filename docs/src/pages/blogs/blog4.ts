@@ -5,8 +5,8 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog4: BlogPostDetail = {
   id: '4',
   title: {
-    en: 'Elit 2.0 vs React vs Other Frameworks: A Comprehensive Comparison',
-    th: 'เปรียบเทียบ Elit 2.0 กับ React และ Frameworks อื่นๆ อย่างครบถ้วน'
+    en: 'Elit vs React vs Other Frameworks: A Comprehensive Comparison',
+    th: 'เปรียบเทียบ Elit กับ React และ Frameworks อื่นๆ อย่างครบถ้วน'
   },
   date: '2024-02-10',
   author: 'n-devs',
@@ -15,7 +15,7 @@ export const blog4: BlogPostDetail = {
     en: div(
       p('Choosing the right framework is crucial for your project. Let\'s compare Elit with popular alternatives to help you make an informed decision.'),
 
-      h2('Elit 2.0'),
+      h2('Elit'),
       h3('Strengths:'),
       ul(
         li('Full-stack framework (~10KB gzipped) - complete solution'),
@@ -179,8 +179,8 @@ export const blog4: BlogPostDetail = {
         li('No component abstraction')
       ),
 
-      h2('When to Choose Elit 2.0?'),
-      p('Elit 2.0 is ideal when you need:'),
+      h2('When to Choose Elit?'),
+      p('Elit is ideal when you need:'),
       ul(
         li('Full-stack framework with minimal bundle size'),
         li('Complete CLI tools for development workflow'),
@@ -196,13 +196,13 @@ export const blog4: BlogPostDetail = {
       ),
 
       h2('Conclusion'),
-      p('Each framework has its place. React excels in large applications with big teams. Vue offers great balance and DX. Svelte and Solid provide excellent performance with modern approaches. Qwik optimizes for initial load. Elit 2.0 shines as a full-stack solution when you need complete CLI tools, built-in API/WebSocket support, minimal overhead, direct control, and reactive features without the baggage of larger frameworks.'),
+      p('Each framework has its place. React excels in large applications with big teams. Vue offers great balance and DX. Svelte and Solid provide excellent performance with modern approaches. Qwik optimizes for initial load. Elit shines as a full-stack solution when you need complete CLI tools, built-in API/WebSocket support, minimal overhead, direct control, and reactive features without the baggage of larger frameworks.'),
       p('Choose based on your project needs, team expertise, and performance requirements.')
     ),
     th: div(
       p('การเลือก framework ที่เหมาะสมเป็นสิ่งสำคัญสำหรับโปรเจกต์ของคุณ มาเปรียบเทียบ Elit กับทางเลือกยอดนิยมเพื่อช่วยให้คุณตัดสินใจได้อย่างรอบคอบ'),
 
-      h2('Elit 2.0'),
+      h2('Elit'),
       h3('จุดแข็ง:'),
       ul(
         li('Full-stack framework (~10KB gzipped) - โซลูชันครบวงจร'),
@@ -366,8 +366,8 @@ export const blog4: BlogPostDetail = {
         li('ไม่มี component abstraction')
       ),
 
-      h2('เมื่อไหร่ควรเลือก Elit 2.0?'),
-      p('Elit 2.0 เหมาะเมื่อคุณต้องการ:'),
+      h2('เมื่อไหร่ควรเลือก Elit?'),
+      p('Elit เหมาะเมื่อคุณต้องการ:'),
       ul(
         li('Full-stack framework ที่มีขนาด bundle น้อย'),
         li('เครื่องมือ CLI ครบครันสำหรับ workflow การพัฒนา'),
@@ -383,7 +383,7 @@ export const blog4: BlogPostDetail = {
       ),
 
       h2('สรุป'),
-      p('แต่ละ framework มีที่ของตัวเอง React เหมาะกับแอปพลิเคชันขนาดใหญ่และทีมใหญ่ Vue ให้ความสมดุลและ DX ที่ดี Svelte และ Solid ให้ประสิทธิภาพยอดเยี่ยมด้วยแนวทางสมัยใหม่ Qwik เพิ่มประสิทธิภาพการโหลดครั้งแรก Elit 2.0 โดดเด่นเป็นโซลูชันแบบ full-stack เมื่อคุณต้องการเครื่องมือ CLI ครบครัน รองรับ API/WebSocket ในตัว overhead น้อยที่สุด ควบคุมโดยตรง และฟีเจอร์ reactive โดยไม่มีภาระของ frameworks ใหญ่'),
+      p('แต่ละ framework มีที่ของตัวเอง React เหมาะกับแอปพลิเคชันขนาดใหญ่และทีมใหญ่ Vue ให้ความสมดุลและ DX ที่ดี Svelte และ Solid ให้ประสิทธิภาพยอดเยี่ยมด้วยแนวทางสมัยใหม่ Qwik เพิ่มประสิทธิภาพการโหลดครั้งแรก Elit โดดเด่นเป็นโซลูชันแบบ full-stack เมื่อคุณต้องการเครื่องมือ CLI ครบครัน รองรับ API/WebSocket ในตัว overhead น้อยที่สุด ควบคุมโดยตรง และฟีเจอร์ reactive โดยไม่มีภาระของ frameworks ใหญ่'),
       p('เลือกตามความต้องการของโปรเจกต์ ความเชี่ยวชาญของทีม และความต้องการด้านประสิทธิภาพ')
     )
   }

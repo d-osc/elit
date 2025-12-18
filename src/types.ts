@@ -88,6 +88,38 @@ export interface ClientConfig {
     watch?: string[];
     /** Ignore patterns for file watching */
     ignore?: string[];
+    /** Proxy configuration specific to this client */
+    proxy?: ProxyConfig[];
+    /** Worker scripts specific to this client */
+    worker?: WorkerConfig[];
+    /** API router for REST endpoints specific to this client */
+    api?: Router;
+    /** Custom middleware specific to this client */
+    middleware?: ((req: any, res: any, next: () => void) => void)[];
+}
+
+export interface ProxyConfig {
+    /** Path prefix to match for proxying (e.g., '/api', '/graphql') */
+    context: string;
+    /** Target URL to proxy to (e.g., 'http://localhost:8080') */
+    target: string;
+    /** Change the origin of the host header to the target URL */
+    changeOrigin?: boolean;
+    /** Rewrite path before sending to target */
+    pathRewrite?: Record<string, string>;
+    /** Additional headers to add to the proxied request */
+    headers?: Record<string, string>;
+    /** Enable WebSocket proxying */
+    ws?: boolean;
+}
+
+export interface WorkerConfig {
+    /** Worker script path relative to root directory */
+    path: string;
+    /** Worker name/identifier (optional, defaults to filename) */
+    name?: string;
+    /** Worker type: 'module' (ESM) or 'classic' (default: 'module') */
+    type?: 'module' | 'classic';
 }
 
 export interface DevServerOptions {
@@ -109,6 +141,8 @@ export interface DevServerOptions {
     watch?: string[];
     /** Ignore patterns for file watcher */
     ignore?: string[];
+    /** Global worker scripts (applies to all clients) */
+    worker?: WorkerConfig[];
     /** Enable logging (default: true) */
     logging?: boolean;
     /** Custom middleware */
@@ -117,6 +151,8 @@ export interface DevServerOptions {
     api?: Router;
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
+    /** Proxy configuration for API requests */
+    proxy?: ProxyConfig[];
 }
 
 export interface DevServer {
@@ -183,4 +219,35 @@ export interface BuildResult {
     buildTime: number;
     /** Output file size in bytes */
     size: number;
+}
+
+// ===== Preview Types =====
+
+export interface PreviewOptions {
+    /** Port to run the preview server on (default: 4173) */
+    port?: number;
+    /** Host to bind to (default: 'localhost') */
+    host?: string;
+    /** Root directory to serve files from (default: dist or build.outDir) */
+    root?: string;
+    /** Base path for the application (e.g., '/app') */
+    basePath?: string;
+    /** Array of client configurations - allows multiple clients on same port */
+    clients?: ClientConfig[];
+    /** Enable HTTPS (default: false) */
+    https?: boolean;
+    /** Open browser automatically (default: true) */
+    open?: boolean;
+    /** Enable logging (default: true) */
+    logging?: boolean;
+    /** Custom middleware */
+    middleware?: ((req: any, res: any, next: () => void) => void)[];
+    /** API router for REST endpoints */
+    api?: Router;
+    /** SSR render function - returns HTML VNode or string */
+    ssr?: () => Child | string;
+    /** Proxy configuration for API requests */
+    proxy?: ProxyConfig[];
+    /** Global worker scripts (applies to all clients) */
+    worker?: WorkerConfig[];
 }

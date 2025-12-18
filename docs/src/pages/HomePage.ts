@@ -1,6 +1,6 @@
 import { div } from 'elit';
 import type { Router } from 'elit';
-import { Hero, Stats, Features, QuickStart, WhyElit, CodeComparison, FeaturedBlogs, ApiOverview } from '../components';
+import { Hero, Stats, Features, QuickStart, WhyElit, CodeComparison, ElitVsNextjs, FeaturedBlogs, ApiOverview } from '../components';
 
 export const HomePage = (router: Router) =>
   div(
@@ -9,6 +9,7 @@ export const HomePage = (router: Router) =>
     Features(),
     QuickStart(router),
     CodeComparison(),
+    ElitVsNextjs(),
     WhyElit(),
     FeaturedBlogs(router),
     ApiOverview(router)

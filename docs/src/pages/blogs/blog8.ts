@@ -1,1035 +1,881 @@
-import { div, h2, h3, h4, p, ul, li, pre, code } from 'elit';
+import { div, h1, h2, h3, p, ul, li, pre, code, strong } from 'elit';
 import { codeBlock } from '../../highlight';
 import type { BlogPostDetail } from '../blogContent';
 
 export const blog8: BlogPostDetail = {
   id: '8',
   title: {
-    en: 'Working with renderJson in Elit',
-    th: 'การใช้งาน renderJson ใน Elit'
+    en: 'Server-Side Rendering (SSR) with Elit',
+    th: 'Server-Side Rendering (SSR) ด้วย Elit'
   },
-  date: '2024-03-01',
+  date: '2024-12-18',
   author: 'n-devs',
-  tags: ['Tutorial', 'API', 'JSON', 'Data Serialization'],
+  tags: ['Tutorial', 'SSR', 'Full-Stack', 'Performance', 'v2.0'],
   content: {
     en: div(
-      p('Learn how to use Elit\'s renderJson utility to serialize VNodes and application state into JSON format. Perfect for SSR hydration, API responses, state persistence, and data transfer between server and client.'),
+      p('Server-Side Rendering (SSR) in Elit enables you to render your application on the server and send fully-formed HTML to the client. This improves initial load performance, SEO, and provides a better user experience.'),
 
-      h2('What is renderJson?'),
-      p('renderJson is a powerful utility in Elit that renders JSON data structures directly to the DOM or converts them to HTML strings. Elit provides several JSON-related utilities:'),
+      h2('Why Server-Side Rendering?'),
+      p('SSR provides several key benefits:'),
       ul(
-        li('renderJson() - Render JSON structure to DOM container'),
-        li('renderJsonToString() - Convert JSON to HTML string'),
-        li('jsonToVNode() - Convert JSON to VNode object'),
-        li('renderVNode() - Render VNode JSON to DOM'),
-        li('vNodeJsonToVNode() - Convert VNode JSON to VNode')
+        li(strong('Faster Initial Load'), ' - Users see content immediately without waiting for JavaScript'),
+        li(strong('Better SEO'), ' - Search engines can crawl fully-rendered HTML'),
+        li(strong('Social Media Previews'), ' - OG tags and meta descriptions work correctly'),
+        li(strong('Improved Performance'), ' - Reduced time-to-interactive on slow connections'),
+        li(strong('Progressive Enhancement'), ' - Content works even if JavaScript fails'),
+        li(strong('Better Core Web Vitals'), ' - Improved FCP, LCP, and CLS scores')
       ),
 
-      h2('Understanding JSON Types'),
-      p('Elit supports two main JSON structures:'),
+      h2('Basic SSR Setup'),
+      h3('1. Server-Side: Render HTML'),
+      p('Use Elit components on the server to generate HTML:'),
 
-      h3('1. JsonNode'),
-      p('Simple JSON structure representing HTML:'),
-      pre(code(...codeBlock(`interface JsonNode {
-  tag: string;
-  props?: Record<string, any>;
-  children?: (string | JsonNode)[];
-}
+      pre(code(...codeBlock(`// server.ts
+import { defineConfig } from 'elit/config';
+import { div, h1, p, button, html } from 'elit/el';
+import { ServerRouter } from 'elit';
 
-// Example JsonNode
-const jsonData = {
-  tag: 'div',
-  props: { className: 'card' },
-  children: [
-    { tag: 'h1', children: ['Hello World'] },
-    { tag: 'p', children: ['This is a paragraph'] }
-  ]
-};`))),
+const api = new ServerRouter();
 
-      h3('2. VNodeJson'),
-      p('VNode JSON structure with full type information:'),
-      pre(code(...codeBlock(`interface VNodeJson {
-  tag: string;
-  props?: Record<string, any>;
-  children?: (string | number | VNodeJson)[];
-}`))),
-
-      h2('Basic Usage'),
-      h3('Rendering JSON to DOM'),
-      p('Use renderJson to render JSON data directly to the DOM:'),
-      pre(code(...codeBlock(`import { renderJson } from 'elit';
-
-// JSON data structure
-const jsonData = {
-  tag: 'div',
-  props: { className: 'card' },
-  children: [
-    { tag: 'h1', children: ['Welcome'] },
-    { tag: 'p', children: ['This content is from JSON'] }
-  ]
-};
-
-// Render to DOM container
-const element = renderJson('#app', jsonData);`))),
-
-      h3('Converting JSON to HTML String'),
-      p('Use renderJsonToString for server-side rendering:'),
-      pre(code(...codeBlock(`import { renderJsonToString } from 'elit';
-
-const jsonData = {
-  tag: 'article',
-  props: { className: 'post' },
-  children: [
-    { tag: 'h2', children: ['Blog Post'] },
-    { tag: 'p', children: ['Content here'] }
-  ]
-};
-
-// Convert to HTML string
-const html = renderJsonToString(jsonData);
-console.log(html);
-// Output: <article class="post"><h2>Blog Post</h2><p>Content here</p></article>
-
-// With pretty printing
-const prettyHtml = renderJsonToString(jsonData, { pretty: true, indent: 2 });`))),
-
-      h2('Working with jsonToVNode'),
-      h3('Converting JSON to VNode'),
-      p('Use jsonToVNode to convert JSON data into VNode objects:'),
-      pre(code(...codeBlock(`import { jsonToVNode } from 'elit';
-
-const jsonData = {
-  tag: 'div',
-  props: { className: 'user-card' },
-  children: [
-    { tag: 'h3', children: ['John Doe'] },
-    { tag: 'p', children: ['Software Developer'] }
-  ]
-};
-
-// Convert JSON to VNode
-const vnode = jsonToVNode(jsonData);
-
-// Now you can work with it as a regular VNode
-document.body.appendChild(vnode.node);`))),
-
-      h2('SSR Hydration Pattern'),
-      h3('Server-Side: Render to HTML String'),
-      p('On the server, use renderToString to generate HTML:'),
-      pre(code(...codeBlock(`import express from 'express';
-import { renderToString, div, h1, span, button } from 'elit';
-
-const app = express();
-
-app.get('/counter', (req, res) => {
-  const initialCount = 0;
-
-  // Create component
-  const component = div({ id: 'app' },
-    h1('Counter App'),
-    span({ id: 'count' }, initialCount),
-    button({ id: 'increment' }, 'Increment')
+api.get('/', (ctx) => {
+  // Create your app component
+  const app = div({ id: 'app' },
+    h1('Welcome to Elit SSR'),
+    p('This content is rendered on the server!'),
+    button({ className: 'cta' }, 'Get Started')
   );
 
-  // Convert to HTML string
-  const html = renderToString(component);
+  // Render to HTML string
+  const appHtml = app.node.outerHTML;
 
-  // Send HTML with embedded initial state
-  res.send(\`
+  // Send complete HTML document
+  html(ctx.res, \`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Elit SSR App</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body>
+        \${appHtml}
+        <script type="module" src="/client.js"></script>
+      </body>
+    </html>
+  \`);
+});
+
+export default defineConfig({
+  dev: { port: 3000, api }
+});`))),
+
+      h3('2. Client-Side: Hydration'),
+      p('On the client, attach event handlers to server-rendered HTML:'),
+
+      pre(code(...codeBlock(`// client.ts
+import { dom } from 'elit/dom';
+
+// Find server-rendered elements
+const button = document.querySelector('.cta');
+
+// Attach client-side behavior
+if (button) {
+  button.addEventListener('click', () => {
+    window.location.href = '/getting-started';
+  });
+}
+
+console.log('Client hydrated!');`))),
+
+      h2('SSR with State Management'),
+      h3('Server: Generate HTML with Initial State'),
+      p('Pass initial state from server to client:'),
+
+      pre(code(...codeBlock(`// server.ts
+import { html } from 'elit';
+import { div, h1, span, button, script } from 'elit/el';
+import { ServerRouter } from 'elit/server';
+
+const api = new ServerRouter();
+
+api.get('/counter', (ctx) => {
+  const initialCount = 0;
+
+  // Create component with initial state
+  const app = div({ id: 'app' },
+    h1('Server-Rendered Counter'),
+    div({ className: 'counter' },
+      span({ id: 'count', className: 'count' }, String(initialCount)),
+      div({ className: 'buttons' },
+        button({ id: 'decrement', className: 'btn' }, '-'),
+        button({ id: 'increment', className: 'btn' }, '+')
+      )
+    )
+  );
+
+  const appHtml = app.node.outerHTML;
+
+  html(ctx.res, \`
     <!DOCTYPE html>
     <html>
-      <head><title>Counter</title></head>
+      <head>
+        <title>SSR Counter</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
       <body>
-        \${html}
+        \${appHtml}
         <script>
-          window.__INITIAL_STATE__ = \${JSON.stringify({ count: initialCount })};
+          // Embed initial state in HTML
+          window.__INITIAL_STATE__ = { count: \${initialCount} };
         </script>
-        <script src="/bundle.js"></script>
+        <script type="module" src="/counter-client.js"></script>
       </body>
     </html>
   \`);
 });`))),
 
-      h3('Client-Side: Hydrate from Initial State'),
-      p('On the client, restore state and attach event handlers:'),
-      pre(code(...codeBlock(`import { createState, reactive } from 'elit';
+      h3('Client: Hydrate with Reactive State'),
+      p('Restore state and make it reactive on the client:'),
+
+      pre(code(...codeBlock(`// counter-client.ts
+import { createState } from 'elit/state';
 
 // Get initial state from server
-const initialState = window.__INITIAL_STATE__;
+const initialState = (window as any).__INITIAL_STATE__;
 
 // Create reactive state
 const count = createState(initialState.count);
 
-// Find existing DOM elements and attach handlers
-const countSpan = document.getElementById('count');
+// Find DOM elements
+const countEl = document.getElementById('count');
+const decrementBtn = document.getElementById('decrement');
 const incrementBtn = document.getElementById('increment');
 
-// Make count reactive
-if (countSpan) {
+// Subscribe to state changes
+if (countEl) {
   count.subscribe(value => {
-    countSpan.textContent = String(value);
+    countEl.textContent = String(value);
   });
 }
 
-// Attach event handler
+// Attach event handlers
+if (decrementBtn) {
+  decrementBtn.addEventListener('click', () => {
+    count.value--;
+  });
+}
+
 if (incrementBtn) {
   incrementBtn.addEventListener('click', () => {
     count.value++;
   });
 }`))),
 
-      h2('API Responses with JSON Data'),
-      h3('Building a JSON API'),
-      p('Create an API that returns JSON structures:'),
-      pre(code(...codeBlock(`import { Router } from 'express';
+      h2('SSR with Data Fetching'),
+      h3('Fetch Data on Server'),
+      p('Load data server-side before rendering:'),
 
-const router = Router();
+      pre(code(...codeBlock(`// server.ts
+import { html, json } from 'elit';
+import { div, h1, ul, li, p } from 'elit/el';
+import { ServerRouter } from 'elit/server';
 
-router.get('/api/widgets/:type', (req, res) => {
-  const { type } = req.params;
+const api = new ServerRouter();
 
-  let widgetJson;
-
-  switch (type) {
-    case 'stats':
-      widgetJson = {
-        tag: 'div',
-        props: { className: 'widget stats' },
-        children: [
-          { tag: 'h2', children: ['Statistics'] },
-          {
-            tag: 'ul',
-            children: [
-              { tag: 'li', children: ['Users: 1,234'] },
-              { tag: 'li', children: ['Posts: 5,678'] }
-            ]
-          }
-        ]
-      };
-      break;
-
-    case 'notification':
-      widgetJson = {
-        tag: 'div',
-        props: { className: 'widget notification' },
-        children: [
-          { tag: 'h2', children: ['Notifications'] },
-          { tag: 'p', children: ['You have 3 new messages'] }
-        ]
-      };
-      break;
-
-    default:
-      return res.status(404).json({ error: 'Widget not found' });
-  }
-
-  // Return JSON structure
-  res.json({
-    success: true,
-    widget: widgetJson,
-    timestamp: Date.now()
-  });
-});`))),
-
-      h3('Client-Side: Render from API'),
-      p('Fetch and render JSON data from API:'),
-      pre(code(...codeBlock(`import { jsonToVNode } from 'elit';
-
-async function loadWidget(type: string) {
-  const response = await fetch(\`/api/widgets/\${type}\`);
-  const data = await response.json();
-
-  if (data.success) {
-    // Convert JSON to VNode
-    const vnode = jsonToVNode(data.widget);
-
-    // Render to DOM
-    const container = document.getElementById('widget-container');
-    if (container) {
-      container.innerHTML = '';
-      container.appendChild(vnode.node);
-    }
-  }
+// Mock database
+async function fetchUsers() {
+  return [
+    { id: 1, name: 'Alice', email: 'alice@example.com' },
+    { id: 2, name: 'Bob', email: 'bob@example.com' },
+    { id: 3, name: 'Charlie', email: 'charlie@example.com' }
+  ];
 }
 
-// Load stats widget
-loadWidget('stats');`))),
+api.get('/users', async (ctx) => {
+  // Fetch data on server
+  const users = await fetchUsers();
 
-      h2('State Persistence'),
-      h3('Save State to LocalStorage'),
-      p('Persist application state across sessions:'),
-      pre(code(...codeBlock(`import { createState } from 'elit';
-
-// Create state
-const todos = createState([
-  { id: 1, text: 'Learn Elit', completed: true },
-  { id: 2, text: 'Build app', completed: false }
-]);
-
-// Save state to localStorage
-function saveState() {
-  localStorage.setItem('appState', JSON.stringify(todos.value));
-}
-
-// Load state from localStorage
-function loadState() {
-  const saved = localStorage.getItem('appState');
-  if (saved) {
-    todos.value = JSON.parse(saved);
-  }
-}
-
-// Auto-save on changes
-todos.subscribe(() => saveState());
-
-// Load on startup
-loadState();`))),
-
-      h2('Caching HTML Output'),
-      h3('Server-Side HTML Cache'),
-      p('Cache rendered HTML strings for better performance:'),
-      pre(code(...codeBlock(`import { renderJsonToString } from 'elit';
-
-const htmlCache = new Map();
-
-function getWidgetHtml(type: string): string {
-  // Check cache
-  if (htmlCache.has(type)) {
-    return htmlCache.get(type);
-  }
-
-  // Create JSON structure
-  const widgetJson = {
-    tag: 'div',
-    props: { className: \`widget \${type}\` },
-    children: [
-      { tag: 'h2', children: [type.toUpperCase()] },
-      { tag: 'p', children: ['Widget content here'] }
-    ]
-  };
-
-  // Convert to HTML string
-  const html = renderJsonToString(widgetJson);
-
-  // Cache it
-  htmlCache.set(type, html);
-
-  return html;
-}`))),
-
-      h2('Using renderVNode and vNodeJsonToVNode'),
-      h3('VNode JSON Format'),
-      p('Work with VNode JSON structures:'),
-      pre(code(...codeBlock(`import { renderVNode, vNodeJsonToVNode } from 'elit';
-
-// VNode JSON structure
-const vnodeJson = {
-  tag: 'div',
-  props: { className: 'message' },
-  children: [
-    { tag: 'h3', children: ['Success!'] },
-    { tag: 'p', children: ['Operation completed'] }
-  ]
-};
-
-// Method 1: Render directly to DOM
-renderVNode('#container', vnodeJson);
-
-// Method 2: Convert to VNode first
-const vnode = vNodeJsonToVNode(vnodeJson);
-document.body.appendChild(vnode.node);`))),
-
-      h2('Best Practices'),
-      ul(
-        li('Use renderJson and renderJsonToString for dynamic content from JSON'),
-        li('Cache HTML strings for frequently rendered components'),
-        li('Validate JSON structures before rendering'),
-        li('Use renderToString for SSR instead of manual HTML generation'),
-        li('Keep JSON structures simple and flat when possible'),
-        li('Use compression for large JSON payloads over the network')
-      ),
-
-      h3('Complete Example'),
-      p('Here\'s a complete example combining multiple utilities:'),
-      pre(code(...codeBlock(`import {
-  jsonToVNode,
-  renderJsonToString,
-  renderJson
-} from 'elit';
-
-// 1. JSON data from API
-const widgetData = {
-  tag: 'div',
-  props: { className: 'widget' },
-  children: [
-    { tag: 'h2', children: ['Dashboard'] },
-    { tag: 'p', children: ['Welcome back!'] }
-  ]
-};
-
-// 2. Convert to HTML string (for SSR)
-const htmlString = renderJsonToString(widgetData, {
-  pretty: true,
-  indent: 2
-});
-console.log(htmlString);
-
-// 3. Convert to VNode (for manipulation)
-const vnode = jsonToVNode(widgetData);
-
-// 4. Render directly to DOM (for client-side)
-const element = renderJson('#widget-container', widgetData);`))),
-
-      h2('Summary of JSON Utilities'),
-      p('Elit provides a comprehensive set of JSON utilities for different use cases:'),
-      ul(
-        li('renderJson(container, json) - Render JSON data to DOM'),
-        li('renderJsonToString(json, options?) - Convert JSON to HTML string'),
-        li('jsonToVNode(json) - Convert JSON to VNode object'),
-        li('renderVNode(container, vnodeJson) - Render VNode JSON to DOM'),
-        li('vNodeJsonToVNode(vnodeJson) - Convert VNode JSON to VNode'),
-        li('renderToString(vnode, options?) - Convert VNode to HTML string')
-      ),
-
-      h2('Conclusion'),
-      p('Elit\'s JSON utilities provide a powerful way to work with component data in JSON format. Whether you\'re implementing SSR, building APIs that return UI structures, or caching rendered output, these tools make it easy to serialize and deserialize component structures.'),
-      p('Key takeaways: Use renderJson and renderJsonToString for working with JSON data, renderToString for SSR, and jsonToVNode for converting JSON back to VNodes. Always validate JSON structures and consider caching HTML strings for better performance.')
-    ),
-    th: div(
-      p('เรียนรู้วิธีใช้ JSON utilities ของ Elit สำหรับ rendering JSON data เป็น DOM, แปลงเป็น HTML strings และทำงานกับ VNode JSON structures เหมาะสำหรับ SSR, API responses และ data caching'),
-
-      h2('renderJson คืออะไร?'),
-      p('renderJson เป็น utility ใน Elit ที่ render โครงสร้าง JSON โดยตรงไปยัง DOM หรือแปลงเป็น HTML strings Elit มี JSON utilities หลายตัว:'),
-      ul(
-        li('renderJson() - Render โครงสร้าง JSON ไปยัง DOM container'),
-        li('renderJsonToString() - แปลง JSON เป็น HTML string'),
-        li('jsonToVNode() - แปลง JSON เป็น VNode object'),
-        li('renderVNode() - Render VNode JSON ไปยัง DOM'),
-        li('vNodeJsonToVNode() - แปลง VNode JSON เป็น VNode')
-      ),
-
-      h2('ทำความเข้าใจ JSON Types'),
-      p('Elit รองรับโครงสร้าง JSON 2 แบบหลัก:'),
-
-      h3('1. JsonNode'),
-      p('โครงสร้าง JSON แบบง่ายที่เป็นตัวแทน HTML:'),
-      pre(code(...codeBlock(`interface JsonNode {
-  tag: string;
-  props?: Record<string, any>;
-  children?: (string | JsonNode)[];
-}
-
-// ตัวอย่าง JsonNode
-const jsonData = {
-  tag: 'div',
-  props: { className: 'card' },
-  children: [
-    { tag: 'h1', children: ['สวัสดีชาวโลก'] },
-    { tag: 'p', children: ['นี่คือย่อหน้า'] }
-  ]
-};`))),
-
-      h3('2. VNodeJson'),
-      p('โครงสร้าง VNode JSON พร้อมข้อมูล type เต็มรูปแบบ:'),
-      pre(code(...codeBlock(`interface VNodeJson {
-  tag: string;
-  props?: Record<string, any>;
-  children?: (string | number | VNodeJson)[];
-}`))),
-
-      h2('การใช้งานพื้นฐาน'),
-      h3('Rendering JSON ไปยัง DOM'),
-      p('ใช้ renderJson เพื่อ render JSON data โดยตรงไปยัง DOM:'),
-      pre(code(...codeBlock(`import { renderJson } from 'elit';
-
-// โครงสร้าง JSON data
-const jsonData = {
-  tag: 'div',
-  props: { className: 'card' },
-  children: [
-    { tag: 'h1', children: ['ยินดีต้อนรับ'] },
-    { tag: 'p', children: ['เนื้อหานี้มาจาก JSON'] }
-  ]
-};
-
-// Render ไปยัง DOM container
-const element = renderJson('#app', jsonData);`))),
-
-      h3('แปลง JSON เป็น HTML String'),
-      p('ใช้ renderJsonToString สำหรับ server-side rendering:'),
-      pre(code(...codeBlock(`import { renderJsonToString } from 'elit';
-
-const jsonData = {
-  tag: 'article',
-  props: { className: 'post' },
-  children: [
-    { tag: 'h2', children: ['บล็อกโพสต์'] },
-    { tag: 'p', children: ['เนื้อหาที่นี่'] }
-  ]
-};
-
-// แปลงเป็น HTML string
-const html = renderJsonToString(jsonData);
-console.log(html);
-// Output: <article class="post"><h2>บล็อกโพสต์</h2><p>เนื้อหาที่นี่</p></article>
-
-// พร้อม pretty printing
-const prettyHtml = renderJsonToString(jsonData, { pretty: true, indent: 2 });`))),
-
-      h2('การทำงานกับ jsonToVNode'),
-      h3('แปลง JSON เป็น VNode'),
-      p('ใช้ jsonToVNode เพื่อแปลง JSON data เป็น VNode objects:'),
-      pre(code(...codeBlock(`import express from 'express';
-import { renderJson, createState, div, h1, span, button } from 'elit';
-
-const app = express();
-
-app.get('/counter', (req, res) => {
-  // สร้าง initial state
-  const count = createState(0);
-
-  // Render component
-  const component = div({ id: 'app' },
-    h1('แอปนับเลข'),
-    span({ id: 'count' }, count.value),
-    button({ id: 'increment' }, 'เพิ่ม')
+  // Render with data
+  const app = div({ id: 'app' },
+    h1('Users (SSR)'),
+    ul({ className: 'user-list' },
+      ...users.map(user =>
+        li({ key: user.id, className: 'user-item' },
+          p(strong(user.name)),
+          p(user.email)
+        )
+      )
+    )
   );
 
-  // Serialize component และ state
-  const componentJson = renderJson(component);
-  const initialState = { count: count.value };
+  const appHtml = app.node.outerHTML;
 
-  // ส่ง HTML พร้อม embedded JSON
-  res.send(\`
+  html(ctx.res, \`
     <!DOCTYPE html>
     <html>
-      <head><title>ตัวนับ</title></head>
+      <head>
+        <title>Users List</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
       <body>
-        <div id="app">\${vnodeToHtml(component)}</div>
+        \${appHtml}
         <script>
-          window.__INITIAL_STATE__ = \${JSON.stringify(initialState)};
-          window.__COMPONENT_JSON__ = \${JSON.stringify(componentJson)};
+          window.__INITIAL_DATA__ = \${JSON.stringify({ users })};
         </script>
-        <script src="/bundle.js"></script>
+        <script type="module" src="/users-client.js"></script>
       </body>
     </html>
   \`);
 });`))),
 
-      h3('ฝั่ง Client: Hydrate จาก JSON'),
-      p('บน client กู้คืน state และ hydrate component:'),
-      pre(code(...codeBlock(`import { createState, reactive, div, h1, span, button } from 'elit';
+      h2('SEO Optimization'),
+      h3('Dynamic Meta Tags'),
+      p('Generate SEO-friendly meta tags based on content:'),
 
-// ดึง initial state จากเซิร์ฟเวอร์
-const initialState = window.__INITIAL_STATE__;
+      pre(code(...codeBlock(`// server.ts
+import { html } from 'elit/el';
+import { ServerRouter } from 'elit/server';
 
-// สร้าง reactive state ใหม่
-const count = createState(initialState.count);
-
-// สร้าง component ใหม่พร้อม event handlers
-const component = div({ id: 'app' },
-  h1('แอปนับเลข'),
-  reactive(count, value => span({ id: 'count' }, value)),
-  button({
-    id: 'increment',
-    onclick: () => count.value++
-  }, 'เพิ่ม')
-);
-
-// Hydrate DOM ที่มีอยู่
-const appElement = document.getElementById('app');
-if (appElement) {
-  appElement.replaceWith(component.node);
-}`))),
-
-      h2('API Responses พร้อม Component Data'),
-      h3('สร้าง Component API'),
-      p('สร้าง API ที่ส่งคืนโครงสร้าง component:'),
-      pre(code(...codeBlock(`import { Router } from 'express';
-import { renderJson, div, h2, p, ul, li } from 'elit';
-
-const router = Router();
-
-router.get('/api/widgets/:type', (req, res) => {
-  const { type } = req.params;
-
-  let widget;
-
-  switch (type) {
-    case 'stats':
-      widget = div({ className: 'widget stats' },
-        h2('สถิติ'),
-        ul(
-          li(\`ผู้ใช้: 1,234\`),
-          li(\`โพสต์: 5,678\`),
-          li(\`ความคิดเห็น: 9,012\`)
-        )
-      );
-      break;
-
-    case 'notification':
-      widget = div({ className: 'widget notification' },
-        h2('การแจ้งเตือน'),
-        p('คุณมีข้อความใหม่ 3 ข้อความ')
-      );
-      break;
-
-    default:
-      return res.status(404).json({ error: 'ไม่พบ Widget' });
-  }
-
-  // ส่งคืน serialized component
-  res.json({
-    success: true,
-    widget: renderJson(widget),
-    timestamp: Date.now()
-  });
-});
-
-export default router;`))),
-
-      h3('ฝั่ง Client: Render จาก API'),
-      p('ดึงข้อมูลและ render components จาก API:'),
-      pre(code(...codeBlock(`async function loadWidget(type: string) {
-  const response = await fetch(\`/api/widgets/\${type}\`);
-  const data = await response.json();
-
-  if (data.success) {
-    // สร้าง VNode ใหม่จาก JSON
-    const widget = jsonToVNode(data.widget);
-
-    // Render ไปยัง DOM
-    const container = document.getElementById('widget-container');
-    if (container) {
-      container.innerHTML = '';
-      container.appendChild(widget.node);
-    }
-  }
+interface PageMeta {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
 }
 
-// Helper สำหรับแปลง JSON กลับเป็น VNode
-function jsonToVNode(json: any): VNode {
-  if (typeof json === 'string' || typeof json === 'number') {
-    return json;
+function generateMetaTags(meta: PageMeta): string {
+  return \`
+    <title>\${meta.title}</title>
+    <meta name="description" content="\${meta.description}">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="\${meta.title}">
+    <meta property="og:description" content="\${meta.description}">
+    <meta property="og:url" content="\${meta.url}">
+    \${meta.image ? \`<meta property="og:image" content="\${meta.image}">\` : ''}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="\${meta.title}">
+    <meta name="twitter:description" content="\${meta.description}">
+    \${meta.image ? \`<meta name="twitter:image" content="\${meta.image}">\` : ''}
+  \`;
+}
+
+const api = new ServerRouter();
+
+api.get('/blog/:slug', async (ctx) => {
+  const { slug } = ctx.params;
+
+  // Fetch blog post
+  const post = await fetchBlogPost(slug);
+
+  if (!post) {
+    return html(ctx.res, '<h1>404 - Not Found</h1>', 404);
   }
 
-  const { tag, props = {}, children = [] } = json;
-
-  // Import element factory แบบ dynamic
-  const factory = elementFactories[tag];
-  if (!factory) {
-    throw new Error(\`Unknown tag: \${tag}\`);
-  }
-
-  // แปลง children แบบ recursive
-  const vnodeChildren = children.map(child => jsonToVNode(child));
-
-  return factory(props, ...vnodeChildren);
-}`))),
-
-      h2('การเก็บ State'),
-      h3('บันทึก State ไป LocalStorage'),
-      p('เก็บ application state ข้ามเซสชัน:'),
-      pre(code(...codeBlock(`import { createState, renderJson } from 'elit';
-
-// สร้าง state
-const todos = createState([
-  { id: 1, text: 'เรียนรู้ Elit', completed: true },
-  { id: 2, text: 'สร้างแอป', completed: false }
-]);
-
-const settings = createState({
-  theme: 'dark',
-  notifications: true
-});
-
-// บันทึก state
-function saveState() {
-  const state = {
-    todos: renderJson(todos.value),
-    settings: renderJson(settings.value)
+  const meta: PageMeta = {
+    title: \`\${post.title} | My Blog\`,
+    description: post.excerpt,
+    image: post.coverImage,
+    url: \`https://myblog.com/blog/\${slug}\`
   };
 
-  localStorage.setItem('appState', JSON.stringify(state));
-}
+  const metaTags = generateMetaTags(meta);
 
-// โหลด state
-function loadState() {
-  const saved = localStorage.getItem('appState');
-
-  if (saved) {
-    const state = JSON.parse(saved);
-    todos.value = state.todos;
-    settings.value = state.settings;
-  }
-}
-
-// บันทึกอัตโนมัติเมื่อมีการเปลี่ยนแปลง
-todos.subscribe(() => saveState());
-settings.subscribe(() => saveState());
-
-// โหลดเมื่อเริ่มต้น
-loadState();`))),
-
-      h2('การ Cache Rendered Components'),
-      h3('Server-Side Component Cache'),
-      p('Cache serialized components เพื่อประสิทธิภาพที่ดีขึ้น:'),
-      pre(code(...codeBlock(`import { LRUCache } from 'lru-cache';
-import { renderJson } from 'elit';
-
-const componentCache = new LRUCache({
-  max: 100,
-  ttl: 1000 * 60 * 5 // 5 นาที
-});
-
-async function getProductCard(productId: string) {
-  const cacheKey = \`product-card:\${productId}\`;
-
-  // ตรวจสอบ cache
-  const cached = componentCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  // ดึงข้อมูลสินค้า
-  const product = await fetchProduct(productId);
-
-  // สร้าง component
-  const card = div({ className: 'product-card' },
-    h2(product.name),
-    p(product.description),
-    span({ className: 'price' }, \`฿\${product.price}\`)
+  // Render blog post component
+  const app = div({ id: 'app' },
+    article({ className: 'blog-post' },
+      h1(post.title),
+      p({ className: 'meta' }, \`By \${post.author} on \${post.date}\`),
+      div({ className: 'content' }, post.content)
+    )
   );
 
-  // Serialize และ cache
-  const serialized = renderJson(card);
-  componentCache.set(cacheKey, serialized);
+  const appHtml = app.node.outerHTML;
 
-  return serialized;
+  html(ctx.res, \`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        \${metaTags}
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body>
+        \${appHtml}
+        <script type="module" src="/blog-client.js"></script>
+      </body>
+    </html>
+  \`);
+});`))),
+
+      h2('SSR with Routing'),
+      h3('Multi-Page SSR Application'),
+      p('Handle multiple routes with SSR:'),
+
+      pre(code(...codeBlock(`// server.ts
+import { defineConfig } from 'elit/config';
+import { div, h1, p, nav, a, html } from 'elit/dom';
+import { ServerRouter } from 'elit/server';
+
+const api = new ServerRouter();
+
+// Layout component
+function Layout(content: any, currentPath: string) {
+  return div({ id: 'app' },
+    nav({ className: 'nav' },
+      a({
+        href: '/',
+        className: currentPath === '/' ? 'active' : ''
+      }, 'Home'),
+      a({
+        href: '/about',
+        className: currentPath === '/about' ? 'active' : ''
+      }, 'About'),
+      a({
+        href: '/contact',
+        className: currentPath === '/contact' ? 'active' : ''
+      }, 'Contact')
+    ),
+    div({ className: 'content' }, content)
+  );
+}
+
+// Home page
+api.get('/', (ctx) => {
+  const content = div(
+    h1('Welcome Home'),
+    p('This is the home page rendered on the server.')
+  );
+
+  const app = Layout(content, '/');
+  const appHtml = app.node.outerHTML;
+
+  html(ctx.res, \`<!DOCTYPE html>
+    <html>
+      <head><title>Home</title><link rel="stylesheet" href="/styles.css"></head>
+      <body>\${appHtml}<script type="module" src="/client.js"></script></body>
+    </html>\`);
+});
+
+// About page
+api.get('/about', (ctx) => {
+  const content = div(
+    h1('About Us'),
+    p('Learn more about our company.')
+  );
+
+  const app = Layout(content, '/about');
+  const appHtml = app.node.outerHTML;
+
+  html(ctx.res, \`<!DOCTYPE html>
+    <html>
+      <head><title>About</title><link rel="stylesheet" href="/styles.css"></head>
+      <body>\${appHtml}<script type="module" src="/client.js"></script></body>
+    </html>\`);
+});
+
+export default defineConfig({
+  dev: { port: 3000, api }
+});`))),
+
+      h2('Performance Optimization'),
+      h3('1. Streaming SSR'),
+      p('Stream HTML as it\'s generated for faster Time to First Byte:'),
+
+      pre(code(...codeBlock(`// server.ts
+api.get('/stream', (ctx) => {
+  ctx.res.writeHead(200, {
+    'Content-Type': 'text/html',
+    'Transfer-Encoding': 'chunked'
+  });
+
+  // Send initial HTML
+  ctx.res.write('<!DOCTYPE html><html><head><title>Streaming</title></head><body>');
+  ctx.res.write('<div id="app">');
+
+  // Stream header
+  const header = h1('Streaming SSR Demo');
+  ctx.res.write(header.node.outerHTML);
+
+  // Simulate async data loading
+  setTimeout(() => {
+    const content = p('This content loaded asynchronously!');
+    ctx.res.write(content.node.outerHTML);
+
+    // Close and send scripts
+    ctx.res.write('</div>');
+    ctx.res.write('<script type="module" src="/client.js"></script>');
+    ctx.res.write('</body></html>');
+    ctx.res.end();
+  }, 1000);
+});`))),
+
+      h3('2. HTML Caching'),
+      p('Cache rendered HTML for better performance:'),
+
+      pre(code(...codeBlock(`import { html } from 'elit/el';
+import { ServerRouter } from 'elit/server';
+
+const htmlCache = new Map<string, { html: string; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute
+
+function getCachedHTML(key: string, generator: () => string): string {
+  const cached = htmlCache.get(key);
+  const now = Date.now();
+
+  // Check if cached and not expired
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    return cached.html;
+  }
+
+  // Generate new HTML
+  const generatedHtml = generator();
+
+  // Cache it
+  htmlCache.set(key, {
+    html: generatedHtml,
+    timestamp: now
+  });
+
+  return generatedHtml;
+}
+
+api.get('/cached-page', (ctx) => {
+  const pageHtml = getCachedHTML('home-page', () => {
+    const app = div({ id: 'app' },
+      h1('Cached Page'),
+      p('This page is cached for 1 minute')
+    );
+
+    return \`<!DOCTYPE html>
+      <html>
+        <head><title>Cached</title></head>
+        <body>\${app.node.outerHTML}</body>
+      </html>\`;
+  });
+
+  html(ctx.res, pageHtml);
+});`))),
+
+      h2('Common SSR Patterns'),
+
+      h3('Conditional Client-Side Hydration'),
+      p('Only hydrate parts of the page that need interactivity:'),
+
+      pre(code(...codeBlock(`// client.ts
+import { createState } from 'elit/state';
+
+// Check if element needs hydration
+const interactiveElements = document.querySelectorAll('[data-hydrate]');
+
+interactiveElements.forEach(el => {
+  const type = el.getAttribute('data-hydrate');
+
+  switch (type) {
+    case 'counter':
+      hydrateCounter(el);
+      break;
+    case 'form':
+      hydrateForm(el);
+      break;
+    default:
+      console.warn(\`Unknown hydration type: \${type}\`);
+  }
+});
+
+function hydrateCounter(el: Element) {
+  const countEl = el.querySelector('.count');
+  const incrementBtn = el.querySelector('.increment');
+  const decrementBtn = el.querySelector('.decrement');
+
+  if (!countEl || !incrementBtn || !decrementBtn) return;
+
+  const count = createState(parseInt(countEl.textContent || '0'));
+
+  count.subscribe(value => {
+    countEl.textContent = String(value);
+  });
+
+  incrementBtn.addEventListener('click', () => count.value++);
+  decrementBtn.addEventListener('click', () => count.value--);
 }`))),
 
-      h2('รูปแบบขั้นสูง'),
-      h3('Nested Components พร้อม State'),
-      p('Serialize โครงสร้างซ้อนที่ซับซ้อน:'),
-      pre(code(...codeBlock(`import { renderJson, div, h2, ul, li, createState } from 'elit';
+      h2('SSR Best Practices'),
+      ul(
+        li(strong('Keep components pure'), ' - Avoid side effects in render functions'),
+        li(strong('Minimize client bundle'), ' - Only send JavaScript needed for interactivity'),
+        li(strong('Use caching wisely'), ' - Cache static pages, invalidate on content changes'),
+        li(strong('Handle errors gracefully'), ' - Provide fallback HTML for failed renders'),
+        li(strong('Optimize Time to Interactive'), ' - Hydrate critical components first'),
+        li(strong('Avoid heavy computations'), ' - Move expensive operations to build time'),
+        li(strong('Use compression'), ' - Enable gzip/brotli for HTML responses'),
+        li(strong('Implement proper SEO'), ' - Include meta tags, structured data, sitemaps'),
+        li(strong('Monitor performance'), ' - Track TTFB, FCP, LCP metrics'),
+        li(strong('Progressive enhancement'), ' - Ensure basic functionality without JavaScript')
+      ),
 
-// โครงสร้างซ้อนที่ซับซ้อน
-const appState = {
-  user: createState({
-    name: 'สมชาย ใจดี',
-    email: 'somchai@example.com',
-    preferences: {
-      theme: 'dark',
-      language: 'th'
-    }
-  }),
-  posts: createState([
-    { id: 1, title: 'โพสต์แรก', likes: 10 },
-    { id: 2, title: 'โพสต์ที่สอง', likes: 25 }
-  ]),
-  ui: createState({
-    sidebarOpen: true,
-    modalVisible: false
-  })
-};
+      h2('Complete SSR Example'),
+      p('Here\'s a complete example combining all concepts:'),
 
-// Serialize application state ทั้งหมด
-function serializeAppState() {
+      pre(code(...codeBlock(`// server.ts
+import { defineConfig } from 'elit/config';
+import { div, h1, h2, p, article, nav, a, button, html } from 'elit/el';
+import { ServerRouter, compress } from 'elit/server';
+
+const api = new ServerRouter();
+
+// Use compression middleware
+api.use(compress());
+
+// Blog post data fetching
+async function fetchBlogPost(slug: string) {
+  // Simulate database fetch
   return {
-    user: renderJson(appState.user.value),
-    posts: renderJson(appState.posts.value),
-    ui: renderJson(appState.ui.value),
-    timestamp: Date.now()
+    slug,
+    title: 'Getting Started with Elit SSR',
+    content: 'SSR in Elit is straightforward and powerful...',
+    author: 'Jane Doe',
+    date: '2024-12-18',
+    excerpt: 'Learn how to implement SSR in Elit applications'
   };
 }
 
-// Export state สำหรับ debugging
-console.log(JSON.stringify(serializeAppState(), null, 2));`))),
+// SSR blog post route
+api.get('/blog/:slug', async (ctx) => {
+  const { slug } = ctx.params;
+  const post = await fetchBlogPost(slug);
 
-      h3('Custom Serialization Logic'),
-      p('จัดการกรณีพิเศษด้วย custom serialization:'),
-      pre(code(...codeBlock(`import { renderJson } from 'elit';
+  // Create SEO meta tags
+  const metaTags = \`
+    <title>\${post.title} | Blog</title>
+    <meta name="description" content="\${post.excerpt}">
+    <meta property="og:title" content="\${post.title}">
+    <meta property="og:description" content="\${post.excerpt}">
+  \`;
 
-// Custom serializer สำหรับ Date objects
-function serializeWithDates(value: any): any {
-  if (value instanceof Date) {
-    return {
-      __type: 'Date',
-      value: value.toISOString()
-    };
-  }
+  // Render blog post
+  const app = div({ id: 'app' },
+    nav({ className: 'nav' },
+      a({ href: '/' }, 'Home'),
+      a({ href: '/blog' }, 'Blog')
+    ),
+    article({ className: 'post' },
+      h1(post.title),
+      p({ className: 'meta' }, \`By \${post.author} • \${post.date}\`),
+      div({ className: 'content' }, post.content),
+      button({
+        'data-hydrate': 'like-button',
+        className: 'like-btn'
+      }, '👍 Like')
+    )
+  );
 
-  if (Array.isArray(value)) {
-    return value.map(item => serializeWithDates(item));
-  }
+  const appHtml = app.node.outerHTML;
 
-  if (value && typeof value === 'object') {
-    const result: any = {};
-    for (const key in value) {
-      result[key] = serializeWithDates(value[key]);
-    }
-    return result;
-  }
+  html(ctx.res, \`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        \${metaTags}
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body>
+        \${appHtml}
+        <script>
+          window.__INITIAL_DATA__ = \${JSON.stringify({ post })};
+        </script>
+        <script type="module" src="/blog-client.js"></script>
+      </body>
+    </html>
+  \`);
+});
 
-  return renderJson(value);
-}
-
-// Custom deserializer
-function deserializeWithDates(value: any): any {
-  if (value && typeof value === 'object' && value.__type === 'Date') {
-    return new Date(value.value);
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(item => deserializeWithDates(item));
-  }
-
-  if (value && typeof value === 'object') {
-    const result: any = {};
-    for (const key in value) {
-      result[key] = deserializeWithDates(value[key]);
-    }
-    return result;
-  }
-
-  return value;
-}
-
-// การใช้งาน
-const data = {
-  createdAt: new Date(),
-  items: [{ date: new Date('2024-01-01') }]
-};
-
-const serialized = serializeWithDates(data);
-const deserialized = deserializeWithDates(serialized);`))),
-
-      h2('การทดสอบด้วย Snapshots'),
-      h3('Component Snapshot Testing'),
-      p('ใช้ renderJson สำหรับการทดสอบแบบ snapshot:'),
-      pre(code(...codeBlock(`import { describe, it, expect } from 'vitest';
-import { renderJson, div, h1, p } from 'elit';
-import { UserCard } from './UserCard';
-
-describe('UserCard Component', () => {
-  it('should match snapshot', () => {
-    const user = {
-      name: 'สมชาย ใจดี',
-      email: 'somchai@example.com',
-      avatar: '/avatar.jpg'
-    };
-
-    const card = UserCard(user);
-    const snapshot = renderJson(card);
-
-    expect(snapshot).toMatchSnapshot();
-  });
-
-  it('should serialize correctly', () => {
-    const user = {
-      name: 'สมหญิง รักดี',
-      email: 'somying@example.com'
-    };
-
-    const card = UserCard(user);
-    const json = renderJson(card);
-
-    expect(json).toEqual({
-      tag: 'div',
-      props: { className: 'user-card' },
-      children: [
-        {
-          tag: 'h1',
-          children: ['สมหญิง รักดี']
-        },
-        {
-          tag: 'p',
-          children: ['somying@example.com']
-        }
-      ]
-    });
-  });
+export default defineConfig({
+  dev: { port: 3000, api }
 });`))),
 
-      h2('ข้อควรพิจารณาด้านประสิทธิภาพ'),
+      pre(code(...codeBlock(`// blog-client.ts
+import { createState } from 'elit/state';
+
+const likeButton = document.querySelector('[data-hydrate="like-button"]');
+
+if (likeButton) {
+  const likes = createState(0);
+
+  const likeCount = document.createElement('span');
+  likeCount.className = 'like-count';
+  likeButton.appendChild(likeCount);
+
+  likes.subscribe(count => {
+    likeCount.textContent = count > 0 ? \` (\${count})\` : '';
+  });
+
+  likeButton.addEventListener('click', () => {
+    likes.value++;
+  });
+}`))),
+
+      h2('Conclusion'),
+      p('Server-Side Rendering in Elit provides a powerful way to build fast, SEO-friendly applications. By rendering HTML on the server and selectively hydrating on the client, you get the best of both worlds: fast initial loads and rich interactivity.'),
+
+      p('Key takeaways: Use SSR for content-heavy pages, implement proper hydration for interactive components, optimize with caching and compression, and always prioritize user experience and performance metrics.')
+    ),
+
+    th: div(
+      p('Server-Side Rendering (SSR) ใน Elit ช่วยให้คุณ render แอปพลิเคชันบนเซิร์ฟเวอร์และส่ง HTML ที่สมบูรณ์ไปยัง client ซึ่งช่วยปรับปรุงประสิทธิภาพการโหลดครั้งแรก SEO และประสบการณ์ผู้ใช้'),
+
+      h2('ทำไมต้อง Server-Side Rendering?'),
+      p('SSR ให้ประโยชน์หลักหลายอย่าง:'),
       ul(
-        li('renderJson เบาและรวดเร็วสำหรับโครงสร้างขนาดเล็กถึงกลาง'),
-        li('ใช้ caching สำหรับ components ที่ serialize บ่อย'),
-        li('หลีกเลี่ยงการ serialize โครงสร้างซ้อนขนาดใหญ่ซ้ำๆ'),
-        li('พิจารณา streaming สำหรับชุดข้อมูลขนาดใหญ่มาก'),
-        li('ลบ event handlers ก่อน serialization (ไม่สามารถ serialize ได้)'),
-        li('ใช้การบีบอัด (gzip/brotli) สำหรับ API responses'),
-        li('ใช้ incremental serialization สำหรับ trees ขนาดใหญ่')
+        li(strong('โหลดเร็วขึ้น'), ' - ผู้ใช้เห็นเนื้อหาทันทีโดยไม่ต้องรอ JavaScript'),
+        li(strong('SEO ดีขึ้น'), ' - Search engines สามารถ crawl HTML ที่ render เต็มรูปแบบ'),
+        li(strong('Social Media Previews'), ' - OG tags และ meta descriptions ทำงานถูกต้อง'),
+        li(strong('ประสิทธิภาพดีขึ้น'), ' - ลด time-to-interactive บนการเชื่อมต่อที่ช้า'),
+        li(strong('Progressive Enhancement'), ' - เนื้อหาทำงานได้แม้ว่า JavaScript จะล้มเหลว'),
+        li(strong('Core Web Vitals ดีขึ้น'), ' - ปรับปรุง FCP, LCP และ CLS scores')
       ),
 
-      h3('Optimized Serialization'),
-      pre(code(...codeBlock(`import { renderJson } from 'elit';
+      h2('การตั้งค่า SSR พื้นฐาน'),
+      h3('1. ฝั่ง Server: Render HTML'),
+      p('ใช้ Elit components บน server เพื่อสร้าง HTML:'),
 
-// Serialize เฉพาะสิ่งที่จำเป็น
-function optimizedSerialize(component: VNode, options = {
-  includeProps: true,
-  maxDepth: 10
-}) {
-  const json = renderJson(component);
+      pre(code(...codeBlock(`// server.ts
+import { defineConfig } from 'elit/config';
+import { div, h1, p, button, html } from 'elit/dom';
+import { ServerRouter } from 'elit/server';
 
-  // ลบข้อมูลที่ไม่จำเป็น
-  function prune(node: any, depth = 0): any {
-    if (depth > options.maxDepth) {
-      return '[ถึงความลึกสูงสุดแล้ว]';
-    }
+const api = new ServerRouter();
 
-    if (typeof node === 'string' || typeof node === 'number') {
-      return node;
-    }
+api.get('/', (ctx) => {
+  // สร้าง app component
+  const app = div({ id: 'app' },
+    h1('ยินดีต้อนรับสู่ Elit SSR'),
+    p('เนื้อหานี้ถูก render บน server!'),
+    button({ className: 'cta' }, 'เริ่มต้นใช้งาน')
+  );
 
-    const result: any = { tag: node.tag };
+  // Render เป็น HTML string
+  const appHtml = app.node.outerHTML;
 
-    if (options.includeProps && node.props) {
-      // รวมเฉพาะ props ที่ serialize ได้
-      result.props = {};
-      for (const key in node.props) {
-        if (!key.startsWith('on')) { // ข้าม event handlers
-          result.props[key] = node.props[key];
-        }
-      }
-    }
+  // ส่ง HTML document ที่สมบูรณ์
+  html(ctx.res, \`
+    <!DOCTYPE html>
+    <html lang="th">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Elit SSR App</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body>
+        \${appHtml}
+        <script type="module" src="/client.js"></script>
+      </body>
+    </html>
+  \`);
+});
 
-    if (node.children) {
-      result.children = node.children.map(
-        (child: any) => prune(child, depth + 1)
-      );
-    }
+export default defineConfig({
+  dev: { port: 3000, api }
+});`))),
 
-    return result;
+      h3('2. ฝั่ง Client: Hydration'),
+      p('บน client ติด event handlers ให้กับ HTML ที่ render จาก server:'),
+
+      pre(code(...codeBlock(`// client.ts
+import { dom } from 'elit/dom';
+
+// หา elements ที่ render จาก server
+const button = document.querySelector('.cta');
+
+// ติด client-side behavior
+if (button) {
+  button.addEventListener('click', () => {
+    window.location.href = '/getting-started';
+  });
+}
+
+console.log('Client hydrated!');`))),
+
+      h2('SSR พร้อม State Management'),
+      h3('Server: สร้าง HTML พร้อม Initial State'),
+      p('ส่ง initial state จาก server ไป client:'),
+
+      pre(code(...codeBlock(`// server.ts
+import { ServerRouter } from 'elit/server';
+import { div, h1, span, button, html } from 'elit/dom';
+
+const api = new ServerRouter();
+
+api.get('/counter', (ctx) => {
+  const initialCount = 0;
+
+  // สร้าง component พร้อม initial state
+  const app = div({ id: 'app' },
+    h1('Counter ที่ Render จาก Server'),
+    div({ className: 'counter' },
+      span({ id: 'count', className: 'count' }, String(initialCount)),
+      div({ className: 'buttons' },
+        button({ id: 'decrement', className: 'btn' }, '-'),
+        button({ id: 'increment', className: 'btn' }, '+')
+      )
+    )
+  );
+
+  const appHtml = app.node.outerHTML;
+
+  html(ctx.res, \`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>SSR Counter</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body>
+        \${appHtml}
+        <script>
+          // ฝัง initial state ใน HTML
+          window.__INITIAL_STATE__ = { count: \${initialCount} };
+        </script>
+        <script type="module" src="/counter-client.js"></script>
+      </body>
+    </html>
+  \`);
+});`))),
+
+      h3('Client: Hydrate ด้วย Reactive State'),
+      p('กู้คืน state และทำให้เป็น reactive บน client:'),
+
+      pre(code(...codeBlock(`// counter-client.ts
+import { createState } from 'elit/state';
+
+// รับ initial state จาก server
+const initialState = (window as any).__INITIAL_STATE__;
+
+// สร้าง reactive state
+const count = createState(initialState.count);
+
+// หา DOM elements
+const countEl = document.getElementById('count');
+const decrementBtn = document.getElementById('decrement');
+const incrementBtn = document.getElementById('increment');
+
+// Subscribe การเปลี่ยนแปลง state
+if (countEl) {
+  count.subscribe(value => {
+    countEl.textContent = String(value);
+  });
+}
+
+// ติด event handlers
+if (decrementBtn) {
+  decrementBtn.addEventListener('click', () => {
+    count.value--;
+  });
+}
+
+if (incrementBtn) {
+  incrementBtn.addEventListener('click', () => {
+    count.value++;
+  });
+}`))),
+
+      h2('การเพิ่มประสิทธิภาพ'),
+      h3('1. HTML Caching'),
+      p('Cache HTML ที่ render แล้วเพื่อประสิทธิภาพที่ดีขึ้น:'),
+
+      pre(code(...codeBlock(`import { ServerRouter } from 'elit/server';
+import { html } from 'elit/el';
+const htmlCache = new Map<string, { html: string; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 นาที
+
+function getCachedHTML(key: string, generator: () => string): string {
+  const cached = htmlCache.get(key);
+  const now = Date.now();
+
+  // ตรวจสอบว่ามี cache และยังไม่หมดอายุ
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    return cached.html;
   }
 
-  return prune(json);
+  // สร้าง HTML ใหม่
+  const generatedHtml = generator();
+
+  // Cache มัน
+  htmlCache.set(key, {
+    html: generatedHtml,
+    timestamp: now
+  });
+
+  return generatedHtml;
+}`))),
+
+      h3('2. การบีบอัด'),
+      p('ใช้ compression middleware สำหรับ responses:'),
+
+      pre(code(...codeBlock(`import { ServerRouter, compress } from 'elit/server';
+
+const api = new ServerRouter();
+
+// ใช้ compression
+api.use(compress());
+
+api.get('/', (ctx) => {
+  // HTML จะถูกบีบอัดโดยอัตโนมัติ
+  html(ctx.res, largeHtmlContent);
+});`))),
+
+      h2('SEO Optimization'),
+      h3('Dynamic Meta Tags'),
+      p('สร้าง meta tags ที่เหมาะกับ SEO:'),
+
+      pre(code(...codeBlock(`function generateMetaTags(meta: {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+}): string {
+  return \`
+    <title>\${meta.title}</title>
+    <meta name="description" content="\${meta.description}">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="\${meta.title}">
+    <meta property="og:description" content="\${meta.description}">
+    <meta property="og:url" content="\${meta.url}">
+    \${meta.image ? \`<meta property="og:image" content="\${meta.image}">\` : ''}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="\${meta.title}">
+    <meta name="twitter:description" content="\${meta.description}">
+  \`;
 }`))),
 
       h2('แนวทางปฏิบัติที่ดี'),
       ul(
-        li('ตรวจสอบความถูกต้องของข้อมูลที่ deserialize ก่อนใช้งาน'),
-        li('ใช้ TypeScript types สำหรับโครงสร้างที่ serialize'),
-        li('ใช้ versioning สำหรับข้อมูลที่ serialize'),
-        li('จัดการ errors อย่างเหมาะสมระหว่าง deserialization'),
-        li('ทำความสะอาดข้อมูลก่อน serialization เพื่อป้องกัน XSS'),
-        li('ใช้การบีบอัดสำหรับ payloads ขนาดใหญ่'),
-        li('พิจารณาความหมายด้านความปลอดภัยของการเปิดเผย state'),
-        li('จัดทำเอกสารรูปแบบ serialization ของคุณ')
-      ),
-
-      h3('Type-Safe Serialization'),
-      pre(code(...codeBlock(`interface SerializedComponent {
-  version: string;
-  timestamp: number;
-  component: any;
-  state?: Record<string, any>;
-}
-
-function safeSerialize(
-  component: VNode,
-  state?: Record<string, any>
-): SerializedComponent {
-  return {
-    version: '1.0.0',
-    timestamp: Date.now(),
-    component: renderJson(component),
-    state: state ? renderJson(state) : undefined
-  };
-}
-
-function safeDeserialize(
-  data: SerializedComponent
-): { component: any; state?: any } {
-  // ตรวจสอบ version
-  if (data.version !== '1.0.0') {
-    throw new Error('เวอร์ชันไม่เข้ากัน');
-  }
-
-  // ตรวจสอบ timestamp (ถ้าต้องการ)
-  const maxAge = 1000 * 60 * 60; // 1 ชั่วโมง
-  if (Date.now() - data.timestamp > maxAge) {
-    console.warn('ข้อมูลเก่าเกินไป');
-  }
-
-  return {
-    component: data.component,
-    state: data.state
-  };
-}`))),
-
-      h2('ตัวอย่างในโลกจริง: Blog CMS'),
-      p('ตัวอย่างสมบูรณ์ของการใช้ renderJson ใน blog CMS:'),
-      pre(code(...codeBlock(`import express from 'express';
-import { renderJson, div, h1, h2, p, article } from 'elit';
-
-const app = express();
-const db = new Map(); // Database จำลอง
-
-// บันทึกโพสต์พร้อม serialized preview
-app.post('/api/posts', async (req, res) => {
-  const { title, content, author } = req.body;
-
-  // สร้าง preview component
-  const preview = article({ className: 'post-preview' },
-    h2(title),
-    p(content.substring(0, 200) + '...'),
-    p({ className: 'author' }, \`โดย \${author}\`)
-  );
-
-  // บันทึกโพสต์พร้อม serialized preview
-  const post = {
-    id: Date.now().toString(),
-    title,
-    content,
-    author,
-    preview: renderJson(preview),
-    createdAt: new Date().toISOString()
-  };
-
-  db.set(post.id, post);
-
-  res.json({ success: true, post });
-});
-
-// ดึงโพสต์พร้อม preview
-app.get('/api/posts/:id', (req, res) => {
-  const post = db.get(req.params.id);
-
-  if (!post) {
-    return res.status(404).json({ error: 'ไม่พบโพสต์' });
-  }
-
-  res.json({ success: true, post });
-});
-
-// แสดงรายการโพสต์ทั้งหมด (เฉพาะ previews)
-app.get('/api/posts', (req, res) => {
-  const posts = Array.from(db.values()).map(post => ({
-    id: post.id,
-    title: post.title,
-    author: post.author,
-    preview: post.preview,
-    createdAt: post.createdAt
-  }));
-
-  res.json({ success: true, posts });
-});`))),
-
-      h2('สรุป JSON Utilities'),
-      p('Elit มี JSON utilities ที่ครบถ้วนสำหรับกรณีการใช้งานต่างๆ:'),
-      ul(
-        li('renderJson(container, json) - Render JSON data ไปยัง DOM'),
-        li('renderJsonToString(json, options?) - แปลง JSON เป็น HTML string'),
-        li('jsonToVNode(json) - แปลง JSON เป็น VNode object'),
-        li('renderVNode(container, vnodeJson) - Render VNode JSON ไปยัง DOM'),
-        li('vNodeJsonToVNode(vnodeJson) - แปลง VNode JSON เป็น VNode'),
-        li('renderToString(vnode, options?) - แปลง VNode เป็น HTML string')
+        li(strong('เก็บ components ให้ pure'), ' - หลีกเลี่ยง side effects ใน render functions'),
+        li(strong('ลด client bundle'), ' - ส่งเฉพาะ JavaScript ที่จำเป็นสำหรับ interactivity'),
+        li(strong('ใช้ caching อย่างชาญฉลาด'), ' - Cache หน้าแบบ static, invalidate เมื่อเนื้อหาเปลี่ยน'),
+        li(strong('จัดการ errors อย่างเหมาะสม'), ' - ให้ fallback HTML สำหรับ renders ที่ล้มเหลว'),
+        li(strong('เพิ่มประสิทธิภาพ Time to Interactive'), ' - Hydrate components สำคัญก่อน'),
+        li(strong('หลีกเลี่ยงการคำนวณหนัก'), ' - ย้ายการดำเนินการที่ใช้เวลามากไปยัง build time'),
+        li(strong('ใช้การบีบอัด'), ' - เปิด gzip/brotli สำหรับ HTML responses'),
+        li(strong('ทำ SEO ให้ถูกต้อง'), ' - รวม meta tags, structured data, sitemaps'),
+        li(strong('ติดตามประสิทธิภาพ'), ' - ติดตาม TTFB, FCP, LCP metrics'),
+        li(strong('Progressive enhancement'), ' - ให้แน่ใจว่าฟังก์ชันพื้นฐานทำงานได้โดยไม่ต้องใช้ JavaScript')
       ),
 
       h2('สรุป'),
-      p('JSON utilities ของ Elit ให้วิธีที่ทรงพลังในการทำงานกับข้อมูล component ในรูปแบบ JSON ไม่ว่าคุณจะทำ SSR, สร้าง APIs ที่ return โครงสร้าง UI หรือ cache rendered output เครื่องมือเหล่านี้ทำให้ง่ายต่อการ serialize และ deserialize component structures'),
-      p('สรุปสำคัญ: ใช้ renderJson และ renderJsonToString สำหรับทำงานกับ JSON data, renderToString สำหรับ SSR และ jsonToVNode สำหรับแปลง JSON กลับเป็น VNodes ตรวจสอบ JSON structures เสมอและพิจารณา cache HTML strings เพื่อประสิทธิภาพที่ดีขึ้น')
+      p('Server-Side Rendering ใน Elit ให้วิธีที่ทรงพลังในการสร้างแอปพลิเคชันที่เร็วและเหมาะกับ SEO ด้วยการ render HTML บน server และ hydrate แบบเลือกสรรบน client คุณจะได้ทั้งสองอย่าง: การโหลดเริ่มต้นที่เร็วและ interactivity ที่หลากหลาย'),
+
+      p('สรุปสำคัญ: ใช้ SSR สำหรับหน้าที่เน้นเนื้อหา ใช้ hydration ที่เหมาะสมสำหรับ interactive components เพิ่มประสิทธิภาพด้วย caching และ compression และให้ความสำคัญกับประสบการณ์ผู้ใช้และ performance metrics เสมอ')
     )
   }
 };

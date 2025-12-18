@@ -7,18 +7,18 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog18: BlogPostDetail = {
   id: '18',
   title: {
-    en: 'Complete Guide to Elit 2.0',
-    th: 'คู่มือครบวงจร Elit 2.0'
+    en: 'Complete Guide to Elit',
+    th: 'คู่มือครบวงจร Elit'
   },
   date: '2024-04-15',
   author: 'n-devs',
-  tags: ['Tutorial', 'Elit 2.0', 'CLI', 'Build System', 'Full Stack'],
+  tags: ['Tutorial', 'Elit', 'CLI', 'Build System', 'Full Stack'],
   content: {
     en: div(
-      p('Learn everything about ', strong('Elit 2.0'), ' - the complete full-stack TypeScript framework. This comprehensive guide covers ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ', and production deployment.'),
+      p('Learn everything about ', strong('Elit'), ' - the complete full-stack TypeScript framework. This comprehensive guide covers ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ', and production deployment.'),
 
-      h2('What is Elit 2.0?'),
-      p('Elit 2.0 is a complete full-stack TypeScript framework that provides:'),
+      h2('What is Elit?'),
+      p('Elit is a complete full-stack TypeScript framework that provides:'),
       ul(
         li('⚡ ', strong('CLI Tools'), ' - npx elit dev/build/preview for complete workflow'),
         li('🏗️ ', strong('Build System'), ' - Integrated esbuild with optimizations'),
@@ -32,7 +32,7 @@ export const blog18: BlogPostDetail = {
       ),
 
       h2('Installation'),
-      pre(code(...codeBlock(`# Install Elit 2.0
+      pre(code(...codeBlock(`# Install Elit
 npm install elit
 
 # No additional packages needed - everything is integrated!`))),
@@ -197,7 +197,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
 });`))),
 
       h2('Environment Variables'),
-      p('Elit 2.0 has built-in environment variables support:'),
+      p('Elit has built-in environment variables support:'),
       h3('Loading .env Files'),
       pre(code(...codeBlock(`# .env
 VITE_API_URL=https://api.example.com
@@ -226,7 +226,7 @@ console.log(import.meta.env.PROD);`))),
 
       h2('Middleware'),
       h3('Built-in Middleware'),
-      p('Elit 2.0 includes these middleware out of the box:'),
+      p('Elit includes these middleware out of the box:'),
 
       pre(code(...codeBlock(`import {
   cors,         // CORS headers
@@ -758,7 +758,7 @@ state.onChange((newValue, oldValue) => {
 
       h2('Comparison with Other Frameworks'),
       pre(code(...codeBlock(`┌──────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature          │ Elit 2.0    │ Vite + React │ Next.js        │
+│ Feature          │ Elit    │ Vite + React │ Next.js        │
 ├──────────────────┼─────────────┼──────────────┼────────────────┤
 │ CLI Tools        │ ✅ Built-in │ ✅ Built-in  │ ✅ Built-in    │
 │ Build System     │ ✅ esbuild  │ ✅ esbuild   │ ✅ Turbopack   │
@@ -774,7 +774,7 @@ state.onChange((newValue, oldValue) => {
 └──────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('Conclusion'),
-      p('Elit 2.0 provides everything you need for full-stack TypeScript development:'),
+      p('Elit provides everything you need for full-stack TypeScript development:'),
       ul(
         li('⚡ ', strong('Complete CLI'), ' - dev, build, preview in one package'),
         li('🏗️ ', strong('Integrated build'), ' - No separate bundler setup needed'),
@@ -792,10 +792,10 @@ state.onChange((newValue, oldValue) => {
       p('For more information, visit the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit GitHub repository'), '.')
     ),
     th: div(
-      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('Elit 2.0'), ' - full-stack TypeScript framework ที่สมบูรณ์ คู่มือครบวงจรนี้ครอบคลุม ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ' และการ deploy แบบ production'),
+      p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('Elit'), ' - full-stack TypeScript framework ที่สมบูรณ์ คู่มือครบวงจรนี้ครอบคลุม ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ' และการ deploy แบบ production'),
 
-      h2('Elit 2.0 คืออะไร?'),
-      p('Elit 2.0 เป็น full-stack TypeScript framework ที่สมบูรณ์ที่ให้:'),
+      h2('Elit คืออะไร?'),
+      p('Elit เป็น full-stack TypeScript framework ที่สมบูรณ์ที่ให้:'),
       ul(
         li('⚡ ', strong('CLI Tools'), ' - npx elit dev/build/preview สำหรับ workflow ที่สมบูรณ์'),
         li('🏗️ ', strong('Build System'), ' - esbuild ที่รวมไว้พร้อมการ optimize'),
@@ -809,7 +809,7 @@ state.onChange((newValue, oldValue) => {
       ),
 
       h2('การติดตั้ง'),
-      pre(code(...codeBlock(`# ติดตั้ง Elit 2.0
+      pre(code(...codeBlock(`# ติดตั้ง Elit
 npm install elit
 
 # ไม่ต้องติดตั้ง packages เพิ่ม - ทุกอย่างรวมอยู่แล้ว!`))),
@@ -889,7 +889,7 @@ export default defineConfig({
 });`))),
 
       h2('Environment Variables'),
-      p('Elit 2.0 มีการรองรับ environment variables ในตัว:'),
+      p('Elit มีการรองรับ environment variables ในตัว:'),
       h3('โหลดไฟล์ .env'),
       pre(code(...codeBlock(`# .env
 VITE_API_URL=https://api.example.com
@@ -976,7 +976,7 @@ api.get('/api/users/:id([0-9]+)', (ctx) => {
 
       h2('Middleware'),
       h3('Middleware ในตัว'),
-      p('Elit 2.0 มี middleware เหล่านี้ในตัว:'),
+      p('Elit มี middleware เหล่านี้ในตัว:'),
 
       pre(code(...codeBlock(`import {
   cors,         // CORS headers
@@ -1308,7 +1308,7 @@ process.once('SIGTERM', shutdown);`))),
 
       h2('เปรียบเทียบกับ Frameworks อื่น'),
       pre(code(...codeBlock(`┌──────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature          │ Elit 2.0    │ Vite + React │ Next.js        │
+│ Feature          │ Elit    │ Vite + React │ Next.js        │
 ├──────────────────┼─────────────┼──────────────┼────────────────┤
 │ CLI Tools        │ ✅ ในตัว    │ ✅ ในตัว     │ ✅ ในตัว       │
 │ Build System     │ ✅ esbuild  │ ✅ esbuild   │ ✅ Turbopack   │
@@ -1324,7 +1324,7 @@ process.once('SIGTERM', shutdown);`))),
 └──────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('สรุป'),
-      p('Elit 2.0 ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack TypeScript:'),
+      p('Elit ให้ทุกสิ่งที่คุณต้องการสำหรับการพัฒนา full-stack TypeScript:'),
       ul(
         li('⚡ ', strong('CLI สมบูรณ์'), ' - dev, build, preview ในแพ็กเกจเดียว'),
         li('🏗️ ', strong('Build รวมอยู่'), ' - ไม่ต้องตั้งค่า bundler แยก'),

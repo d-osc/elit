@@ -1,4 +1,4 @@
-# Elit 2.0
+# Elit
 
 ⚡ A full-stack TypeScript framework (~10KB gzipped) with built-in dev server, HMR, build tool, and REST API. Zero dependencies, maximum productivity.
 
@@ -8,7 +8,7 @@
 
 > **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [CLI Tools](#cli-tools) | [API](#api) | [Deployment](#deployment)
 
-## Why Elit 2.0?
+## Why Elit?
 
 - **🎯 Tiny Bundle Size**: Only ~10KB gzipped (30KB minified) - no framework bloat
 - **📦 Zero Dependencies**: Pure TypeScript, no external dependencies
@@ -31,7 +31,7 @@ npm install elit
 
 ## CLI Tools
 
-Elit 2.0 includes a powerful CLI for development and production:
+Elit includes a powerful CLI for development and production:
 
 ```bash
 # Development server with HMR
@@ -140,7 +140,7 @@ import { div, h1, button, createState, reactive, domNode } from 'elit';
 const count = createState(0);
 
 const app = div({ className: 'app' },
-  h1('Hello Elit 2.0! 🚀'),
+  h1('Hello Elit! 🚀'),
   reactive(count, (value) =>
     button({
       onclick: () => count.value++,
@@ -160,7 +160,7 @@ Create `index.html`:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Elit 2.0 App</title>
+  <title>Elit App</title>
 </head>
 <body>
   <div id="app"></div>
@@ -703,7 +703,7 @@ const users: State<User[]> = createState([]);
 
 ## Deployment
 
-Deploy your Elit 2.0 application to production:
+Deploy your Elit application to production:
 
 ### Build for Production
 
@@ -792,7 +792,7 @@ const isProd = import.meta.env.PROD;
 
 ## Comparison with Other Frameworks
 
-| Feature | Elit 2.0 | Vite + React | Next.js | SvelteKit |
+| Feature | Elit | Vite + React | Next.js | SvelteKit |
 |---------|----------|--------------|---------|-----------|
 | Bundle Size | 30KB | ~140KB+ | ~200KB+ | ~15KB* |
 | Zero Dependencies | ✅ | ❌ | ❌ | ❌ |
@@ -816,7 +816,7 @@ const isProd = import.meta.env.PROD;
 
 ## Changelog
 
-### Elit 2.0 - Full-Stack Framework
+### Elit - Full-Stack Framework
 
 **Major Changes:**
 - 🚀 **Integrated Build System**: Built-in esbuild with automatic client/server code separation
@@ -843,7 +843,7 @@ const isProd = import.meta.env.PROD;
 
 ## Examples
 
-Example applications demonstrating Elit 2.0 features:
+Example applications demonstrating Elit features:
 
 - 📖 **[Documentation Site](./docs)** - Full-featured docs site with i18n and blog
 - 🎯 **[Counter App](./examples/counter)** - Simple reactive counter

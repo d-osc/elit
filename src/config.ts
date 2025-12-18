@@ -9,8 +9,8 @@ import type { DevServerOptions, BuildOptions } from './types';
 export interface ElitConfig {
     /** Development server configuration */
     dev?: DevServerOptions;
-    /** Build configuration */
-    build?: BuildOptions;
+    /** Build configuration - supports single build or multiple builds */
+    build?: BuildOptions | BuildOptions[];
     /** Preview server configuration (subset of dev options) */
     preview?: {
         port?: number;

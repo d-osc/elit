@@ -2,14 +2,15 @@
  * Development server with HMR support
  */
 
-import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from 'http';
+import { request as httpsRequest } from 'https';
 import { WebSocketServer, WebSocket } from 'ws';
 import { watch } from 'chokidar';
 import { readFile, stat, realpath } from 'fs/promises';
 import { join, extname, relative, resolve, normalize, sep } from 'path';
 import { lookup } from 'mime-types';
 import { build } from 'esbuild';
-import type { DevServerOptions, DevServer, HMRMessage, Child, VNode } from './types';
+import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
 
 // ===== Router =====
@@ -328,6 +329,88 @@ export function security(): Middleware {
   };
 }
 
+// ===== Proxy Handler =====
+
+function rewritePath(path: string, pathRewrite?: Record<string, string>): string {
+  if (!pathRewrite) return path;
+
+  for (const [from, to] of Object.entries(pathRewrite)) {
+    const regex = new RegExp(from);
+    if (regex.test(path)) {
+      return path.replace(regex, to);
+    }
+  }
+  return path;
+}
+
+export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
+  return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
+    const url = req.url || '/';
+    const path = url.split('?')[0];
+
+    // Find matching proxy configuration (first match wins)
+    const proxy = proxyConfigs.find(p => path.startsWith(p.context));
+    if (!proxy) return false;
+
+    const { target, changeOrigin, pathRewrite, headers } = proxy;
+
+    try {
+      const targetUrl = new URL(target);
+      const isHttps = targetUrl.protocol === 'https:';
+      const requestLib = isHttps ? httpsRequest : httpRequest;
+
+      // Rewrite path if needed
+      let proxyPath = rewritePath(url, pathRewrite);
+
+      // Build proxy request options
+      const proxyReqOptions = {
+        hostname: targetUrl.hostname,
+        port: targetUrl.port || (isHttps ? 443 : 80),
+        path: proxyPath,
+        method: req.method,
+        headers: {
+          ...req.headers,
+          ...(headers || {}),
+        }
+      };
+
+      // Change origin if requested
+      if (changeOrigin) {
+        proxyReqOptions.headers.host = targetUrl.host;
+      }
+
+      // Remove headers that shouldn't be forwarded
+      delete proxyReqOptions.headers['host'];
+
+      // Create proxy request
+      const proxyReq = requestLib(proxyReqOptions, (proxyRes) => {
+        // Forward status code and headers
+        res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+
+        // Pipe response
+        proxyRes.pipe(res);
+      });
+
+      // Handle errors
+      proxyReq.on('error', (error) => {
+        console.error(`[Proxy] Error proxying ${url} to ${target}:`, error.message);
+        if (!res.headersSent) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Bad Gateway', message: 'Proxy error' }));
+        }
+      });
+
+      // Pipe request body
+      req.pipe(proxyReq);
+
+      return true;
+    } catch (error) {
+      console.error(`[Proxy] Invalid proxy configuration for ${path}:`, error);
+      return false;
+    }
+  };
+}
+
 // ===== State Management =====
 
 export type StateChangeHandler<T = any> = (value: T, oldValue: T) => void;
@@ -466,7 +549,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -474,13 +557,15 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
   watch: ['**/*.ts', '**/*.js', '**/*.html', '**/*.css'],
   ignore: ['node_modules/**', 'dist/**', '.git/**', '**/*.d.ts'],
   logging: true,
-  middleware: []
+  middleware: [],
+  worker: []
 };
 
 interface NormalizedClient {
   root: string;
   basePath: string;
   ssr?: () => Child | string;
+  proxyHandler?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
 }
 
 export function createDevServer(options: DevServerOptions): DevServer {
@@ -489,7 +574,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const stateManager = new StateManager();
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
-  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', ssr: config.ssr }] : null;
+  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', ssr: config.ssr, proxy: config.proxy }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
   const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
@@ -500,8 +585,16 @@ export function createDevServer(options: DevServerOptions): DevServer {
       while (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
       basePath = basePath ? '/' + basePath : '';
     }
-    return { root: client.root, basePath, ssr: client.ssr };
+    return {
+      root: client.root,
+      basePath,
+      ssr: client.ssr,
+      proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined
+    };
   });
+
+  // Create global proxy handler if proxy config exists
+  const globalProxyHandler = config.proxy ? createProxyHandler(config.proxy) : null;
 
   // HTTP Server
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -513,6 +606,32 @@ export function createDevServer(options: DevServerOptions): DevServer {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('404 Not Found');
       return;
+    }
+
+    // Try client-specific proxy first
+    if (matchedClient.proxyHandler) {
+      try {
+        const proxied = await matchedClient.proxyHandler(req, res);
+        if (proxied) {
+          if (config.logging) console.log(`[Proxy] ${req.method} ${originalUrl} -> proxied (client-specific)`);
+          return;
+        }
+      } catch (error) {
+        console.error('[Proxy] Error (client-specific):', error);
+      }
+    }
+
+    // Try global proxy if client-specific didn't match
+    if (globalProxyHandler) {
+      try {
+        const proxied = await globalProxyHandler(req, res);
+        if (proxied) {
+          if (config.logging) console.log(`[Proxy] ${req.method} ${originalUrl} -> proxied (global)`);
+          return;
+        }
+      } catch (error) {
+        console.error('[Proxy] Error (global):', error);
+      }
     }
 
     const url = matchedClient.basePath ? (originalUrl.slice(matchedClient.basePath.length) || '/') : originalUrl;

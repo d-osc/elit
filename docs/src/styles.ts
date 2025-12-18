@@ -848,6 +848,149 @@ styles.descendant('.blog-card-title', 'a', {
 
 styles.addPseudoClass('hover', { color: styles.var(primary) }, '.blog-card-title a');
 
+// Framework Comparison Section (Elit vs Next.js)
+styles.addClass('framework-comparison', {
+  padding: '5rem 0',
+  background: styles.var(bg)
+});
+
+styles.addClass('comparison-table', {
+  marginTop: '3rem',
+  background: styles.var(bgCard),
+  borderRadius: '12px',
+  padding: '2rem',
+  overflowX: 'auto'
+});
+
+styles.addClass('table-responsive', {
+  minWidth: '600px'
+});
+
+styles.addClass('comparison-row', {
+  display: 'grid',
+  gridTemplateColumns: '1.5fr 1fr 1fr',
+  gap: '1rem',
+  padding: '1rem',
+  borderBottom: `1px solid ${styles.var(border)}`,
+  alignItems: 'center'
+});
+
+styles.add({
+  '.comparison-row:last-child': {
+    borderBottom: 'none'
+  }
+});
+
+styles.add({
+  '.comparison-row.table-header': {
+    fontWeight: 700,
+    fontSize: '1.1rem',
+    background: styles.var(bgCode),
+    borderRadius: '8px',
+    borderBottom: 'none',
+    marginBottom: '0.5rem'
+  }
+});
+
+styles.addClass('comparison-cell', {
+  padding: '0.5rem'
+});
+
+styles.add({
+  '.comparison-cell.success': {
+    color: '#22c55e',
+    fontWeight: 600
+  }
+});
+
+styles.addClass('comparison-summary', {
+  marginTop: '3rem'
+});
+
+styles.add({
+  '.comparison-summary h3': {
+    textAlign: 'center',
+    fontSize: '2rem',
+    marginBottom: '2rem'
+  }
+});
+
+styles.addClass('summary-grid', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: '2rem',
+  marginTop: '2rem'
+});
+
+styles.addClass('summary-card', {
+  background: styles.var(bgCard),
+  padding: '2rem',
+  borderRadius: '12px',
+  border: `1px solid ${styles.var(border)}`,
+  transition: 'transform 0.2s, box-shadow 0.2s'
+});
+
+styles.addPseudoClass('hover', {
+  transform: 'translateY(-4px)',
+  boxShadow: '0 12px 24px rgba(99, 102, 241, 0.1)'
+}, '.summary-card');
+
+styles.addClass('summary-icon', {
+  fontSize: '2.5rem',
+  marginBottom: '1rem',
+  display: 'block'
+});
+
+styles.add({
+  '.summary-card h4': {
+    fontSize: '1.3rem',
+    marginBottom: '1rem',
+    color: styles.var(primary)
+  }
+});
+
+styles.add({
+  '.summary-card p': {
+    color: styles.var(textMuted),
+    lineHeight: 1.7
+  }
+});
+
+styles.add({
+  '.comparison-header.nextjs': {
+    background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
+    color: '#ffffff'
+  }
+});
+
+// Update Stats Grid for 6 items
+styles.add({
+  '.stats-grid': {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '2rem'
+  }
+});
+
+// Responsive design for comparison table
+styles.add({
+  '@media (max-width: 768px)': {
+    '.comparison-row': {
+      gridTemplateColumns: '1fr',
+      gap: '0.5rem'
+    },
+    '.comparison-cell': {
+      padding: '0.75rem 0.5rem'
+    },
+    '.comparison-row.table-header .comparison-cell:first-child': {
+      display: 'none'
+    },
+    '.comparison-table': {
+      padding: '1rem'
+    }
+  }
+});
+
 // Inject styles
 export function injectStyles() {
   styles.inject('elit-docs-styles');

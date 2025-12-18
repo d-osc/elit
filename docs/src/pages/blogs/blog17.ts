@@ -7,15 +7,15 @@ import type { BlogPostDetail } from '../blogContent';
 export const blog17: BlogPostDetail = {
   id: '17',
   title: {
-    en: 'Hot Module Replacement with Elit 2.0',
-    th: 'Hot Module Replacement กับ Elit 2.0'
+    en: 'Hot Module Replacement with Elit',
+    th: 'Hot Module Replacement กับ Elit'
   },
   date: '2024-04-12',
   author: 'n-devs',
   tags: ['Tutorial', 'HMR', 'CLI', 'Development', 'Workflow'],
   content: {
     en: div(
-      p('Learn how to use ', strong('Hot Module Replacement (HMR)'), ' with Elit 2.0\'s built-in dev server for an instant development experience. See your changes reflected in the browser ', em('without page refresh'), ' - preserving application state and speeding up your development workflow dramatically.'),
+      p('Learn how to use ', strong('Hot Module Replacement (HMR)'), ' with Elit\'s built-in dev server for an instant development experience. See your changes reflected in the browser ', em('without page refresh'), ' - preserving application state and speeding up your development workflow dramatically.'),
 
       h2('What is HMR?'),
       p('Hot Module Replacement (HMR) is a development feature that updates your application in the browser as you edit files, without requiring a full page refresh. This means:'),
@@ -27,8 +27,8 @@ export const blog17: BlogPostDetail = {
         li('💾 ', strong('Form data preserved'), ' - No loss of input data during development')
       ),
 
-      h2('How HMR Works in Elit 2.0'),
-      p('Elit 2.0\'s built-in HMR uses WebSocket to communicate file changes:'),
+      h2('How HMR Works in Elit'),
+      p('Elit\'s built-in HMR uses WebSocket to communicate file changes:'),
 
       pre(code(...codeBlock(`┌──────────────┐         WebSocket         ┌──────────────┐
 │   Browser    │◄──────────────────────────►│   Server     │
@@ -43,7 +43,7 @@ export const blog17: BlogPostDetail = {
 └──────────────┘                            └──────────────┘`))),
 
       h2('Quick Start'),
-      h3('1. Install Elit 2.0'),
+      h3('1. Install Elit'),
       pre(code(...codeBlock(`npm install elit`))),
 
       h3('2. Create Your App'),
@@ -445,7 +445,7 @@ export default TodoApp;
       h2('Comparison with Other Solutions'),
 
       pre(code(...codeBlock(`┌────────────────┬─────────────┬──────────────┬────────────────┐
-│ Feature        │ Elit 2.0    │ Vite         │ Webpack HMR    │
+│ Feature        │ Elit    │ Vite         │ Webpack HMR    │
 ├────────────────┼─────────────┼──────────────┼────────────────┤
 │ Setup Time     │ 0 config    │ Minimal      │ Complex        │
 │ Update Speed   │ < 100ms     │ < 50ms       │ 200-500ms      │
@@ -458,7 +458,7 @@ export default TodoApp;
 └────────────────┴─────────────┴──────────────┴────────────────┘`))),
 
       h2('Conclusion'),
-      p('Hot Module Replacement transforms your development experience by providing instant feedback without page refreshes. With Elit 2.0, HMR is enabled out of the box with zero configuration through the built-in CLI (', code('npx elit dev'), '), allowing you to focus on building your application.'),
+      p('Hot Module Replacement transforms your development experience by providing instant feedback without page refreshes. With Elit, HMR is enabled out of the box with zero configuration through the built-in CLI (', code('npx elit dev'), '), allowing you to focus on building your application.'),
 
       p('Key benefits:'),
       ul(
@@ -474,7 +474,7 @@ export default TodoApp;
       p('For more information, check out the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit documentation'), '.')
     ),
     th: div(
-      p('เรียนรู้วิธีใช้ ', strong('Hot Module Replacement (HMR)'), ' กับ dev server ในตัวของ Elit 2.0 เพื่อประสบการณ์การพัฒนาที่รวดเร็ว ดูการเปลี่ยนแปลงสะท้อนใน browser ', em('โดยไม่ต้อง refresh หน้าเว็บ'), ' - รักษา state ของแอปและเพิ่มความเร็วในการพัฒนาอย่างมาก'),
+      p('เรียนรู้วิธีใช้ ', strong('Hot Module Replacement (HMR)'), ' กับ dev server ในตัวของ Elit เพื่อประสบการณ์การพัฒนาที่รวดเร็ว ดูการเปลี่ยนแปลงสะท้อนใน browser ', em('โดยไม่ต้อง refresh หน้าเว็บ'), ' - รักษา state ของแอปและเพิ่มความเร็วในการพัฒนาอย่างมาก'),
 
       h2('HMR คืออะไร?'),
       p('Hot Module Replacement (HMR) คือฟีเจอร์การพัฒนาที่อัปเดตแอปพลิเคชันใน browser ขณะที่คุณแก้ไขไฟล์ โดยไม่ต้อง refresh หน้าเว็บทั้งหมด หมายความว่า:'),
@@ -486,8 +486,8 @@ export default TodoApp;
         li('💾 ', strong('รักษาข้อมูล Form'), ' - ไม่สูญเสียข้อมูลที่กรอกระหว่างพัฒนา')
       ),
 
-      h2('HMR ทำงานอย่างไรใน Elit 2.0'),
-      p('HMR ในตัวของ Elit 2.0 ใช้ WebSocket สื่อสารการเปลี่ยนแปลงไฟล์:'),
+      h2('HMR ทำงานอย่างไรใน Elit'),
+      p('HMR ในตัวของ Elit ใช้ WebSocket สื่อสารการเปลี่ยนแปลงไฟล์:'),
 
       pre(code(...codeBlock(`┌──────────────┐         WebSocket         ┌──────────────┐
 │   Browser    │◄──────────────────────────►│   Server     │
@@ -502,7 +502,7 @@ export default TodoApp;
 └──────────────┘                            └──────────────┘`))),
 
       h2('เริ่มต้นอย่างรวดเร็ว'),
-      h3('1. ติดตั้ง Elit 2.0'),
+      h3('1. ติดตั้ง Elit'),
       pre(code(...codeBlock(`npm install elit`))),
 
       h3('2. สร้างแอป'),
@@ -758,7 +758,7 @@ export const deleteTodo = (id) => {
       ),
 
       h2('สรุป'),
-      p('Hot Module Replacement เปลี่ยนประสบการณ์การพัฒนาของคุณโดยให้ feedback ทันทีโดยไม่ต้อง refresh หน้า ด้วย Elit 2.0, HMR เปิดใช้งานโดยอัตโนมัติโดยไม่ต้องกำหนดค่าผ่าน CLI ในตัว (', code('npx elit dev'), ') ช่วยให้คุณมุ่งเน้นการสร้างแอปพลิเคชัน'),
+      p('Hot Module Replacement เปลี่ยนประสบการณ์การพัฒนาของคุณโดยให้ feedback ทันทีโดยไม่ต้อง refresh หน้า ด้วย Elit, HMR เปิดใช้งานโดยอัตโนมัติโดยไม่ต้องกำหนดค่าผ่าน CLI ในตัว (', code('npx elit dev'), ') ช่วยให้คุณมุ่งเน้นการสร้างแอปพลิเคชัน'),
 
       p('ประโยชน์หลัก:'),
       ul(

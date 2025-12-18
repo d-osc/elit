@@ -640,6 +640,525 @@ styles.clear();`
     }
   ],
 
+  server: [
+    {
+      name: 'ServerRouter',
+      badge: 'class',
+      sig: 'class ServerRouter',
+      desc: 'Server-side API router สำหรับสร้าง REST API',
+      details: `ServerRouter เป็น Express-like router สำหรับ server-side:
+• รองรับ HTTP methods: GET, POST, PUT, DELETE, PATCH, OPTIONS
+• Dynamic route parameters (:id)
+• Middleware chain support
+• Auto body parsing (JSON, form data)
+• Query string parsing
+• Error handling`,
+      example: `import { ServerRouter, json } from 'elit';
+
+const api = new ServerRouter();
+
+// Routes
+api.get('/users', (ctx) => {
+  json(ctx.res, { users: [] });
+});
+
+api.get('/users/:id', (ctx) => {
+  const { id } = ctx.params;
+  json(ctx.res, { id, name: 'John' });
+});
+
+api.post('/users', async (ctx) => {
+  const userData = ctx.body;
+  json(ctx.res, { created: userData }, 201);
+});
+
+// Use in config
+export default {
+  dev: {
+    api
+  }
+};`
+    },
+    {
+      name: 'HTTP Methods',
+      badge: 'method',
+      sig: 'get, post, put, delete, patch, options',
+      desc: 'Methods สำหรับกำหนด route handlers',
+      details: `• get(path, handler) - GET requests
+• post(path, handler) - POST requests
+• put(path, handler) - PUT requests (update)
+• delete(path, handler) - DELETE requests
+• patch(path, handler) - PATCH requests (partial update)
+• options(path, handler) - OPTIONS requests (CORS)`,
+      example: `const api = new ServerRouter();
+
+api.get('/items', (ctx) => {
+  json(ctx.res, { items: [] });
+});
+
+api.post('/items', (ctx) => {
+  const item = ctx.body;
+  json(ctx.res, { created: item }, 201);
+});
+
+api.put('/items/:id', (ctx) => {
+  const { id } = ctx.params;
+  json(ctx.res, { updated: id });
+});
+
+api.delete('/items/:id', (ctx) => {
+  const { id } = ctx.params;
+  json(ctx.res, { deleted: id });
+});`
+    },
+    {
+      name: 'use',
+      badge: 'method',
+      sig: 'use(middleware: Middleware): this',
+      desc: 'เพิ่ม middleware เข้า chain',
+      details: 'Middleware จะรันก่อน route handler ทุกครั้ง ใช้สำหรับ authentication, logging, CORS, etc.',
+      params: [
+        { name: 'middleware', type: 'Middleware', desc: 'Middleware function' }
+      ],
+      example: `import { ServerRouter, cors, logger } from 'elit';
+
+const api = new ServerRouter();
+
+// Add middleware
+api.use(cors());
+api.use(logger({ format: 'detailed' }));
+
+// Custom middleware
+api.use(async (ctx, next) => {
+  console.log('Request:', ctx.req.method, ctx.req.url);
+  await next();
+  console.log('Response sent');
+});
+
+api.get('/data', (ctx) => {
+  json(ctx.res, { data: 'value' });
+});`
+    },
+    {
+      name: 'Response Helpers',
+      badge: 'function',
+      sig: 'json, text, html, status',
+      desc: 'Helper functions สำหรับส่ง response',
+      details: `• json(res, data, status?) - ส่ง JSON response
+• text(res, data, status?) - ส่ง plain text
+• html(res, data, status?) - ส่ง HTML
+• status(res, code, message?) - ส่ง status code`,
+      example: `import { json, text, html, status } from 'elit';
+
+api.get('/api/data', (ctx) => {
+  json(ctx.res, { message: 'Hello' });
+});
+
+api.get('/text', (ctx) => {
+  text(ctx.res, 'Plain text response');
+});
+
+api.get('/page', (ctx) => {
+  html(ctx.res, '<h1>Hello World</h1>');
+});
+
+api.get('/error', (ctx) => {
+  status(ctx.res, 404, 'Not Found');
+});`
+    },
+    {
+      name: 'ServerRouteContext',
+      badge: 'interface',
+      sig: 'interface ServerRouteContext',
+      desc: 'Context object ที่ส่งให้ route handler',
+      details: `Context properties:
+• req: IncomingMessage - HTTP request
+• res: ServerResponse - HTTP response
+• params: Record<string, string> - Route parameters
+• query: Record<string, string> - Query string
+• body: any - Parsed request body
+• headers: Record<string, string> - Request headers`,
+      example: `api.get('/users/:id', (ctx) => {
+  // Route params
+  const { id } = ctx.params;
+
+  // Query string
+  const { filter } = ctx.query;
+
+  // Headers
+  const auth = ctx.headers.authorization;
+
+  json(ctx.res, { id, filter, auth });
+});
+
+api.post('/data', (ctx) => {
+  // Body (auto-parsed JSON/form data)
+  const { name, email } = ctx.body;
+
+  json(ctx.res, { received: { name, email } });
+});`
+    }
+  ],
+
+  middleware: [
+    {
+      name: 'cors',
+      badge: 'function',
+      sig: 'cors(options?): Middleware',
+      desc: 'CORS middleware สำหรับ cross-origin requests',
+      details: `Options:
+• origin: string | string[] - Allowed origins (default: '*')
+• methods: string[] - Allowed methods
+• credentials: boolean - Allow credentials
+• maxAge: number - Preflight cache duration`,
+      params: [
+        { name: 'options.origin', type: 'string | string[]', desc: 'Allowed origins (default: "*")' },
+        { name: 'options.methods', type: 'string[]', desc: 'Allowed methods' },
+        { name: 'options.credentials', type: 'boolean', desc: 'Allow credentials (default: true)' },
+        { name: 'options.maxAge', type: 'number', desc: 'Preflight cache (default: 86400)' }
+      ],
+      example: `import { ServerRouter, cors } from 'elit';
+
+const api = new ServerRouter();
+
+// Allow all origins
+api.use(cors());
+
+// Specific origins
+api.use(cors({
+  origin: ['https://example.com', 'https://app.example.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));`
+    },
+    {
+      name: 'logger',
+      badge: 'function',
+      sig: 'logger(options?): Middleware',
+      desc: 'Request logging middleware',
+      details: `Logs incoming requests และ response status
+• simple format: "GET /api/users 200"
+• detailed format: timestamp, method, URL, status, duration`,
+      params: [
+        { name: 'options.format', type: "'simple' | 'detailed'", desc: 'Log format (default: simple)' }
+      ],
+      example: `api.use(logger({ format: 'detailed' }));
+
+// Output:
+// [2024-01-01 12:00:00] GET /api/users 200 45ms`
+    },
+    {
+      name: 'errorHandler',
+      badge: 'function',
+      sig: 'errorHandler(): Middleware',
+      desc: 'Error handling middleware',
+      details: 'จับ errors ที่เกิดใน handlers และส่ง 500 response พร้อม error message',
+      example: `api.use(errorHandler());
+
+api.get('/error', (ctx) => {
+  throw new Error('Something went wrong');
+  // Returns: { error: 'Internal Server Error', message: 'Something went wrong' }
+});`
+    },
+    {
+      name: 'rateLimit',
+      badge: 'function',
+      sig: 'rateLimit(options?): Middleware',
+      desc: 'Rate limiting middleware',
+      details: `จำกัดจำนวน requests ต่อ IP address:
+• windowMs: time window ในการนับ requests
+• max: จำนวน requests สูงสุดต่อ window
+• message: custom error message`,
+      params: [
+        { name: 'options.windowMs', type: 'number', desc: 'Time window (default: 60000 = 1min)' },
+        { name: 'options.max', type: 'number', desc: 'Max requests (default: 100)' },
+        { name: 'options.message', type: 'string', desc: 'Error message' }
+      ],
+      example: `// Max 100 requests per minute
+api.use(rateLimit({
+  windowMs: 60000,
+  max: 100,
+  message: 'Too many requests'
+}));`
+    },
+    {
+      name: 'bodyLimit',
+      badge: 'function',
+      sig: 'bodyLimit(options?): Middleware',
+      desc: 'จำกัดขนาด request body',
+      details: 'ป้องกัน large payload attacks',
+      params: [
+        { name: 'options.limit', type: 'number', desc: 'Max bytes (default: 1MB)' }
+      ],
+      example: `// Max 5MB
+api.use(bodyLimit({ limit: 5 * 1024 * 1024 }));`
+    },
+    {
+      name: 'cacheControl',
+      badge: 'function',
+      sig: 'cacheControl(options?): Middleware',
+      desc: 'ตั้งค่า Cache-Control headers',
+      params: [
+        { name: 'options.maxAge', type: 'number', desc: 'Cache duration (seconds)' },
+        { name: 'options.public', type: 'boolean', desc: 'Public/private cache' }
+      ],
+      example: `// Cache for 1 hour
+api.use(cacheControl({
+  maxAge: 3600,
+  public: true
+}));`
+    },
+    {
+      name: 'compress',
+      badge: 'function',
+      sig: 'compress(): Middleware',
+      desc: 'Response compression (gzip)',
+      details: 'อัดเนื้อหา response ด้วย gzip เพื่อลดขนาด',
+      example: `api.use(compress());`
+    },
+    {
+      name: 'security',
+      badge: 'function',
+      sig: 'security(): Middleware',
+      desc: 'Security headers middleware',
+      details: `เพิ่ม security headers:
+• X-Content-Type-Options: nosniff
+• X-Frame-Options: DENY
+• X-XSS-Protection: 1; mode=block
+• Strict-Transport-Security (HTTPS)`,
+      example: `api.use(security());`
+    }
+  ],
+
+  sharedState: [
+    {
+      name: 'StateManager',
+      badge: 'class',
+      sig: 'class StateManager',
+      desc: 'จัดการ shared state ระหว่าง server และ clients',
+      details: `StateManager ใช้ WebSocket สำหรับ real-time state sync:
+• สร้างและจัดการ SharedState instances
+• Broadcast state changes ไปยัง connected clients
+• รองรับ persistence และ validation`,
+      example: `import { StateManager } from 'elit';
+
+const stateManager = new StateManager();
+
+// Create shared state
+const counter = stateManager.create('counter', {
+  initial: 0,
+  persist: true
+});
+
+// Update state (broadcasts to all clients)
+counter.set(counter.get() + 1);`
+    },
+    {
+      name: 'SharedState',
+      badge: 'class',
+      sig: 'class SharedState<T>',
+      desc: 'Shared state instance ที่ sync ระหว่าง server-client',
+      details: `SharedState features:
+• Real-time synchronization ผ่าน WebSocket
+• Optional persistence
+• Value validation
+• Change handlers
+• Multi-client support`,
+      example: `const userCount = stateManager.create('users', {
+  initial: 0,
+  persist: false,
+  validate: (value) => value >= 0
+});
+
+// Get value
+const count = userCount.get();
+
+// Set value (syncs to clients)
+userCount.set(10);
+
+// Subscribe to changes
+userCount.onChange((newValue, oldValue) => {
+  console.log(\`Users: \${oldValue} -> \${newValue}\`);
+});`
+    },
+    {
+      name: 'create',
+      badge: 'method',
+      sig: 'stateManager.create<T>(key, options): SharedState<T>',
+      desc: 'สร้าง SharedState instance',
+      params: [
+        { name: 'key', type: 'string', desc: 'Unique state key' },
+        { name: 'options.initial', type: 'T', desc: 'Initial value' },
+        { name: 'options.persist', type: 'boolean', desc: 'Enable persistence' },
+        { name: 'options.validate', type: 'function', desc: 'Validation function' }
+      ],
+      returns: 'SharedState<T>',
+      example: `const todos = stateManager.create('todos', {
+  initial: [],
+  persist: true,
+  validate: (value) => Array.isArray(value)
+});`
+    },
+    {
+      name: 'get & set',
+      badge: 'method',
+      sig: 'state.get(): T, state.set(value: T): void',
+      desc: 'Get/set shared state value',
+      example: `const value = counter.get();
+counter.set(value + 1);`
+    },
+    {
+      name: 'onChange',
+      badge: 'method',
+      sig: 'state.onChange(handler): () => void',
+      desc: 'Subscribe to state changes',
+      params: [
+        { name: 'handler', type: '(newValue, oldValue) => void', desc: 'Change handler' }
+      ],
+      returns: 'Unsubscribe function',
+      example: `const unsubscribe = state.onChange((newVal, oldVal) => {
+  console.log('Changed:', oldVal, '->', newVal);
+});
+
+// Later
+unsubscribe();`
+    }
+  ],
+
+  config: [
+    {
+      name: 'defineConfig',
+      badge: 'function',
+      sig: 'defineConfig(config: ElitConfig): ElitConfig',
+      desc: 'Type-safe config definition helper',
+      details: 'ใช้ใน elit.config.ts เพื่อให้ TypeScript autocomplete และ type checking',
+      example: `// elit.config.ts
+import { defineConfig, ServerRouter } from 'elit';
+
+export default defineConfig({
+  dev: {
+    port: 3000,
+    root: './src',
+    api: new ServerRouter()
+      .get('/api/health', (ctx) => {
+        json(ctx.res, { status: 'ok' });
+      })
+  },
+  build: {
+    entry: './src/main.ts',
+    outDir: './dist',
+    minify: true
+  }
+});`
+    },
+    {
+      name: 'loadConfig',
+      badge: 'function',
+      sig: 'loadConfig(cwd?): Promise<ElitConfig | null>',
+      desc: 'โหลด config file จาก project root',
+      details: `ค้นหาและโหลด config files ตามลำดับ:
+1. elit.config.ts
+2. elit.config.js
+3. elit.config.mjs
+4. elit.config.cjs
+5. elit.config.json`,
+      params: [
+        { name: 'cwd', type: 'string', desc: 'Working directory (default: process.cwd())' }
+      ],
+      returns: 'ElitConfig | null',
+      example: `import { loadConfig } from 'elit';
+
+const config = await loadConfig();
+if (config) {
+  console.log('Config loaded:', config);
+}`
+    },
+    {
+      name: 'loadEnv',
+      badge: 'function',
+      sig: 'loadEnv(mode?, cwd?): Record<string, string>',
+      desc: 'โหลด environment variables จาก .env files',
+      details: `โหลด .env files ตามลำดับ priority:
+1. .env.[mode].local
+2. .env.[mode]
+3. .env.local
+4. .env`,
+      params: [
+        { name: 'mode', type: 'string', desc: 'Environment mode (default: "development")' },
+        { name: 'cwd', type: 'string', desc: 'Working directory' }
+      ],
+      returns: 'Record<string, string>',
+      example: `import { loadEnv } from 'elit';
+
+// Load .env.production
+const env = loadEnv('production');
+console.log(env.API_URL);
+console.log(env.MODE); // "production"
+
+// Use in config
+export default {
+  dev: {
+    proxy: [{
+      context: '/api',
+      target: env.API_URL
+    }]
+  }
+};`
+    },
+    {
+      name: 'mergeConfig',
+      badge: 'function',
+      sig: 'mergeConfig(base, override): ElitConfig',
+      desc: 'รวม config objects แบบ deep merge',
+      details: 'ใช้สำหรับ extend base config ด้วย overrides',
+      params: [
+        { name: 'base', type: 'ElitConfig', desc: 'Base config' },
+        { name: 'override', type: 'ElitConfig', desc: 'Override config' }
+      ],
+      example: `import { mergeConfig, defineConfig } from 'elit';
+
+const baseConfig = {
+  dev: { port: 3000 }
+};
+
+const prodConfig = mergeConfig(baseConfig, {
+  build: { minify: true }
+});`
+    },
+    {
+      name: 'ElitConfig',
+      badge: 'interface',
+      sig: 'interface ElitConfig',
+      desc: 'Config file structure',
+      details: `ElitConfig properties:
+• dev?: DevServerOptions - Dev server config
+• build?: BuildOptions | BuildOptions[] - Build config(s)
+• preview?: PreviewOptions - Preview server config`,
+      example: `interface ElitConfig {
+  dev?: {
+    port?: number;
+    host?: string;
+    root?: string;
+    basePath?: string;
+    open?: boolean;
+    https?: boolean;
+    proxy?: ProxyConfig[];
+    worker?: WorkerConfig[];
+    api?: ServerRouter;
+    middleware?: Middleware[];
+    clients?: ClientConfig[];
+  };
+  build?: BuildOptions | BuildOptions[];
+  preview?: {
+    port?: number;
+    root?: string;
+    basePath?: string;
+    open?: boolean;
+  };
+}`
+    }
+  ],
+
   routing: [
     {
       name: 'createRouter',
@@ -1241,7 +1760,11 @@ const ApiReference = () =>
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('state')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '⚡ State Management')),
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('reactive')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🔄 Reactive Rendering')),
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('styling')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🎨 CreateStyle (CSS)')),
-        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('routing')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🛤️ Routing')),
+        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('server')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🔌 Server API Router')),
+        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('middleware')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🔧 Middleware')),
+        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('sharedState')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🌐 Shared State')),
+        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('config')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '⚙️ Configuration')),
+        li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('routing')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🛤️ Client Routing')),
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('performance')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '🚀 Performance')),
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('head')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '📋 Head Management')),
         li(a({ href: 'javascript:void(0)', onclick: () => document.getElementById('types')?.scrollIntoView({ behavior: 'smooth' }), style: 'color: var(--text-muted); cursor: pointer;' }, '📝 Types & Interfaces')),
@@ -1254,7 +1777,11 @@ const ApiReference = () =>
     div({ id: 'state' }, ApiCategory('⚡ State Management', apiData.state)),
     div({ id: 'reactive' }, ApiCategory('🔄 Reactive Rendering', apiData.reactive)),
     div({ id: 'styling' }, ApiCategory('🎨 CreateStyle (CSS)', apiData.styling)),
-    div({ id: 'routing' }, ApiCategory('🛤️ Routing', apiData.routing)),
+    div({ id: 'server' }, ApiCategory('🔌 Server API Router', apiData.server)),
+    div({ id: 'middleware' }, ApiCategory('🔧 Middleware', apiData.middleware)),
+    div({ id: 'sharedState' }, ApiCategory('🌐 Shared State', apiData.sharedState)),
+    div({ id: 'config' }, ApiCategory('⚙️ Configuration', apiData.config)),
+    div({ id: 'routing' }, ApiCategory('🛤️ Client Routing', apiData.routing)),
     div({ id: 'performance' }, ApiCategory('🚀 Performance', apiData.performance)),
     div({ id: 'head' }, ApiCategory('📋 Head Management', apiData.head)),
     div({ id: 'types' }, ApiCategory('📝 Types & Interfaces', apiData.types)),

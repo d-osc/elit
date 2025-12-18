@@ -93,7 +93,7 @@ import { div, h1, button, createState, reactive, dom } from 'elit';
 const count = createState(0);
 
 const app = div({ className: 'app' },
-  h1('Elit 2.0 🚀'),
+  h1('Elit 🚀'),
   reactive(count, value =>
     div({ className: 'counter' },
       button({ onclick: () => count.value-- }, '-'),
@@ -223,6 +223,147 @@ export const CodeComparison = () =>
     )
   );
 
+// Elit vs Next.js Comparison
+const elitFullStackCode = `// Elit - Full-Stack in One File
+import { div, h1, button, createState, reactive, dom, router } from 'elit';
+
+// Client-side state
+const count = createState(0);
+
+// Client router
+const appRouter = router()
+  .get('/', () => div(h1('Home'), reactive(count, c => \`Count: \${c}\`)))
+  .get('/about', () => div(h1('About')));
+
+// Server API (elit.config.mjs)
+export default {
+  dev: {
+    api: router()
+      .get('/api/data', (req, res) => res.json({ count: 42 }))
+  },
+  build: { entry: 'src/main.ts', outDir: 'dist' }
+};
+
+dom.render('#app', appRouter);`;
+
+const nextjsFullStackCode = `// Next.js - Multiple Files & Conventions
+// pages/index.tsx
+'use client';
+import { useState } from 'react';
+export default function Home() {
+  const [count, setCount] = useState(0);
+  return <h1>Count: {count}</h1>;
+}
+
+// pages/api/data.ts
+export default function handler(req, res) {
+  res.status(200).json({ count: 42 });
+}
+
+// next.config.js
+module.exports = { /* config */ };
+
+// package.json dependencies
+// react, react-dom, next (500KB+ runtime)`;
+
+export const ElitVsNextjs = () =>
+  section({ className: 'framework-comparison container' },
+    reactive(currentLang, () => h2({ className: 'section-title' }, t('vsNextjs.title'))),
+    reactive(currentLang, () => p({ className: 'section-subtitle' }, t('vsNextjs.subtitle'))),
+
+    div({ className: 'comparison-grid' },
+      div({ className: 'comparison-card' },
+        div({ className: 'comparison-header elit' }, 'Elit'),
+        pre({ className: 'comparison-code' }, code(...codeBlock(elitFullStackCode)))
+      ),
+      div({ className: 'comparison-card' },
+        div({ className: 'comparison-header nextjs' }, 'Next.js'),
+        pre({ className: 'comparison-code' }, code(...codeBlock(nextjsFullStackCode)))
+      )
+    ),
+
+    reactive(currentLang, () =>
+      div({ className: 'comparison-table' },
+        h3(t('vsNextjs.tableTitle')),
+        div({ className: 'table-responsive' },
+          div({ className: 'comparison-row table-header' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.feature')),
+            div({ className: 'comparison-cell' }, 'Elit'),
+            div({ className: 'comparison-cell' }, 'Next.js')
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.bundleSize')),
+            div({ className: 'comparison-cell success' }, '~10KB'),
+            div({ className: 'comparison-cell' }, '~85KB (min)')
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.dependencies')),
+            div({ className: 'comparison-cell success' }, '0 runtime'),
+            div({ className: 'comparison-cell' }, 'React + Next')
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.devServer')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.devServerElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.devServerNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.apiRoutes')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.apiRoutesElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.apiRoutesNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.routing')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.routingElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.routingNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.state')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.stateElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.stateNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.ssr')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.ssrElit')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.ssrNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.build')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.buildElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.buildNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.learning')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.learningElit')),
+            div({ className: 'comparison-cell' }, t('vsNextjs.learningNext'))
+          ),
+          div({ className: 'comparison-row' },
+            div({ className: 'comparison-cell' }, t('vsNextjs.typescript')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.typescriptElit')),
+            div({ className: 'comparison-cell success' }, t('vsNextjs.typescriptNext'))
+          )
+        )
+      )
+    ),
+
+    reactive(currentLang, () =>
+      div({ className: 'comparison-summary' },
+        h3(t('vsNextjs.summaryTitle')),
+        div({ className: 'summary-grid' },
+          div({ className: 'summary-card' },
+            span({ className: 'summary-icon' }, '🎯'),
+            h4(t('vsNextjs.useElitTitle')),
+            p(t('vsNextjs.useElitDesc'))
+          ),
+          div({ className: 'summary-card' },
+            span({ className: 'summary-icon' }, '⚛️'),
+            h4(t('vsNextjs.useNextTitle')),
+            p(t('vsNextjs.useNextDesc'))
+          )
+        )
+      )
+    )
+  );
+
 // API Overview Section
 const apiCategoryKeys = [
   { icon: '🏗️', key: 'elements', count: '100+' },
@@ -275,12 +416,16 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '15+'),
-          span({ className: 'stat-label' }, t('stats.features'))
-        ),
-        div({ className: 'stat' },
           span({ className: 'stat-number' }, '100%'),
           span({ className: 'stat-label' }, t('stats.typescript'))
+        ),
+        div({ className: 'stat' },
+          span({ className: 'stat-number' }, '<1s'),
+          span({ className: 'stat-label' }, t('stats.hmr'))
+        ),
+        div({ className: 'stat' },
+          span({ className: 'stat-number' }, 'Full-Stack'),
+          span({ className: 'stat-label' }, t('stats.framework'))
         )
       )
     )
