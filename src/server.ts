@@ -518,20 +518,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
     const isDistRequest = filePath.startsWith('/dist/');
     let normalizedPath: string;
 
-    if (isDistRequest) {
-      // For /dist/* requests, resolve from parent directory
-      normalizedPath = filePath.substring(1); // Remove leading slash
-    } else {
-      // For regular requests, check for path traversal attempts
-      const tempPath = normalize(filePath).replace(/\\/g, '/').replace(/^\/+/, '');
-      if (tempPath.includes('..')) {
-        if (config.logging) console.log(`[403] Path traversal attempt: ${filePath}`);
-        res.writeHead(403, { 'Content-Type': 'text/plain' });
-        res.end('403 Forbidden');
-        return;
-      }
-      normalizedPath = tempPath;
+    // Normalize and validate the path for both /dist/* and regular requests
+    const tempPath = normalize(filePath).replace(/\\/g, '/').replace(/^\/+/, '');
+    if (tempPath.includes('..')) {
+      if (config.logging) console.log(`[403] Path traversal attempt: ${filePath}`);
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('403 Forbidden');
+      return;
     }
+    normalizedPath = tempPath;
 
     // Resolve file path
     const rootDir = await realpath(resolve(matchedClient.root));
