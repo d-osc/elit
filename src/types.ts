@@ -82,6 +82,8 @@ export interface ClientConfig {
     root: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
     basePath: string;
+    /** SSR render function - returns HTML VNode or string */
+    ssr?: () => Child | string;
 }
 
 export interface DevServerOptions {
@@ -109,6 +111,8 @@ export interface DevServerOptions {
     middleware?: ((req: any, res: any, next: () => void) => void)[];
     /** API router for REST endpoints */
     api?: Router;
+    /** SSR render function - returns HTML VNode or string */
+    ssr?: () => Child | string;
 }
 
 export interface DevServer {

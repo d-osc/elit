@@ -8,7 +8,8 @@ import { watch } from 'chokidar';
 import { readFile, stat, realpath } from 'fs/promises';
 import { join, extname, relative, resolve, normalize, sep } from 'path';
 import { lookup } from 'mime-types';
-import type { DevServerOptions, DevServer, HMRMessage } from './types';
+import type { DevServerOptions, DevServer, HMRMessage, Child, VNode } from './types';
+import { domNode } from './dom';
 
 // ===== Router =====
 
@@ -438,7 +439,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -452,6 +453,7 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
 interface NormalizedClient {
   root: string;
   basePath: string;
+  ssr?: () => Child | string;
 }
 
 export function createDevServer(options: DevServerOptions): DevServer {
@@ -460,7 +462,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const stateManager = new StateManager();
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
-  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '' }] : null;
+  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', ssr: config.ssr }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
   const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
@@ -471,7 +473,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
       while (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
       basePath = basePath ? '/' + basePath : '';
     }
-    return { root: client.root, basePath };
+    return { root: client.root, basePath, ssr: client.ssr };
   });
 
   // HTTP Server
@@ -563,6 +565,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
       try {
         resolvedPath = await realpath(resolve(filePath));
       } catch {
+        // If index.html not found but SSR function exists, use SSR
+        if (filePath.endsWith('index.html') && client.ssr) {
+          return serveSSR(res, client);
+        }
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('404 Not Found');
         return;
@@ -595,6 +601,50 @@ export function createDevServer(options: DevServerOptions): DevServer {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('500 Internal Server Error');
       if (config.logging) console.error('[500] Error reading file:', error);
+    }
+  }
+
+  // SSR helper - Generate HTML from SSR function
+  function serveSSR(res: ServerResponse, client: NormalizedClient) {
+    try {
+      if (!client.ssr) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('SSR function not configured');
+        return;
+      }
+
+      const result = client.ssr();
+      let html: string;
+
+      // If result is a string, use it directly
+      if (typeof result === 'string') {
+        html = result;
+      }
+      // If result is a VNode, render it to HTML string
+      else if (typeof result === 'object' && result !== null && 'tagName' in result) {
+        const vnode = result as VNode;
+        if (vnode.tagName === 'html') {
+          html = domNode.renderToString(vnode);
+        } else {
+          // Wrap in basic HTML structure if not html tag
+          html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${domNode.renderToString(vnode)}</body></html>`;
+        }
+      } else {
+        html = String(result);
+      }
+
+      // Inject HMR script
+      const hmrScript = `<script>(function(){const ws=new WebSocket('ws://${config.host}:${config.port}${client.basePath}');ws.onopen=()=>console.log('[Elit HMR] Connected');ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{console.log('[Elit HMR] Disconnected - Retrying...');setTimeout(()=>window.location.reload(),1000)};ws.onerror=(e)=>console.error('[Elit HMR] WebSocket error:',e)})();</script>`;
+      html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
+
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      res.end(html);
+
+      if (config.logging) console.log(`[200] SSR rendered`);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('500 SSR Error');
+      if (config.logging) console.error('[500] SSR Error:', error);
     }
   }
 

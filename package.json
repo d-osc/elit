@@ -1,12 +1,12 @@
 {
   "name": "elit",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "elit": "./dist/cli-main.js"
+    "elit": "./dist/cli.js"
   },
   "exports": {
     ".": {
