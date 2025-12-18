@@ -1,14 +1,14 @@
-# Elit
+# Elit 2.0
 
-⚡ A lightweight, zero-dependency library for building reactive web applications with direct DOM manipulation.
+⚡ A full-stack TypeScript framework (~10KB gzipped) with built-in dev server, HMR, build tool, and REST API. Zero dependencies, maximum productivity.
 
 [![npm version](https://img.shields.io/npm/v/elit.svg)](https://www.npmjs.com/package/elit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Bundle Size](https://img.shields.io/badge/bundle%20size-~10KB%20gzipped-success)](https://bundlephobia.com/package/elit)
 
-> **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [API](#api) | [Examples](#examples) | [elit-server](./server/README.md)
+> **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [CLI Tools](#cli-tools) | [API](#api) | [Deployment](#deployment)
 
-## Why Elit?
+## Why Elit 2.0?
 
 - **🎯 Tiny Bundle Size**: Only ~10KB gzipped (30KB minified) - no framework bloat
 - **📦 Zero Dependencies**: Pure TypeScript, no external dependencies
@@ -16,64 +16,166 @@
 - **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
 - **🔄 Reactive State**: Simple but powerful reactive state management
 - **🌲 Tree-Shakeable**: Import only what you need for optimal bundle size
-- **🚀 Modern Features**: Router, SSR, virtual scrolling, CSS-in-JS, and more
-- **🎨 Developer Experience**: Clean, intuitive API with excellent tooling support
+- **🚀 Full-Stack Ready**: Built-in dev server, HMR, build tool, and REST API
+- **🔥 Hot Module Replacement**: Instant development feedback with automatic HMR
+- **🏗️ Build System**: Integrated esbuild with automatic client/server separation
+- **🌐 REST API Router**: Built-in server-side routing with middleware stack
+- **🔌 WebSocket Support**: Real-time state synchronization out of the box
+- **🎨 Developer Experience**: CLI tools, zero config, and excellent tooling support
 
 ## Installation
 
 ```bash
 npm install elit
+```
 
-# Optional: Install dev server with HMR
-npm install --save-dev elit-server
+## CLI Tools
+
+Elit 2.0 includes a powerful CLI for development and production:
+
+```bash
+# Development server with HMR
+npx elit dev
+
+# Production build
+npx elit build
+
+# Preview production build
+npx elit preview
+```
+
+### Configuration
+
+Create `elit.config.mjs` (or .ts, .js, .json) in your project root:
+
+```javascript
+import { defineConfig } from 'elit';
+import { resolve } from 'path';
+
+export default defineConfig({
+  dev: {
+    port: 3000,
+    host: 'localhost',
+    root: './src',
+    basePath: '/',
+    open: true
+  },
+  build: {
+    entry: './src/main.ts',
+    outDir: './dist',
+    format: 'esm',
+    minify: true,
+    platform: 'browser',
+    basePath: '/app',
+    copy: [
+      {
+        from: 'index.html',
+        to: 'index.html',
+        transform: (content, config) => {
+          // Inject base tag from basePath
+          return content;
+        }
+      }
+    ]
+  },
+  preview: {
+    port: 4173,
+    root: './dist',
+    basePath: '/app'
+  }
+});
 ```
 
 ## Features
 
-### Core Library (elit)
+### Frontend Framework
 
-- 🎯 **Ultra Lightweight**: Just 30KB minified, ~10KB gzipped - optimized for performance
+- 🎯 **Ultra Lightweight**: Just 30KB minified, ~10KB gzipped
 - ⚡ **Reactive State**: Built-in reactive state management with `createState`
 - 🔄 **Computed Values**: Automatic dependency tracking with `computed`
-- 🌐 **Shared State**: Real-time state sync with `elit-server` (optional)
-- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle` - full CSS features support
+- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle`
 - 🛣️ **Client-Side Router**: Hash and history mode routing with dynamic parameters
-- 📱 **Virtual Scrolling**: Handle 100k+ items efficiently with built-in virtual list
+- 📱 **Virtual Scrolling**: Handle 100k+ items efficiently
 - 🖥️ **SSR Support**: Full server-side rendering capabilities
-- 🎭 **SVG & MathML**: Complete support for SVG and MathML elements (100+ elements)
-- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering, and chunked rendering
-- 📦 **Tree-Shakeable**: Import only what you need - excellent for bundle optimization
-- 🎮 **DOM Utilities**: Convenient helper functions for common DOM operations
-- 🔌 **No Build Required**: Works directly in browsers via CDN
+- 🎭 **SVG & MathML**: Complete support for all elements
+- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering
+- 📦 **Tree-Shakeable**: Import only what you need
+- 🎮 **DOM Utilities**: Convenient helper functions
 
-### Development Server (elit-server)
+### Full-Stack Tools
 
-- ⚡ **Hot Module Replacement (HMR)**: Instant updates without page refresh
-- 🌐 **REST API Router**: Built-in routing system with regex parameters
-- 🔧 **Middleware Stack**: CORS, logging, error handling, rate limiting, compression, security headers
-- 🔄 **Shared State Sync**: Real-time WebSocket state synchronization
-- 📊 **WebSocket Support**: Built-in WebSocket server for real-time features
-- 📁 **Static File Server**: Serves your application files with MIME type detection
+- 🔥 **Hot Module Replacement**: Instant development feedback
+- 🏗️ **Build System**: esbuild integration with automatic client/server separation
+- 🌐 **REST API Router**: Server-side routing with middleware stack
+- 🔧 **Middleware**: CORS, logging, error handling, rate limiting, compression, security
+- 🔄 **Shared State**: Real-time WebSocket state synchronization
+- 📊 **WebSocket Support**: Built-in WebSocket server
+- 📁 **Static File Server**: Gzip compression and cache headers
 - 🎯 **Zero Config**: Works out of the box with sensible defaults
-- 🛠️ **CLI Tool**: Simple command-line interface (`elit-dev`)
-- 📦 **Lightweight**: Minimal dependencies (chokidar, ws, mime-types)
+- 🔐 **Environment Variables**: Support for .env files with VITE_ prefix
 
 ## Quick Start
 
-### Development Server with HMR
-
-Get started instantly with hot module replacement:
+### 1. Create Your Project
 
 ```bash
-# Install Elit and dev server
-npm install elit
-npm install --save-dev elit-server
+# Create a new directory
+mkdir my-elit-app
+cd my-elit-app
 
-# Start dev server
-npx elit-dev
+# Initialize package.json
+npm init -y
+
+# Install Elit
+npm install elit
 ```
 
-Your app will automatically reload when you make changes!
+### 2. Create Your App
+
+Create `src/main.ts`:
+
+```typescript
+import { div, h1, button, createState, reactive, domNode } from 'elit';
+
+const count = createState(0);
+
+const app = div({ className: 'app' },
+  h1('Hello Elit 2.0! 🚀'),
+  reactive(count, (value) =>
+    button({
+      onclick: () => count.value++,
+      className: 'btn'
+    }, `Count: ${value}`)
+  )
+);
+
+domNode.render('#app', app);
+```
+
+Create `index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elit 2.0 App</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="src/main.ts"></script>
+</body>
+</html>
+```
+
+### 3. Start Development Server
+
+```bash
+npx elit dev
+```
+
+Your app will automatically reload when you make changes with HMR!
 
 ### NPM Installation
 
@@ -599,92 +701,156 @@ const users: State<User[]> = createState([]);
 // Full IntelliSense support for all 100+ HTML elements
 ```
 
-## Comparison with Other Libraries
+## Deployment
 
-| Feature | Elit | React | Vue | Svelte |
-|---------|------|-------|-----|--------|
-| Bundle Size (min) | 30KB | ~140KB | ~90KB | ~15KB* |
-| Zero Dependencies | ✅ | ❌ | ❌ | ✅ |
-| Virtual DOM | ❌ | ✅ | ✅ | ❌ |
-| TypeScript First | ✅ | ✅ | ✅ | ✅ |
-| Built-in Router | ✅ | ❌ | ❌ | ❌ |
-| Built-in State | ✅ | ❌ | ✅ | ✅ |
-| SSR Support | ✅ | ✅ | ✅ | ✅ |
+Deploy your Elit 2.0 application to production:
+
+### Build for Production
+
+```bash
+# Build your app
+npx elit build
+
+# Preview production build
+npx elit preview
+```
+
+### Deploy to Vercel
+
+```bash
+npm i -g vercel
+npm run build
+vercel --prod
+```
+
+### Deploy to Netlify
+
+```bash
+npm i -g netlify-cli
+npm run build
+netlify deploy --prod --dir=dist
+```
+
+### Deploy to GitHub Pages
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm run build
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+```
+
+### Docker Deployment
+
+```dockerfile
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Environment Variables
+
+Create `.env.production`:
+
+```env
+VITE_API_URL=https://api.example.com
+VITE_ENV=production
+```
+
+Access in your code:
+
+```typescript
+const apiUrl = import.meta.env.VITE_API_URL;
+const isProd = import.meta.env.PROD;
+```
+
+## Comparison with Other Frameworks
+
+| Feature | Elit 2.0 | Vite + React | Next.js | SvelteKit |
+|---------|----------|--------------|---------|-----------|
+| Bundle Size | 30KB | ~140KB+ | ~200KB+ | ~15KB* |
+| Zero Dependencies | ✅ | ❌ | ❌ | ❌ |
+| Dev Server | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in |
+| HMR | ✅ | ✅ | ✅ | ✅ |
+| Build Tool | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in |
+| REST API | ✅ Built-in | ❌ | ✅ | ✅ |
+| TypeScript | ✅ | ✅ | ✅ | ✅ |
+| SSR | ✅ | ❌ | ✅ | ✅ |
 | Learning Curve | Easy | Medium | Medium | Easy |
 
 *Svelte requires compilation
 
-## Packages
-
-This monorepo contains two packages:
-
-### elit
-[![npm version](https://img.shields.io/npm/v/elit.svg)](https://www.npmjs.com/package/elit)
-
-The core library for building reactive web applications.
-
-```bash
-npm install elit
-```
-
-### elit-server
-[![npm version](https://img.shields.io/npm/v/elit-server.svg)](https://www.npmjs.com/package/elit-server)
-
-Development server with HMR, REST API, and real-time state synchronization.
-
-```bash
-npm install --save-dev elit-server
-```
-
-[View elit-server documentation →](./server/README.md)
-
 ## Documentation
 
-- 📚 [Documentation Hub](./docs/README.md)
-- ⚡ [Quick Start Guide](./docs/QUICK_START.md) - Get started in 5 minutes
-- 📖 [API Reference](./docs/API.md) - Complete API documentation
-- ⚖️ [Comparison Guide](./docs/COMPARISON.md) - Compare with React, Vue, Svelte
-- 🔄 [Migration Guide](./docs/MIGRATION.md) - Migrate from other frameworks
-- 🤝 [Contributing Guide](./CONTRIBUTING.md) - Contribute to Elit
+- 📚 [Full Documentation](https://github.com/oangsa/elit/docs)
+- ⚡ [Quick Start Guide](./docs/QUICK_START.md)
+- 📖 [API Reference](./docs/API.md)
+- 🔄 [Migration Guide](./docs/MIGRATION.md)
+- 🤝 [Contributing Guide](./CONTRIBUTING.md)
 
 ## Changelog
 
-### elit v0.1.0
+### Elit 2.0 - Full-Stack Framework
+
+**Major Changes:**
+- 🚀 **Integrated Build System**: Built-in esbuild with automatic client/server code separation
+- 🔥 **CLI Tools**: New commands - `npx elit dev`, `npx elit build`, `npx elit preview`
+- 🏗️ **Zero Config**: Works out of the box with optional `elit.config.mjs`
+- 🌐 **REST API Router**: Server-side routing with full middleware stack
+- 🔄 **Shared State**: Real-time WebSocket state synchronization
+- 🎯 **basePath Support**: Configure base paths for subdirectory deployments
+- 🔐 **Environment Variables**: .env file support with VITE_ prefix
+- 📦 **Gzip Compression**: Automatic compression for production builds
+- 💾 **Cache Headers**: Smart caching for static assets
+- ⚡ **Hot Module Replacement**: Instant development feedback
 
 **Core Library:**
-- 🎉 Initial release
-- ⚡ Optimized bundle size (50% reduction from initial builds - 30KB minified)
-- 🚀 Full TypeScript support with complete type definitions
-- 🎨 Complete CSS-in-JS with CreateStyle
-- 🛣️ Client-side router with navigation guards
-- 📦 Tree-shakeable ES modules
+- 🎯 Ultra lightweight (~10KB gzipped)
+- ⚡ Reactive state management
+- 🎨 CSS-in-JS with CreateStyle
+- 🛣️ Client-side router
+- 📱 Virtual scrolling
+- 🖥️ SSR support
 - 🎭 100+ HTML, SVG, and MathML elements
-- 🔧 Performance utilities (throttle, debounce, virtual scrolling)
-- 🖥️ SSR capabilities with renderToString
-- 🎮 DOM utility functions
-- 🌐 Shared state integration with elit-server
-
-**New Package - elit-server v0.1.0:**
-- ⚡ Hot Module Replacement (HMR) with WebSocket
-- 🌐 REST API router with regex-based parameters
-- 🔧 Middleware stack (CORS, logging, error handling, rate limiting, compression, security)
-- 🔄 Real-time shared state synchronization
-- 📊 Built-in WebSocket server
-- 📁 Static file server with MIME type detection
-- 🛠️ CLI tool (`elit-dev`)
-- 🎯 Zero-config with sensible defaults
+- 🔧 Performance utilities
+- 📦 Tree-shakeable ES modules
 
 ## Examples
 
-Check out the example applications in the repository:
+Example applications demonstrating Elit 2.0 features:
 
-- **[HMR Example](./server/example/hmr-example.html)** - Hot Module Replacement demo
-- **[REST API Example](./server/example/api-example.js)** - Full REST API with todos
-- **[Shared State (Vanilla)](./server/example/state-demo.html)** - Real-time state sync without Elit
-- **[Shared State (Elit)](./server/example/elit-state-demo.html)** - Real-time state with Elit reactive system
-- **[Todo App](./examples)** - Complete todo application (coming soon)
+- 📖 **[Documentation Site](./docs)** - Full-featured docs site with i18n and blog
+- 🎯 **[Counter App](./examples/counter)** - Simple reactive counter
+- ✅ **[Todo App](./examples/todo)** - Todo list with state management
+- 🎨 **[Styled Components](./examples/styled)** - CSS-in-JS examples
 
-[View all examples →](./server/example/README.md)
+[View all examples →](./examples)
 
 ## Links
 

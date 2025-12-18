@@ -15,6 +15,7 @@ export interface ElitConfig {
     preview?: {
         port?: number;
         host?: string;
+        root?: string;
         basePath?: string;
         open?: boolean;
         logging?: boolean;

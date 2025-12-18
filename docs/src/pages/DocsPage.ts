@@ -92,6 +92,7 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
+    root: './dist',
     basePath: '/app'
   }
 });`),

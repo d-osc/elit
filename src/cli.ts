@@ -112,13 +112,14 @@ async function runPreview(args: string[]) {
     const options: DevServerOptions = {
         port: mergedOptions.port || 4173,
         host: mergedOptions.host || 'localhost',
-        root: 'dist',
+        root: mergedOptions.root || config?.build?.outDir || 'dist',
         basePath: mergedOptions.basePath,
         open: mergedOptions.open ?? true,
         logging: mergedOptions.logging ?? true
     };
 
     console.log('Starting preview server...');
+    console.log(`  Root:  ${options.root}`);
     const devServer = createDevServer(options);
 
     const shutdown = async () => {
@@ -204,8 +205,8 @@ function parseBuildArgs(args: string[]): Partial<BuildOptions> {
     return options;
 }
 
-function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; basePath: string; open: boolean; logging: boolean }> {
-    const options: Partial<{ port: number; host: string; basePath: string; open: boolean; logging: boolean }> = {};
+function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean }> {
+    const options: Partial<{ port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean }> = {};
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -220,6 +221,11 @@ function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string;
             case '-h':
             case '--host':
                 options.host = next;
+                i++;
+                break;
+            case '-r':
+            case '--root':
+                options.root = next;
                 i++;
                 break;
             case '-b':
@@ -271,6 +277,7 @@ Build Options:
 Preview Options:
   -p, --port <number>      Port to run server on (default: 4173)
   -h, --host <string>      Host to bind to (default: localhost)
+  -r, --root <dir>         Root directory to serve (default: dist or build.outDir)
   -b, --base-path <path>   Base path for the application
   --no-open                Don't open browser automatically
   --silent                 Disable logging
