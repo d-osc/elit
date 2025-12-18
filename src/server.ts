@@ -535,11 +535,18 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     // Resolve file path
     const rootDir = await realpath(resolve(matchedClient.root));
-    const baseDir = isDistRequest ? resolve(matchedClient.root, '..') : matchedClient.root;
+    const baseDir = isDistRequest ? await realpath(resolve(matchedClient.root, '..')) : rootDir;
     let fullPath;
 
     try {
       fullPath = await realpath(resolve(join(baseDir, normalizedPath)));
+      // Security: Ensure path is strictly within the allowed root directory
+      if (!fullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
+        if (config.logging) console.log(`[403] File access outside of root: ${fullPath}`);
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('403 Forbidden');
+        return;
+      }
       if (config.logging && filePath === '/src/pages') {
         console.log(`[DEBUG] Initial resolve succeeded: ${fullPath}`);
       }
@@ -555,7 +562,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
       if (normalizedPath.endsWith('.js')) {
         const tsPath = normalizedPath.replace(/\.js$/, '.ts');
         try {
-          resolvedPath = await realpath(resolve(join(baseDir, tsPath)));
+          const tsFullPath = await realpath(resolve(join(baseDir, tsPath)));
+          // Security: Ensure path is strictly within the allowed root directory
+          if (!tsFullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
+            if (config.logging) console.log(`[403] Fallback TS path outside of root: ${tsFullPath}`);
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('403 Forbidden');
+            return;
+          }
+          resolvedPath = tsFullPath;
         } catch {
           // Continue to next attempt
         }
