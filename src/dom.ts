@@ -726,6 +726,109 @@ export class DomNode {
         return this.renderToString(vNode, options);
     }
 
+    // Server-side rendering - Render complete HTML document VNode to document
+    renderServer(vNode: Child): void {
+        if (typeof vNode !== 'object' || vNode === null || !('tagName' in vNode)) throw new Error('renderServer requires a VNode with html tag');
+        if (vNode.tagName !== 'html') throw new Error('renderServer requires a VNode with html tag as root');
+
+        const htmlVNode = vNode as VNode;
+        let headVNode: VNode | null = null, bodyVNode: VNode | null = null;
+
+        // Extract head and body from html children
+        for (const child of htmlVNode.children || []) {
+            if (typeof child === 'object' && child !== null && 'tagName' in child) {
+                if (child.tagName === 'head') headVNode = child as VNode;
+                if (child.tagName === 'body') bodyVNode = child as VNode;
+            }
+        }
+
+        // Set html attributes
+        if (htmlVNode.props) for (const k in htmlVNode.props) {
+            const v = htmlVNode.props[k];
+            if (v !== undefined && v !== null && v !== false) document.documentElement.setAttribute(k, String(v));
+        }
+
+        // Clear and render head
+        if (headVNode) {
+            document.head.innerHTML = '';
+            for (const child of headVNode.children || []) this.renderToDOM(child, document.head);
+        }
+
+        // Clear and render body
+        if (bodyVNode) {
+            document.body.innerHTML = '';
+            if (bodyVNode.props) for (const k in bodyVNode.props) {
+                const v = bodyVNode.props[k];
+                if (v !== undefined && v !== null && v !== false) document.body.setAttribute(k, String(v));
+            }
+            for (const child of bodyVNode.children || []) this.renderToDOM(child, document.body);
+        }
+    }
+
+    // Generate complete HTML document as string (for SSR)
+    renderToHTMLDocument(vNode: Child, options: {
+        title?: string;
+        meta?: Array<Record<string, string>>;
+        links?: Array<Record<string, string>>;
+        scripts?: Array<{ src?: string; content?: string; async?: boolean; defer?: boolean; type?: string }>;
+        styles?: Array<{ href?: string; content?: string }>;
+        lang?: string;
+        head?: string;
+        bodyAttrs?: Record<string, string>;
+        pretty?: boolean;
+    } = {}): string {
+        const { title = '', meta = [], links = [], scripts = [], styles = [], lang = 'en', head = '', bodyAttrs = {}, pretty = false } = options;
+        const nl = pretty ? '\n' : '';
+        const indent = pretty ? '  ' : '';
+        const indent2 = pretty ? '    ' : '';
+
+        let html = `<!DOCTYPE html>${nl}<html lang="${lang}">${nl}${indent}<head>${nl}${indent2}<meta charset="UTF-8">${nl}${indent2}<meta name="viewport" content="width=device-width, initial-scale=1.0">${nl}`;
+        if (title) html += `${indent2}<title>${this.escapeHtml(title)}</title>${nl}`;
+
+        for (const m of meta) {
+            html += `${indent2}<meta`;
+            for (const k in m) html += ` ${k}="${this.escapeHtml(m[k])}"`;
+            html += `>${nl}`;
+        }
+
+        for (const l of links) {
+            html += `${indent2}<link`;
+            for (const k in l) html += ` ${k}="${this.escapeHtml(l[k])}"`;
+            html += `>${nl}`;
+        }
+
+        for (const s of styles) {
+            if (s.href) {
+                html += `${indent2}<link rel="stylesheet" href="${this.escapeHtml(s.href)}">${nl}`;
+            } else if (s.content) {
+                html += `${indent2}<style>${s.content}</style>${nl}`;
+            }
+        }
+
+        if (head) html += head + nl;
+        html += `${indent}</head>${nl}${indent}<body`;
+        for (const k in bodyAttrs) html += ` ${k}="${this.escapeHtml(bodyAttrs[k])}"`;
+        html += `>${nl}`;
+        html += this.renderToString(vNode, { pretty, indent: 2 });
+
+        for (const script of scripts) {
+            html += `${indent2}<script`;
+            if (script.type) html += ` type="${this.escapeHtml(script.type)}"`;
+            if (script.async) html += ` async`;
+            if (script.defer) html += ` defer`;
+            if (script.src) {
+                html += ` src="${this.escapeHtml(script.src)}"></script>${nl}`;
+            } else if (script.content) {
+                html += `>${script.content}</script>${nl}`;
+            } else {
+                html += `></script>${nl}`;
+            }
+        }
+
+        html += `${indent}</body>${nl}</html>`;
+        return html;
+    }
+
     // Expose elementCache for reactive updates
     getElementCache(): WeakMap<Element, boolean> {
         return this.elementCache;
