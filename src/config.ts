@@ -2,8 +2,8 @@
  * Config loader for elit.config.{ts,js,json}
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, readFileSync } from './fs';
+import { resolve } from './path';
 import type { DevServerOptions, BuildOptions } from './types';
 
 export interface ElitConfig {
@@ -54,7 +54,8 @@ export function loadEnv(mode: string = 'development', cwd: string = process.cwd(
     for (const file of envFiles) {
         const filePath = resolve(cwd, file);
         if (existsSync(filePath)) {
-            const content = readFileSync(filePath, 'utf-8');
+            const contentBuffer = readFileSync(filePath, 'utf-8');
+            const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
             const lines = content.split('\n');
 
             for (const line of lines) {
@@ -109,7 +110,8 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
 
     if (ext === 'json') {
         // Load JSON config
-        const content = readFileSync(configPath, 'utf-8');
+        const contentBuffer = readFileSync(configPath, 'utf-8');
+        const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
         return JSON.parse(content);
     } else {
         // Load JS/TS config using dynamic import

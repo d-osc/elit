@@ -1,10 +1,15 @@
 /**
  * Build module for bundling applications
+ * Pure implementation with cross-runtime support
+ * Compatible with standard build tools API
+ * - Node.js: uses esbuild
+ * - Bun: uses Bun.build
+ * - Deno: uses Deno.emit
  */
 
-import { build as esbuild } from 'esbuild';
-import { statSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs';
-import { resolve, join, basename, extname, dirname } from 'path';
+import { statSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync } from './fs';
+import { resolve, join, basename, extname, dirname } from './path';
+import { runtime } from './runtime';
 import type { BuildOptions, BuildResult } from './types';
 
 const defaultOptions: Omit<BuildOptions, 'entry'> = {
@@ -100,44 +105,100 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
             define['import.meta.env.PROD'] = JSON.stringify(config.env.MODE === 'production');
         }
 
-        // Build with esbuild
-        const result = await esbuild({
-            entryPoints: [entryPath],
-            bundle: true,
-            outfile: outputPath,
-            format: config.format,
-            target: config.target,
-            minify: config.minify,
-            sourcemap: config.sourcemap,
-            external: config.external,
-            treeShaking: config.treeshake,
-            globalName: config.globalName,
-            platform,
-            plugins,
-            define,
-            logLevel: config.logging ? 'info' : 'silent',
-            metafile: true,
-            // Additional optimizations
-            ...(config.minify && {
-                minifyWhitespace: true,
-                minifyIdentifiers: true,
-                minifySyntax: true,
-                legalComments: 'none',
-                mangleProps: /^_/,  // Mangle properties starting with _
-                keepNames: false
-            })
-        });
+        let result: any;
+        let buildTime: number;
+        let size: number;
 
-        const buildTime = Date.now() - startTime;
-        const stats = statSync(outputPath);
-        const size = stats.size;
+        if (runtime === 'node') {
+            // Node.js - use esbuild
+            const { build: esbuild } = await import('esbuild');
+
+            result = await esbuild({
+                entryPoints: [entryPath],
+                bundle: true,
+                outfile: outputPath,
+                format: config.format,
+                target: config.target,
+                minify: config.minify,
+                sourcemap: config.sourcemap,
+                external: config.external,
+                treeShaking: config.treeshake,
+                globalName: config.globalName,
+                platform,
+                plugins,
+                define,
+                logLevel: config.logging ? 'info' : 'silent',
+                metafile: true,
+                // Additional optimizations
+                ...(config.minify && {
+                    minifyWhitespace: true,
+                    minifyIdentifiers: true,
+                    minifySyntax: true,
+                    legalComments: 'none',
+                    mangleProps: /^_/,
+                    keepNames: false
+                })
+            });
+
+            buildTime = Date.now() - startTime;
+            const stats = statSync(outputPath);
+            size = stats.size;
+        } else if (runtime === 'bun') {
+            // Bun - use Bun.build
+            // @ts-ignore
+            result = await Bun.build({
+                entrypoints: [entryPath],
+                outdir: outDir,
+                target: 'bun',
+                format: config.format === 'cjs' ? 'cjs' : 'esm',
+                minify: config.minify,
+                sourcemap: config.sourcemap ? 'external' : 'none',
+                external: config.external,
+                naming: outFile,
+                define
+            });
+
+            buildTime = Date.now() - startTime;
+
+            if (!result.success) {
+                throw new Error('Bun build failed: ' + JSON.stringify(result.logs));
+            }
+
+            const stats = statSync(outputPath);
+            size = stats.size;
+        } else {
+            // Deno - use Deno.emit
+            // @ts-ignore
+            result = await Deno.emit(entryPath, {
+                bundle: 'module',
+                check: false,
+                compilerOptions: {
+                    target: config.target,
+                    module: config.format === 'cjs' ? 'commonjs' : 'esnext',
+                    sourceMap: config.sourcemap
+                }
+            });
+
+            buildTime = Date.now() - startTime;
+
+            // Write the bundled output
+            const bundledCode = result.files['deno:///bundle.js'];
+            if (bundledCode) {
+                // @ts-ignore
+                await Deno.writeTextFile(outputPath, bundledCode);
+            }
+
+            const stats = statSync(outputPath);
+            size = stats.size;
+        }
 
         if (config.logging) {
             console.log(`\n✅ Build successful!`);
             console.log(`  Time: ${buildTime}ms`);
             console.log(`  Size: ${formatBytes(size)}`);
 
-            if (result.metafile) {
+            // Show metafile info (Node.js esbuild only)
+            if (runtime === 'node' && result.metafile) {
                 const inputs = Object.keys(result.metafile.inputs).length;
                 console.log(`  Files: ${inputs} input(s)`);
 
@@ -147,14 +208,19 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                     const mainOutput = result.metafile.outputs[outputKeys[0]];
                     if (mainOutput && mainOutput.inputs) {
                         const sortedInputs = Object.entries(mainOutput.inputs)
-                            .sort(([, a], [, b]) => b.bytesInOutput - a.bytesInOutput)
+                            .sort(([, a], [, b]) => {
+                                const aBytes = (a as any).bytesInOutput || 0;
+                                const bBytes = (b as any).bytesInOutput || 0;
+                                return bBytes - aBytes;
+                            })
                             .slice(0, 5);
 
                         if (sortedInputs.length > 0) {
                             console.log('\n  📊 Top 5 largest modules:');
                             sortedInputs.forEach(([file, info]) => {
                                 const fileName = file.split(/[/\\]/).pop() || file;
-                                console.log(`     ${fileName.padEnd(30)} ${formatBytes(info.bytesInOutput)}`);
+                                const infoBytes = (info as any).bytesInOutput || 0;
+                                console.log(`     ${fileName.padEnd(30)} ${formatBytes(infoBytes)}`);
                             });
                         }
                     }
@@ -187,7 +253,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 if (existsSync(fromPath)) {
                     if (copyItem.transform) {
                         // Read, transform, and write
-                        const content = readFileSync(fromPath, 'utf-8');
+                        const contentBuffer = readFileSync(fromPath, 'utf-8');
+                        const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
                         const transformed = copyItem.transform(content, config);
                         writeFileSync(toPath, transformed);
                     } else {

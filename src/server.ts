@@ -1,5 +1,9 @@
 /**
  * Development server with HMR support
+ * Cross-runtime transpilation support
+ * - Node.js: uses esbuild
+ * - Bun: uses Bun.Transpiler
+ * - Deno: uses Deno.emit
  */
 
 import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from './http';
@@ -9,7 +13,7 @@ import { watch } from './chokidar';
 import { readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
-import { build } from 'esbuild';
+import { runtime } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
 
@@ -884,21 +888,58 @@ export function createDevServer(options: DevServerOptions): DevServer {
       // Handle TypeScript files - transpile only (no bundling)
       if (ext === '.ts' || ext === '.tsx') {
         try {
-          const result = await build({
-            stdin: {
-              contents: content.toString(),
-              loader: ext === '.tsx' ? 'tsx' : 'ts',
-              resolveDir: resolve(resolvedPath, '..'),
-              sourcefile: resolvedPath
-            },
-            format: 'esm',
-            target: 'es2020',
-            write: false,
-            bundle: false,
-            sourcemap: 'inline'
-          });
+          let transpiled: string;
 
-          content = Buffer.from(result.outputFiles[0].text);
+          if (runtime === 'deno') {
+            // Deno - use Deno.emit
+            // @ts-ignore
+            const result = await Deno.emit(resolvedPath, {
+              check: false,
+              bundle: false,
+              compilerOptions: {
+                sourceMap: true,
+                inlineSourceMap: true,
+                target: 'ES2020',
+                module: 'esnext'
+              },
+              sources: {
+                [resolvedPath]: content.toString()
+              }
+            });
+
+            transpiled = result.files[resolvedPath.replace(/\.tsx?$/, '.js')] || '';
+
+          } else if (runtime === 'bun') {
+            // Bun - use Bun.Transpiler
+            // @ts-ignore
+            const transpiler = new Bun.Transpiler({
+              loader: ext === '.tsx' ? 'tsx' : 'ts',
+              target: 'browser'
+            });
+
+            // @ts-ignore
+            transpiled = transpiler.transformSync(content.toString());
+          } else {
+            // Node.js - use esbuild
+            const { build } = await import('esbuild');
+            const result = await build({
+              stdin: {
+                contents: content.toString(),
+                loader: ext === '.tsx' ? 'tsx' : 'ts',
+                resolveDir: resolve(resolvedPath, '..'),
+                sourcefile: resolvedPath
+              },
+              format: 'esm',
+              target: 'es2020',
+              write: false,
+              bundle: false,
+              sourcemap: 'inline'
+            });
+
+            transpiled = result.outputFiles[0].text;
+          }
+
+          content = Buffer.from(transpiled);
           mimeType = 'application/javascript';
         } catch (error) {
           res.writeHead(500, { 'Content-Type': 'text/plain' });

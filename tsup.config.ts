@@ -22,7 +22,8 @@ export default defineConfig([
             fs: 'src/fs.ts',
             'mime-types': 'src/mime-types.ts',
             chokidar: 'src/chokidar.ts',
-            path: 'src/path.ts'
+            path: 'src/path.ts',
+            runtime: 'src/runtime.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
