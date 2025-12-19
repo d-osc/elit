@@ -11,17 +11,7 @@ import { EventEmitter } from 'events';
 import type { IncomingMessage } from './http';
 import { createServer as createHttpsServer } from './https';
 import { WebSocket, WebSocketServer, ServerOptions, Data, ReadyState, CLOSE_CODES } from './ws';
-
-/**
- * Runtime detection (cached at module load)
- */
-const runtime = (() => {
-  // @ts-ignore - Deno global
-  if (typeof Deno !== 'undefined') return 'deno';
-  // @ts-ignore - Bun global
-  if (typeof Bun !== 'undefined') return 'bun';
-  return 'node';
-})();
+import { runtime } from './runtime';
 
 /**
  * WSS Server options (extends WebSocket ServerOptions with TLS)

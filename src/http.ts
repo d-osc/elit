@@ -4,17 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-
-/**
- * Runtime detection (cached at module load)
- */
-const runtime = (() => {
-  // @ts-ignore - Deno global
-  if (typeof Deno !== 'undefined') return 'deno';
-  // @ts-ignore - Bun global
-  if (typeof Bun !== 'undefined') return 'bun';
-  return 'node';
-})();
+import { runtime } from './runtime';
 
 // Pre-load native modules for Node.js
 let http: any, https: any;

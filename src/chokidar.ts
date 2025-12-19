@@ -8,28 +8,7 @@
  */
 
 import { EventEmitter } from 'events';
-
-/**
- * Runtime detection (cached at module load)
- */
-const runtime = (() => {
-  // @ts-ignore - Deno global
-  if (typeof Deno !== 'undefined') return 'deno';
-  // @ts-ignore - Bun global
-  if (typeof Bun !== 'undefined') return 'bun';
-  return 'node';
-})();
-
-// Global declarations for runtime-specific APIs
-declare global {
-  // @ts-ignore
-  const Deno: {
-    watchFs(paths: string | string[]): AsyncIterable<{
-      kind: string;
-      paths: string[];
-    }>;
-  } | undefined;
-}
+import { runtime } from './runtime';
 
 /**
  * Watch options

@@ -10,17 +10,7 @@ import type {
   RequestListener,
   RequestOptions,
 } from './http';
-
-/**
- * Runtime detection (cached at module load)
- */
-const runtime = (() => {
-  // @ts-ignore - Deno global
-  if (typeof Deno !== 'undefined') return 'deno';
-  // @ts-ignore - Bun global
-  if (typeof Bun !== 'undefined') return 'bun';
-  return 'node';
-})();
+import { runtime } from './runtime';
 
 // Pre-load native https module for Node.js
 let https: any;

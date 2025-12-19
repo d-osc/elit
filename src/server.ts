@@ -895,7 +895,6 @@ export function createDevServer(options: DevServerOptions): DevServer {
             // @ts-ignore
             const result = await Deno.emit(resolvedPath, {
               check: false,
-              bundle: false,
               compilerOptions: {
                 sourceMap: true,
                 inlineSourceMap: true,

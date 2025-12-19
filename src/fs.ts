@@ -6,54 +6,7 @@
  * - Deno: uses Deno.readFile(), etc.
  */
 
-// EventEmitter is available but not needed in this module currently
-// import { EventEmitter } from 'events';
-
-// Global declarations for runtime-specific APIs
-declare global {
-  // @ts-ignore
-  const Bun: {
-    file(path: string): {
-      size: number;
-      arrayBuffer(): ArrayBuffer | Promise<ArrayBuffer>;
-      exists(): Promise<boolean>;
-    };
-    write(path: string, data: string | Buffer | Uint8Array): Promise<void>;
-  } | undefined;
-
-  // @ts-ignore
-  const Deno: {
-    readFile(path: string): Promise<Uint8Array>;
-    readFileSync(path: string): Uint8Array;
-    writeFile(path: string, data: Uint8Array): Promise<void>;
-    writeFileSync(path: string, data: Uint8Array): void;
-    stat(path: string): Promise<any>;
-    statSync(path: string): any;
-    mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
-    mkdirSync(path: string, options?: { recursive?: boolean }): void;
-    readDir(path: string): AsyncIterable<any>;
-    readDirSync(path: string): Iterable<any>;
-    remove(path: string, options?: { recursive?: boolean }): Promise<void>;
-    removeSync(path: string, options?: { recursive?: boolean }): void;
-    rename(oldPath: string, newPath: string): Promise<void>;
-    renameSync(oldPath: string, newPath: string): void;
-    copyFile(src: string, dest: string): Promise<void>;
-    copyFileSync(src: string, dest: string): void;
-    realPath(path: string): Promise<string>;
-    realPathSync(path: string): string;
-  } | undefined;
-}
-
-/**
- * Runtime detection (cached at module load)
- */
-const runtime = (() => {
-  // @ts-ignore - Deno global
-  if (typeof Deno !== 'undefined') return 'deno';
-  // @ts-ignore - Bun global
-  if (typeof Bun !== 'undefined') return 'bun';
-  return 'node';
-})();
+import { runtime } from './runtime';
 
 // Pre-load fs module for Node.js
 let fs: any, fsPromises: any;
