@@ -1,6 +1,6 @@
 # Elit
 
-⚡ A lightweight TypeScript framework with built-in dev server, HMR, routing, and reactive state management. Minimal dependencies, maximum developer experience.
+⚡ A lightweight TypeScript framework with built-in dev server, HMR, routing, and reactive state management. **Zero production dependencies**, maximum developer experience.
 
 [![npm version](https://img.shields.io/npm/v/elit.svg)](https://www.npmjs.com/package/elit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,19 +10,30 @@
 
 ## Why Elit?
 
-- **🎯 Lightweight**: Minimal bundle size with tree-shaking support
+### Frontend Excellence
+- **🎯 Ultra Lightweight**: Modular design - import only what you need (DOM: 11KB, State: 15KB)
 - **⚡ Lightning Fast**: Direct DOM manipulation - no virtual DOM overhead
-- **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
 - **🔄 Reactive State**: Simple but powerful reactive state management with `createState` and `computed`
-- **🌲 Tree-Shakeable**: Import only what you need for optimal bundle size
-- **🚀 Full-Stack Ready**: Built-in dev server, HMR, build tool, and REST API
+- **🎨 CSS-in-JS**: Type-safe styling with `CreateStyle`
+- **🛣️ Client Router**: Hash and history mode routing with dynamic parameters and guards
+- **📱 Virtual Scrolling**: Handle 100k+ items efficiently
+- **🌲 Tree-Shakeable**: Smart ES modules - only bundle what you use
+
+### Backend Performance
+- **🚀 High Performance**: 10,000+ req/s on Node.js with sub-7ms latency
+- **🌐 ServerRouter**: Full-featured routing with only 2.7% overhead vs raw HTTP
+- **🔌 WebSocket**: Built-in real-time communication support
+- **⚡ Cross-Runtime**: Works on Node.js, Bun, and Deno with runtime-specific optimizations
+- **🔧 Middleware Stack**: CORS, logging, rate limiting, compression, and more
+- **🔐 Zero Dependencies**: No production dependencies for maximum security
+
+### Developer Experience
+- **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
 - **🔥 Hot Module Replacement**: Instant development feedback with automatic HMR
 - **🏗️ Build System**: Integrated esbuild for fast production builds
-- **🌐 ServerRouter**: Built-in server-side routing for REST APIs
-- **🔌 WebSocket Support**: Real-time communication via WebSocket
-- **🎨 CSS-in-JS**: Type-safe styling with `CreateStyle`
-- **🛣️ Client Router**: Hash and history mode routing with guards
-- **📦 Modular Exports**: Import from specific paths (`elit/dom`, `elit/router`, `elit/state`)
+- **🎯 Zero Config**: Works out of the box with optional `elit.config.mjs`
+- **📦 CLI Tools**: `npx elit dev`, `npx elit build`, `npx elit preview`
+- **🌍 Environment Support**: .env files with VITE_ prefix
 
 ## Installation
 
@@ -91,28 +102,30 @@ export default defineConfig({
 
 ### Frontend Framework
 
-- 🎯 **Ultra Lightweight**: Just 30KB minified, ~10KB gzipped
-- ⚡ **Reactive State**: Built-in reactive state management with `createState`
-- 🔄 **Computed Values**: Automatic dependency tracking with `computed`
-- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle`
-- 🛣️ **Client-Side Router**: Hash and history mode routing with dynamic parameters
-- 📱 **Virtual Scrolling**: Handle 100k+ items efficiently
-- 🖥️ **SSR Support**: Full server-side rendering capabilities
-- 🎭 **SVG & MathML**: Complete support for all elements
-- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering
-- 📦 **Tree-Shakeable**: Import only what you need
-- 🎮 **DOM Utilities**: Convenient helper functions
+- 🎯 **Modular & Lightweight**: DOM (11KB), State (15KB), Router (13KB) - use only what you need
+- ⚡ **Reactive State**: Built-in reactive state management with `createState` and automatic dependency tracking
+- 🔄 **Computed Values**: Automatic dependency tracking with `computed` for derived state
+- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle` and support for pseudo-selectors
+- 🛣️ **Client-Side Router**: Hash and history mode routing with dynamic parameters and navigation guards
+- 📱 **Virtual Scrolling**: Handle 100k+ items efficiently with `createVirtualList`
+- 🖥️ **SSR Support**: Full server-side rendering with `renderToString`
+- 🎭 **100+ Elements**: Complete HTML, SVG, and MathML element support
+- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering, chunked rendering
+- 📦 **Tree-Shakeable**: ES modules with excellent tree-shaking support
+- 🎮 **DOM Utilities**: Query selectors, element creation, fragment support
 
-### Development Tools
+### Backend & Development
 
-- 🔥 **Hot Module Replacement**: Instant development feedback with automatic reload
-- 🏗️ **Build System**: Integrated esbuild for fast production builds
-- 🌐 **ServerRouter**: Built-in REST API routing for server-side logic
-- 🔧 **Middleware Support**: Add custom middleware to the ServerRouter
-- 🔌 **WebSocket Server**: Built-in WebSocket support for real-time features
-- 📁 **Static File Server**: Efficient static file serving with proper MIME types
-- 🎯 **Smart Defaults**: Works with minimal configuration
-- 📦 **TypeScript Compilation**: Automatic TypeScript compilation with esbuild
+- 🔥 **Hot Module Replacement**: Instant development feedback with automatic state preservation
+- 🏗️ **Build System**: Integrated esbuild with runtime-specific optimizations (Node.js, Bun, Deno)
+- 🌐 **ServerRouter**: High-performance routing (10,128 req/s) with minimal overhead (2.7%)
+- 🔧 **Rich Middleware**: CORS, logging, rate limiting, compression, security headers, and more
+- 🔌 **WebSocket Server**: Built-in WebSocket with automatic state synchronization
+- 📁 **Static File Server**: Efficient serving with proper MIME types and caching
+- 🎯 **Smart Defaults**: Zero-config development with optional `elit.config.mjs`
+- 📦 **Auto TypeScript**: Automatic TypeScript compilation on all runtimes
+- 🌍 **Environment Variables**: .env file support with VITE_ prefix
+- ⚡ **Cross-Runtime**: Optimized for Node.js, Bun, and Deno with specific adaptations
 
 ## Quick Start
 
@@ -645,22 +658,61 @@ All MathML elements are prefixed with `math`:
 
 ## Bundle Size & Performance
 
-Elit is designed to be extremely lightweight while providing powerful features:
+Elit is designed to be modular and lightweight with excellent tree-shaking support:
 
-| Format | Size (Minified) | Size (Gzipped) |
-|--------|----------------|----------------|
-| ESM    | 29KB          | ~10KB          |
-| CJS    | 30KB          | ~10KB          |
-| IIFE   | 30KB          | ~10KB          |
+### Bundle Sizes (Minified)
 
-**Tree-shaking**: When using ES modules, only the features you import will be included in your bundle.
+| Component | ESM | CJS | Description |
+|-----------|-----|-----|-------------|
+| **Full Framework** | 79.52 KB | 80.48 KB | All features included |
+| **DOM Only** | 11.06 KB | 11.07 KB | Just DOM utilities |
+| **State** | 15.34 KB | 15.38 KB | Reactive state management |
+| **Router** | 13.22 KB | 13.22 KB | Client-side routing |
+| **Server** | 51.07 KB | 51.18 KB | Server features + Router |
+| **HTTP** | 7.70 KB | 7.85 KB | HTTP utilities |
+| **CLI** | 127.63 KB | - | Full development toolchain |
 
-**Performance Optimizations**:
+**Tree-shaking**: Import only what you need! Using modular imports (`elit/dom`, `elit/state`) keeps your bundle minimal.
+
+### Server Performance (Node.js v24.12.0)
+
+| Component | Throughput | Latency (P50) | Latency (Avg) | Description |
+|-----------|-----------|---------------|---------------|-------------|
+| **HTTP Server** | 10,410 req/s | 5.91ms | 6.69ms | Raw HTTP optimized |
+| **ServerRouter** | 10,128 req/s | 6.09ms | 6.94ms | Full routing + middleware |
+
+**Router Overhead**: Only 2.7% slower than raw HTTP while providing:
+- Route matching with dynamic params
+- Query string parsing
+- Request context
+- Middleware chain support
+- Body parsing
+
+### Cross-Runtime Support
+
+Elit works seamlessly on **Node.js, Bun, and Deno** with runtime-specific optimizations:
+
+- **Node.js**: Uses native `http` module
+- **Bun**: Ultra-fast `Bun.serve()` with synchronous response detection
+- **Deno**: `Deno.serve()` integration
+
+### Performance Optimizations
+
+**Frontend**:
 - Direct DOM manipulation (no virtual DOM diffing)
 - Optimized rendering with RAF batching
 - Smart children rendering with automatic fragment usage
 - Efficient attribute updates using charCode checks
 - Minimal function closures and memory allocation
+
+**Backend**:
+- **Zero-copy headers** for Bun/Deno runtimes
+- **Synchronous response detection** eliminates Promise overhead
+- **String-based body buffering** reduces allocations
+- **Inline Response creation** minimizes object overhead
+- **Pre-compiled route patterns** for fast matching
+
+[View detailed benchmarks →](./benchmark)
 
 ## Browser Usage
 
@@ -843,22 +895,39 @@ const isProd = import.meta.env.PROD;
 
 ## Comparison with Other Frameworks
 
-| Feature | Elit | Vite + React | Next.js | SvelteKit |
-|---------|----------|--------------|---------|-----------|
-| Runtime Size | Lightweight | ~140KB+ | ~200KB+ | ~15KB* |
-| Dependencies | Minimal (5) | Many | Many | Many |
-| Dev Server | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in |
-| HMR | ✅ | ✅ | ✅ | ✅ |
-| Build Tool | ✅ esbuild | ✅ Vite | ✅ Turbopack | ✅ Vite |
-| REST API | ✅ Built-in | ❌ | ✅ | ✅ |
-| Middleware | ✅ Built-in | ❌ | ✅ | ✅ |
-| WebSocket | ✅ Built-in | ❌ | ❌ | ❌ |
-| Shared State | ✅ Built-in | ❌ | ❌ | ❌ |
-| TypeScript | ✅ | ✅ | ✅ | ✅ |
-| SSR | ✅ | ❌ | ✅ | ✅ |
-| Learning Curve | Easy | Medium | Medium | Easy |
+| Feature | Elit | Vite + React | Next.js | SvelteKit | Express.js |
+|---------|----------|--------------|---------|-----------|------------|
+| **Frontend Size** | 11-15KB (modular) | ~140KB+ | ~200KB+ | ~15KB* | N/A |
+| **Backend Size** | 51KB (Server) | N/A | N/A | N/A | ~200KB+ |
+| **Prod Dependencies** | **0** (Zero!) | Many | Many | Many | Many |
+| **Dev Server** | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in | ❌ |
+| **HMR** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Build Tool** | ✅ esbuild | ✅ Vite | ✅ Turbopack | ✅ Vite | ❌ |
+| **REST API** | ✅ 10K+ req/s | ❌ | ✅ | ✅ | ✅ 8K+ req/s |
+| **Middleware** | ✅ Built-in | ❌ | ✅ | ✅ | ✅ |
+| **WebSocket** | ✅ Built-in | ❌ | ❌ | ❌ | ➕ Via package |
+| **Shared State** | ✅ Auto-sync | ❌ | ❌ | ❌ | ❌ |
+| **Cross-Runtime** | ✅ Node/Bun/Deno | ❌ | ❌ | ❌ | ✅ Node only |
+| **TypeScript** | ✅ Native | ✅ | ✅ | ✅ | ➕ Via setup |
+| **SSR** | ✅ | ❌ | ✅ | ✅ | ➕ Manual |
+| **Tree-Shaking** | ✅ Excellent | ✅ | ✅ | ✅ | ❌ |
+| **Learning Curve** | Easy | Medium | Medium | Easy | Easy |
 
 *Svelte requires compilation step
+
+### Performance Comparison
+
+**Backend (10K requests, 100 concurrent)**:
+- **Elit ServerRouter**: 10,128 req/s (6.94ms avg) on Node.js
+- **Express.js**: ~8,000 req/s (12ms avg) on Node.js
+- **Fastify**: ~12,000 req/s (8ms avg) on Node.js
+- **Elysia (Bun)**: ~100,000 req/s (<1ms avg) on Bun
+
+**Frontend Bundle**:
+- **Elit (modular)**: 11KB (DOM) + 15KB (State) = 26KB for typical app
+- **React + React-DOM**: 140KB+ (45KB gzipped)
+- **Vue 3**: 95KB+ (32KB gzipped)
+- **Svelte**: 15KB+ (6KB gzipped) *after compilation*
 
 ## Documentation
 
@@ -869,30 +938,51 @@ const isProd = import.meta.env.PROD;
 
 ## Changelog
 
-### Elit - Full-Stack Framework
+### v2.0.0 - Full-Stack Framework with Performance Optimizations
 
-**Major Changes:**
-- 🚀 **Integrated Build System**: Built-in esbuild with automatic client/server code separation
-- 🔥 **CLI Tools**: New commands - `npx elit dev`, `npx elit build`, `npx elit preview`
+**🚀 Backend Performance Enhancements:**
+- ⚡ **Ultra-Fast HTTP**: 10,410 req/s with sub-7ms latency on Node.js
+- 🎯 **Optimized ServerRouter**: 10,128 req/s with only 2.7% overhead vs raw HTTP
+- 🔄 **Synchronous Response Detection**: Eliminates Promise overhead for Bun runtime
+- 🆓 **Zero-Copy Headers**: Direct headers reference for Bun/Deno runtimes
+- 📦 **String-Based Body Buffering**: Reduced allocations and faster responses
+- ⚡ **Cross-Runtime Optimizations**: Runtime-specific code paths for Node.js, Bun, and Deno
+- 🔧 **Pre-Compiled Routes**: Route patterns compiled once during registration
+
+**🏗️ Build System & CLI:**
+- 🚀 **Integrated Build System**: Built-in esbuild with runtime-specific transpilation
+- 🔥 **CLI Tools**: `npx elit dev`, `npx elit build`, `npx elit preview`
 - 🏗️ **Zero Config**: Works out of the box with optional `elit.config.mjs`
-- 🌐 **REST API Router**: Server-side routing with full middleware stack
-- 🔄 **Shared State**: Real-time WebSocket state synchronization
 - 🎯 **basePath Support**: Configure base paths for subdirectory deployments
 - 🔐 **Environment Variables**: .env file support with VITE_ prefix
-- 📦 **Gzip Compression**: Automatic compression for production builds
-- 💾 **Cache Headers**: Smart caching for static assets
+- 📦 **Smart Bundling**: Automatic code splitting and tree-shaking
 - ⚡ **Hot Module Replacement**: Instant development feedback
 
-**Core Library:**
-- 🎯 Ultra lightweight (~10KB gzipped)
-- ⚡ Reactive state management
-- 🎨 CSS-in-JS with CreateStyle
-- 🛣️ Client-side router
-- 📱 Virtual scrolling
-- 🖥️ SSR support
-- 🎭 100+ HTML, SVG, and MathML elements
-- 🔧 Performance utilities
-- 📦 Tree-shakeable ES modules
+**🌐 Server Features:**
+- 🌐 **ServerRouter**: High-performance routing with regex pattern matching
+- 🔧 **Rich Middleware**: CORS, logger, rate limit, compression, security headers
+- 🔌 **WebSocket Server**: Built-in WebSocket with state synchronization
+- 🔄 **Shared State**: Real-time auto-sync between server and all clients
+- 📁 **Static File Server**: Efficient serving with proper MIME types
+- 💾 **Cache Headers**: Smart caching for static assets
+- 📦 **Gzip Compression**: Automatic compression for production
+
+**🎨 Frontend Library:**
+- 🎯 **Modular Design**: DOM (11KB), State (15KB), Router (13KB) - use only what you need
+- ⚡ **Reactive State**: Automatic dependency tracking with `createState` and `computed`
+- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle`
+- 🛣️ **Client Router**: Hash and history mode with navigation guards
+- 📱 **Virtual Scrolling**: Handle 100k+ items with `createVirtualList`
+- 🖥️ **SSR Support**: `renderToString` for server-side rendering
+- 🎭 **100+ Elements**: Complete HTML, SVG, and MathML support
+- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering
+- 📦 **Tree-Shakeable**: Excellent ES module tree-shaking
+
+**📊 Benchmarks:**
+- HTTP Server: 10,410 req/s (Node.js v24.12.0)
+- ServerRouter: 10,128 req/s with full routing + middleware
+- Router Overhead: Only 2.7% vs raw HTTP
+- [View detailed benchmarks →](./benchmark)
 
 ## Examples
 
