@@ -17,15 +17,32 @@ curl -fsSL https://bun.sh/install | bash
 
 ## Running Benchmarks
 
-### On Node.js
+### HTTP Server Benchmark
+
+**On Node.js:**
 ```bash
 node benchmark/server-benchmark.js
 ```
 
-### On Bun (includes Elysia comparison)
+**On Bun (includes Elysia comparison):**
 ```bash
 bun install elysia
 bun benchmark/server-benchmark.js
+```
+
+### ServerRouter Benchmark
+
+**On Node.js:**
+```bash
+node benchmark/router-benchmark.js
+# or
+npm run benchmark:router
+```
+
+**On Bun (includes Elysia comparison):**
+```bash
+bun install elysia
+bun benchmark/router-benchmark.js
 ```
 
 ## Benchmark Configuration
@@ -104,16 +121,28 @@ bun benchmark/server-benchmark.js
 
 ## Actual Benchmark Results
 
-### elit/server on Node.js v24.12.0
+### elit/server (HTTP) on Node.js v24.12.0
 ```
-Requests/sec:    10,899
+Requests/sec:    10,410
 Latency (ms):
-  Min:           3.95
-  Max:           15.10
-  Average:       6.34
-  P50:           5.67
-  P95:           10.79
-  P99:           11.60
+  Min:           3.85
+  Max:           17.33
+  Average:       6.69
+  P50:           5.91
+  P95:           11.54
+  P99:           12.83
+```
+
+### elit/ServerRouter on Node.js v24.12.0
+```
+Requests/sec:    10,128
+Latency (ms):
+  Min:           4.16
+  Max:           15.95
+  Average:       6.94
+  P50:           6.09
+  P95:           12.30
+  P99:           15.16
 ```
 
 **Test Configuration:**
@@ -126,3 +155,8 @@ Latency (ms):
 - Runtime: Node.js v24.12.0
 - Platform: Windows
 - Date: 2025-12-19
+
+**Analysis:**
+- ServerRouter adds ~2.7% overhead compared to raw HTTP (routing, param parsing, middleware support)
+- Both achieve >10,000 req/sec on Node.js with sub-7ms average latency
+- Performance difference is minimal considering the additional features (routing, params, middleware)

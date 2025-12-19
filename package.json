@@ -105,6 +105,7 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "benchmark": "node benchmark/server-benchmark.js",
+    "benchmark:router": "node benchmark/router-benchmark.js",
     "docs:dev": "npm run --prefix docs dev",
     "docs:build": "npm run --prefix docs build",
     "docs:preview": "npm run --prefix docs preview",
