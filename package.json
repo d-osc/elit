@@ -53,6 +53,46 @@
       "types": "./dist/build.d.ts",
       "import": "./dist/build.mjs",
       "require": "./dist/build.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.mjs",
+      "require": "./dist/http.js"
+    },
+    "./https": {
+      "types": "./dist/https.d.ts",
+      "import": "./dist/https.mjs",
+      "require": "./dist/https.js"
+    },
+    "./ws": {
+      "types": "./dist/ws.d.ts",
+      "import": "./dist/ws.mjs",
+      "require": "./dist/ws.js"
+    },
+    "./fs": {
+      "types": "./dist/fs.d.ts",
+      "import": "./dist/fs.mjs",
+      "require": "./dist/fs.js"
+    },
+    "./mime-types": {
+      "types": "./dist/mime-types.d.ts",
+      "import": "./dist/mime-types.mjs",
+      "require": "./dist/mime-types.js"
+    },
+    "./chokidar": {
+      "types": "./dist/chokidar.d.ts",
+      "import": "./dist/chokidar.mjs",
+      "require": "./dist/chokidar.js"
+    },
+    "./path": {
+      "types": "./dist/path.d.ts",
+      "import": "./dist/path.mjs",
+      "require": "./dist/path.js"
+    },
+    "./wss": {
+      "types": "./dist/wss.d.ts",
+      "import": "./dist/wss.mjs",
+      "require": "./dist/wss.js"
     }
   },
   "scripts": {
@@ -99,16 +139,14 @@
   },
   "homepage": "https://github.com/d-osc/elit#readme",
   "dependencies": {
-    "chokidar": "^4.0.3",
     "esbuild": "^0.24.2",
-    "mime-types": "^2.1.35",
-    "open": "^11.0.0",
-    "ws": "^8.18.0"
+    "open": "^11.0.0"
   },
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.13",
+    "elysia": "^1.4.19",
     "terser": "^5.44.1",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"

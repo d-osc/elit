@@ -2,13 +2,13 @@
  * Development server with HMR support
  */
 
-import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from 'http';
-import { request as httpsRequest } from 'https';
-import { WebSocketServer, WebSocket } from 'ws';
-import { watch } from 'chokidar';
-import { readFile, stat, realpath } from 'fs/promises';
-import { join, extname, relative, resolve, normalize, sep } from 'path';
-import { lookup } from 'mime-types';
+import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from './http';
+import { request as httpsRequest } from './https';
+import { WebSocketServer, WebSocket, ReadyState } from './ws';
+import { watch } from './chokidar';
+import { readFile, stat, realpath } from './fs';
+import { join, extname, relative, resolve, normalize, sep } from './path';
+import { lookup } from './mime-types';
 import { build } from 'esbuild';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
@@ -197,7 +197,8 @@ export function cors(options: {
   const { origin = '*', methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], credentials = true, maxAge = 86400 } = options;
 
   return async (ctx, next) => {
-    const requestOrigin = ctx.req.headers.origin || '';
+    const requestOriginHeader = ctx.req.headers.origin;
+    const requestOrigin = Array.isArray(requestOriginHeader) ? requestOriginHeader[0] : (requestOriginHeader || '');
     const allowOrigin = Array.isArray(origin) && origin.includes(requestOrigin) ? requestOrigin : (Array.isArray(origin) ? '' : origin);
 
     if (allowOrigin) ctx.res.setHeader('Access-Control-Allow-Origin', allowOrigin);
@@ -267,7 +268,9 @@ export function rateLimit(options: { windowMs?: number; max?: number; message?: 
 export function bodyLimit(options: { limit?: number } = {}): Middleware {
   const { limit = 1024 * 1024 } = options;
   return async (ctx, next) => {
-    if (parseInt(ctx.req.headers['content-length'] || '0', 10) > limit) {
+    const contentLength = ctx.req.headers['content-length'];
+    const contentLengthStr = Array.isArray(contentLength) ? contentLength[0] : (contentLength || '0');
+    if (parseInt(contentLengthStr, 10) > limit) {
       ctx.res.writeHead(413, { 'Content-Type': 'application/json' });
       ctx.res.end(JSON.stringify({ error: 'Request body too large' }));
       return;
@@ -362,33 +365,51 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
       // Rewrite path if needed
       let proxyPath = rewritePath(url, pathRewrite);
 
+      // Build the full proxy URL
+      const proxyUrl = `${isHttps ? 'https' : 'http'}://${targetUrl.hostname}:${targetUrl.port || (isHttps ? 443 : 80)}${proxyPath}`;
+
       // Build proxy request options
-      const proxyReqOptions = {
-        hostname: targetUrl.hostname,
-        port: targetUrl.port || (isHttps ? 443 : 80),
-        path: proxyPath,
-        method: req.method,
-        headers: {
-          ...req.headers,
-          ...(headers || {}),
+      const proxyReqHeaders: Record<string, string | number | string[]> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (value !== undefined) {
+          proxyReqHeaders[key] = value;
         }
-      };
+      }
+      if (headers) {
+        for (const [key, value] of Object.entries(headers)) {
+          if (value !== undefined) {
+            proxyReqHeaders[key] = value;
+          }
+        }
+      }
 
       // Change origin if requested
       if (changeOrigin) {
-        proxyReqOptions.headers.host = targetUrl.host;
+        proxyReqHeaders.host = targetUrl.host;
       }
 
       // Remove headers that shouldn't be forwarded
-      delete proxyReqOptions.headers['host'];
+      delete proxyReqHeaders['host'];
+
+      const proxyReqOptions = {
+        method: req.method,
+        headers: proxyReqHeaders
+      };
 
       // Create proxy request
-      const proxyReq = requestLib(proxyReqOptions, (proxyRes) => {
-        // Forward status code and headers
-        res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      const proxyReq = requestLib(proxyUrl, proxyReqOptions, (proxyRes) => {
+        // Forward status code and headers - convert incoming headers properly
+        const outgoingHeaders: Record<string, string | number | string[]> = {};
+        for (const [key, value] of Object.entries(proxyRes.headers)) {
+          if (value !== undefined) {
+            outgoingHeaders[key] = value;
+          }
+        }
+        res.writeHead(proxyRes.statusCode || 200, outgoingHeaders);
 
-        // Pipe response
-        proxyRes.pipe(res);
+        // Pipe response using read/write instead of pipe
+        proxyRes.on('data', (chunk) => res.write(chunk));
+        proxyRes.on('end', () => res.end());
       });
 
       // Handle errors
@@ -400,8 +421,9 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
         }
       });
 
-      // Pipe request body
-      req.pipe(proxyReq);
+      // Forward request body
+      req.on('data', (chunk) => proxyReq.write(chunk));
+      req.on('end', () => proxyReq.end());
 
       return true;
     } catch (error) {
@@ -474,11 +496,11 @@ export class SharedState<T = any> {
 
   private broadcast(): void {
     const message = JSON.stringify({ type: 'state:update', key: this.key, value: this._value, timestamp: Date.now() });
-    this.listeners.forEach(ws => ws.readyState === WebSocket.OPEN && ws.send(message));
+    this.listeners.forEach(ws => ws.readyState === ReadyState.OPEN && ws.send(message));
   }
 
   private sendTo(ws: WebSocket): void {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (ws.readyState === ReadyState.OPEN) {
       ws.send(JSON.stringify({ type: 'state:init', key: this.key, value: this._value, timestamp: Date.now() }));
     }
   }
@@ -1062,7 +1084,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   );
 
   const watcher = watch(watchPaths, {
-    ignored: config.ignore,
+    ignored: (path: string) => config.ignore.some(pattern => path.includes(pattern.replace('/**', '').replace('**/', ''))),
     ignoreInitial: true,
     persistent: true
   });
@@ -1070,7 +1092,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   watcher.on('change', (path: string) => {
     if (config.logging) console.log(`[HMR] File changed: ${path}`);
     const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
-    wsClients.forEach(client => client.readyState === WebSocket.OPEN && client.send(message));
+    wsClients.forEach(client => client.readyState === ReadyState.OPEN && client.send(message));
   });
 
   watcher.on('add', (path: string) => config.logging && console.log(`[HMR] File added: ${path}`));
@@ -1140,8 +1162,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const primaryUrl = `http://${config.host}:${config.port}${primaryClient.basePath}`;
 
   return {
-    server,
-    wss,
+    server: server as any,
+    wss: wss as any,
     url: primaryUrl,
     state: stateManager,
     close

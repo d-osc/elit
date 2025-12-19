@@ -14,7 +14,15 @@ export default defineConfig([
             types: 'src/types.ts',
             server: 'src/server.ts',
             hmr: 'src/hmr.ts',
-            build: 'src/build.ts'
+            build: 'src/build.ts',
+            http: 'src/http.ts',
+            https: 'src/https.ts',
+            ws: 'src/ws.ts',
+            wss: 'src/wss.ts',
+            fs: 'src/fs.ts',
+            'mime-types': 'src/mime-types.ts',
+            chokidar: 'src/chokidar.ts',
+            path: 'src/path.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
