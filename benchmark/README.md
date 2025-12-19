@@ -1,86 +1,128 @@
-# elit/http Benchmarks
+# Server Performance Benchmark
 
-Performance benchmarks comparing `elit/http` with other popular HTTP frameworks.
+Performance comparison between Elysia and elit/server across different runtimes.
 
-## Setup
+## Prerequisites
 
 ```bash
 # Install dependencies
-bun install
+npm install
 
-# Install autocannon (for professional benchmarking)
-npm install -g autocannon
+# Build elit package
+npm run build
 
-# Install Elysia (for comparison)
-bun add elysia
+# For Bun benchmarks
+curl -fsSL https://bun.sh/install | bash
 ```
 
 ## Running Benchmarks
 
-### Simple Benchmark (Built-in)
-
+### On Node.js
 ```bash
-# Using Bun (fastest)
-bun benchmark/http-vs-elysia.ts
-
-# Using Node.js
-node benchmark/http-vs-elysia.ts
-
-# Using Deno
-deno run --allow-net benchmark/http-vs-elysia.ts
+node benchmark/server-benchmark.js
 ```
 
-### Professional Benchmark (Autocannon)
-
+### On Bun (includes Elysia comparison)
 ```bash
-bun benchmark/autocannon-bench.ts
+bun install elysia
+bun benchmark/server-benchmark.js
 ```
 
-## Benchmark Scenarios
+## Benchmark Configuration
 
-### 1. Simple "Hello World" Response
-Tests raw throughput with minimal processing.
+- **Warmup requests**: 1,000
+- **Benchmark requests**: 10,000
+- **Concurrent requests**: 100
+- **Endpoints tested**: Simple GET `/` returning "Hello World"
 
-### 2. JSON Response
-Tests JSON serialization performance.
+## Metrics
 
-## Expected Results (Bun runtime)
+- **Requests/sec**: Total requests per second
+- **Latency (ms)**: Response time statistics
+  - Min: Minimum response time
+  - Max: Maximum response time
+  - Average: Mean response time
+  - P50: 50th percentile (median)
+  - P95: 95th percentile
+  - P99: 99th percentile
 
-Based on preliminary testing:
+## Expected Results
 
+### Node.js
+- elit/server: ~15,000-25,000 req/sec
+- Average latency: 4-8ms
+
+### Bun
+- Elysia: ~80,000-150,000 req/sec
+- elit/server: ~50,000-100,000 req/sec
+- Average latency: <1-2ms
+
+*Note: Results vary based on hardware and system load*
+
+## Implementation Details
+
+### elit/server
+- Cross-runtime compatible (Node.js, Bun, Deno)
+- Zero external dependencies
+- Built-in routing, middleware support
+- HMR and dev server features
+
+### Elysia
+- Bun-native HTTP server
+- Optimized for Bun runtime
+- Type-safe with TypeScript
+- Plugin ecosystem
+
+## Architecture Comparison
+
+| Feature | elit/server | Elysia |
+|---------|-------------|--------|
+| Runtime | Node.js, Bun, Deno | Bun only |
+| Dependencies | 0 (production) | Multiple |
+| Bundle size | ~52KB | ~150KB+ |
+| Type safety | TypeScript | TypeScript |
+| Routing | Built-in | Built-in |
+| WebSocket | Built-in | Plugin |
+| HMR | Built-in | No |
+| Dev server | Built-in | No |
+
+## Why elit/server?
+
+1. **Cross-runtime**: Works on Node.js, Bun, and Deno
+2. **Zero dependencies**: No production dependencies
+3. **Small bundle**: ~52KB total
+4. **Full-featured**: Server + dev server + HMR + build tools
+5. **Type-safe**: Full TypeScript support
+6. **Consistent API**: Same API across all runtimes
+
+## When to use Elysia?
+
+- Bun-only deployment
+- Maximum performance on Bun
+- Need Elysia's plugin ecosystem
+- Don't need cross-runtime compatibility
+
+## Actual Benchmark Results
+
+### elit/server on Node.js v24.12.0
 ```
-📊 Simple Response
-  elit/http:  ~150,000 req/sec
-  Elysia:     ~140,000 req/sec
-  → elit/http is 1.07x faster
-
-📊 JSON Response
-  elit/http:  ~120,000 req/sec
-  Elysia:     ~115,000 req/sec
-  → elit/http is 1.04x faster
+Requests/sec:    10,899
+Latency (ms):
+  Min:           3.95
+  Max:           15.10
+  Average:       6.34
+  P50:           5.67
+  P95:           10.79
+  P99:           11.60
 ```
 
-## Why elit/http is Fast
+**Test Configuration:**
+- Warmup: 1,000 requests
+- Benchmark: 10,000 requests
+- Concurrent: 100 requests
+- Endpoint: Simple GET `/` returning "Hello World"
 
-1. **Zero-overhead abstractions** - Direct delegation to native runtime APIs
-2. **Object pooling** - Uses `Object.create(null)` for headers
-3. **Minimal wrapping** - Thin wrapper over native implementations
-4. **Optimized parsing** - Fast argument and header parsing
-5. **Runtime-specific optimizations** - Different code paths for Node/Bun/Deno
-
-## Autocannon Configuration
-
-- **Duration**: 10 seconds
-- **Connections**: 100 concurrent
-- **Pipelining**: 10 requests per connection
-
-## Notes
-
-- Results may vary based on hardware and runtime version
-- For most accurate results, use autocannon benchmark
-- elit/http aims to be within 95-105% of native performance
-- The goal is compatibility with minimal overhead, not beating specialized frameworks
-
-## Contributing
-
-Found better optimization techniques? PRs welcome!
+**System:**
+- Runtime: Node.js v24.12.0
+- Platform: Windows
+- Date: 2025-12-19
