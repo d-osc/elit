@@ -129,7 +129,7 @@ const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res,
 const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
 
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
-const createElitImportMap = (basePath: string = '', mode: 'dev' | 'preview' = 'dev'): string => {
+const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
   // In dev mode, use built files from node_modules/elit/dist
   // In preview mode, use built files from dist
   const srcPath = mode === 'dev'
@@ -138,19 +138,26 @@ const createElitImportMap = (basePath: string = '', mode: 'dev' | 'preview' = 'd
 
   const fileExt = mode === 'dev' ? '.ts' : '.mjs';
 
-  return `<script type="importmap">{
-  "imports": {
-    "elit": "${srcPath}/index${fileExt}",
-    "elit/": "${srcPath}/",
-    "elit/dom": "${srcPath}/dom${fileExt}",
-    "elit/state": "${srcPath}/state${fileExt}",
-    "elit/style": "${srcPath}/style${fileExt}",
-    "elit/el": "${srcPath}/el${fileExt}",
-    "elit/router": "${srcPath}/router${fileExt}",
-    "elit/hmr": "${srcPath}/hmr${fileExt}",
-    "elit/types": "${srcPath}/types${fileExt}"
-  }
-}</script>`;
+  // Base Elit imports
+  const elitImports: ImportMapEntry = {
+    "elit": `${srcPath}/index${fileExt}`,
+    "elit/": `${srcPath}/`,
+    "elit/dom": `${srcPath}/dom${fileExt}`,
+    "elit/state": `${srcPath}/state${fileExt}`,
+    "elit/style": `${srcPath}/style${fileExt}`,
+    "elit/el": `${srcPath}/el${fileExt}`,
+    "elit/router": `${srcPath}/router${fileExt}`,
+    "elit/hmr": `${srcPath}/hmr${fileExt}`,
+    "elit/types": `${srcPath}/types${fileExt}`
+  };
+
+  // Generate external library imports
+  const externalImports = await generateExternalImportMaps(rootDir, basePath);
+
+  // Merge imports (Elit imports take precedence)
+  const allImports = { ...externalImports, ...elitImports };
+
+  return `<script type="importmap">${JSON.stringify({ imports: allImports }, null, 2)}</script>`;
 };
 
 // Helper function to generate HMR script (reused in serveFile and serveSSR)
@@ -188,6 +195,196 @@ async function findSpecialDir(startDir: string, targetDir: string): Promise<stri
     const parentDir = resolve(currentDir, '..');
     if (parentDir === currentDir) break; // Reached filesystem root
     currentDir = parentDir;
+  }
+
+  return null;
+}
+
+// ===== External Library Import Maps =====
+
+interface PackageExports {
+  [key: string]: string | PackageExports;
+}
+
+interface PackageJson {
+  name?: string;
+  main?: string;
+  module?: string;
+  browser?: string;
+  exports?: string | PackageExports | { [key: string]: any };
+}
+
+interface ImportMapEntry {
+  [importName: string]: string;
+}
+
+// Cache for generated import maps to avoid re-scanning
+const importMapCache = new Map<string, ImportMapEntry>();
+
+/**
+ * Scan node_modules and generate import maps for external libraries
+ */
+async function generateExternalImportMaps(rootDir: string, basePath: string = ''): Promise<ImportMapEntry> {
+  const cacheKey = `${rootDir}:${basePath}`;
+  if (importMapCache.has(cacheKey)) {
+    return importMapCache.get(cacheKey)!;
+  }
+
+  const importMap: ImportMapEntry = {};
+  const nodeModulesPath = await findNodeModules(rootDir);
+
+  if (!nodeModulesPath) {
+    importMapCache.set(cacheKey, importMap);
+    return importMap;
+  }
+
+  try {
+    const { readdir } = await import('./fs');
+    const packages = await readdir(nodeModulesPath);
+
+    for (const pkgEntry of packages) {
+      // Convert Dirent to string
+      const pkg = typeof pkgEntry === 'string' ? pkgEntry : pkgEntry.name;
+
+      // Skip special directories
+      if (pkg.startsWith('.')) continue;
+
+      // Handle scoped packages (@org/package)
+      if (pkg.startsWith('@')) {
+        try {
+          const scopedPackages = await readdir(join(nodeModulesPath, pkg));
+          for (const scopedEntry of scopedPackages) {
+            const scopedPkg = typeof scopedEntry === 'string' ? scopedEntry : scopedEntry.name;
+            const fullPkgName = `${pkg}/${scopedPkg}`;
+            await processPackage(nodeModulesPath, fullPkgName, importMap, basePath);
+          }
+        } catch {
+          // Skip if can't read scoped directory
+        }
+      } else {
+        await processPackage(nodeModulesPath, pkg, importMap, basePath);
+      }
+    }
+  } catch (error) {
+    console.error('[Import Maps] Error scanning node_modules:', error);
+  }
+
+  importMapCache.set(cacheKey, importMap);
+  return importMap;
+}
+
+/**
+ * Find node_modules directory by walking up the directory tree
+ */
+async function findNodeModules(startDir: string): Promise<string | null> {
+  const foundDir = await findSpecialDir(startDir, 'node_modules');
+  return foundDir ? join(foundDir, 'node_modules') : null;
+}
+
+/**
+ * Process a single package and add its exports to the import map
+ */
+async function processPackage(
+  nodeModulesPath: string,
+  pkgName: string,
+  importMap: ImportMapEntry,
+  basePath: string
+): Promise<void> {
+  const pkgPath = join(nodeModulesPath, pkgName);
+  const pkgJsonPath = join(pkgPath, 'package.json');
+
+  try {
+    const pkgJsonContent = await readFile(pkgJsonPath);
+    const pkgJson: PackageJson = JSON.parse(pkgJsonContent.toString());
+
+    const baseUrl = basePath ? `${basePath}/node_modules/${pkgName}` : `/node_modules/${pkgName}`;
+
+    // Handle exports field (modern)
+    if (pkgJson.exports) {
+      processExportsField(pkgName, pkgJson.exports, baseUrl, importMap);
+    }
+    // Fallback to main/module/browser fields (legacy)
+    else {
+      const entryPoint = pkgJson.browser || pkgJson.module || pkgJson.main || 'index.js';
+      importMap[pkgName] = `${baseUrl}/${entryPoint}`;
+
+      // Add trailing slash for subpath imports
+      importMap[`${pkgName}/`] = `${baseUrl}/`;
+    }
+  } catch {
+    // Skip packages without package.json or invalid JSON
+  }
+}
+
+/**
+ * Process package.json exports field and add to import map
+ */
+function processExportsField(
+  pkgName: string,
+  exports: string | PackageExports | { [key: string]: any },
+  baseUrl: string,
+  importMap: ImportMapEntry
+): void {
+  // Simple string export
+  if (typeof exports === 'string') {
+    importMap[pkgName] = `${baseUrl}/${exports}`;
+    importMap[`${pkgName}/`] = `${baseUrl}/`;
+    return;
+  }
+
+  // Object exports
+  if (typeof exports === 'object' && exports !== null) {
+    // Handle "." export (main entry)
+    if ('.' in exports) {
+      const dotExport = exports['.'];
+      const resolved = resolveExport(dotExport);
+      if (resolved) {
+        importMap[pkgName] = `${baseUrl}/${resolved}`;
+      }
+    } else if ('import' in exports) {
+      // Root-level import/require
+      const resolved = resolveExport(exports);
+      if (resolved) {
+        importMap[pkgName] = `${baseUrl}/${resolved}`;
+      }
+    }
+
+    // Handle subpath exports
+    for (const [key, value] of Object.entries(exports)) {
+      if (key === '.' || key === 'import' || key === 'require' || key === 'types' || key === 'default') {
+        continue;
+      }
+
+      const resolved = resolveExport(value);
+      if (resolved) {
+        // Remove leading ./ from key
+        const cleanKey = key.startsWith('./') ? key.slice(2) : key;
+        const importName = cleanKey ? `${pkgName}/${cleanKey}` : pkgName;
+        importMap[importName] = `${baseUrl}/${resolved}`;
+      }
+    }
+
+    // Always add trailing slash for subpath imports
+    importMap[`${pkgName}/`] = `${baseUrl}/`;
+  }
+}
+
+/**
+ * Resolve export value to actual file path
+ * Handles conditional exports (import/require/default)
+ */
+function resolveExport(exportValue: any): string | null {
+  if (typeof exportValue === 'string') {
+    // Remove leading ./
+    return exportValue.startsWith('./') ? exportValue.slice(2) : exportValue;
+  }
+
+  if (typeof exportValue === 'object' && exportValue !== null) {
+    // Prefer import over require over default
+    const resolved = exportValue.import || exportValue.browser || exportValue.default || exportValue.require;
+    if (typeof resolved === 'string') {
+      return resolved.startsWith('./') ? resolved.slice(2) : resolved;
+    }
   }
 
   return null;
@@ -694,7 +891,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
     let filePath: string;
     if (url === '/' && matchedClient.ssr && !matchedClient.index) {
       // Use SSR directly when configured and no custom index specified
-      return serveSSR(res, matchedClient);
+      return await serveSSR(res, matchedClient);
     } else {
       // Use custom index file if specified, otherwise default to /index.html
       filePath = url === '/' ? (matchedClient.index || '/index.html') : url;
@@ -809,7 +1006,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
         if (!res.headersSent) {
           // If index.html not found but SSR function exists, use SSR
           if (filePath === '/index.html' && matchedClient.ssr) {
-            return serveSSR(res, matchedClient);
+            return await serveSSR(res, matchedClient);
           }
           if (config.logging) console.log(`[404] ${filePath}`);
           return send404(res, '404 Not Found');
@@ -840,7 +1037,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
             if (config.logging) console.log(`[DEBUG] No index file found in directory`);
             // If index.html not found in directory but SSR function exists, use SSR
             if (matchedClient.ssr) {
-              return serveSSR(res, matchedClient);
+              return await serveSSR(res, matchedClient);
             }
             return send404(res, '404 Not Found');
           }
@@ -911,7 +1108,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
       } catch {
         // If index.html not found but SSR function exists, use SSR
         if (filePath.endsWith('index.html') && client.ssr) {
-          return serveSSR(res, client);
+          return await serveSSR(res, client);
         }
         return send404(res, '404 Not Found');
       }
@@ -1048,7 +1245,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
         }
 
         // Inject import map and SSR styles into <head>
-        const elitImportMap = createElitImportMap(basePath, client.mode);
+        const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
         const headInjection = ssrStyles ? `${ssrStyles}\n${elitImportMap}` : elitImportMap;
         html = html.includes('</head>') ? html.replace('</head>', `${headInjection}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
@@ -1088,7 +1285,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   }
 
   // SSR helper - Generate HTML from SSR function
-  function serveSSR(res: ServerResponse, client: NormalizedClient) {
+  async function serveSSR(res: ServerResponse, client: NormalizedClient) {
     try {
       if (!client.ssr) {
         return send500(res, 'SSR function not configured');
@@ -1122,7 +1319,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
       const hmrScript = createHMRScript(config.port, basePath);
 
       // Inject import map in head, HMR script in body
-      const elitImportMap = createElitImportMap(basePath, client.mode);
+      const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
       html = html.includes('</head>') ? html.replace('</head>', `${elitImportMap}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
