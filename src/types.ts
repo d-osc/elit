@@ -82,6 +82,8 @@ export interface ClientConfig {
     root: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
     basePath: string;
+    /** Custom index file path (relative to root, e.g., './public/index.html') */
+    index?: string;
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
     /** Watch patterns for file changes */
@@ -131,6 +133,8 @@ export interface DevServerOptions {
     root?: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
     basePath?: string;
+    /** Custom index file path (relative to root, e.g., './public/index.html') */
+    index?: string;
     /** Array of client configurations - allows multiple clients on same port */
     clients?: ClientConfig[];
     /** Enable HTTPS (default: false) */
@@ -232,6 +236,8 @@ export interface PreviewOptions {
     root?: string;
     /** Base path for the application (e.g., '/app') */
     basePath?: string;
+    /** Custom index file path (relative to root, e.g., './public/index.html') */
+    index?: string;
     /** Array of client configurations - allows multiple clients on same port */
     clients?: ClientConfig[];
     /** Enable HTTPS (default: false) */

@@ -14,6 +14,10 @@ export const runtime = (() => {
   return 'node';
 })() as 'node' | 'bun' | 'deno';
 
+export const isNode = runtime === 'node';
+export const isBun = runtime === 'bun';
+export const isDeno = runtime === 'deno';
+
 // Global declarations for runtime-specific APIs
 declare global {
   // @ts-ignore - Bun global

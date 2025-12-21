@@ -86,6 +86,27 @@ export type VerifyClientCallback = (
 ) => boolean | void;
 
 /**
+ * Helper: Queue callback with optional error (eliminates duplication in callback handling)
+ */
+function queueCallback(callback?: (err?: Error) => void, error?: Error): void {
+  if (callback) {
+    queueMicrotask(() => callback(error));
+  }
+}
+
+/**
+ * Helper: Create native WebSocket instance (eliminates duplication in constructor)
+ */
+function createNativeWebSocket(url: string, protocols?: string[]): any {
+  // @ts-ignore - WebSocket is available in Node.js 18+ and all modern runtimes
+  if (runtime === 'node' && typeof globalThis.WebSocket === 'undefined') {
+    throw new Error('WebSocket is not available. Please use Node.js 18+ or install ws package.');
+  }
+  // @ts-ignore
+  return new globalThis.WebSocket(url, protocols);
+}
+
+/**
  * WebSocket class - Pure implementation
  */
 export class WebSocket extends EventEmitter {
@@ -101,24 +122,9 @@ export class WebSocket extends EventEmitter {
   constructor(address: string | URL, protocols?: string | string[], _options?: any) {
     super();
     this.url = typeof address === 'string' ? address : address.toString();
-
     const protocolsArray = Array.isArray(protocols) ? protocols : protocols ? [protocols] : undefined;
-
-    if (runtime === 'node') {
-      // Node.js - use native WebSocket (available in Node.js v18+)
-      // @ts-ignore - WebSocket is available in Node.js 18+
-      if (typeof globalThis.WebSocket !== 'undefined') {
-        // @ts-ignore
-        this._socket = new globalThis.WebSocket(this.url, protocolsArray);
-        this._setupNativeSocket();
-      } else {
-        throw new Error('WebSocket is not available. Please use Node.js 18+ or install ws package.');
-      }
-    } else {
-      // Bun/Deno - use native WebSocket
-      this._socket = new globalThis.WebSocket(this.url, protocolsArray);
-      this._setupNativeSocket();
-    }
+    this._socket = createNativeWebSocket(this.url, protocolsArray);
+    this._setupNativeSocket();
   }
 
   private _setupNativeSocket(): void {
@@ -146,31 +152,17 @@ export class WebSocket extends EventEmitter {
    * Send data through WebSocket
    */
   send(data: Data, options?: SendOptions | ((err?: Error) => void), callback?: (err?: Error) => void): void {
-    let cb: ((err?: Error) => void) | undefined;
-
-    if (typeof options === 'function') {
-      cb = options;
-    } else {
-      cb = callback;
-    }
+    const cb = typeof options === 'function' ? options : callback;
 
     if (this.readyState !== ReadyState.OPEN) {
-      const err = new Error('WebSocket is not open');
-      if (cb) {
-        queueMicrotask(() => cb(err));
-      }
-      return;
+      return queueCallback(cb, new Error('WebSocket is not open'));
     }
 
     try {
       this._socket.send(data);
-      if (cb) {
-        queueMicrotask(() => cb());
-      }
+      queueCallback(cb);
     } catch (error) {
-      if (cb) {
-        queueMicrotask(() => cb(error as Error));
-      }
+      queueCallback(cb, error as Error);
     }
   }
 
@@ -204,20 +196,14 @@ export class WebSocket extends EventEmitter {
    * Send a ping frame (no-op for native WebSocket)
    */
   ping(_data?: Data, _mask?: boolean, callback?: (err?: Error) => void): void {
-    // Native WebSocket doesn't expose ping
-    if (callback) {
-      queueMicrotask(() => callback());
-    }
+    queueCallback(callback); // Native WebSocket doesn't expose ping
   }
 
   /**
    * Send a pong frame (no-op for native WebSocket)
    */
   pong(_data?: Data, _mask?: boolean, callback?: (err?: Error) => void): void {
-    // Native WebSocket doesn't expose pong
-    if (callback) {
-      queueMicrotask(() => callback());
-    }
+    queueCallback(callback); // Native WebSocket doesn't expose pong
   }
 
   /**
@@ -270,19 +256,20 @@ export class WebSocketServer extends EventEmitter {
       }
     } else {
       // Bun/Deno - WebSocket server setup
-      if (callback) {
-        queueMicrotask(callback);
-      }
+      queueCallback(callback as any);
     }
   }
 
   private _setupUpgradeHandler(): void {
     this._httpServer.on('upgrade', (request: any, socket: any, head: Buffer) => {
-      if (this.path && request.url !== this.path) {
+      console.log('[WebSocket] Upgrade request:', request.url, 'Expected:', this.path);
+      if (this.path && this.path !== '/' && request.url !== this.path) {
+        console.log('[WebSocket] Path mismatch, ignoring');
         return;
       }
 
       this.handleUpgrade(request, socket, head, (client) => {
+        console.log('[WebSocket] Client connected');
         this.emit('connection', client, request);
       });
     });
@@ -369,9 +356,9 @@ export class WebSocketServer extends EventEmitter {
       try {
         const frame = this._createFrame(data);
         socket.write(frame);
-        if (callback) queueMicrotask(() => callback());
+        queueCallback(callback);
       } catch (error) {
-        if (callback) queueMicrotask(() => callback(error as Error));
+        queueCallback(callback, error as Error);
       }
     };
 
@@ -467,9 +454,7 @@ export class WebSocketServer extends EventEmitter {
       this._httpServer.close(callback);
     } else {
       this.emit('close');
-      if (callback) {
-        queueMicrotask(() => callback());
-      }
+      queueCallback(callback);
     }
   }
 

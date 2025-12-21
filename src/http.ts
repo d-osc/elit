@@ -10,13 +10,78 @@
  */
 
 import { EventEmitter } from 'events';
-import { runtime } from './runtime';
+import { runtime, isBun, isDeno, isNode } from './runtime';
 
-// Pre-load native modules for Node.js
+/**
+ * Helper: Check if running on Node.js (eliminates duplication in runtime checks)
+ */
+
+
+/**
+ * Helper: Queue callback (eliminates duplication in callback handling)
+ */
+function queueCallback(callback?: () => void): void {
+  if (callback) queueMicrotask(callback);
+}
+
+/**
+ * Helper: Convert headers to HeadersInit (eliminates duplication in Response creation)
+ */
+function headersToInit(headers: OutgoingHttpHeaders): HeadersInit {
+  const result: HeadersInit = {};
+  for (const key in headers) {
+    const value = headers[key];
+    result[key] = Array.isArray(value) ? value.join(', ') : String(value);
+  }
+  return result;
+}
+
+/**
+ * Helper: Create address object (eliminates duplication in address() method)
+ */
+function createAddress(port: number, address: string, family = 'IPv4'): { port: number; family: string; address: string } {
+  return { port, family, address };
+}
+
+/**
+ * Helper: Create error Response (eliminates duplication in error handling)
+ */
+function createErrorResponse(): Response {
+  return new Response('Internal Server Error', { status: 500 });
+}
+
+/**
+ * Helper: Emit listening and queue callback (eliminates duplication in Bun/Deno listen)
+ */
+function emitListeningWithCallback(server: Server, callback?: () => void): void {
+  server._listening = true;
+  server.emit('listening');
+  queueCallback(callback);
+}
+
+/**
+ * Helper: Close server and emit events (eliminates duplication in Bun/Deno close)
+ */
+function closeAndEmit(server: Server, callback?: (err?: Error) => void): void {
+  server._listening = false;
+  server.emit('close');
+  if (callback) queueMicrotask(() => callback());
+}
+
+// Lazy-load native modules for Node.js
 let http: any, https: any;
-if (runtime === 'node') {
-  http = require('http');
-  https = require('https');
+async function loadNodeModules() {
+  if (isNode && !http) {
+    const httpMod = await import('http');
+    const httpsMod = await import('https');
+    http = httpMod.default || httpMod;
+    https = httpsMod.default || httpsMod;
+  }
+}
+
+// Initialize on first use for SSR
+if (isNode && typeof process !== 'undefined') {
+  loadNodeModules().catch(() => { });
 }
 
 /**
@@ -76,7 +141,7 @@ export class IncomingMessage extends EventEmitter {
     super();
     this._req = req;
 
-    if (runtime === 'node') {
+    if (isNode) {
       // Direct property access (fastest)
       this.method = req.method;
       this.url = req.url;
@@ -99,7 +164,7 @@ export class IncomingMessage extends EventEmitter {
   }
 
   async text(): Promise<string> {
-    if (runtime === 'node') {
+    if (isNode) {
       return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
         this._req.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -112,7 +177,7 @@ export class IncomingMessage extends EventEmitter {
   }
 
   async json(): Promise<any> {
-    if (runtime === 'node') {
+    if (isNode) {
       const text = await this.text();
       return JSON.parse(text);
     }
@@ -147,7 +212,7 @@ export class ServerResponse extends EventEmitter {
       throw new Error('Cannot set headers after they are sent');
     }
 
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       this._nodeRes.setHeader(name, value);
     }
 
@@ -156,28 +221,28 @@ export class ServerResponse extends EventEmitter {
   }
 
   getHeader(name: string): string | string[] | number | undefined {
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       return this._nodeRes.getHeader(name);
     }
     return this._headers[name.toLowerCase()];
   }
 
   getHeaders(): OutgoingHttpHeaders {
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       return this._nodeRes.getHeaders();
     }
     return { ...this._headers };
   }
 
   getHeaderNames(): string[] {
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       return this._nodeRes.getHeaderNames();
     }
     return Object.keys(this._headers);
   }
 
   hasHeader(name: string): boolean {
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       return this._nodeRes.hasHeader(name);
     }
     return name.toLowerCase() in this._headers;
@@ -188,7 +253,7 @@ export class ServerResponse extends EventEmitter {
       throw new Error('Cannot remove headers after they are sent');
     }
 
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       this._nodeRes.removeHeader(name);
     }
 
@@ -215,7 +280,7 @@ export class ServerResponse extends EventEmitter {
       }
     }
 
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       if (typeof statusMessage === 'string') {
         this._nodeRes.writeHead(statusCode, statusMessage, headers);
       } else {
@@ -237,15 +302,12 @@ export class ServerResponse extends EventEmitter {
       this.writeHead(this.statusCode);
     }
 
-    if (runtime === 'node' && this._nodeRes) {
+    if (isNode && this._nodeRes) {
       return this._nodeRes.write(chunk, encoding, callback);
     }
 
     this._body += chunk;
-
-    if (callback) {
-      queueMicrotask(callback);
-    }
+    queueCallback(callback);
 
     return true;
   }
@@ -273,34 +335,23 @@ export class ServerResponse extends EventEmitter {
 
     this._finished = true;
 
-    if (runtime === 'node' && this._nodeRes) {
-      if (chunk !== undefined) {
-        this._nodeRes.end(chunk, encoding, callback);
-      } else {
-        this._nodeRes.end(callback);
-      }
+    if (isNode && this._nodeRes) {
+      // Don't pass chunk to end() since we already wrote it via this.write() above
+      this._nodeRes.end(callback);
       this.emit('finish');
     } else {
       // Bun/Deno - ultra-optimized inline Response creation
-      const headers: HeadersInit = {};
-      for (const key in this._headers) {
-        const value = this._headers[key];
-        headers[key] = Array.isArray(value) ? value.join(', ') : String(value);
-      }
-
       const response = new Response(this._body, {
         status: this.statusCode,
         statusText: this.statusMessage,
-        headers,
+        headers: headersToInit(this._headers),
       });
 
       if (this._resolve) {
         this._resolve(response);
       }
 
-      if (callback) {
-        queueMicrotask(callback);
-      }
+      queueCallback(callback);
     }
 
     return this;
@@ -317,7 +368,7 @@ export class ServerResponse extends EventEmitter {
 export class Server extends EventEmitter {
   private nativeServer?: any;
   private requestListener?: RequestListener;
-  private _listening: boolean = false;
+  public _listening: boolean = false;
 
   constructor(requestListener?: RequestListener) {
     super();
@@ -352,7 +403,7 @@ export class Server extends EventEmitter {
 
     const self = this;
 
-    if (runtime === 'node') {
+    if (isNode) {
       // Node.js - delegate directly to native http
       this.nativeServer = http.createServer((req: any, res: any) => {
         const incomingMessage = new IncomingMessage(req);
@@ -363,6 +414,11 @@ export class Server extends EventEmitter {
         } else {
           self.emit('request', incomingMessage, serverResponse);
         }
+      });
+
+      // Forward upgrade event for WebSocket support
+      this.nativeServer.on('upgrade', (req: any, socket: any, head: any) => {
+        self.emit('upgrade', req, socket, head);
       });
 
       this.nativeServer.listen(port, hostname, () => {
@@ -376,7 +432,7 @@ export class Server extends EventEmitter {
         this._listening = false;
         this.emit('close');
       });
-    } else if (runtime === 'bun') {
+    } else if (isBun) {
       // Bun - ultra-optimized Bun.serve() with minimal overhead
       // @ts-ignore
       this.nativeServer = Bun.serve({
@@ -408,15 +464,11 @@ export class Server extends EventEmitter {
             serverResponse._setResolver(resolve);
           });
         },
-        error: () => {
-          return new Response('Internal Server Error', { status: 500 });
-        },
+        error: createErrorResponse,
       });
 
-      this._listening = true;
-      this.emit('listening');
-      if (callback) queueMicrotask(callback);
-    } else if (runtime === 'deno') {
+      emitListeningWithCallback(this, callback);
+    } else if (isDeno) {
       // Deno - use Deno.serve()
       // @ts-ignore
       this.nativeServer = Deno.serve({
@@ -438,13 +490,11 @@ export class Server extends EventEmitter {
         },
         onError: (error: Error) => {
           this.emit('error', error);
-          return new Response('Internal Server Error', { status: 500 });
+          return createErrorResponse();
         },
       });
 
-      this._listening = true;
-      this.emit('listening');
-      if (callback) queueMicrotask(callback);
+      emitListeningWithCallback(this, callback);
     }
 
     return this;
@@ -456,19 +506,15 @@ export class Server extends EventEmitter {
       return this;
     }
 
-    if (runtime === 'node') {
+    if (isNode) {
       this.nativeServer.close(callback);
-    } else if (runtime === 'bun') {
+    } else if (isBun) {
       this.nativeServer.stop();
-      this._listening = false;
-      this.emit('close');
-      if (callback) queueMicrotask(() => callback());
-    } else if (runtime === 'deno') {
+      closeAndEmit(this, callback);
+    } else if (isDeno) {
       // @ts-ignore
       this.nativeServer.shutdown();
-      this._listening = false;
-      this.emit('close');
-      if (callback) queueMicrotask(() => callback());
+      closeAndEmit(this, callback);
     }
 
     return this;
@@ -477,27 +523,19 @@ export class Server extends EventEmitter {
   address(): { port: number; family: string; address: string } | null {
     if (!this.nativeServer) return null;
 
-    if (runtime === 'node') {
+    if (isNode) {
       const addr = this.nativeServer.address();
       if (!addr) return null;
       if (typeof addr === 'string') {
-        return { port: 0, family: 'unix', address: addr };
+        return createAddress(0, addr, 'unix');
       }
       return addr;
-    } else if (runtime === 'bun') {
-      return {
-        port: this.nativeServer.port,
-        family: 'IPv4',
-        address: this.nativeServer.hostname,
-      };
-    } else if (runtime === 'deno') {
+    } else if (isBun) {
+      return createAddress(this.nativeServer.port, this.nativeServer.hostname);
+    } else if (isDeno) {
       // @ts-ignore
       const addr = this.nativeServer.addr;
-      return {
-        port: addr.port,
-        family: 'IPv4',
-        address: addr.hostname,
-      };
+      return createAddress(addr.port, addr.hostname);
     }
 
     return null;
@@ -544,7 +582,7 @@ export class ClientRequest extends EventEmitter {
   }
 
   end(callback?: () => void): void {
-    if (callback) queueMicrotask(callback);
+    queueCallback(callback);
   }
 }
 
@@ -552,7 +590,7 @@ export class ClientRequest extends EventEmitter {
  * HTTP Agent
  */
 export class Agent {
-  constructor(public options?: any) {}
+  constructor(public options?: any) { }
 }
 
 /**
@@ -574,7 +612,7 @@ export function request(url: string | URL, options?: RequestOptions, callback?: 
   const urlString = typeof url === 'string' ? url : url.toString();
   const req = new ClientRequest(urlString, options);
 
-  if (runtime === 'node') {
+  if (isNode) {
     const urlObj = new URL(urlString);
     const client = urlObj.protocol === 'https:' ? https : http;
 

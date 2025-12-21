@@ -4,6 +4,35 @@
 
 import type { VNode, Child, Props, ElementFactory } from './types';
 
+/**
+ * Helper: Check if document is available (eliminates duplication in document checks)
+ */
+const hasDocument = typeof document !== 'undefined';
+
+/**
+ * Helper: Capitalize first letter (eliminates duplication in tag name processing)
+ */
+function capitalize(str: string): string {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Helper: Bind document method safely (eliminates duplication in document method binding)
+ */
+function bindDocMethod<T extends Function>(method: T | undefined): T | undefined {
+    return hasDocument && method ? method.bind(doc) : undefined as any;
+}
+
+/**
+ * Helper: Create prefixed element factories (eliminates duplication in factory creation)
+ */
+function createPrefixedFactories(tags: readonly string[], prefix: string, elements: any): void {
+    tags.forEach(tag => {
+        const name = prefix + capitalize(tag);
+        elements[name] = createElementFactory(tag);
+    });
+}
+
 export const createElementFactory = (tag: string): ElementFactory => {
     return function(props?: Props | Child | null, ...rest: Child[]): VNode {
         if (!arguments.length) return { tagName: tag, props: {}, children: [] };
@@ -85,15 +114,8 @@ tags.forEach(tag => {
     (elements as any)[tag] = createElementFactory(tag);
 });
 
-svgTags.forEach(tag => {
-    const name = 'svg' + tag.charAt(0).toUpperCase() + tag.slice(1);
-    (elements as any)[name] = createElementFactory(tag);
-});
-
-mathTags.forEach(tag => {
-    const name = 'math' + tag.charAt(0).toUpperCase() + tag.slice(1);
-    (elements as any)[name] = createElementFactory(tag);
-});
+createPrefixedFactories(svgTags, 'svg', elements);
+createPrefixedFactories(mathTags, 'math', elements);
 
 (elements as any).varElement = createElementFactory('var');
 
@@ -127,16 +149,16 @@ export const el = elements;
 export { elements };
 
 // DOM utility functions - Shorthand helpers for common document operations
-export const doc = document;
-export const getEl = doc.querySelector.bind(doc);
-export const getEls = doc.querySelectorAll.bind(doc);
-export const createEl = doc.createElement.bind(doc);
-export const createSvgEl = doc.createElementNS.bind(doc, 'http://www.w3.org/2000/svg');
-export const createMathEl = doc.createElementNS.bind(doc, 'http://www.w3.org/1998/Math/MathML');
-export const fragment = doc.createDocumentFragment.bind(doc);
-export const textNode = doc.createTextNode.bind(doc);
-export const commentNode = doc.createComment.bind(doc);
-export const getElId = doc.getElementById.bind(doc);
-export const getElClass = doc.getElementsByClassName.bind(doc);
-export const getElTag = doc.getElementsByTagName.bind(doc);
-export const getElName = doc.getElementsByName.bind(doc);
+export const doc = hasDocument ? document : undefined as any;
+export const getEl = bindDocMethod(doc?.querySelector);
+export const getEls = bindDocMethod(doc?.querySelectorAll);
+export const createEl = bindDocMethod(doc?.createElement);
+export const createSvgEl = hasDocument ? doc.createElementNS.bind(doc, 'http://www.w3.org/2000/svg') : undefined as any;
+export const createMathEl = hasDocument ? doc.createElementNS.bind(doc, 'http://www.w3.org/1998/Math/MathML') : undefined as any;
+export const fragment = bindDocMethod(doc?.createDocumentFragment);
+export const textNode = bindDocMethod(doc?.createTextNode);
+export const commentNode = bindDocMethod(doc?.createComment);
+export const getElId = bindDocMethod(doc?.getElementById);
+export const getElClass = bindDocMethod(doc?.getElementsByClassName);
+export const getElTag = bindDocMethod(doc?.getElementsByTagName);
+export const getElName = bindDocMethod(doc?.getElementsByName);

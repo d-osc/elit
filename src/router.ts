@@ -40,7 +40,9 @@ export interface Router {
     destroy: () => void;
 }
 
-// Helper to match route
+/**
+ * Helper: Match route pattern against path
+ */
 function matchRoute(pattern: string, path: string): RouteParams | null {
     const patternParts = pattern.split('/').filter(Boolean);
     const pathParts = path.split('/').filter(Boolean);
@@ -66,6 +68,35 @@ function matchRoute(pattern: string, path: string): RouteParams | null {
         }
     }
     return params;
+}
+
+/**
+ * Helper: Execute guard and handle result (eliminates duplication in navigate)
+ */
+function executeGuard(
+    guard: (to: RouteLocation, from: RouteLocation | null) => boolean | string | void,
+    to: RouteLocation,
+    from: RouteLocation | null,
+    navigate: (path: string, replace?: boolean) => void,
+    replace = false
+): boolean {
+    const result = guard(to, from);
+    if (result === false) return false;
+    if (typeof result === 'string') {
+        navigate(result, replace);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Helper: Wrap component in VNode if needed (eliminates duplication in createRouterView)
+ */
+function wrapComponent(component: VNode | Child): VNode {
+    if (typeof component === 'object' && component !== null && 'tagName' in component) {
+        return component as VNode;
+    }
+    return { tagName: 'span', props: {}, children: [component] };
 }
 
 export function createRouter(options: RouterOptions): Router {
@@ -118,21 +149,11 @@ export function createRouter(options: RouterOptions): Router {
         }
 
         for (const guard of globalGuards) {
-            const result = guard(location, currentRoute.value);
-            if (result === false) return;
-            if (typeof result === 'string') {
-                navigate(result, replace);
-                return;
-            }
+            if (!executeGuard(guard, location, currentRoute.value, navigate, replace)) return;
         }
 
         if (match?.route.beforeEnter) {
-            const result = match.route.beforeEnter(location, currentRoute.value);
-            if (result === false) return;
-            if (typeof result === 'string') {
-                navigate(result, replace);
-                return;
-            }
+            if (!executeGuard(match.route.beforeEnter, location, currentRoute.value, navigate, replace)) return;
         }
 
         const url = mode === 'hash' ? '#' + path : base + path;
@@ -187,18 +208,12 @@ export function createRouterView(router: Router, options: RouterOptions): () => 
         if (match) {
             const params = matchRoute(match.path, location.path) || {};
             const component = match.component({ ...params, ...location.query });
-            if (typeof component === 'object' && component !== null && 'tagName' in component) {
-                return component as VNode;
-            }
-            return { tagName: 'span', props: {}, children: [component] };
+            return wrapComponent(component);
         }
 
         if (notFound) {
             const component = notFound(location.params);
-            if (typeof component === 'object' && component !== null && 'tagName' in component) {
-                return component as VNode;
-            }
-            return { tagName: 'span', props: {}, children: [component] };
+            return wrapComponent(component);
         }
 
         return { tagName: 'div', props: {}, children: ['404 - Not Found'] };

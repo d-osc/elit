@@ -10,13 +10,60 @@ import type {
   RequestListener,
   RequestOptions,
 } from './http';
-import { runtime } from './runtime';
+import { runtime, isNode, isBun, isDeno } from './runtime';
 
-// Pre-load native https module for Node.js
-let https: any;
-if (runtime === 'node') {
-  https = require('https');
+/**
+ * Helper: Queue callback (eliminates duplication in callback handling)
+ */
+function queueCallback(callback?: () => void): void {
+  if (callback) queueMicrotask(callback);
 }
+
+/**
+ * Helper: Create error Response (eliminates duplication in error handling)
+ */
+function createErrorResponse(): Response {
+  return new Response('Internal Server Error', { status: 500 });
+}
+
+/**
+ * Helper: Create address object (eliminates duplication in address() method)
+ */
+function createAddress(port: number, address: string, family = 'IPv4'): { port: number; family: string; address: string } {
+  return { port, family, address };
+}
+
+/**
+ * Helper: Emit listening and queue callback (eliminates duplication in Bun/Deno listen)
+ */
+function emitListeningWithCallback(server: Server, callback?: () => void): void {
+  server._listening = true;
+  server.emit('listening');
+  queueCallback(callback);
+}
+
+/**
+ * Helper: Close server and emit events (eliminates duplication in Bun/Deno close)
+ */
+function closeAndEmit(server: Server, callback?: (err?: Error) => void): void {
+  server._listening = false;
+  server.emit('close');
+  if (callback) queueMicrotask(() => callback());
+}
+
+/**
+ * Helper: Lazy-load http module classes (eliminates duplication in require('./http'))
+ */
+function loadHttpClasses(): { IncomingMessage: any; ServerResponse: any } {
+  const httpModule = require('./http');
+  return {
+    IncomingMessage: httpModule.IncomingMessage,
+    ServerResponse: httpModule.ServerResponse
+  };
+}
+
+// Lazy-load native https module for Node.js
+let https: any;
 
 /**
  * HTTPS Server options
@@ -56,7 +103,7 @@ export interface ServerOptions {
 export class Server extends EventEmitter {
   private nativeServer?: any;
   private requestListener?: RequestListener;
-  private _listening: boolean = false;
+  public _listening: boolean = false;
   private options: ServerOptions;
 
   constructor(options: ServerOptions, requestListener?: RequestListener) {
@@ -93,9 +140,10 @@ export class Server extends EventEmitter {
 
     const self = this;
 
-    if (runtime === 'node') {
+    if (isNode) {
       // Node.js - use native https module
-      const { IncomingMessage, ServerResponse } = require('./http');
+      const { IncomingMessage, ServerResponse } = loadHttpClasses();
+      if (!https) https = require('https');
 
       this.nativeServer = https.createServer(this.options, (req: any, res: any) => {
         const incomingMessage = new IncomingMessage(req);
@@ -119,9 +167,9 @@ export class Server extends EventEmitter {
         this._listening = false;
         this.emit('close');
       });
-    } else if (runtime === 'bun') {
+    } else if (isBun) {
       // Bun - use Bun.serve() with TLS
-      const { IncomingMessage, ServerResponse } = require('./http');
+      const { IncomingMessage, ServerResponse } = loadHttpClasses();
 
       const tlsOptions: any = {
         port,
@@ -142,7 +190,7 @@ export class Server extends EventEmitter {
         },
         error: (error: Error) => {
           this.emit('error', error);
-          return new Response('Internal Server Error', { status: 500 });
+          return createErrorResponse();
         },
       };
 
@@ -161,12 +209,10 @@ export class Server extends EventEmitter {
       // @ts-ignore
       this.nativeServer = Bun.serve(tlsOptions);
 
-      this._listening = true;
-      this.emit('listening');
-      if (callback) queueMicrotask(callback);
-    } else if (runtime === 'deno') {
+      emitListeningWithCallback(this, callback);
+    } else if (isDeno) {
       // Deno - use Deno.serve() with TLS
-      const { IncomingMessage, ServerResponse } = require('./http');
+      const { IncomingMessage, ServerResponse } = loadHttpClasses();
 
       const serveOptions: any = {
         port,
@@ -187,7 +233,7 @@ export class Server extends EventEmitter {
         },
         onError: (error: Error) => {
           this.emit('error', error);
-          return new Response('Internal Server Error', { status: 500 });
+          return createErrorResponse();
         },
       };
 
@@ -202,9 +248,7 @@ export class Server extends EventEmitter {
       // @ts-ignore
       this.nativeServer = Deno.serve(serveOptions);
 
-      this._listening = true;
-      this.emit('listening');
-      if (callback) queueMicrotask(callback);
+      emitListeningWithCallback(this, callback);
     }
 
     return this;
@@ -216,19 +260,15 @@ export class Server extends EventEmitter {
       return this;
     }
 
-    if (runtime === 'node') {
+    if (isNode) {
       this.nativeServer.close(callback);
-    } else if (runtime === 'bun') {
+    } else if (isBun) {
       this.nativeServer.stop();
-      this._listening = false;
-      this.emit('close');
-      if (callback) queueMicrotask(() => callback());
-    } else if (runtime === 'deno') {
+      closeAndEmit(this, callback);
+    } else if (isDeno) {
       // @ts-ignore
       this.nativeServer.shutdown();
-      this._listening = false;
-      this.emit('close');
-      if (callback) queueMicrotask(() => callback());
+      closeAndEmit(this, callback);
     }
 
     return this;
@@ -237,27 +277,19 @@ export class Server extends EventEmitter {
   address(): { port: number; family: string; address: string } | null {
     if (!this.nativeServer) return null;
 
-    if (runtime === 'node') {
+    if (isNode) {
       const addr = this.nativeServer.address();
       if (!addr) return null;
       if (typeof addr === 'string') {
-        return { port: 0, family: 'unix', address: addr };
+        return createAddress(0, addr, 'unix');
       }
       return addr;
-    } else if (runtime === 'bun') {
-      return {
-        port: this.nativeServer.port,
-        family: 'IPv4',
-        address: this.nativeServer.hostname,
-      };
-    } else if (runtime === 'deno') {
+    } else if (isBun) {
+      return createAddress(this.nativeServer.port, this.nativeServer.hostname);
+    } else if (isDeno) {
       // @ts-ignore
       const addr = this.nativeServer.addr;
-      return {
-        port: addr.port,
-        family: 'IPv4',
-        address: addr.hostname,
-      };
+      return createAddress(addr.port, addr.hostname);
     }
 
     return null;
@@ -281,7 +313,7 @@ export class ClientRequest extends EventEmitter {
   }
 
   end(callback?: () => void): void {
-    if (callback) queueMicrotask(callback);
+    queueCallback(callback);
   }
 }
 
@@ -306,8 +338,9 @@ export function request(url: string | URL, options?: RequestOptions, callback?: 
   const urlString = typeof url === 'string' ? url : url.toString();
   const req = new ClientRequest(urlString, options);
 
-  if (runtime === 'node') {
-    const { IncomingMessage } = require('./http');
+  if (isNode) {
+    const { IncomingMessage } = loadHttpClasses();
+    if (!https) https = require('https');
 
     const nodeReq = https.request(urlString, {
       method: options?.method || 'GET',
@@ -324,7 +357,7 @@ export function request(url: string | URL, options?: RequestOptions, callback?: 
     nodeReq.end();
   } else {
     // Bun/Deno - use fetch (automatically handles HTTPS)
-    const { IncomingMessage } = require('./http');
+    const { IncomingMessage } = loadHttpClasses();
 
     queueMicrotask(async () => {
       try {

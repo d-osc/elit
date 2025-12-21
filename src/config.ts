@@ -4,22 +4,56 @@
 
 import { existsSync, readFileSync } from './fs';
 import { resolve } from './path';
-import type { DevServerOptions, BuildOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
+
+/**
+ * Helper: Read file and ensure string output (eliminates duplication in file reading)
+ */
+function readFileAsString(filePath: string): string {
+    const contentBuffer = readFileSync(filePath, 'utf-8');
+    return typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
+}
+
+/**
+ * Helper: Remove surrounding quotes from string (eliminates duplication in env parsing)
+ */
+function removeQuotes(value: string): string {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+        return trimmed.slice(1, -1);
+    }
+    return trimmed;
+}
+
+/**
+ * Helper: Import config module and return default or module (eliminates duplication in config loading)
+ */
+async function importConfigModule(configPath: string): Promise<ElitConfig> {
+    const { pathToFileURL } = await import('url');
+    const configModule = await import(pathToFileURL(configPath).href);
+    return configModule.default || configModule;
+}
+
+/**
+ * Helper: Safe file cleanup (eliminates duplication in temp file cleanup)
+ */
+async function safeCleanup(filePath: string): Promise<void> {
+    try {
+        const { unlinkSync } = await import('./fs');
+        unlinkSync(filePath);
+    } catch {
+        // Ignore cleanup errors
+    }
+}
 
 export interface ElitConfig {
     /** Development server configuration */
     dev?: DevServerOptions;
     /** Build configuration - supports single build or multiple builds */
     build?: BuildOptions | BuildOptions[];
-    /** Preview server configuration (subset of dev options) */
-    preview?: {
-        port?: number;
-        host?: string;
-        root?: string;
-        basePath?: string;
-        open?: boolean;
-        logging?: boolean;
-    };
+    /** Preview server configuration */
+    preview?: PreviewOptions;
 }
 
 /**
@@ -54,8 +88,7 @@ export function loadEnv(mode: string = 'development', cwd: string = process.cwd(
     for (const file of envFiles) {
         const filePath = resolve(cwd, file);
         if (existsSync(filePath)) {
-            const contentBuffer = readFileSync(filePath, 'utf-8');
-            const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
+            const content = readFileAsString(filePath);
             const lines = content.split('\n');
 
             for (const line of lines) {
@@ -66,12 +99,7 @@ export function loadEnv(mode: string = 'development', cwd: string = process.cwd(
                 const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
                 if (match) {
                     const [, key, value] = match;
-                    // Remove quotes if present
-                    let cleanValue = value.trim();
-                    if ((cleanValue.startsWith('"') && cleanValue.endsWith('"')) ||
-                        (cleanValue.startsWith("'") && cleanValue.endsWith("'"))) {
-                        cleanValue = cleanValue.slice(1, -1);
-                    }
+                    const cleanValue = removeQuotes(value);
                     // Only set if not already set (priority order)
                     if (!(key in env)) {
                         env[key] = cleanValue;
@@ -110,34 +138,50 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
 
     if (ext === 'json') {
         // Load JSON config
-        const contentBuffer = readFileSync(configPath, 'utf-8');
-        const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
+        const content = readFileAsString(configPath);
         return JSON.parse(content);
-    } else {
-        // Load JS/TS config using dynamic import
-        // For TypeScript files, we need to use tsx or ts-node in production
-        // For now, we'll require the compiled version or use dynamic import
+    } else if (ext === 'ts') {
+        // Load TypeScript config by transpiling it with esbuild
+        try {
+            const { build } = await import('esbuild');
+            const { tmpdir } = await import('os');
+            const { join, dirname } = await import('./path');
 
-        if (ext === 'ts') {
-            // Try to use tsx/ts-node if available, otherwise show error
-            try {
-                // Check if tsx is available
-                const { pathToFileURL } = await import('url');
-                const configModule = await import(pathToFileURL(configPath).href);
-                return configModule.default || configModule;
-            } catch {
-                // If tsx not available, show helpful error
-                console.error('TypeScript config files require tsx or ts-node to be installed.');
-                console.error('Install with: npm install -D tsx');
-                console.error('Or use a .js or .json config file instead.');
-                throw new Error('Cannot load TypeScript config without tsx/ts-node');
-            }
-        } else {
-            // Load JS config
-            const { pathToFileURL } = await import('url');
-            const configModule = await import(pathToFileURL(configPath).href);
-            return configModule.default || configModule;
+            // Create temporary output file
+            const tempFile = join(tmpdir(), `elit-config-${Date.now()}.mjs`);
+
+            // Bundle the TypeScript config with proper path resolution
+            const configDir = dirname(configPath);
+            await build({
+                entryPoints: [configPath],
+                bundle: true,
+                format: 'esm',
+                platform: 'node',
+                outfile: tempFile,
+                write: true,
+                target: 'es2020',
+                // Bundle everything including elit/* so config can use elit modules
+                // Only mark Node.js built-ins as external
+                external: ['node:*'],
+                // Use the config directory as the working directory for resolution
+                absWorkingDir: configDir,
+            });
+
+            // Import the compiled config
+            const config = await importConfigModule(tempFile);
+
+            // Clean up temp file
+            await safeCleanup(tempFile);
+
+            return config;
+        } catch (error) {
+            console.error('Failed to load TypeScript config file.');
+            console.error('You can use a .js, .mjs, or .json config file instead.');
+            throw error;
         }
+    } else {
+        // Load JS config
+        return await importConfigModule(configPath);
     }
 }
 

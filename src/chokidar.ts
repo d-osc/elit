@@ -11,6 +11,76 @@ import { EventEmitter } from 'events';
 import { runtime } from './runtime';
 
 /**
+ * Helper: Normalize path separators (eliminates duplication in path handling)
+ */
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+/**
+ * Helper: Emit event and all event (eliminates duplication in event emitting)
+ */
+function emitEvent(watcher: FSWatcher, eventType: string, path: string): void {
+  watcher.emit(eventType, path);
+  watcher.emit('all', eventType, path);
+}
+
+/**
+ * Helper: Check if path matches any pattern (eliminates duplication in pattern matching)
+ */
+function matchesAnyPattern(path: string, patterns: string[]): boolean {
+  return patterns.some(pattern => matchesPattern(path, pattern));
+}
+
+/**
+ * Helper: Handle rename event (eliminates duplication in rename handling)
+ */
+function handleRenameEvent(watcher: FSWatcher, fullPath: string, fs: any): void {
+  try {
+    fs.statSync(fullPath);
+    emitEvent(watcher, 'add', fullPath);
+  } catch {
+    emitEvent(watcher, 'unlink', fullPath);
+  }
+}
+
+/**
+ * Helper: Setup fs.watch for Node.js/Bun (eliminates duplication in watcher setup)
+ */
+function setupFsWatch(
+  watcher: FSWatcher,
+  baseDir: string,
+  patterns: string[],
+  fs: any
+): void {
+  try {
+    const nativeWatcher = fs.watch(baseDir, { recursive: true }, (eventType: string, filename: string) => {
+      if (!filename) return;
+
+      const fullPath = normalizePath(`${baseDir}/${filename}`);
+
+      // Check if the file matches any of the patterns
+      if (!matchesAnyPattern(fullPath, patterns)) return;
+
+      if (eventType === 'rename') {
+        handleRenameEvent(watcher, fullPath, fs);
+      } else if (eventType === 'change') {
+        emitEvent(watcher, 'change', fullPath);
+      }
+    });
+
+    watcher._setWatcher(nativeWatcher);
+    // Track watched paths directly
+    watcher['_watched'].add(baseDir);
+
+    // Emit ready after a short delay
+    queueMicrotask(() => watcher.emit('ready'));
+  } catch (error) {
+    watcher.emit('error', error as Error);
+  }
+}
+
+/**
  * Watch options
  */
 export interface WatchOptions {
@@ -204,6 +274,41 @@ export class FSWatcher extends EventEmitter {
 }
 
 /**
+ * Extract base directory from glob pattern
+ * e.g., 'src/**\/*.ts' -> 'src', '**\/*.ts' -> '.'
+ */
+function getBaseDirectory(pattern: string): string {
+  // Remove glob patterns to get the base directory
+  const parts = pattern.split(/[\\\/]/);
+  let baseDir = '';
+
+  for (const part of parts) {
+    if (part.includes('*') || part.includes('?')) {
+      break;
+    }
+    baseDir = baseDir ? `${baseDir}/${part}` : part;
+  }
+
+  return baseDir || '.';
+}
+
+/**
+ * Check if a path matches a glob pattern
+ */
+function matchesPattern(filePath: string, pattern: string): boolean {
+  // Simple glob matching - convert pattern to regex
+  const regexPattern = normalizePath(pattern)
+    .replace(/\*\*/g, '.*')
+    .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '.');
+
+  const regex = new RegExp(`^${regexPattern}$`);
+  const normalizedPath = normalizePath(filePath);
+
+  return regex.test(normalizedPath);
+}
+
+/**
  * Watch files and directories
  */
 export function watch(
@@ -213,99 +318,54 @@ export function watch(
   const watcher = new FSWatcher(options);
   const pathArray = Array.isArray(paths) ? paths : [paths];
 
+  // Extract patterns and their base directories
+  const watchMap = new Map<string, string[]>();
+
+  pathArray.forEach(path => {
+    const baseDir = getBaseDirectory(path);
+    if (!watchMap.has(baseDir)) {
+      watchMap.set(baseDir, []);
+    }
+    watchMap.get(baseDir)!.push(path);
+  });
+
   if (runtime === 'node') {
     // Node.js - use native fs.watch
     const fs = require('fs');
-
-    pathArray.forEach(path => {
-      try {
-        const nativeWatcher = fs.watch(path, { recursive: true }, (eventType: string, filename: string) => {
-          if (!filename) return;
-
-          const fullPath = `${path}/${filename}`;
-
-          if (eventType === 'rename') {
-            try {
-              fs.statSync(fullPath);
-              watcher.emit('add', fullPath);
-              watcher.emit('all', 'add', fullPath);
-            } catch {
-              watcher.emit('unlink', fullPath);
-              watcher.emit('all', 'unlink', fullPath);
-            }
-          } else if (eventType === 'change') {
-            watcher.emit('change', fullPath);
-            watcher.emit('all', 'change', fullPath);
-          }
-        });
-
-        watcher._setWatcher(nativeWatcher);
-        watcher.add(path);
-
-        // Emit ready after a short delay
-        queueMicrotask(() => watcher.emit('ready'));
-      } catch (error) {
-        watcher.emit('error', error as Error);
-      }
-    });
+    watchMap.forEach((patterns, baseDir) => setupFsWatch(watcher, baseDir, patterns, fs));
   } else if (runtime === 'bun') {
     // Bun - use native fs.watch
     const fs = require('fs');
-
-    pathArray.forEach(path => {
-      try {
-        const nativeWatcher = fs.watch(path, { recursive: true }, (eventType: string, filename: string) => {
-          if (!filename) return;
-
-          const fullPath = `${path}/${filename}`;
-
-          if (eventType === 'rename') {
-            try {
-              fs.statSync(fullPath);
-              watcher.emit('add', fullPath);
-              watcher.emit('all', 'add', fullPath);
-            } catch {
-              watcher.emit('unlink', fullPath);
-              watcher.emit('all', 'unlink', fullPath);
-            }
-          } else if (eventType === 'change') {
-            watcher.emit('change', fullPath);
-            watcher.emit('all', 'change', fullPath);
-          }
-        });
-
-        watcher._setWatcher(nativeWatcher);
-        watcher.add(path);
-
-        // Emit ready after a short delay
-        queueMicrotask(() => watcher.emit('ready'));
-      } catch (error) {
-        watcher.emit('error', error as Error);
-      }
-    });
+    watchMap.forEach((patterns, baseDir) => setupFsWatch(watcher, baseDir, patterns, fs));
   } else if (runtime === 'deno') {
     // Deno - use Deno.watchFs
+    // Extract just the base directories for Deno
+    const baseDirs = Array.from(watchMap.keys());
+    const allPatterns = Array.from(watchMap.values()).flat();
+
     (async () => {
       try {
         // @ts-ignore
-        const denoWatcher = Deno.watchFs(pathArray);
+        const denoWatcher = Deno.watchFs(baseDirs);
 
         for await (const event of denoWatcher) {
           if (watcher['_closed']) break;
 
           for (const path of event.paths) {
+            const normalizedPath = normalizePath(path);
+
+            // Check if the file matches any of the patterns
+            if (!matchesAnyPattern(normalizedPath, allPatterns)) continue;
+
             switch (event.kind) {
               case 'create':
-                watcher.emit('add', path);
-                watcher.emit('all', 'add', path);
+                emitEvent(watcher, 'add', path);
                 break;
               case 'modify':
-                watcher.emit('change', path);
-                watcher.emit('all', 'change', path);
+                emitEvent(watcher, 'change', path);
                 break;
               case 'remove':
-                watcher.emit('unlink', path);
-                watcher.emit('all', 'unlink', path);
+                emitEvent(watcher, 'unlink', path);
                 break;
             }
           }

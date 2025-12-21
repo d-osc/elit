@@ -14,6 +14,37 @@ import { WebSocket, WebSocketServer, ServerOptions, Data, ReadyState, CLOSE_CODE
 import { runtime } from './runtime';
 
 /**
+ * Helper: Queue callback (eliminates duplication in callback handling)
+ */
+function queueCallback(callback?: () => void): void {
+  if (callback) {
+    queueMicrotask(callback);
+  }
+}
+
+/**
+ * Helper: Build HTTPS options from WSS options (eliminates duplication in constructor)
+ */
+function buildHttpsOptions(options?: WSSServerOptions): any {
+  const httpsOptions: any = {};
+  if (options?.key) httpsOptions.key = options.key;
+  if (options?.cert) httpsOptions.cert = options.cert;
+  if (options?.ca) httpsOptions.ca = options.ca;
+  if (options?.passphrase) httpsOptions.passphrase = options.passphrase;
+  if (options?.rejectUnauthorized !== undefined) httpsOptions.rejectUnauthorized = options.rejectUnauthorized;
+  if (options?.requestCert !== undefined) httpsOptions.requestCert = options.requestCert;
+  return httpsOptions;
+}
+
+/**
+ * Helper: Emit close event with optional callback (eliminates duplication in close method)
+ */
+function emitCloseWithCallback(emitter: EventEmitter, callback?: (err?: Error) => void): void {
+  emitter.emit('close');
+  queueCallback(callback as any);
+}
+
+/**
  * WSS Server options (extends WebSocket ServerOptions with TLS)
  */
 export interface WSSServerOptions extends ServerOptions {
@@ -66,38 +97,20 @@ export class WSSServer extends EventEmitter {
       } else if (options?.noServer) {
         // No server mode - user will call handleUpgrade manually
         this._wsServer = new WebSocketServer({ noServer: true });
-        if (callback) queueMicrotask(callback);
+        queueCallback(callback);
       } else {
         // Create new HTTPS server
-        const httpsOptions: any = {};
-        if (options?.key) httpsOptions.key = options.key;
-        if (options?.cert) httpsOptions.cert = options.cert;
-        if (options?.ca) httpsOptions.ca = options.ca;
-        if (options?.passphrase) httpsOptions.passphrase = options.passphrase;
-        if (options?.rejectUnauthorized !== undefined) {
-          httpsOptions.rejectUnauthorized = options.rejectUnauthorized;
-        }
-        if (options?.requestCert !== undefined) {
-          httpsOptions.requestCert = options.requestCert;
-        }
-
-        this._httpsServer = createHttpsServer(httpsOptions);
+        this._httpsServer = createHttpsServer(buildHttpsOptions(options));
         this._setupServer(callback);
 
         if (options?.port) {
-          this._httpsServer.listen(options.port, options.host, () => {
-            if (callback) callback();
-          });
+          this._httpsServer.listen(options.port, options.host, callback);
         }
       }
-    } else if (runtime === 'bun') {
-      // Bun - WebSocket server with TLS
+    } else {
+      // Bun/Deno - WebSocket server with TLS
       this._wsServer = new WebSocketServer(options);
-      if (callback) queueMicrotask(callback);
-    } else if (runtime === 'deno') {
-      // Deno - WebSocket server with TLS
-      this._wsServer = new WebSocketServer(options);
-      if (callback) queueMicrotask(callback);
+      queueCallback(callback);
     }
   }
 
@@ -124,8 +137,8 @@ export class WSSServer extends EventEmitter {
       this.emit('error', error);
     });
 
-    if (callback && !this.options?.port) {
-      queueMicrotask(callback);
+    if (!this.options?.port) {
+      queueCallback(callback);
     }
   }
 
@@ -163,15 +176,13 @@ export class WSSServer extends EventEmitter {
         if (this._httpsServer) {
           this._httpsServer.close(callback);
         } else {
-          this.emit('close');
-          if (callback) queueMicrotask(() => callback());
+          emitCloseWithCallback(this, callback);
         }
       });
     } else if (this._httpsServer) {
       this._httpsServer.close(callback);
     } else {
-      this.emit('close');
-      if (callback) queueMicrotask(() => callback());
+      emitCloseWithCallback(this, callback);
     }
   }
 

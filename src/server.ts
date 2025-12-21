@@ -13,7 +13,7 @@ import { watch } from './chokidar';
 import { readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
-import { runtime } from './runtime';
+import { isBun, isDeno, runtime } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
 
@@ -49,29 +49,12 @@ export class ServerRouter {
     return this;
   }
 
-  get(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('GET', path, handler);
-  }
-
-  post(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('POST', path, handler);
-  }
-
-  put(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('PUT', path, handler);
-  }
-
-  delete(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('DELETE', path, handler);
-  }
-
-  patch(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('PATCH', path, handler);
-  }
-
-  options(path: string, handler: ServerRouteHandler): this {
-    return this.addRoute('OPTIONS', path, handler);
-  }
+  get = (path: string, handler: ServerRouteHandler): this => this.addRoute('GET', path, handler);
+  post = (path: string, handler: ServerRouteHandler): this => this.addRoute('POST', path, handler);
+  put = (path: string, handler: ServerRouteHandler): this => this.addRoute('PUT', path, handler);
+  delete = (path: string, handler: ServerRouteHandler): this => this.addRoute('DELETE', path, handler);
+  patch = (path: string, handler: ServerRouteHandler): this => this.addRoute('PATCH', path, handler);
+  options = (path: string, handler: ServerRouteHandler): this => this.addRoute('OPTIONS', path, handler);
 
   private addRoute(method: HttpMethod, path: string, handler: ServerRouteHandler): this {
     const { pattern, paramNames } = this.pathToRegex(path);
@@ -81,88 +64,52 @@ export class ServerRouter {
 
   private pathToRegex(path: string): { pattern: RegExp; paramNames: string[] } {
     const paramNames: string[] = [];
-    const pattern = path
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\//g, '\\/')
-      .replace(/:(\w+)/g, (_, name) => (paramNames.push(name), '([^\\/]+)'));
+    const pattern = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/').replace(/:(\w+)/g, (_, name) => (paramNames.push(name), '([^\\/]+)'));
     return { pattern: new RegExp(`^${pattern}$`), paramNames };
   }
 
   private parseQuery(url: string): Record<string, string> {
     const query: Record<string, string> = {};
-    const queryString = url.split('?')[1];
-    if (queryString) new URLSearchParams(queryString).forEach((v, k) => query[k] = v);
+    url.split('?')[1]?.split('&').forEach(p => { const [k, v] = p.split('='); if (k) query[k] = v || ''; });
     return query;
   }
 
-  private async parseBody(req: IncomingMessage): Promise<any> {
+  private parseBody(req: IncomingMessage): Promise<any> {
     return new Promise((resolve, reject) => {
       let body = '';
-      req.on('data', chunk => body += chunk.toString());
+      req.on('data', chunk => body += chunk);
       req.on('end', () => {
         try {
-          const contentType = req.headers['content-type'] || '';
-          if (contentType.includes('application/json')) {
-            resolve(body ? JSON.parse(body) : {});
-          } else if (contentType.includes('application/x-www-form-urlencoded')) {
-            const data: Record<string, string> = {};
-            new URLSearchParams(body).forEach((v, k) => data[k] = v);
-            resolve(data);
-          } else {
-            resolve(body);
-          }
-        } catch (error) {
-          reject(error);
-        }
+          const ct = req.headers['content-type'] || '';
+          resolve(ct.includes('json') ? (body ? JSON.parse(body) : {}) : ct.includes('urlencoded') ? Object.fromEntries(new URLSearchParams(body)) : body);
+        } catch (e) { reject(e); }
       });
       req.on('error', reject);
     });
   }
 
   async handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
-    const method = req.method as HttpMethod;
-    const url = req.url || '/';
-    const path = url.split('?')[0];
+    const method = req.method as HttpMethod, url = req.url || '/', path = url.split('?')[0];
 
     for (const route of this.routes) {
-      if (route.method !== method) continue;
-      const match = path.match(route.pattern);
-      if (!match) continue;
+      if (route.method !== method || !route.pattern.test(path)) continue;
+      const match = path.match(route.pattern)!;
+      const params = Object.fromEntries(route.paramNames.map((name, i) => [name, match[i + 1]]));
 
-      const params: Record<string, string> = {};
-      route.paramNames.forEach((name, index) => { params[name] = match[index + 1]; });
-
-      const query = this.parseQuery(url);
       let body: any = {};
       if (['POST', 'PUT', 'PATCH'].includes(method)) {
-        try {
-          body = await this.parseBody(req);
-        } catch (error) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid request body' }));
-          return true;
-        }
+        try { body = await this.parseBody(req); }
+        catch { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"Invalid request body"}'); return true; }
       }
 
-      const ctx: ServerRouteContext = { req, res, params, query, body, headers: req.headers as Record<string, string | string[] | undefined> };
+      const ctx: ServerRouteContext = { req, res, params, query: this.parseQuery(url), body, headers: req.headers as any };
+      let i = 0;
+      const next = async () => i < this.middlewares.length && await this.middlewares[i++](ctx, next);
 
-      let middlewareIndex = 0;
-      const next = async (): Promise<void> => {
-        if (middlewareIndex < this.middlewares.length) {
-          const middleware = this.middlewares[middlewareIndex++];
-          await middleware(ctx, next);
-        }
-      };
-
-      try {
-        await next();
-        await route.handler(ctx);
-      } catch (error) {
-        console.error('Route handler error:', error);
-        if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Internal Server Error', message: error instanceof Error ? error.message : 'Unknown error' }));
-        }
+      try { await next(); await route.handler(ctx); }
+      catch (e) {
+        console.error('Route error:', e);
+        !res.headersSent && (res.writeHead(500, { 'Content-Type': 'application/json' }), res.end(JSON.stringify({ error: 'Internal Server Error', message: e instanceof Error ? e.message : 'Unknown' })));
       }
       return true;
     }
@@ -170,25 +117,44 @@ export class ServerRouter {
   }
 }
 
-export const json = (res: ServerResponse, data: any, status = 200) => {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(data));
+export const json = (res: ServerResponse, data: any, status = 200) => (res.writeHead(status, { 'Content-Type': 'application/json' }), res.end(JSON.stringify(data)));
+export const text = (res: ServerResponse, data: string, status = 200) => (res.writeHead(status, { 'Content-Type': 'text/plain' }), res.end(data));
+export const html = (res: ServerResponse, data: string, status = 200) => (res.writeHead(status, { 'Content-Type': 'text/html' }), res.end(data));
+export const status = (res: ServerResponse, code: number, message = '') => (res.writeHead(code, { 'Content-Type': 'application/json' }), res.end(JSON.stringify({ status: code, message })));
+
+// Helper functions for common responses
+const sendError = (res: ServerResponse, code: number, msg: string): void => { res.writeHead(code, { 'Content-Type': 'text/plain' }); res.end(msg); };
+const send404 = (res: ServerResponse, msg = 'Not Found'): void => sendError(res, 404, msg);
+const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res, 403, msg);
+const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
+
+// Import map for all Elit client-side modules (reused in serveFile and serveSSR)
+const ELIT_IMPORT_MAP = `<script type="importmap">{"imports":{` +
+  `"elit":"/dist/index.mjs",` +
+  `"elit/":"/dist/",` +
+  `"elit/dom":"/dist/dom.mjs",` +
+  `"elit/state":"/dist/state.mjs",` +
+  `"elit/style":"/dist/style.mjs",` +
+  `"elit/el":"/dist/el.mjs",` +
+  `"elit/router":"/dist/router.mjs",` +
+  `"elit/hmr":"/dist/hmr.mjs",` +
+  `"elit/types":"/dist/types.mjs"` +
+  `}}</script>`;
+
+// Helper function to generate HMR script (reused in serveFile and serveSSR)
+const createHMRScript = (port: number, wsPath: string): string =>
+  `<script>(function(){let ws;let retries=0;let maxRetries=5;function connect(){ws=new WebSocket('ws://'+window.location.hostname+':${port}${wsPath}');ws.onopen=()=>{console.log('[Elit HMR] Connected');retries=0};ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{if(retries<maxRetries){retries++;setTimeout(connect,1000*retries)}else if(retries===maxRetries){console.log('[Elit HMR] Connection closed. Start dev server to reconnect.')}};ws.onerror=()=>{ws.close()}}connect()})();</script>`;
+
+// Helper function to rewrite relative paths with basePath (reused in serveFile and serveSSR)
+const rewriteRelativePaths = (html: string, basePath: string): string => {
+  if (!basePath) return html;
+  html = html.replace(/(<script[^>]+src=["'])\.\/([^"']+)(["'])/g, `$1${basePath}/$2$3`);
+  html = html.replace(/(<link[^>]+href=["'])\.\/([^"']+)(["'])/g, `$1${basePath}/$2$3`);
+  return html;
 };
 
-export const text = (res: ServerResponse, data: string, status = 200) => {
-  res.writeHead(status, { 'Content-Type': 'text/plain' });
-  res.end(data);
-};
-
-export const html = (res: ServerResponse, data: string, status = 200) => {
-  res.writeHead(status, { 'Content-Type': 'text/html' });
-  res.end(data);
-};
-
-export const status = (res: ServerResponse, code: number, message?: string) => {
-  res.writeHead(code, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: code, message: message || '' }));
-};
+// Helper function to normalize basePath (reused in serveFile and serveSSR)
+const normalizeBasePath = (basePath?: string): string => basePath && basePath !== '/' ? basePath : '';
 
 // ===== Middleware =====
 
@@ -420,8 +386,7 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
       proxyReq.on('error', (error) => {
         console.error('[Proxy] Error proxying %s to %s:', url, target, error.message);
         if (!res.headersSent) {
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Bad Gateway', message: 'Proxy error' }));
+          json(res, { error: 'Bad Gateway', message: 'Proxy error' }, 502);
         }
       });
 
@@ -575,7 +540,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -590,7 +555,9 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
 interface NormalizedClient {
   root: string;
   basePath: string;
+  index?: string;
   ssr?: () => Child | string;
+  api?: ServerRouter;
   proxyHandler?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
 }
 
@@ -600,7 +567,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const stateManager = new StateManager();
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
-  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', ssr: config.ssr, proxy: config.proxy }] : null;
+  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
   const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
@@ -611,10 +578,23 @@ export function createDevServer(options: DevServerOptions): DevServer {
       while (basePath.endsWith('/')) basePath = basePath.slice(0, -1);
       basePath = basePath ? '/' + basePath : '';
     }
+
+    // Normalize index path - convert ./path to /path
+    let indexPath = client.index;
+    if (indexPath) {
+      // Remove leading ./ and ensure it starts with /
+      indexPath = indexPath.replace(/^\.\//, '/');
+      if (!indexPath.startsWith('/')) {
+        indexPath = '/' + indexPath;
+      }
+    }
+
     return {
       root: client.root,
       basePath,
+      index: indexPath,
       ssr: client.ssr,
+      api: client.api,
       proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined
     };
   });
@@ -628,11 +608,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     // Find matching client based on basePath
     const matchedClient = normalizedClients.find(c => c.basePath && originalUrl.startsWith(c.basePath)) || normalizedClients.find(c => !c.basePath);
-    if (!matchedClient) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('404 Not Found');
-      return;
-    }
+    if (!matchedClient) return send404(res, '404 Not Found');
 
     // Try client-specific proxy first
     if (matchedClient.proxyHandler) {
@@ -662,13 +638,27 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     const url = matchedClient.basePath ? (originalUrl.slice(matchedClient.basePath.length) || '/') : originalUrl;
 
-    // Try API routes first (global API router)
+    // Try client-specific API routes first
+    if (matchedClient.api && url.startsWith('/api')) {
+      const handled = await matchedClient.api.handle(req, res);
+      if (handled) return;
+    }
+
+    // Try global API routes (fallback)
     if (config.api && url.startsWith('/api')) {
       const handled = await config.api.handle(req, res);
       if (handled) return;
     }
 
-    let filePath = url === '/' ? '/index.html' : url;
+    // For root path requests, prioritize SSR over index files if SSR is configured
+    let filePath: string;
+    if (url === '/' && matchedClient.ssr && !matchedClient.index) {
+      // Use SSR directly when configured and no custom index specified
+      return serveSSR(res, matchedClient);
+    } else {
+      // Use custom index file if specified, otherwise default to /index.html
+      filePath = url === '/' ? (matchedClient.index || '/index.html') : url;
+    }
 
     // Remove query string
     filePath = filePath.split('?')[0];
@@ -680,28 +670,25 @@ export function createDevServer(options: DevServerOptions): DevServer {
     // Security: Check for null bytes early
     if (filePath.includes('\0')) {
       if (config.logging) console.log(`[403] Rejected path with null byte: ${filePath}`);
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('403 Forbidden');
-      return;
+      return send403(res, '403 Forbidden');
     }
 
-    // Handle /dist/* requests - serve from parent dist folder
+    // Handle /dist/* and /node_modules/* requests - serve from parent folder
     const isDistRequest = filePath.startsWith('/dist/');
+    const isNodeModulesRequest = filePath.startsWith('/node_modules/');
     let normalizedPath: string;
 
     // Normalize and validate the path for both /dist/* and regular requests
     const tempPath = normalize(filePath).replace(/\\/g, '/').replace(/^\/+/, '');
     if (tempPath.includes('..')) {
       if (config.logging) console.log(`[403] Path traversal attempt: ${filePath}`);
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('403 Forbidden');
-      return;
+      return send403(res, '403 Forbidden');
     }
     normalizedPath = tempPath;
 
     // Resolve file path
     const rootDir = await realpath(resolve(matchedClient.root));
-    const baseDir = isDistRequest ? await realpath(resolve(matchedClient.root, '..')) : rootDir;
+    const baseDir = (isDistRequest || isNodeModulesRequest) ? await realpath(resolve(matchedClient.root, '../..')) : rootDir;
     let fullPath;
 
     try {
@@ -709,9 +696,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
       // Security: Ensure path is strictly within the allowed root directory
       if (!fullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
         if (config.logging) console.log(`[403] File access outside of root: ${fullPath}`);
-        res.writeHead(403, { 'Content-Type': 'text/plain' });
-        res.end('403 Forbidden');
-        return;
+        return send403(res, '403 Forbidden');
       }
       if (config.logging && filePath === '/src/pages') {
         console.log(`[DEBUG] Initial resolve succeeded: ${fullPath}`);
@@ -732,9 +717,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
           // Security: Ensure path is strictly within the allowed root directory
           if (!tsFullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
             if (config.logging) console.log(`[403] Fallback TS path outside of root: ${tsFullPath}`);
-            res.writeHead(403, { 'Content-Type': 'text/plain' });
-            res.end('403 Forbidden');
-            return;
+            return send403(res, '403 Forbidden');
           }
           resolvedPath = tsFullPath;
         } catch {
@@ -772,8 +755,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
       }
 
       if (!resolvedPath) {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('404 Not Found');
+        if (!res.headersSent) {
+          // If index.html not found but SSR function exists, use SSR
+          if (filePath === '/index.html' && matchedClient.ssr) {
+            return serveSSR(res, matchedClient);
+          }
+          if (config.logging) console.log(`[404] ${filePath}`);
+          return send404(res, '404 Not Found');
+        }
         return;
       }
 
@@ -798,30 +787,29 @@ export function createDevServer(options: DevServerOptions): DevServer {
             if (config.logging) console.log(`[DEBUG] Found index.js in directory`);
           } catch {
             if (config.logging) console.log(`[DEBUG] No index file found in directory`);
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('404 Not Found');
-            return;
+            // If index.html not found in directory but SSR function exists, use SSR
+            if (matchedClient.ssr) {
+              return serveSSR(res, matchedClient);
+            }
+            return send404(res, '404 Not Found');
           }
         }
 
         fullPath = indexPath;
       }
     } catch (statError) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('404 Not Found');
-      return;
+      if (config.logging) console.log(`[404] ${filePath}`);
+      return send404(res, '404 Not Found');
     }
 
     // Security: Ensure the resolved path is within allowed directories
-    const parentDir = await realpath(resolve(matchedClient.root, '..'));
+    const parentDir = await realpath(resolve(matchedClient.root, '../..'));
     const isInRoot = fullPath.startsWith(rootDir + sep) || fullPath === rootDir;
-    const isInParent = isDistRequest && (fullPath.startsWith(parentDir + sep) || fullPath === parentDir);
+    const isInParent = (isDistRequest || isNodeModulesRequest) && (fullPath.startsWith(parentDir + sep) || fullPath === parentDir);
 
     if (!isInRoot && !isInParent) {
       if (config.logging) console.log(`[403] Path outside allowed directories: ${filePath}`);
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
-      res.end('403 Forbidden');
-      return;
+      return send403(res, '403 Forbidden');
     }
 
     try {
@@ -831,24 +819,22 @@ export function createDevServer(options: DevServerOptions): DevServer {
         try {
           const indexPath = await realpath(resolve(join(fullPath, 'index.html')));
           if (!indexPath.startsWith(rootDir + sep) && indexPath !== rootDir) {
-            res.writeHead(403, { 'Content-Type': 'text/plain' });
-            res.end('403 Forbidden');
-            return;
+            return send403(res, '403 Forbidden');
           }
           await stat(indexPath);
           return serveFile(indexPath, res, matchedClient);
         } catch {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
-          res.end('404 Not Found');
-          return;
+          return send404(res, '404 Not Found');
         }
       }
 
       await serveFile(fullPath, res, matchedClient);
     } catch (error) {
-      if (config.logging) console.log(`[404] ${filePath}`);
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('404 Not Found');
+      // Only send 404 if response hasn't been sent yet
+      if (!res.headersSent) {
+        if (config.logging) console.log(`[404] ${filePath}`);
+        send404(res, '404 Not Found');
+      }
     }
   });
 
@@ -856,7 +842,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   async function serveFile(filePath: string, res: ServerResponse, client: NormalizedClient) {
     try {
       const rootDir = await realpath(resolve(client.root));
-      const parentDir = await realpath(resolve(client.root, '..'));
+      const parentDir = await realpath(resolve(client.root, '../..'));
       let resolvedPath;
       try {
         resolvedPath = await realpath(resolve(filePath));
@@ -865,20 +851,16 @@ export function createDevServer(options: DevServerOptions): DevServer {
         if (filePath.endsWith('index.html') && client.ssr) {
           return serveSSR(res, client);
         }
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('404 Not Found');
-        return;
+        return send404(res, '404 Not Found');
       }
 
-      // Allow files in root directory or parent/dist directory
+      // Allow files in root directory or parent directory (for /dist and /node_modules)
       const isInRoot = resolvedPath.startsWith(rootDir + sep) || resolvedPath === rootDir;
-      const isInParentDist = resolvedPath.startsWith(parentDir + sep + 'dist' + sep);
+      const isInParent = resolvedPath.startsWith(parentDir + sep) || resolvedPath === parentDir;
 
-      if (!isInRoot && !isInParentDist) {
+      if (!isInRoot && !isInParent) {
         if (config.logging) console.log(`[403] Attempted to serve file outside allowed directories: ${filePath}`);
-        res.writeHead(403, { 'Content-Type': 'text/plain' });
-        res.end('403 Forbidden');
-        return;
+        return send403(res, '403 Forbidden');
       }
 
       let content = await readFile(resolvedPath);
@@ -890,7 +872,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
         try {
           let transpiled: string;
 
-          if (runtime === 'deno') {
+          if (isDeno) {
             // Deno - use Deno.emit
             // @ts-ignore
             const result = await Deno.emit(resolvedPath, {
@@ -908,7 +890,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
             transpiled = result.files[resolvedPath.replace(/\.tsx?$/, '.js')] || '';
 
-          } else if (runtime === 'bun') {
+          } else if (isBun) {
             // Bun - use Bun.Transpiler
             // @ts-ignore
             const transpiler = new Bun.Transpiler({
@@ -938,28 +920,61 @@ export function createDevServer(options: DevServerOptions): DevServer {
             transpiled = result.outputFiles[0].text;
           }
 
+          // Rewrite .ts imports to .js for browser compatibility
+          // This allows developers to write import './file.ts' in their source code
+          // and the dev server will automatically rewrite it to import './file.js'
+          transpiled = transpiled.replace(
+            /from\s+["']([^"']+)\.ts(x?)["']/g,
+            (_, path, tsx) => `from "${path}.js${tsx}"`
+          );
+          transpiled = transpiled.replace(
+            /import\s+["']([^"']+)\.ts(x?)["']/g,
+            (_, path, tsx) => `import "${path}.js${tsx}"`
+          );
+
           content = Buffer.from(transpiled);
           mimeType = 'application/javascript';
         } catch (error) {
-          res.writeHead(500, { 'Content-Type': 'text/plain' });
-          res.end(`TypeScript compilation error:\n${error}`);
           if (config.logging) console.error('[500] TypeScript compilation error:', error);
-          return;
+          return send500(res, `TypeScript compilation error:\n${error}`);
         }
       }
 
       // Inject HMR client and import map for HTML files
       if (ext === '.html') {
-        const elitPath = client.basePath ? `${client.basePath}/dist/client.mjs` : '/dist/client.mjs';
-        const importMap = `<script type="importmap">
-{
-  "imports": {
-    "elit": "${elitPath}"
-  }
-}
-</script>`;
-        const hmrScript = `<script>(function(){const ws=new WebSocket('ws://${config.host}:${config.port}${client.basePath}');ws.onopen=()=>console.log('[Elit HMR] Connected');ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{console.log('[Elit HMR] Disconnected - Retrying...');setTimeout(()=>window.location.reload(),1000)};ws.onerror=(e)=>console.error('[Elit HMR] WebSocket error:',e)})();</script>`;
+        const wsPath = normalizeBasePath(client.basePath);
+        const hmrScript = createHMRScript(config.port, wsPath);
         let html = content.toString();
+
+        // If SSR is configured, extract and inject styles from SSR
+        let ssrStyles = '';
+        if (client.ssr) {
+          try {
+            const result = client.ssr();
+            let ssrHtml: string;
+
+            // Convert SSR result to string
+            if (typeof result === 'string') {
+              ssrHtml = result;
+            } else if (typeof result === 'object' && result !== null && 'tagName' in result) {
+              ssrHtml = dom.renderToString(result as VNode);
+            } else {
+              ssrHtml = String(result);
+            }
+
+            // Extract <style> tags from SSR output
+            const styleMatches = ssrHtml.match(/<style[^>]*>[\s\S]*?<\/style>/g);
+            if (styleMatches) {
+              ssrStyles = styleMatches.join('\n');
+            }
+          } catch (error) {
+            if (config.logging) console.error('[Warning] Failed to extract styles from SSR:', error);
+          }
+        }
+
+        // Fix relative paths to use basePath
+        const basePath = normalizeBasePath(client.basePath);
+        html = rewriteRelativePaths(html, basePath);
 
         // Inject base tag if basePath is configured and not '/'
         if (client.basePath && client.basePath !== '/') {
@@ -979,7 +994,9 @@ export function createDevServer(options: DevServerOptions): DevServer {
           }
         }
 
-        html = html.includes('</head>') ? html.replace('</head>', `${importMap}</head>`) : html;
+        // Inject import map and SSR styles into <head>
+        const headInjection = ssrStyles ? `${ssrStyles}\n${ELIT_IMPORT_MAP}` : ELIT_IMPORT_MAP;
+        html = html.includes('</head>') ? html.replace('</head>', `${headInjection}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
         content = Buffer.from(html);
       }
@@ -1011,9 +1028,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
       if (config.logging) console.log(`[200] ${relative(client.root, filePath)}`);
     } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end('500 Internal Server Error');
       if (config.logging) console.error('[500] Error reading file:', error);
+      send500(res, '500 Internal Server Error');
     }
   }
 
@@ -1021,9 +1037,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   function serveSSR(res: ServerResponse, client: NormalizedClient) {
     try {
       if (!client.ssr) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('SSR function not configured');
-        return;
+        return send500(res, 'SSR function not configured');
       }
 
       const result = client.ssr();
@@ -1046,8 +1060,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
         html = String(result);
       }
 
+      // Fix relative paths to use basePath
+      const basePath = normalizeBasePath(client.basePath);
+      html = rewriteRelativePaths(html, basePath);
+
       // Inject HMR script
-      const hmrScript = `<script>(function(){const ws=new WebSocket('ws://${config.host}:${config.port}${client.basePath}');ws.onopen=()=>console.log('[Elit HMR] Connected');ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{console.log('[Elit HMR] Disconnected - Retrying...');setTimeout(()=>window.location.reload(),1000)};ws.onerror=(e)=>console.error('[Elit HMR] WebSocket error:',e)})();</script>`;
+      const hmrScript = createHMRScript(config.port, basePath);
+
+      // Inject import map in head, HMR script in body
+      html = html.includes('</head>') ? html.replace('</head>', `${ELIT_IMPORT_MAP}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
       res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
@@ -1055,23 +1076,26 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
       if (config.logging) console.log(`[200] SSR rendered`);
     } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end('500 SSR Error');
       if (config.logging) console.error('[500] SSR Error:', error);
+      send500(res, '500 SSR Error');
     }
   }
 
   // WebSocket Server for HMR
   const wss = new WebSocketServer({ server });
 
-  wss.on('connection', (ws: WebSocket) => {
+  if (config.logging) {
+    console.log('[HMR] WebSocket server initialized');
+  }
+
+  wss.on('connection', (ws: WebSocket, req) => {
     wsClients.add(ws);
 
     const message: HMRMessage = { type: 'connected', timestamp: Date.now() };
     ws.send(JSON.stringify(message));
 
     if (config.logging) {
-      console.log('[HMR] Client connected');
+      console.log('[HMR] Client connected from', req.socket.remoteAddress);
     }
 
     // Handle incoming messages

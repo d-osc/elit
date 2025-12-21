@@ -5,15 +5,94 @@
  * Works on Node.js, Bun, and Deno
  */
 
-import { runtime } from './runtime';
+import { isBun, isDeno, isNode, runtime } from './runtime';
+
+/**
+ * Helper: Get path separator for platform (eliminates duplication in separator logic)
+ */
+function getSeparator(isWin: boolean): string {
+  return isWin ? '\\' : '/';
+}
+
+/**
+ * Helper: Get current working directory (eliminates duplication in resolvePaths)
+ */
+function getCwd(): string {
+  if (isNode || isBun) {
+    return process.cwd();
+  } else if (isDeno) {
+    // @ts-ignore
+    return Deno.cwd();
+  }
+  return '/';
+}
+
+/**
+ * Helper: Find last separator index (eliminates duplication in getExtname and getBasename)
+ */
+function findLastSeparator(path: string): number {
+  return Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+}
+
+/**
+ * Helper: Create path operation object (eliminates duplication in posix and win32)
+ */
+function createPathOps(isWin: boolean) {
+  return {
+    sep: getSeparator(isWin),
+    delimiter: isWin ? ';' : ':',
+    normalize: (path: string) => normalizePath(path, isWin),
+    join: (...paths: string[]) => joinPaths(paths, isWin),
+    resolve: (...paths: string[]) => resolvePaths(paths, isWin),
+    isAbsolute: (path: string) => isWin ? isAbsoluteWin(path) : isAbsolutePosix(path),
+    relative: (from: string, to: string) => relativePath(from, to, isWin),
+    dirname: (path: string) => getDirname(path, isWin),
+    basename: (path: string, ext?: string) => getBasename(path, ext, isWin),
+    extname: (path: string) => getExtname(path),
+    parse: (path: string) => parsePath(path, isWin),
+    format: (pathObject: FormatInputPathObject) => formatPath(pathObject, isWin)
+  };
+}
+
+/**
+ * Helper: Check if path is absolute (POSIX)
+ */
+function isAbsolutePosix(path: string): boolean {
+  return path.length > 0 && path[0] === '/';
+}
+
+/**
+ * Helper: Check if path is absolute (Windows)
+ */
+function isAbsoluteWin(path: string): boolean {
+  const len = path.length;
+  if (len === 0) return false;
+
+  const code = path.charCodeAt(0);
+  if (code === 47 /* / */ || code === 92 /* \ */) {
+    return true;
+  }
+
+  // Check for drive letter
+  if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+    if (len > 2 && path.charCodeAt(1) === 58 /* : */) {
+      const code2 = path.charCodeAt(2);
+      if (code2 === 47 /* / */ || code2 === 92 /* \ */) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 /**
  * Platform detection
  */
 const isWindows = (() => {
-  if (runtime === 'node') {
+  if (isNode) {
     return process.platform === 'win32';
-  } else if (runtime === 'deno') {
+  } else if (isDeno) {
     // @ts-ignore
     return Deno.build.os === 'windows';
   }
@@ -34,116 +113,12 @@ export const delimiter = isWindows ? ';' : ':';
 /**
  * POSIX path operations
  */
-const posix = {
-  sep: '/',
-  delimiter: ':',
-
-  normalize(path: string): string {
-    return normalizePath(path, false);
-  },
-
-  join(...paths: string[]): string {
-    return joinPaths(paths, false);
-  },
-
-  resolve(...paths: string[]): string {
-    return resolvePaths(paths, false);
-  },
-
-  isAbsolute(path: string): boolean {
-    return path.length > 0 && path[0] === '/';
-  },
-
-  relative(from: string, to: string): string {
-    return relativePath(from, to, false);
-  },
-
-  dirname(path: string): string {
-    return getDirname(path, false);
-  },
-
-  basename(path: string, ext?: string): string {
-    return getBasename(path, ext, false);
-  },
-
-  extname(path: string): string {
-    return getExtname(path);
-  },
-
-  parse(path: string): ParsedPath {
-    return parsePath(path, false);
-  },
-
-  format(pathObject: FormatInputPathObject): string {
-    return formatPath(pathObject, false);
-  }
-};
+const posix = createPathOps(false);
 
 /**
  * Windows path operations
  */
-const win32 = {
-  sep: '\\',
-  delimiter: ';',
-
-  normalize(path: string): string {
-    return normalizePath(path, true);
-  },
-
-  join(...paths: string[]): string {
-    return joinPaths(paths, true);
-  },
-
-  resolve(...paths: string[]): string {
-    return resolvePaths(paths, true);
-  },
-
-  isAbsolute(path: string): boolean {
-    const len = path.length;
-    if (len === 0) return false;
-
-    const code = path.charCodeAt(0);
-    if (code === 47 /* / */ || code === 92 /* \ */) {
-      return true;
-    }
-
-    // Check for drive letter
-    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
-      if (len > 2 && path.charCodeAt(1) === 58 /* : */) {
-        const code2 = path.charCodeAt(2);
-        if (code2 === 47 /* / */ || code2 === 92 /* \ */) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  },
-
-  relative(from: string, to: string): string {
-    return relativePath(from, to, true);
-  },
-
-  dirname(path: string): string {
-    return getDirname(path, true);
-  },
-
-  basename(path: string, ext?: string): string {
-    return getBasename(path, ext, true);
-  },
-
-  extname(path: string): string {
-    return getExtname(path);
-  },
-
-  parse(path: string): ParsedPath {
-    return parsePath(path, true);
-  },
-
-  format(pathObject: FormatInputPathObject): string {
-    return formatPath(pathObject, true);
-  }
-};
+const win32 = createPathOps(true);
 
 /**
  * Path object interface
@@ -170,8 +145,8 @@ export interface FormatInputPathObject {
 function normalizePath(path: string, isWin: boolean): string {
   if (path.length === 0) return '.';
 
-  const separator = isWin ? '\\' : '/';
-  const isAbsolute = isWin ? win32.isAbsolute(path) : posix.isAbsolute(path);
+  const separator = getSeparator(isWin);
+  const isAbsolute = isWin ? isAbsoluteWin(path) : isAbsolutePosix(path);
   const trailingSeparator = path[path.length - 1] === separator || (isWin && path[path.length - 1] === '/');
 
   // Normalize slashes
@@ -221,6 +196,7 @@ function normalizePath(path: string, isWin: boolean): string {
 function joinPaths(paths: string[], isWin: boolean): string {
   if (paths.length === 0) return '.';
 
+  const separator = getSeparator(isWin);
   let joined = '';
   for (let i = 0; i < paths.length; i++) {
     const path = paths[i];
@@ -228,7 +204,7 @@ function joinPaths(paths: string[], isWin: boolean): string {
       if (joined.length === 0) {
         joined = path;
       } else {
-        joined += (isWin ? '\\' : '/') + path;
+        joined += separator + path;
       }
     }
   }
@@ -242,25 +218,21 @@ function joinPaths(paths: string[], isWin: boolean): string {
  * Resolve paths to absolute path
  */
 function resolvePaths(paths: string[], isWin: boolean): string {
+  const separator = getSeparator(isWin);
   let resolved = '';
   let isAbsolute = false;
 
   for (let i = paths.length - 1; i >= 0 && !isAbsolute; i--) {
     const path = paths[i];
     if (path && path.length > 0) {
-      resolved = path + (resolved.length > 0 ? (isWin ? '\\' : '/') + resolved : '');
-      isAbsolute = isWin ? win32.isAbsolute(resolved) : posix.isAbsolute(resolved);
+      resolved = path + (resolved.length > 0 ? separator + resolved : '');
+      isAbsolute = isWin ? isAbsoluteWin(resolved) : isAbsolutePosix(resolved);
     }
   }
 
   if (!isAbsolute) {
-    // Get current working directory
-    if (runtime === 'node' || runtime === 'bun') {
-      resolved = process.cwd() + (resolved.length > 0 ? (isWin ? '\\' : '/') + resolved : '');
-    } else if (runtime === 'deno') {
-      // @ts-ignore
-      resolved = Deno.cwd() + (resolved.length > 0 ? (isWin ? '\\' : '/') + resolved : '');
-    }
+    const cwd = getCwd();
+    resolved = cwd + (resolved.length > 0 ? separator + resolved : '');
   }
 
   return normalizePath(resolved, isWin);
@@ -275,7 +247,7 @@ function relativePath(from: string, to: string, isWin: boolean): string {
 
   if (from === to) return '';
 
-  const separator = isWin ? '\\' : '/';
+  const separator = getSeparator(isWin);
   const fromParts = from.split(separator).filter(p => p.length > 0);
   const toParts = to.split(separator).filter(p => p.length > 0);
 
@@ -310,7 +282,7 @@ function relativePath(from: string, to: string, isWin: boolean): string {
 function getDirname(path: string, isWin: boolean): string {
   if (path.length === 0) return '.';
 
-  const separator = isWin ? '\\' : '/';
+  const separator = getSeparator(isWin);
   const normalized = normalizePath(path, isWin);
   const lastSepIndex = normalized.lastIndexOf(separator);
 
@@ -326,12 +298,7 @@ function getDirname(path: string, isWin: boolean): string {
 function getBasename(path: string, ext?: string, isWin?: boolean): string {
   if (path.length === 0) return '';
 
-  const separator = isWin ? '\\' : '/';
-  const lastSepIndex = Math.max(
-    path.lastIndexOf(separator),
-    isWin ? path.lastIndexOf('/') : -1
-  );
-
+  const lastSepIndex = isWin ? findLastSeparator(path) : path.lastIndexOf('/');
   let base = lastSepIndex === -1 ? path : path.slice(lastSepIndex + 1);
 
   if (ext && base.endsWith(ext)) {
@@ -346,7 +313,7 @@ function getBasename(path: string, ext?: string, isWin?: boolean): string {
  */
 function getExtname(path: string): string {
   const lastDotIndex = path.lastIndexOf('.');
-  const lastSepIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  const lastSepIndex = findLastSeparator(path);
 
   if (lastDotIndex === -1 || lastDotIndex < lastSepIndex || lastDotIndex === path.length - 1) {
     return '';
@@ -388,8 +355,7 @@ function parsePath(path: string, isWin: boolean): ParsedPath {
  * Format path from components
  */
 function formatPath(pathObject: FormatInputPathObject, isWin: boolean): string {
-  const separator = isWin ? '\\' : '/';
-
+  const separator = getSeparator(isWin);
   const dir = pathObject.dir || pathObject.root || '';
   const base = pathObject.base || ((pathObject.name || '') + (pathObject.ext || ''));
 

@@ -4,6 +4,39 @@
 
 import type { VNode, Child, Children, Props, State, StateOptions, VirtualListController, JsonNode, VNodeJson } from './types';
 
+/**
+ * Helper: Resolve element from string ID or HTMLElement (eliminates duplication in render methods)
+ */
+function resolveElement(rootElement: string | HTMLElement): HTMLElement | null {
+    return typeof rootElement === 'string'
+        ? document.getElementById(rootElement.replace('#', ''))
+        : rootElement;
+}
+
+/**
+ * Helper: Ensure element exists or throw error (eliminates duplication in validation)
+ */
+function ensureElement(el: HTMLElement | null, rootElement: string | HTMLElement): HTMLElement {
+    if (!el) {
+        throw new Error(`Element not found: ${rootElement}`);
+    }
+    return el;
+}
+
+/**
+ * Helper: Check if child should be skipped (eliminates duplication in child rendering)
+ */
+function shouldSkipChild(child: any): boolean {
+    return child == null || child === false;
+}
+
+/**
+ * Helper: Check if value is primitive JSON type (eliminates duplication in JSON conversion)
+ */
+function isPrimitiveJson(json: any): json is string | number | boolean | null | undefined {
+    return json == null || typeof json === 'boolean' || typeof json === 'string' || typeof json === 'number';
+}
+
 export class DomNode {
     private elementCache = new WeakMap<Element, boolean>();
 
@@ -74,12 +107,12 @@ export class DomNode {
         const renderChildren = (target: HTMLElement | SVGElement | DocumentFragment) => {
             for (let i = 0; i < len; i++) {
                 const child = children[i];
-                if (child == null || child === false) continue;
+                if (shouldSkipChild(child)) continue;
 
                 if (Array.isArray(child)) {
                     for (let j = 0, cLen = child.length; j < cLen; j++) {
                         const c = child[j];
-                        c != null && c !== false && this.renderToDOM(c, target);
+                        !shouldSkipChild(c) && this.renderToDOM(c, target);
                     }
                 } else {
                     this.renderToDOM(child, target);
@@ -99,13 +132,10 @@ export class DomNode {
     }
 
     render(rootElement: string | HTMLElement, vNode: VNode): HTMLElement {
-        const el = typeof rootElement === 'string'
-            ? document.getElementById(rootElement.replace('#', ''))
-            : rootElement;
+        const el = ensureElement(resolveElement(rootElement), rootElement);
 
-        if (!el) {
-            throw new Error(`Element not found: ${rootElement}`);
-        }
+        // Clear existing content before rendering
+        el.innerHTML = '';
 
         if (vNode.children && vNode.children.length > 500) {
             const fragment = document.createDocumentFragment();
@@ -118,13 +148,7 @@ export class DomNode {
     }
 
     batchRender(rootElement: string | HTMLElement, vNodes: VNode[]): HTMLElement {
-        const el = typeof rootElement === 'string'
-            ? document.getElementById(rootElement.replace('#', ''))
-            : rootElement;
-
-        if (!el) {
-            throw new Error(`Element not found: ${rootElement}`);
-        }
+        const el = ensureElement(resolveElement(rootElement), rootElement);
 
         const len = vNodes.length;
 
@@ -164,13 +188,7 @@ export class DomNode {
         chunkSize = 5000,
         onProgress?: (current: number, total: number) => void
     ): HTMLElement {
-        const el = typeof rootElement === 'string'
-            ? document.getElementById(rootElement.replace('#', ''))
-            : rootElement;
-
-        if (!el) {
-            throw new Error(`Element not found: ${rootElement}`);
-        }
+        const el = ensureElement(resolveElement(rootElement), rootElement);
 
         const len = vNodes.length;
         let index = 0;
@@ -427,11 +445,11 @@ export class DomNode {
             if (pretty && hasComplexChildren) {
                 html += newLine;
                 for (const child of resolvedChildren) {
-                    if (child == null || child === false) continue;
+                    if (shouldSkipChild(child)) continue;
 
                     if (Array.isArray(child)) {
                         for (const c of child) {
-                            if (c != null && c !== false) {
+                            if (!shouldSkipChild(c)) {
                                 html += this.renderToString(c, { pretty, indent: indent + 1 });
                             }
                         }
@@ -442,11 +460,11 @@ export class DomNode {
                 html += indentStr;
             } else {
                 for (const child of resolvedChildren) {
-                    if (child == null || child === false) continue;
+                    if (shouldSkipChild(child)) continue;
 
                     if (Array.isArray(child)) {
                         for (const c of child) {
-                            if (c != null && c !== false) {
+                            if (!shouldSkipChild(c)) {
                                 html += this.renderToString(c, { pretty: false, indent: 0 });
                             }
                         }
@@ -618,11 +636,8 @@ export class DomNode {
             return this.createReactiveChild(json, (v: any) => v);
         }
 
-        if (json == null || typeof json === 'boolean') {
+        if (isPrimitiveJson(json)) {
             return json as Child;
-        }
-        if (typeof json === 'string' || typeof json === 'number') {
-            return json;
         }
 
         const { tag, attributes = {}, children } = json;
@@ -670,11 +685,8 @@ export class DomNode {
             return this.createReactiveChild(json, (v: any) => v);
         }
 
-        if (json == null || typeof json === 'boolean') {
+        if (isPrimitiveJson(json)) {
             return json as Child;
-        }
-        if (typeof json === 'string' || typeof json === 'number') {
-            return json;
         }
 
         const { tagName, props = {}, children = [] } = json;
@@ -726,44 +738,6 @@ export class DomNode {
         return this.renderToString(vNode, options);
     }
 
-    // Server-side rendering - Render complete HTML document VNode to document
-    renderServer(vNode: Child): void {
-        if (typeof vNode !== 'object' || vNode === null || !('tagName' in vNode)) throw new Error('renderServer requires a VNode with html tag');
-        if (vNode.tagName !== 'html') throw new Error('renderServer requires a VNode with html tag as root');
-
-        const htmlVNode = vNode as VNode;
-        let headVNode: VNode | null = null, bodyVNode: VNode | null = null;
-
-        // Extract head and body from html children
-        for (const child of htmlVNode.children || []) {
-            if (typeof child === 'object' && child !== null && 'tagName' in child) {
-                if (child.tagName === 'head') headVNode = child as VNode;
-                if (child.tagName === 'body') bodyVNode = child as VNode;
-            }
-        }
-
-        // Set html attributes
-        if (htmlVNode.props) for (const k in htmlVNode.props) {
-            const v = htmlVNode.props[k];
-            if (v !== undefined && v !== null && v !== false) document.documentElement.setAttribute(k, String(v));
-        }
-
-        // Clear and render head
-        if (headVNode) {
-            document.head.innerHTML = '';
-            for (const child of headVNode.children || []) this.renderToDOM(child, document.head);
-        }
-
-        // Clear and render body
-        if (bodyVNode) {
-            document.body.innerHTML = '';
-            if (bodyVNode.props) for (const k in bodyVNode.props) {
-                const v = bodyVNode.props[k];
-                if (v !== undefined && v !== null && v !== false) document.body.setAttribute(k, String(v));
-            }
-            for (const child of bodyVNode.children || []) this.renderToDOM(child, document.body);
-        }
-    }
 
     // Generate complete HTML document as string (for SSR)
     renderToHTMLDocument(vNode: Child, options: {
@@ -836,3 +810,8 @@ export class DomNode {
 }
 
 export const dom = new DomNode();
+
+// Export helper functions for convenience
+export const render = dom.render.bind(dom);
+export const renderToString = dom.renderToString.bind(dom);
+export const mount = render; // alias for render

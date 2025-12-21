@@ -1,19 +1,37 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig([
-    // Main library bundle
+    // Browser-compatible modules (no require shim needed)
     {
         entry: {
-            index: 'src/index.ts',
-            client: 'src/client.ts',
             dom: 'src/dom.ts',
             el: 'src/el.ts',
             router: 'src/router.ts',
             state: 'src/state.ts',
             style: 'src/style.ts',
             types: 'src/types.ts',
-            server: 'src/server.ts',
             hmr: 'src/hmr.ts',
+            runtime: 'src/runtime.ts'
+        },
+        format: ['cjs', 'esm'],
+        dts: true,
+        clean: true,
+        minify: false,
+        splitting: false,
+        treeshake: false,
+        sourcemap: false,
+        target: 'es2020',
+        outExtension({ format }) {
+            return {
+                js: format === 'cjs' ? '.js' : '.mjs'
+            };
+        }
+    },
+    // Node.js-only modules (with require shim for ESM)
+    {
+        entry: {
+            index: 'src/index.ts',
+            server: 'src/server.ts',
             build: 'src/build.ts',
             http: 'src/http.ts',
             https: 'src/https.ts',
@@ -22,23 +40,24 @@ export default defineConfig([
             fs: 'src/fs.ts',
             'mime-types': 'src/mime-types.ts',
             chokidar: 'src/chokidar.ts',
-            path: 'src/path.ts',
-            runtime: 'src/runtime.ts'
+            path: 'src/path.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
-        clean: true,
-        minify: 'terser',
-        minifyWhitespace: true,
-        minifyIdentifiers: true,
-        minifySyntax: true,
+        clean: false,
+        minify: false,
         splitting: false,
-        treeshake: {
-            preset: 'smallest',
-            moduleSideEffects: false
-        },
+        treeshake: false,
         sourcemap: false,
         target: 'es2020',
+        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode'],
+        banner({ format }) {
+            if (format === 'esm') {
+                return {
+                    js: `import {createRequire as __createRequire} from 'module';const require = __createRequire(import.meta.url);`
+                };
+            }
+        },
         outExtension({ format }) {
             return {
                 js: format === 'cjs' ? '.js' : '.mjs'
@@ -53,9 +72,6 @@ export default defineConfig([
         format: ['cjs'],
         dts: false,
         clean: false,
-        splitting: false,
-        banner: {
-            js: '#!/usr/bin/env node'
-        }
+        splitting: false
     }
 ]);

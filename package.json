@@ -144,7 +144,7 @@
   "bugs": {
     "url": "https://github.com/d-osc/elit/issues"
   },
-  "homepage": "https://github.com/d-osc/elit#readme",
+  "homepage": "https://d-osc.github.io/elit/",
   "dependencies": {
     "esbuild": "^0.24.2",
     "open": "^11.0.0"

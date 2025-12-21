@@ -298,6 +298,51 @@ export const sharedStateManager = new SharedStateManager();
 
 // ===== Reactive Rendering Helpers =====
 
+// Helper function to schedule RAF updates (reused in reactive and reactiveAs)
+const scheduleRAFUpdate = (rafId: number | null, updateFn: () => void): number => {
+    rafId && cancelAnimationFrame(rafId);
+    return requestAnimationFrame(() => {
+        updateFn();
+    });
+};
+
+// Helper function to render content to fragment (reused in reactive and reactiveAs)
+const renderToFragment = (content: VNode | Child, isVNode?: boolean): DocumentFragment => {
+    const fragment = document.createDocumentFragment();
+
+    if (isVNode && content && typeof content === 'object' && 'tagName' in content) {
+        const { children } = content as VNode;
+        for (const child of children) {
+            dom.renderToDOM(child, fragment);
+        }
+    } else {
+        dom.renderToDOM(content, fragment);
+    }
+
+    return fragment;
+};
+
+// Helper function to update element props (reused in reactive)
+const updateElementProps = (element: HTMLElement | SVGElement, props: Props): void => {
+    for (const key in props) {
+        const value = props[key];
+        if (key === 'ref') continue;
+
+        if (key === 'class' || key === 'className') {
+            (element as HTMLElement).className = Array.isArray(value) ? value.join(' ') : (value || '');
+        } else if (key === 'style' && typeof value === 'object') {
+            const s = (element as HTMLElement).style;
+            for (const k in value) (s as any)[k] = value[k];
+        } else if (key.startsWith('on')) {
+            (element as any)[key.toLowerCase()] = value;
+        } else if (value != null && value !== false) {
+            element.setAttribute(key, String(value === true ? '' : value));
+        } else {
+            element.removeAttribute(key);
+        }
+    }
+};
+
 // Reactive element helpers
 export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Child): VNode => {
     let rafId: number | null = null;
@@ -329,36 +374,12 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
             }
 
             if (elementRef) {
-                const fragment = document.createDocumentFragment();
-
-                if (isVNodeResult && newResult && typeof newResult === 'object' && 'tagName' in newResult) {
-                    const { props, children } = newResult as VNode;
-
-                    for (const key in props) {
-                        const value = props[key];
-                        if (key === 'ref') continue;
-
-                        if (key === 'class' || key === 'className') {
-                            (elementRef as HTMLElement).className = Array.isArray(value) ? value.join(' ') : (value || '');
-                        } else if (key === 'style' && typeof value === 'object') {
-                            const s = (elementRef as HTMLElement).style;
-                            for (const k in value) (s as any)[k] = value[k];
-                        } else if (key.startsWith('on')) {
-                            (elementRef as any)[key.toLowerCase()] = value;
-                        } else if (value != null && value !== false) {
-                            elementRef.setAttribute(key, String(value === true ? '' : value));
-                        } else {
-                            elementRef.removeAttribute(key);
-                        }
-                    }
-
-                    for (const child of children) {
-                        dom.renderToDOM(child, fragment);
-                    }
-                } else {
-                    dom.renderToDOM(newResult, fragment);
+                const isCurrentVNode = !!(isVNodeResult && newResult && typeof newResult === 'object' && 'tagName' in newResult);
+                if (isCurrentVNode) {
+                    const { props } = newResult as VNode;
+                    updateElementProps(elementRef, props);
                 }
-
+                const fragment = renderToFragment(newResult, isCurrentVNode);
                 elementRef.textContent = '';
                 elementRef.appendChild(fragment);
                 dom.getElementCache().set(elementRef, true);
@@ -367,8 +388,7 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
     };
 
     state.subscribe(() => {
-        rafId && cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => {
+        rafId = scheduleRAFUpdate(rafId, () => {
             updateElement();
             rafId = null;
         });
@@ -406,11 +426,8 @@ export const reactiveAs = <T>(
     let elementRef: HTMLElement | SVGElement | null = null;
 
     state.subscribe(() => {
-        if (rafId) cancelAnimationFrame(rafId);
-
-        rafId = requestAnimationFrame(() => {
+        rafId = scheduleRAFUpdate(rafId, () => {
             if (elementRef) {
-                const fragment = document.createDocumentFragment();
                 const newResult = renderFn(state.value);
 
                 if (newResult == null || newResult === false) {
@@ -418,7 +435,7 @@ export const reactiveAs = <T>(
                     elementRef.textContent = '';
                 } else {
                     (elementRef as HTMLElement).style.display = '';
-                    dom.renderToDOM(newResult, fragment);
+                    const fragment = renderToFragment(newResult, false);
                     elementRef.textContent = '';
                     elementRef.appendChild(fragment);
                 }

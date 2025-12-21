@@ -29,13 +29,57 @@
 
 ### Developer Experience
 - **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
+- **📝 TypeScript Imports**: Write `import './file.ts'` - automatically rewritten to `.js` for browsers
 - **🔥 Hot Module Replacement**: Instant development feedback with automatic HMR
 - **🏗️ Build System**: Integrated esbuild for fast production builds
-- **🎯 Zero Config**: Works out of the box with optional `elit.config.mjs`
+- **🎯 Zero Config**: Works out of the box with optional `elit.config.ts`
 - **📦 CLI Tools**: `npx elit dev`, `npx elit build`, `npx elit preview`
 - **🌍 Environment Support**: .env files with VITE_ prefix
 
-## Installation
+## Quick Start
+
+The fastest way to get started with Elit is using our scaffolding tool:
+
+```bash
+# With npm
+npm create elit@latest my-app
+
+# With yarn
+yarn create elit my-app
+
+# With pnpm
+pnpm create elit my-app
+
+# With bun
+bun create elit my-app
+
+# With deno
+deno run -A npm:create-elit my-app
+```
+
+Then follow the prompts!
+
+```bash
+cd my-app
+npm install
+npm run dev
+```
+
+### Available Templates
+
+Choose a template with the `--template` flag:
+
+- **basic** (default) - Full-featured app with styled counter example
+- **full** - Full-stack app with dev server and API routes
+- **minimal** - Minimal setup with just DOM rendering
+
+```bash
+npm create elit@latest my-app --template=full
+```
+
+## Manual Installation
+
+If you prefer to set up manually:
 
 ```bash
 npm install elit
@@ -58,44 +102,82 @@ npx elit preview
 
 ### Configuration
 
-Create `elit.config.mjs` (or .ts, .js, .json) in your project root:
+Create `elit.config.ts` (or .js, .mjs, .json) in your project root:
 
-```javascript
-import { defineConfig } from 'elit';
-import { resolve } from 'path';
+```typescript
+import { server } from './src/server';
+import { client } from './src/client';
 
-export default defineConfig({
+export default {
   dev: {
-    port: 3000,
-    host: 'localhost',
-    root: './src',
-    basePath: '/',
-    open: true
+    port: 3003,
+    host: '0.0.0.0',
+    open: false,
+    logging: true,
+    clients: [{
+      root: '.',
+      basePath: '',
+      ssr: () => client,  // Server-side rendering
+      api: server         // API routes
+    }]
   },
-  build: {
+  build: [{
     entry: './src/main.ts',
     outDir: './dist',
+    outFile: 'main.js',
     format: 'esm',
     minify: true,
-    platform: 'browser',
-    basePath: '/app',
+    sourcemap: true,
+    target: 'es2020',
     copy: [
-      {
-        from: 'index.html',
-        to: 'index.html',
-        transform: (content, config) => {
-          // Inject base tag from basePath
-          return content;
-        }
-      }
+      { from: './public/index.html', to: './index.html' }
     ]
-  },
+  }],
   preview: {
-    port: 4173,
+    port: 3000,
+    host: '0.0.0.0',
+    open: false,
+    logging: true,
     root: './dist',
-    basePath: '/app'
+    basePath: '',
+    index: './index.html'
   }
+};
+```
+
+**Server setup (src/server.ts):**
+
+```typescript
+import { ServerRouter } from 'elit/server';
+
+export const router = new ServerRouter();
+
+router.get('/api/hello', async (ctx) => {
+    ctx.res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    ctx.res.end("Hello from Elit ServerRouter!");
 });
+
+export const server = router;
+```
+
+**Client SSR template (src/client.ts):**
+
+```typescript
+import { div, html, head, body, title, link, script, meta } from 'elit/el';
+
+export const client = html(
+    head(
+        title('Elit - Full-Stack TypeScript Framework'),
+        link({ rel: 'icon', type: 'image/svg+xml', href: 'favicon.svg' }),
+        meta({ charset: 'UTF-8' }),
+        meta({ name: 'viewport', content: 'width=device-width, initial-scale=1.0' }),
+        meta({ name: 'description', content: 'Full-stack TypeScript framework' })
+    ),
+    body(
+        div({ id: 'root' }),
+        script({ type: 'module', src: '/src/main.js' })
+    )
+);
 ```
 
 ## Features
@@ -127,7 +209,9 @@ export default defineConfig({
 - 🌍 **Environment Variables**: .env file support with VITE_ prefix
 - ⚡ **Cross-Runtime**: Optimized for Node.js, Bun, and Deno with specific adaptations
 
-## Quick Start
+## Manual Setup
+
+If you prefer to set up your project manually:
 
 ### 1. Create Your Project
 
@@ -190,34 +274,6 @@ npx elit dev
 ```
 
 Your app will automatically reload when you make changes with HMR!
-
-### NPM Installation
-
-```bash
-npm install elit
-```
-
-```typescript
-import { div, h1, p, button, createState, reactive, dom } from 'elit';
-
-// Create reactive state
-const count = createState(0);
-
-// Create elements with reactive updates
-const app = div({ className: 'app' },
-  h1('Hello Elit! 👋'),
-  p('A lightweight, reactive DOM library'),
-  reactive(count, (value) =>
-    button({
-      onclick: () => count.value++,
-      className: 'btn-primary'
-    }, `Count: ${value}`)
-  )
-);
-
-// Render to DOM
-dom.render('#app', app);
-```
 
 ### CDN Usage
 
@@ -997,7 +1053,8 @@ Example applications demonstrating Elit features:
 
 ## Links
 
-- 📦 [npm Package](https://www.npmjs.com/package/elit)
+- 📦 [npm - elit](https://www.npmjs.com/package/elit)
+- 🚀 [npm - create-elit](https://www.npmjs.com/package/create-elit)
 - 🐙 [GitHub Repository](https://github.com/d-osc/elit)
 - 📚 [Documentation](https://d-osc.github.io/elit)
 - 💬 Community & Issues: [GitHub Discussions](https://github.com/d-osc/elit/discussions)

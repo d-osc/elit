@@ -11,6 +11,73 @@ import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 const COMMANDS = ['dev', 'build', 'preview', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
+/**
+ * Helper: Setup graceful shutdown handlers (eliminates duplication in runDev and runPreview)
+ */
+function setupShutdownHandlers(closeFunc: () => Promise<void>): void {
+    const shutdown = async () => {
+        console.log('\n[Server] Shutting down...');
+        await closeFunc();
+        process.exit(0);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+}
+
+/**
+ * Helper: Execute build with error handling (eliminates duplication in runBuild)
+ */
+async function executeBuild(options: BuildOptions): Promise<void> {
+    try {
+        await build(options);
+    } catch (error) {
+        process.exit(1);
+    }
+}
+
+/**
+ * Helper: Validate entry file (eliminates duplication in runBuild)
+ */
+function validateEntry(entry: string | undefined, buildIndex?: number): void {
+    if (!entry) {
+        if (buildIndex !== undefined) {
+            console.error(`Error: Entry file is required for build #${buildIndex + 1}`);
+        } else {
+            console.error('Error: Entry file is required');
+            console.error('Specify in config file or use --entry <file>');
+        }
+        process.exit(1);
+    }
+}
+
+/**
+ * Helper: Ensure env is set (eliminates duplication in runBuild)
+ */
+function ensureEnv(options: BuildOptions, env: Record<string, string>): void {
+    if (!options.env) {
+        options.env = env;
+    }
+}
+
+/**
+ * Helper: Generic argument parser (eliminates duplication in parseDevArgs, parseBuildArgs, parsePreviewArgs)
+ */
+type ArgHandler<T> = (options: T, value: string, index: { current: number }) => void;
+
+function parseArgs<T>(args: string[], handlers: Record<string, ArgHandler<T>>, options: T): T {
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        const handler = handlers[arg];
+        if (handler) {
+            const index = { current: i };
+            handler(options, args[i + 1], index);
+            i = index.current;
+        }
+    }
+    return options;
+}
+
 async function main() {
     const args = process.argv.slice(2);
     const command = (args[0] as Command) || 'help';
@@ -57,14 +124,7 @@ async function runDev(args: string[]) {
     const devServer = createDevServer(options);
 
     // Handle graceful shutdown
-    const shutdown = async () => {
-        console.log('\n[Server] Shutting down...');
-        await devServer.close();
-        process.exit(0);
-    };
-
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    setupShutdownHandlers(() => devServer.close());
 }
 
 async function runBuild(args: string[]) {
@@ -83,21 +143,10 @@ async function runBuild(args: string[]) {
         if (Object.keys(cliOptions).length > 0) {
             const options = mergeConfig(builds[0] || {}, cliOptions) as BuildOptions;
 
-            if (!options.env) {
-                options.env = env;
-            }
+            ensureEnv(options, env);
+            validateEntry(options.entry);
 
-            if (!options.entry) {
-                console.error('Error: Entry file is required');
-                console.error('Specify in config file or use --entry <file>');
-                process.exit(1);
-            }
-
-            try {
-                await build(options);
-            } catch (error) {
-                process.exit(1);
-            }
+            await executeBuild(options);
         } else {
             // Run all builds from config
             console.log(`Building ${builds.length} ${builds.length === 1 ? 'entry' : 'entries'}...\n`);
@@ -105,14 +154,8 @@ async function runBuild(args: string[]) {
             for (let i = 0; i < builds.length; i++) {
                 const buildConfig = builds[i];
 
-                if (!buildConfig.env) {
-                    buildConfig.env = env;
-                }
-
-                if (!buildConfig.entry) {
-                    console.error(`Error: Entry file is required for build #${i + 1}`);
-                    process.exit(1);
-                }
+                ensureEnv(buildConfig, env);
+                validateEntry(buildConfig.entry, i);
 
                 console.log(`[${i + 1}/${builds.length}] Building ${buildConfig.entry}...`);
 
@@ -134,21 +177,10 @@ async function runBuild(args: string[]) {
         // No config, use CLI options only
         const options = cliOptions as BuildOptions;
 
-        if (!options.env) {
-            options.env = env;
-        }
+        ensureEnv(options, env);
+        validateEntry(options.entry);
 
-        if (!options.entry) {
-            console.error('Error: Entry file is required');
-            console.error('Specify in config file or use --entry <file>');
-            process.exit(1);
-        }
-
-        try {
-            await build(options);
-        } catch (error) {
-            process.exit(1);
-        }
+        await executeBuild(options);
     }
 }
 
@@ -187,6 +219,7 @@ async function runPreview(args: string[]) {
 
         options.root = mergedOptions.root || defaultOutDir || 'dist';
         options.basePath = mergedOptions.basePath;
+        options.index = mergedOptions.index;
         console.log('Starting preview server...');
         console.log(`  Root:  ${options.root}`);
     }
@@ -223,127 +256,63 @@ async function runPreview(args: string[]) {
 
     const devServer = createDevServer(options);
 
-    const shutdown = async () => {
-        console.log('\n[Server] Shutting down...');
-        await devServer.close();
-        process.exit(0);
-    };
-
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    setupShutdownHandlers(() => devServer.close());
 }
 
 function parseDevArgs(args: string[]): Partial<DevServerOptions> {
     const options: Partial<DevServerOptions> = {};
 
-    for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        const next = args[i + 1];
+    const handlers: Record<string, ArgHandler<Partial<DevServerOptions>>> = {
+        '-p': (opts, value, index) => { opts.port = parseInt(value, 10); index.current++; },
+        '--port': (opts, value, index) => { opts.port = parseInt(value, 10); index.current++; },
+        '-h': (opts, value, index) => { opts.host = value; index.current++; },
+        '--host': (opts, value, index) => { opts.host = value; index.current++; },
+        '-r': (opts, value, index) => { opts.root = value; index.current++; },
+        '--root': (opts, value, index) => { opts.root = value; index.current++; },
+        '--no-open': (opts) => { opts.open = false; },
+        '--silent': (opts) => { opts.logging = false; },
+    };
 
-        switch (arg) {
-            case '-p':
-            case '--port':
-                options.port = parseInt(next, 10);
-                i++;
-                break;
-            case '-h':
-            case '--host':
-                options.host = next;
-                i++;
-                break;
-            case '-r':
-            case '--root':
-                options.root = next;
-                i++;
-                break;
-            case '--no-open':
-                options.open = false;
-                break;
-            case '--silent':
-                options.logging = false;
-                break;
-        }
-    }
-
-    return options;
+    return parseArgs(args, handlers, options);
 }
 
 function parseBuildArgs(args: string[]): Partial<BuildOptions> {
     const options: Partial<BuildOptions> = {};
 
-    for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        const next = args[i + 1];
+    const handlers: Record<string, ArgHandler<Partial<BuildOptions>>> = {
+        '-e': (opts, value, index) => { opts.entry = value; index.current++; },
+        '--entry': (opts, value, index) => { opts.entry = value; index.current++; },
+        '-o': (opts, value, index) => { opts.outDir = value; index.current++; },
+        '--out-dir': (opts, value, index) => { opts.outDir = value; index.current++; },
+        '--no-minify': (opts) => { opts.minify = false; },
+        '--sourcemap': (opts) => { opts.sourcemap = true; },
+        '-f': (opts, value, index) => { opts.format = value as BuildOptions['format']; index.current++; },
+        '--format': (opts, value, index) => { opts.format = value as BuildOptions['format']; index.current++; },
+        '--silent': (opts) => { opts.logging = false; },
+    };
 
-        switch (arg) {
-            case '-e':
-            case '--entry':
-                options.entry = next;
-                i++;
-                break;
-            case '-o':
-            case '--out-dir':
-                options.outDir = next;
-                i++;
-                break;
-            case '--no-minify':
-                options.minify = false;
-                break;
-            case '--sourcemap':
-                options.sourcemap = true;
-                break;
-            case '-f':
-            case '--format':
-                options.format = next as BuildOptions['format'];
-                i++;
-                break;
-            case '--silent':
-                options.logging = false;
-                break;
-        }
-    }
-
-    return options;
+    return parseArgs(args, handlers, options);
 }
 
 function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean }> {
     const options: Partial<{ port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean }> = {};
 
-    for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
-        const next = args[i + 1];
+    type PreviewOptions = { port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean };
 
-        switch (arg) {
-            case '-p':
-            case '--port':
-                options.port = parseInt(next, 10);
-                i++;
-                break;
-            case '-h':
-            case '--host':
-                options.host = next;
-                i++;
-                break;
-            case '-r':
-            case '--root':
-                options.root = next;
-                i++;
-                break;
-            case '-b':
-            case '--base-path':
-                options.basePath = next;
-                i++;
-                break;
-            case '--no-open':
-                options.open = false;
-                break;
-            case '--silent':
-                options.logging = false;
-                break;
-        }
-    }
+    const handlers: Record<string, ArgHandler<Partial<PreviewOptions>>> = {
+        '-p': (opts, value, index) => { opts.port = parseInt(value, 10); index.current++; },
+        '--port': (opts, value, index) => { opts.port = parseInt(value, 10); index.current++; },
+        '-h': (opts, value, index) => { opts.host = value; index.current++; },
+        '--host': (opts, value, index) => { opts.host = value; index.current++; },
+        '-r': (opts, value, index) => { opts.root = value; index.current++; },
+        '--root': (opts, value, index) => { opts.root = value; index.current++; },
+        '-b': (opts, value, index) => { opts.basePath = value; index.current++; },
+        '--base-path': (opts, value, index) => { opts.basePath = value; index.current++; },
+        '--no-open': (opts) => { opts.open = false; },
+        '--silent': (opts) => { opts.logging = false; },
+    };
 
-    return options;
+    return parseArgs(args, handlers, options);
 }
 
 function printHelp() {

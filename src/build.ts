@@ -12,6 +12,68 @@ import { resolve, join, basename, extname, dirname } from './path';
 import { runtime } from './runtime';
 import type { BuildOptions, BuildResult } from './types';
 
+/**
+ * Helper: Ensure directory exists (eliminates duplication in directory creation)
+ */
+function ensureDir(dirPath: string): void {
+    try {
+        mkdirSync(dirPath, { recursive: true });
+    } catch (error) {
+        // Directory might already exist
+    }
+}
+
+/**
+ * Helper: Calculate build time and size (eliminates duplication in build result)
+ */
+function calculateBuildMetrics(startTime: number, outputPath: string): { buildTime: number; size: number } {
+    const buildTime = Date.now() - startTime;
+    const stats = statSync(outputPath);
+    return { buildTime, size: stats.size };
+}
+
+/**
+ * Helper: Read file and ensure string output (eliminates duplication in file reading)
+ */
+function readFileAsString(filePath: string): string {
+    const contentBuffer = readFileSync(filePath, 'utf-8');
+    return typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
+}
+
+/**
+ * Helper: Get esbuild minify options (eliminates duplication in esbuild config)
+ */
+function getMinifyOptions(minify?: boolean): object {
+    return minify ? {
+        minifyWhitespace: true,
+        minifyIdentifiers: true,
+        minifySyntax: true,
+        legalComments: 'none',
+        mangleProps: /^_/,
+        keepNames: false
+    } : {};
+}
+
+/**
+ * Helper: Log build info (eliminates duplication in logging)
+ */
+function logBuildInfo(config: BuildOptions, outputPath: string): void {
+    console.log('\n🔨 Building...');
+    console.log(`  Entry:  ${config.entry}`);
+    console.log(`  Output: ${outputPath}`);
+    console.log(`  Format: ${config.format}`);
+    console.log(`  Target: ${config.target}`);
+}
+
+/**
+ * Helper: Log build success (eliminates duplication in success logging)
+ */
+function logBuildSuccess(buildTime: number, size: number): void {
+    console.log(`\n✅ Build successful!`);
+    console.log(`  Time: ${buildTime}ms`);
+    console.log(`  Size: ${formatBytes(size)}`);
+}
+
 const defaultOptions: Omit<BuildOptions, 'entry'> = {
     outDir: 'dist',
     minify: true,
@@ -45,18 +107,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     const outputPath = join(outDir, outFile);
 
     // Ensure output directory exists
-    try {
-        mkdirSync(outDir, { recursive: true });
-    } catch (error) {
-        // Directory might already exist
-    }
+    ensureDir(outDir);
 
     if (config.logging) {
-        console.log('\n🔨 Building...');
-        console.log(`  Entry:  ${config.entry}`);
-        console.log(`  Output: ${outputPath}`);
-        console.log(`  Format: ${config.format}`);
-        console.log(`  Target: ${config.target}`);
+        logBuildInfo(config, outputPath);
     }
 
     // Browser-only plugin for automatic client/server separation
@@ -130,19 +184,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 logLevel: config.logging ? 'info' : 'silent',
                 metafile: true,
                 // Additional optimizations
-                ...(config.minify && {
-                    minifyWhitespace: true,
-                    minifyIdentifiers: true,
-                    minifySyntax: true,
-                    legalComments: 'none',
-                    mangleProps: /^_/,
-                    keepNames: false
-                })
+                ...getMinifyOptions(config.minify)
             });
 
-            buildTime = Date.now() - startTime;
-            const stats = statSync(outputPath);
-            size = stats.size;
+            ({ buildTime, size } = calculateBuildMetrics(startTime, outputPath));
         } else if (runtime === 'bun') {
             // Bun - use Bun.build
             // @ts-ignore
@@ -158,14 +203,11 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 define
             });
 
-            buildTime = Date.now() - startTime;
-
             if (!result.success) {
                 throw new Error('Bun build failed: ' + JSON.stringify(result.logs));
             }
 
-            const stats = statSync(outputPath);
-            size = stats.size;
+            ({ buildTime, size } = calculateBuildMetrics(startTime, outputPath));
         } else {
             // Deno - use Deno.emit
             // @ts-ignore
@@ -179,8 +221,6 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 }
             });
 
-            buildTime = Date.now() - startTime;
-
             // Write the bundled output
             const bundledCode = result.files['deno:///bundle.js'];
             if (bundledCode) {
@@ -188,14 +228,11 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 await Deno.writeTextFile(outputPath, bundledCode);
             }
 
-            const stats = statSync(outputPath);
-            size = stats.size;
+            ({ buildTime, size } = calculateBuildMetrics(startTime, outputPath));
         }
 
         if (config.logging) {
-            console.log(`\n✅ Build successful!`);
-            console.log(`  Time: ${buildTime}ms`);
-            console.log(`  Size: ${formatBytes(size)}`);
+            logBuildSuccess(buildTime, size);
 
             // Show metafile info (Node.js esbuild only)
             if (runtime === 'node' && result.metafile) {
@@ -247,14 +284,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 // Ensure target directory exists
                 const targetDir = dirname(toPath);
                 if (!existsSync(targetDir)) {
-                    mkdirSync(targetDir, { recursive: true });
+                    ensureDir(targetDir);
                 }
 
                 if (existsSync(fromPath)) {
                     if (copyItem.transform) {
                         // Read, transform, and write
-                        const contentBuffer = readFileSync(fromPath, 'utf-8');
-                        const content = typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
+                        const content = readFileAsString(fromPath);
                         const transformed = copyItem.transform(content, config);
                         writeFileSync(toPath, transformed);
                     } else {

@@ -1,0 +1,40 @@
+{
+  "name": "create-elit",
+  "version": "2.0.0",
+  "description": "Scaffolding tool for creating Elit projects",
+  "type": "module",
+  "bin": {
+    "create-elit": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [
+    "create-elit",
+    "elit",
+    "scaffolding",
+    "cli",
+    "template",
+    "boilerplate"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/d-osc/elit.git",
+    "directory": "packages/create-elit"
+  },
+  "bugs": {
+    "url": "https://github.com/d-osc/elit/issues"
+  },
+  "homepage": "https://d-osc.github.io/elit/",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}

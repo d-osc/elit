@@ -155,38 +155,23 @@ export class CreateStyle {
 
     // Combinator Selectors
     descendant(ancestor: string, descendant: string, styles: Record<string, string | number>): CSSRule {
-        const selector = `${ancestor} ${descendant}`;
-        const rule: CSSRule = { selector, styles, type: 'custom' };
-        this.rules.push(rule);
-        return rule;
+        return this.createAndAddRule(`${ancestor} ${descendant}`, styles);
     }
 
     child(parent: string, childSel: string, styles: Record<string, string | number>): CSSRule {
-        const selector = `${parent} > ${childSel}`;
-        const rule: CSSRule = { selector, styles, type: 'custom' };
-        this.rules.push(rule);
-        return rule;
+        return this.createAndAddRule(`${parent} > ${childSel}`, styles);
     }
 
     adjacentSibling(element: string, sibling: string, styles: Record<string, string | number>): CSSRule {
-        const selector = `${element} + ${sibling}`;
-        const rule: CSSRule = { selector, styles, type: 'custom' };
-        this.rules.push(rule);
-        return rule;
+        return this.createAndAddRule(`${element} + ${sibling}`, styles);
     }
 
     generalSibling(element: string, sibling: string, styles: Record<string, string | number>): CSSRule {
-        const selector = `${element} ~ ${sibling}`;
-        const rule: CSSRule = { selector, styles, type: 'custom' };
-        this.rules.push(rule);
-        return rule;
+        return this.createAndAddRule(`${element} ~ ${sibling}`, styles);
     }
 
     multiple(selectors: string[], styles: Record<string, string | number>): CSSRule {
-        const selector = selectors.join(', ');
-        const rule: CSSRule = { selector, styles, type: 'custom' };
-        this.rules.push(rule);
-        return rule;
+        return this.createAndAddRule(selectors.join(', '), styles);
     }
 
     // Nesting (BEM-style)
@@ -231,12 +216,7 @@ export class CreateStyle {
 
     // @media - Media Queries
     media(type: string, condition: string, rules: Record<string, Record<string, string | number>>): MediaRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const mediaRule: MediaRule = { type, condition, rules: cssRules };
+        const mediaRule: MediaRule = { type, condition, rules: this.rulesToCSSRules(rules) };
         this.mediaRules.push(mediaRule);
         return mediaRule;
     }
@@ -258,46 +238,26 @@ export class CreateStyle {
     }
 
     mediaDark(rules: Record<string, Record<string, string | number>>): MediaRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const mediaRule: MediaRule = { type: '', condition: 'prefers-color-scheme: dark', rules: cssRules };
+        const mediaRule: MediaRule = { type: '', condition: 'prefers-color-scheme: dark', rules: this.rulesToCSSRules(rules) };
         this.mediaRules.push(mediaRule);
         return mediaRule;
     }
 
     mediaLight(rules: Record<string, Record<string, string | number>>): MediaRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const mediaRule: MediaRule = { type: '', condition: 'prefers-color-scheme: light', rules: cssRules };
+        const mediaRule: MediaRule = { type: '', condition: 'prefers-color-scheme: light', rules: this.rulesToCSSRules(rules) };
         this.mediaRules.push(mediaRule);
         return mediaRule;
     }
 
     mediaReducedMotion(rules: Record<string, Record<string, string | number>>): MediaRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const mediaRule: MediaRule = { type: '', condition: 'prefers-reduced-motion: reduce', rules: cssRules };
+        const mediaRule: MediaRule = { type: '', condition: 'prefers-reduced-motion: reduce', rules: this.rulesToCSSRules(rules) };
         this.mediaRules.push(mediaRule);
         return mediaRule;
     }
 
     // @container - Container Queries
     container(condition: string, rules: Record<string, Record<string, string | number>>, name?: string): ContainerRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const containerRule: ContainerRule = { name, condition, rules: cssRules };
+        const containerRule: ContainerRule = { name, condition, rules: this.rulesToCSSRules(rules) };
         this.containerRules.push(containerRule);
         return containerRule;
     }
@@ -309,12 +269,7 @@ export class CreateStyle {
 
     // @supports - Feature Queries
     supports(condition: string, rules: Record<string, Record<string, string | number>>): SupportsRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const supportsRule: SupportsRule = { condition, rules: cssRules };
+        const supportsRule: SupportsRule = { condition, rules: this.rulesToCSSRules(rules) };
         this.supportsRules.push(supportsRule);
         return supportsRule;
     }
@@ -325,12 +280,7 @@ export class CreateStyle {
     }
 
     layer(name: string, rules: Record<string, Record<string, string | number>>): LayerRule {
-        const cssRules: CSSRule[] = Object.entries(rules).map(([selector, styles]) => ({
-            selector,
-            styles,
-            type: 'custom' as const
-        }));
-        const layerRule: LayerRule = { name, rules: cssRules };
+        const layerRule: LayerRule = { name, rules: this.rulesToCSSRules(rules) };
         this.layerRules.push(layerRule);
         return layerRule;
     }
@@ -352,6 +302,27 @@ export class CreateStyle {
     // Utility Methods
     private toKebabCase(str: string): string {
         return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+    }
+
+    // Helper: Create and add rule (eliminates duplication in combinator selectors)
+    private createAndAddRule(selector: string, styles: Record<string, string | number>, type: CSSRule['type'] = 'custom'): CSSRule {
+        const rule: CSSRule = { selector, styles, type };
+        this.rules.push(rule);
+        return rule;
+    }
+
+    // Helper: Convert rules object to CSSRule array (eliminates duplication in media/container/supports/layer)
+    private rulesToCSSRules(rules: Record<string, Record<string, string | number>>): CSSRule[] {
+        return Object.entries(rules).map(([selector, styles]) => ({
+            selector,
+            styles,
+            type: 'custom' as const
+        }));
+    }
+
+    // Helper: Render rules with indentation (eliminates duplication in render methods)
+    private renderRulesWithIndent(rules: CSSRule[], indent: string = '    '): string {
+        return rules.map(rule => this.renderRule(rule, indent)).join('\n');
     }
 
     private stylesToString(styles: Record<string, string | number>, indent: string = '    '): string {
@@ -387,12 +358,7 @@ export class CreateStyle {
             : media.type
                 ? media.type
                 : `(${media.condition})`;
-        let css = `@media ${condition} {\n`;
-        for (const rule of media.rules) {
-            css += this.renderRule(rule, '    ') + '\n';
-        }
-        css += '}';
-        return css;
+        return `@media ${condition} {\n${this.renderRulesWithIndent(media.rules)}\n}`;
     }
 
     private renderKeyframes(kf: Keyframes): string {
@@ -418,30 +384,15 @@ export class CreateStyle {
 
     private renderContainerRule(container: ContainerRule): string {
         const nameStr = container.name ? `${container.name} ` : '';
-        let css = `@container ${nameStr}(${container.condition}) {\n`;
-        for (const rule of container.rules) {
-            css += this.renderRule(rule, '    ') + '\n';
-        }
-        css += '}';
-        return css;
+        return `@container ${nameStr}(${container.condition}) {\n${this.renderRulesWithIndent(container.rules)}\n}`;
     }
 
     private renderSupportsRule(supports: SupportsRule): string {
-        let css = `@supports (${supports.condition}) {\n`;
-        for (const rule of supports.rules) {
-            css += this.renderRule(rule, '    ') + '\n';
-        }
-        css += '}';
-        return css;
+        return `@supports (${supports.condition}) {\n${this.renderRulesWithIndent(supports.rules)}\n}`;
     }
 
     private renderLayerRule(layer: LayerRule): string {
-        let css = `@layer ${layer.name} {\n`;
-        for (const rule of layer.rules) {
-            css += this.renderRule(rule, '    ') + '\n';
-        }
-        css += '}';
-        return css;
+        return `@layer ${layer.name} {\n${this.renderRulesWithIndent(layer.rules)}\n}`;
     }
 
     // Render Output
@@ -548,3 +499,26 @@ export class CreateStyle {
         this._layerOrder = [];
     }
 }
+
+export const styles = new CreateStyle();
+
+
+export const {
+    addVar, var: getVar,
+    addTag, addClass, addId,
+    addPseudoClass, addPseudoElement, addAttribute, attrEquals, attrContainsWord, attrStartsWith, attrEndsWith, attrContains,
+    descendant, child: childStyle, adjacentSibling, generalSibling, multiple: multipleStyle,
+    addName, nesting,
+    keyframe, keyframeFromTo,
+    fontFace,
+    import: importStyle,
+    media: mediaStyle,
+    mediaScreen, mediaPrint, mediaMinWidth, mediaMaxWidth, mediaDark, mediaLight, mediaReducedMotion,
+    container, addContainer,
+    supports: supportsStyle,
+    layerOrder, layer,
+    add: addStyle, important,
+    render: renderStyle, inject: injectStyle, clear: clearStyle
+} = styles;
+
+export default styles;
