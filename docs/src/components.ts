@@ -86,8 +86,8 @@ export const Hero = (router: Router) =>
       reactive(currentLang, () => a({ href: 'https://github.com/d-osc/elit', className: 'btn btn-secondary', target: '_blank' }, t('hero.viewGithub')))
     ),
     div({ className: 'install-box' },
-      code('npm install elit'),
-      button({ onclick: () => navigator.clipboard.writeText('npm install elit') }, 'Copy')
+      code('npm create elit@latest'),
+      button({ onclick: () => navigator.clipboard.writeText('npm create elit@latest') }, 'Copy')
     )
   );
 
@@ -97,7 +97,7 @@ const featureKeys = [
   { icon: '⚡', key: 'fast' },
   { icon: '🔄', key: 'reactive' },
   { icon: '🎨', key: 'styling' },
-  { icon: '📦', key: 'ssr' },
+  { icon: '🌐', key: 'server' },
   { icon: '🛤️', key: 'routing' }
 ];
 
@@ -118,11 +118,15 @@ export const Features = () =>
   );
 
 // Quick Start Section
-const quickStartCode = `// 1. Install Elit
-npm install elit
+const quickStartCode = `// 1. Create a new Elit project
+npm create elit@latest my-app
+cd my-app
 
 // 2. Start dev server with HMR
-npx elit dev
+npm run dev
+
+// Or install manually:
+npm install elit
 
 // 3. Create your app (src/main.ts)
 import { div, h1, button, createState, reactive, dom } from 'elit';
@@ -154,7 +158,7 @@ export const QuickStart = (router: Router) =>
             div({ className: 'step-number' }, '1'),
             div({ className: 'step-content' },
               h3(t('quickstart.install')),
-              pre(code(...codeBlock('npm install elit')))
+              pre(code(...codeBlock('npm create elit@latest my-app')))
             )
           ),
           div({ className: 'step' },
@@ -330,8 +334,8 @@ export const ElitVsNextjs = () =>
           ),
           div({ className: 'comparison-row' },
             div({ className: 'comparison-cell' }, t('vsNextjs.bundleSize')),
-            div({ className: 'comparison-cell success' }, '~10KB'),
-            div({ className: 'comparison-cell' }, '~85KB (min)')
+            div({ className: 'comparison-cell success' }, '11-15KB'),
+            div({ className: 'comparison-cell' }, '~140KB+')
           ),
           div({ className: 'comparison-row' },
             div({ className: 'comparison-cell' }, t('vsNextjs.dependencies')),
@@ -386,7 +390,7 @@ export const ElitVsNextjs = () =>
       div({ className: 'comparison-summary' },
         h3(t('vsNextjs.summaryTitle')),
         div({ className: 'summary-grid' },
-          div({ className: 'summary-card' },
+          div({ className: 'summary-card pros' },
             span({ className: 'summary-icon' }, '🎯'),
             h4(t('vsNextjs.useElitTitle')),
             p(t('vsNextjs.useElitDesc'))
@@ -395,6 +399,143 @@ export const ElitVsNextjs = () =>
             span({ className: 'summary-icon' }, '⚛️'),
             h4(t('vsNextjs.useNextTitle')),
             p(t('vsNextjs.useNextDesc'))
+          )
+        ),
+
+        // Pros & Cons
+        div({ className: 'pros-cons-grid' },
+          div({ className: 'pros-cons-card' },
+            h4({ className: 'pros-title' }, t('vsNextjs.elitPros')),
+            div({ className: 'pros-cons-list' },
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proLightweight')),
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proZeroDeps')),
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proFastBuild')),
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proSimple')),
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proDirectDom')),
+              div({ className: 'pros-cons-item pros' }, '✓ ', t('vsNextjs.proFullControl'))
+            )
+          ),
+          div({ className: 'pros-cons-card' },
+            h4({ className: 'cons-title' }, t('vsNextjs.elitCons')),
+            div({ className: 'pros-cons-list' },
+              div({ className: 'pros-cons-item cons' }, '✗ ', t('vsNextjs.conNewFramework')),
+              div({ className: 'pros-cons-item cons' }, '✗ ', t('vsNextjs.conSmallCommunity')),
+              div({ className: 'pros-cons-item cons' }, '✗ ', t('vsNextjs.conFewerPlugins')),
+              div({ className: 'pros-cons-item cons' }, '✗ ', t('vsNextjs.conManualOptimization'))
+            )
+          )
+        )
+      )
+    )
+  );
+
+// Framework Comparison Table (Elit vs All)
+export const FrameworkComparison = () =>
+  section({ className: 'all-frameworks-comparison container' },
+    reactive(currentLang, () => h2({ className: 'section-title' }, t('frameworks.title'))),
+    reactive(currentLang, () => p({ className: 'section-subtitle' }, t('frameworks.subtitle'))),
+
+    reactive(currentLang, () =>
+      div({ className: 'frameworks-table-wrapper' },
+        div({ className: 'frameworks-table' },
+          // Header
+          div({ className: 'frameworks-row header' },
+            div({ className: 'frameworks-cell' }, t('frameworks.feature')),
+            div({ className: 'frameworks-cell highlight' }, 'Elit'),
+            div({ className: 'frameworks-cell' }, 'React'),
+            div({ className: 'frameworks-cell' }, 'Vue'),
+            div({ className: 'frameworks-cell' }, 'Svelte'),
+            div({ className: 'frameworks-cell' }, 'SolidJS')
+          ),
+
+          // Bundle Size
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.bundleSize')),
+            div({ className: 'frameworks-cell highlight best' }, '~10KB'),
+            div({ className: 'frameworks-cell' }, '~140KB'),
+            div({ className: 'frameworks-cell' }, '~35KB'),
+            div({ className: 'frameworks-cell good' }, '~7KB'),
+            div({ className: 'frameworks-cell good' }, '~7KB')
+          ),
+
+          // Runtime Deps
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.runtimeDeps')),
+            div({ className: 'frameworks-cell highlight best' }, '0'),
+            div({ className: 'frameworks-cell' }, 'React + ReactDOM'),
+            div({ className: 'frameworks-cell' }, 'Vue core'),
+            div({ className: 'frameworks-cell good' }, 'Compiled away'),
+            div({ className: 'frameworks-cell good' }, 'Minimal runtime')
+          ),
+
+          // Performance
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.performance')),
+            div({ className: 'frameworks-cell highlight best' }, t('frameworks.perfElit')),
+            div({ className: 'frameworks-cell' }, t('frameworks.perfReact')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.perfVue')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.perfSvelte')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.perfSolid'))
+          ),
+
+          // Reactivity
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.reactivity')),
+            div({ className: 'frameworks-cell highlight' }, t('frameworks.reactElit')),
+            div({ className: 'frameworks-cell' }, t('frameworks.reactReact')),
+            div({ className: 'frameworks-cell' }, t('frameworks.reactVue')),
+            div({ className: 'frameworks-cell' }, t('frameworks.reactSvelte')),
+            div({ className: 'frameworks-cell' }, t('frameworks.reactSolid'))
+          ),
+
+          // Server Features
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.serverFeatures')),
+            div({ className: 'frameworks-cell highlight best' }, t('frameworks.serverElit')),
+            div({ className: 'frameworks-cell' }, t('frameworks.serverReact')),
+            div({ className: 'frameworks-cell' }, t('frameworks.serverVue')),
+            div({ className: 'frameworks-cell' }, t('frameworks.serverSvelte')),
+            div({ className: 'frameworks-cell' }, t('frameworks.serverSolid'))
+          ),
+
+          // Learning Curve
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.learningCurve')),
+            div({ className: 'frameworks-cell highlight best' }, t('frameworks.learnElit')),
+            div({ className: 'frameworks-cell' }, t('frameworks.learnReact')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.learnVue')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.learnSvelte')),
+            div({ className: 'frameworks-cell' }, t('frameworks.learnSolid'))
+          ),
+
+          // Ecosystem
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.ecosystem')),
+            div({ className: 'frameworks-cell highlight' }, t('frameworks.ecoElit')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.ecoReact')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.ecoVue')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.ecoSvelte')),
+            div({ className: 'frameworks-cell' }, t('frameworks.ecoSolid'))
+          ),
+
+          // TypeScript
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.typescript')),
+            div({ className: 'frameworks-cell highlight best' }, t('frameworks.tsElit')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.tsReact')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.tsVue')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.tsSvelte')),
+            div({ className: 'frameworks-cell best' }, t('frameworks.tsSolid'))
+          ),
+
+          // Build Speed
+          div({ className: 'frameworks-row' },
+            div({ className: 'frameworks-cell label' }, t('frameworks.buildSpeed')),
+            div({ className: 'frameworks-cell highlight best' }, t('frameworks.buildElit')),
+            div({ className: 'frameworks-cell' }, t('frameworks.buildReact')),
+            div({ className: 'frameworks-cell' }, t('frameworks.buildVue')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.buildSvelte')),
+            div({ className: 'frameworks-cell good' }, t('frameworks.buildSolid'))
           )
         )
       )
@@ -441,7 +582,7 @@ export const Stats = () =>
     reactive(currentLang, () =>
       div({ className: 'container stats-grid' },
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '~10KB'),
+          span({ className: 'stat-number' }, '11KB'),
           span({ className: 'stat-label' }, t('stats.size'))
         ),
         div({ className: 'stat' },
@@ -449,20 +590,280 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.deps'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, 'v2.0.0'),
+          span({ className: 'stat-number' }, 'v3.0.0'),
           span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '100%'),
-          span({ className: 'stat-label' }, t('stats.typescript'))
+          span({ className: 'stat-number' }, '10K+'),
+          span({ className: 'stat-label' }, 'req/s')
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, '<1s'),
-          span({ className: 'stat-label' }, t('stats.hmr'))
+          span({ className: 'stat-number' }, '<7ms'),
+          span({ className: 'stat-label' }, 'latency')
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, 'Full-Stack'),
-          span({ className: 'stat-label' }, t('stats.framework'))
+          span({ className: 'stat-number' }, '3'),
+          span({ className: 'stat-label' }, 'runtimes')
+        )
+      )
+    )
+  );
+
+// Performance Benchmark Section
+export const PerformanceBenchmark = () =>
+  section({ className: 'performance-benchmark container' },
+    reactive(currentLang, () => h2({ className: 'section-title' }, t('benchmark.title'))),
+    reactive(currentLang, () => p({ className: 'section-subtitle' }, t('benchmark.subtitle'))),
+
+    reactive(currentLang, () =>
+      div({ className: 'benchmark-content-multi' },
+        // Node.js Benchmark
+        div({ className: 'runtime-benchmark' },
+          div({ className: 'runtime-header' },
+            div({ className: 'runtime-icon' }, '🟢'),
+            h3({ className: 'runtime-title' }, 'Node.js v20.19.5'),
+            div({ className: 'runtime-badge' }, t('benchmark.production'))
+          ),
+
+          div({ className: 'chart-bars' },
+            // Elit on Node.js (Actual benchmark results)
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name elit' }, 'Elit'),
+                span({ className: 'chart-value' }, '5,943 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-elit', style: 'width: 100%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 16.67ms')
+            ),
+
+            // Express on Node.js (Actual benchmark results)
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name' }, 'Express'),
+                span({ className: 'chart-value' }, '3,744 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-express', style: 'width: 63%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 26.58ms')
+            )
+          ),
+
+          div({ className: 'runtime-summary' },
+            span({ className: 'summary-icon' }, '🏆'),
+            span(t('benchmark.elitFaster') + ' 59% ' + t('benchmark.thanExpress'))
+          )
+        ),
+
+        // Bun Benchmark
+        div({ className: 'runtime-benchmark' },
+          div({ className: 'runtime-header' },
+            div({ className: 'runtime-icon' }, '🔥'),
+            h3({ className: 'runtime-title' }, 'Bun v1.3.2'),
+            div({ className: 'runtime-badge badge-fast' }, t('benchmark.fastest'))
+          ),
+
+          div({ className: 'chart-bars' },
+            // Elit on Bun (Winner!)
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name elit' }, 'Elit ⚡'),
+                span({ className: 'chart-value' }, '14,301 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-elit', style: 'width: 100%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 6.96ms')
+            ),
+
+            // Express v5 on Bun
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name' }, 'Express v5'),
+                span({ className: 'chart-value' }, '13,025 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-express', style: 'width: 91%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 7.65ms')
+            ),
+
+            // Elysia on Bun
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name' }, 'Elysia'),
+                span({ className: 'chart-value' }, '11,914 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-elysia', style: 'width: 83%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 8.37ms')
+            )
+          ),
+
+          div({ className: 'runtime-summary' },
+            span({ className: 'summary-icon' }, '⚡'),
+            span(t('benchmark.elitFaster') + ' 20% ' + t('benchmark.thanElysia'))
+          )
+        ),
+
+        // Deno Benchmark
+        div({ className: 'runtime-benchmark' },
+          div({ className: 'runtime-header' },
+            div({ className: 'runtime-icon' }, '🦕'),
+            h3({ className: 'runtime-title' }, 'Deno v2.5.6'),
+            div({ className: 'runtime-badge badge-secure' }, t('benchmark.secure'))
+          ),
+
+          div({ className: 'chart-bars' },
+            // Elit on Deno (Actual benchmark results)
+            div({ className: 'chart-bar-wrapper' },
+              div({ className: 'chart-label' },
+                div({ className: 'framework-name elit' }, 'Elit'),
+                span({ className: 'chart-value' }, '7,223 req/s')
+              ),
+              div({ className: 'chart-bar-container' },
+                div({ className: 'chart-bar bar-elit', style: 'width: 100%;' })
+              ),
+              div({ className: 'chart-latency' }, t('benchmark.latency') + ': 13.69ms')
+            )
+          ),
+
+          div({ className: 'runtime-summary' },
+            span({ className: 'summary-icon' }, '🛡️'),
+            span(t('benchmark.denoNote'))
+          )
+        )
+      )
+    ),
+
+    // Config and Why Fast section
+    reactive(currentLang, () =>
+      div({ className: 'benchmark-footer' },
+        div({ className: 'benchmark-config' },
+          h4(t('benchmark.configTitle')),
+          div({ className: 'config-grid' },
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.warmup')),
+              span({ className: 'config-value' }, '1,000')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.requests')),
+              span({ className: 'config-value' }, '10,000')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.concurrent')),
+              span({ className: 'config-value' }, '100')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.endpoint')),
+              span({ className: 'config-value' }, 'GET /')
+            )
+          ),
+          h4({ style: 'margin-top: 1.5rem;' }, t('benchmark.systemSpec')),
+          div({ className: 'config-grid' },
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.platform')),
+              span({ className: 'config-value' }, 'Windows 11 Pro (26200)')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.cpu')),
+              span({ className: 'config-value' }, 'Intel 13th/14th Gen @ 2.5GHz')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.memory')),
+              span({ className: 'config-value' }, '64GB RAM (65,246 MB)')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.motherboard')),
+              span({ className: 'config-value' }, 'ASRock B760M PG Lightning')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.network')),
+              span({ className: 'config-value' }, 'Realtek 2.5GbE')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.testDate')),
+              span({ className: 'config-value' }, '2025-12-21')
+            )
+          ),
+          h4({ style: 'margin-top: 1.5rem;' }, t('benchmark.runtimeVersions')),
+          div({ className: 'config-grid' },
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.nodeVersion')),
+              span({ className: 'config-value' }, 'v20.19.5 (V8 11.3)')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.bunVersion')),
+              span({ className: 'config-value' }, 'v1.3.2 (JSC)')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.denoVersion')),
+              span({ className: 'config-value' }, 'v2.5.6 (V8 14.0)')
+            ),
+            div({ className: 'config-item' },
+              span({ className: 'config-label' }, t('benchmark.architecture')),
+              span({ className: 'config-value' }, 'x86_64 Windows')
+            )
+          )
+        ),
+
+        div({ className: 'benchmark-reasons' },
+          h4(t('benchmark.whyFast')),
+          div({ className: 'reasons-grid' },
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '⚡'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle1')),
+                div({ className: 'reason-desc' }, t('benchmark.reason1'))
+              )
+            ),
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '🎯'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle2')),
+                div({ className: 'reason-desc' }, t('benchmark.reason2'))
+              )
+            ),
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '📦'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle3')),
+                div({ className: 'reason-desc' }, t('benchmark.reason3'))
+              )
+            ),
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '🚀'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle4')),
+                div({ className: 'reason-desc' }, t('benchmark.reason4'))
+              )
+            ),
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '💎'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle5')),
+                div({ className: 'reason-desc' }, t('benchmark.reason5'))
+              )
+            ),
+            div({ className: 'reason-item' },
+              span({ className: 'reason-icon' }, '🔧'),
+              div({ className: 'reason-content' },
+                div({ className: 'reason-title' }, t('benchmark.reasonTitle6')),
+                div({ className: 'reason-desc' }, t('benchmark.reason6'))
+              )
+            )
+          )
+        )
+      )
+    ),
+
+    reactive(currentLang, () =>
+      div({ className: 'benchmark-note' },
+        p({ style: 'margin: 0; font-size: 0.9rem; color: var(--text-muted); text-align: center;' },
+          t('benchmark.note')
         )
       )
     )
@@ -639,7 +1040,7 @@ export const Footer = () =>
         p(
           t('footer.license'), ' | ',
           a({ href: 'https://github.com/d-osc/elit' }, 'GitHub'),
-          ' | ', t('footer.builtWith'), ' v2.0.0 | ',
+          ' | ', t('footer.builtWith'), ' v3.0.0 | ',
           'Created by ', a({ href: 'https://github.com/n-devs', target: '_blank' }, 'n-devs')
         )
       )

@@ -98,6 +98,8 @@ export interface ClientConfig {
     api?: Router;
     /** Custom middleware specific to this client */
     middleware?: ((req: any, res: any, next: () => void) => void)[];
+    /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
+    mode?: 'dev' | 'preview';
 }
 
 export interface ProxyConfig {
@@ -157,6 +159,8 @@ export interface DevServerOptions {
     ssr?: () => Child | string;
     /** Proxy configuration for API requests */
     proxy?: ProxyConfig[];
+    /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
+    mode?: 'dev' | 'preview';
 }
 
 export interface DevServer {

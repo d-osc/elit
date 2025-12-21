@@ -30,6 +30,30 @@ const Docs = () =>
       reactive(currentLang, () =>
         div({ className: 'docs-content' },
           h2({ id: 'installation' }, t('docs.installation')),
+
+          h3('Quick Start with create-elit'),
+          p('The fastest way to get started is using create-elit to scaffold a new project:'),
+          codeExample(`# Create a new project
+npm create elit my-app
+
+# With specific template
+npm create elit my-app -- --template=basic
+npm create elit my-app -- --template=full
+npm create elit my-app -- --template=minimal
+
+# Start development
+cd my-app
+npm install
+npm run dev`),
+
+          p('Available templates:'),
+          ul(
+            li(code('basic'), ' - Basic Elit app with counter example and SSR (default)'),
+            li(code('full'), ' - Full-stack app with dev server, API routes, and HMR'),
+            li(code('minimal'), ' - Minimal setup with just DOM rendering')
+          ),
+
+          h3('Manual Installation'),
           p(t('docs.installNpm')),
           codeExample('npm install elit'),
 
@@ -42,6 +66,7 @@ const Docs = () =>
             li('Tree-shakeable: Import only what you need')
           ),
 
+          h3('CDN Installation'),
           p(t('docs.installCdn')),
           codeExample(`<script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>`),
 

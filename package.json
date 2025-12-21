@@ -1,6 +1,6 @@
 {
   "name": "elit",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -150,9 +150,11 @@
     "open": "^11.0.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/mime-types": "^2.1.4",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.13",
+    "express": "^5.2.1",
     "elysia": "^1.4.19",
     "terser": "^5.44.1",
     "tsup": "^8.0.0",

@@ -9,6 +9,7 @@ export default {
     port: 3003,
     host: 'localhost',
     root: __dirname,
+    index: './index.html',
     basePath: '/elit',
     open: true,
     logging: true,
@@ -156,105 +157,105 @@ export default {
   //     minify: true
   //   }
   // ],
-  preview: {
-    port: 3003,
-    host: 'localhost',
-    basePath: '/elit',
-    open: true,
-    logging: true,
+  // preview: {
+  //   port: 3003,
+  //   host: 'localhost',
+  //   basePath: '/elit',
+  //   open: true,
+  //   logging: true,
 
-    // HTTPS support - uncomment to use
-    // https: true,
+  //   // HTTPS support - uncomment to use
+  //   // https: true,
 
-    // API router for REST endpoints - uncomment to use
-    // api: router()
-    //   .get('/api/health', (req, res) => {
-    //     res.json({ status: 'ok' });
-    //   })
-    //   .get('/api/data', (req, res) => {
-    //     res.json({ message: 'Preview API response' });
-    //   }),
+  //   // API router for REST endpoints - uncomment to use
+  //   // api: router()
+  //   //   .get('/api/health', (req, res) => {
+  //   //     res.json({ status: 'ok' });
+  //   //   })
+  //   //   .get('/api/data', (req, res) => {
+  //   //     res.json({ message: 'Preview API response' });
+  //   //   }),
 
-    // Custom middleware - uncomment to use
-    // middleware: [
-    //   (req, res, next) => {
-    //     console.log('Preview request:', req.url);
-    //     next();
-    //   }
-    // ],
+  //   // Custom middleware - uncomment to use
+  //   // middleware: [
+  //   //   (req, res, next) => {
+  //   //     console.log('Preview request:', req.url);
+  //   //     next();
+  //   //   }
+  //   // ],
 
-    // SSR render function - uncomment to use
-    // ssr: () => '<h1>Server-rendered content</h1>',
+  //   // SSR render function - uncomment to use
+  //   // ssr: () => '<h1>Server-rendered content</h1>',
 
-    // Proxy configuration for preview - uncomment to use
-    // proxy: [
-    //   {
-    //     context: '/api',
-    //     target: 'http://localhost:8080'
-    //   }
-    // ],
+  //   // Proxy configuration for preview - uncomment to use
+  //   // proxy: [
+  //   //   {
+  //   //     context: '/api',
+  //   //     target: 'http://localhost:8080'
+  //   //   }
+  //   // ],
 
-    // Worker configuration for preview - uncomment to use
-    // worker: [
-    //   {
-    //     path: 'workers/cache-worker.js',
-    //     type: 'module'
-    //   }
-    // ]
+  //   // Worker configuration for preview - uncomment to use
+  //   // worker: [
+  //   //   {
+  //   //     path: 'workers/cache-worker.js',
+  //   //     type: 'module'
+  //   //   }
+  //   // ]
 
-    // Alternative: Multi-client preview setup (similar to dev mode)
-    // clients: [
-    //   {
-    //     root: resolve(__dirname, 'dist/app1'),
-    //     basePath: '/app1',
-    //     proxy: [
-    //       {
-    //         context: '/api',
-    //         target: 'http://localhost:8080',
-    //         changeOrigin: true
-    //       }
-    //     ],
-    //     worker: [
-    //       {
-    //         path: 'workers/app1-worker.js',
-    //         type: 'module'
-    //       }
-    //     ],
-    //     // API routes are prefixed with basePath
-    //     // This route becomes: /app1/api/health
-    //     api: router()
-    //       .get('/api/health', (req, res) => {
-    //         res.json({ status: 'ok', app: 'app1' });
-    //       }),
-    //     middleware: [
-    //       (req, res, next) => {
-    //         console.log('App1 preview:', req.url);
-    //         next();
-    //       }
-    //     ]
-    //   },
-    //   {
-    //     root: resolve(__dirname, 'dist/app2'),
-    //     basePath: '/app2',
-    //     worker: [
-    //       {
-    //         path: 'workers/app2-worker.js',
-    //         type: 'module'
-    //       }
-    //     ],
-    //     // API routes are prefixed with basePath
-    //     // This route becomes: /app2/api/status
-    //     api: router()
-    //       .get('/api/status', (req, res) => {
-    //         res.json({ status: 'running', app: 'app2' });
-    //       }),
-    //     middleware: [
-    //       (req, res, next) => {
-    //         console.log('App2 preview:', req.url);
-    //         next();
-    //       }
-    //     ]
-    //   }
-    // ]
-  }
+  //   // Alternative: Multi-client preview setup (similar to dev mode)
+  //   // clients: [
+  //   //   {
+  //   //     root: resolve(__dirname, 'dist/app1'),
+  //   //     basePath: '/app1',
+  //   //     proxy: [
+  //   //       {
+  //   //         context: '/api',
+  //   //         target: 'http://localhost:8080',
+  //   //         changeOrigin: true
+  //   //       }
+  //   //     ],
+  //   //     worker: [
+  //   //       {
+  //   //         path: 'workers/app1-worker.js',
+  //   //         type: 'module'
+  //   //       }
+  //   //     ],
+  //   //     // API routes are prefixed with basePath
+  //   //     // This route becomes: /app1/api/health
+  //   //     api: router()
+  //   //       .get('/api/health', (req, res) => {
+  //   //         res.json({ status: 'ok', app: 'app1' });
+  //   //       }),
+  //   //     middleware: [
+  //   //       (req, res, next) => {
+  //   //         console.log('App1 preview:', req.url);
+  //   //         next();
+  //   //       }
+  //   //     ]
+  //   //   },
+  //   //   {
+  //   //     root: resolve(__dirname, 'dist/app2'),
+  //   //     basePath: '/app2',
+  //   //     worker: [
+  //   //       {
+  //   //         path: 'workers/app2-worker.js',
+  //   //         type: 'module'
+  //   //       }
+  //   //     ],
+  //   //     // API routes are prefixed with basePath
+  //   //     // This route becomes: /app2/api/status
+  //   //     api: router()
+  //   //       .get('/api/status', (req, res) => {
+  //   //         res.json({ status: 'running', app: 'app2' });
+  //   //       }),
+  //   //     middleware: [
+  //   //       (req, res, next) => {
+  //   //         console.log('App2 preview:', req.url);
+  //   //         next();
+  //   //       }
+  //   //     ]
+  //   //   }
+  //   // ]
+  // }
 };

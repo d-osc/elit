@@ -121,6 +121,9 @@ async function runDev(args: string[]) {
         options.root = process.cwd();
     }
 
+    // Set mode to 'dev' for dev command
+    options.mode = 'dev';
+
     const devServer = createDevServer(options);
 
     // Handle graceful shutdown
@@ -253,6 +256,9 @@ async function runPreview(args: string[]) {
     if (mergedOptions.ssr) {
         options.ssr = mergedOptions.ssr;
     }
+
+    // Set mode to 'preview' for preview command
+    options.mode = 'preview';
 
     const devServer = createDevServer(options);
 

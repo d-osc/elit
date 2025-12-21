@@ -3,13 +3,15 @@
  * Ultra-optimized for maximum performance across Node.js, Bun, and Deno
  *
  * Performance optimizations:
+ * - Bun fast path: Zero class instantiation (object literals only)
  * - Eliminated EventEmitter overhead for Bun/Deno
  * - Zero-copy headers conversion
  * - Inline response creation
  * - Reduced object allocations
+ * - Direct closure capture (no resolver indirection)
  */
 
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import { runtime, isBun, isDeno, isNode } from './runtime';
 
 /**
@@ -70,18 +72,17 @@ function closeAndEmit(server: Server, callback?: (err?: Error) => void): void {
 
 // Lazy-load native modules for Node.js
 let http: any, https: any;
-async function loadNodeModules() {
-  if (isNode && !http) {
-    const httpMod = await import('http');
-    const httpsMod = await import('https');
-    http = httpMod.default || httpMod;
-    https = httpsMod.default || httpsMod;
-  }
-}
 
-// Initialize on first use for SSR
+// Initialize immediately for Node.js (synchronous require)
 if (isNode && typeof process !== 'undefined') {
-  loadNodeModules().catch(() => { });
+  try {
+    http = require('node:http');
+    https = require('node:https');
+  } catch (e) {
+    // Fallback for older Node versions
+    http = require('http');
+    https = require('https');
+  }
 }
 
 /**
@@ -433,35 +434,122 @@ export class Server extends EventEmitter {
         this.emit('close');
       });
     } else if (isBun) {
-      // Bun - ultra-optimized Bun.serve() with minimal overhead
+      // Bun - ULTRA-OPTIMIZED direct fast path (zero wrapper overhead)
       // @ts-ignore
       this.nativeServer = Bun.serve({
         port,
         hostname,
         fetch: (req: Request) => {
-          const incomingMessage = new IncomingMessage(req);
-          const serverResponse = new ServerResponse();
+          // Fast path: Create minimal context object to avoid wrapper classes
+          const urlObj = new URL(req.url);
+          const pathname = urlObj.pathname + urlObj.search;
 
-          let response: Response | null = null;
+          // Ultra-lightweight response builder (no class instantiation)
+          let statusCode = 200;
+          let statusMessage = 'OK';
+          let body = '';
+          const headers: Record<string, string> = Object.create(null);
+          let responseReady = false;
 
-          // Set up resolver to capture response
-          serverResponse._setResolver((res: Response) => {
-            response = res;
-          });
+          // Minimal IncomingMessage-compatible object (object literal is faster than class)
+          const incomingMessage: any = {
+            method: req.method,
+            url: pathname,
+            headers: req.headers,
+            httpVersion: '1.1',
+            rawHeaders: [],
+            _req: req,
+            text: () => req.text(),
+            json: () => req.json(),
+          };
 
-          // Call handler
+          // Minimal ServerResponse-compatible object (inline methods, no inheritance)
+          const serverResponse: any = {
+            statusCode: 200,
+            statusMessage: 'OK',
+            headersSent: false,
+            _headers: headers,
+
+            setHeader(name: string, value: string | string[] | number) {
+              headers[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : String(value);
+              return this;
+            },
+
+            getHeader(name: string) {
+              return headers[name.toLowerCase()];
+            },
+
+            getHeaders() {
+              return { ...headers };
+            },
+
+            writeHead(status: number, arg2?: any, arg3?: any) {
+              statusCode = status;
+              this.statusCode = status;
+              this.headersSent = true;
+
+              if (typeof arg2 === 'string') {
+                statusMessage = arg2;
+                this.statusMessage = arg2;
+                if (arg3) {
+                  for (const key in arg3) {
+                    headers[key.toLowerCase()] = arg3[key];
+                  }
+                }
+              } else if (arg2) {
+                for (const key in arg2) {
+                  headers[key.toLowerCase()] = arg2[key];
+                }
+              }
+              return this;
+            },
+
+            write(chunk: any) {
+              if (!this.headersSent) {
+                this.writeHead(statusCode);
+              }
+              body += chunk;
+              return true;
+            },
+
+            end(chunk?: any) {
+              if (chunk !== undefined) {
+                this.write(chunk);
+              }
+              if (!this.headersSent) {
+                this.writeHead(statusCode);
+              }
+              responseReady = true;
+              return this;
+            },
+          };
+
+          // Execute handler
           if (self.requestListener) {
             self.requestListener(incomingMessage, serverResponse);
           }
 
-          // If response was set synchronously, return it immediately
-          if (response) {
-            return response;
+          // Inline Response creation (fastest path - no function calls)
+          if (responseReady) {
+            return new Response(body, {
+              status: statusCode,
+              statusText: statusMessage,
+              headers: headers as HeadersInit,
+            });
           }
 
-          // Otherwise, wait for async response
+          // Fallback for async (rare case)
           return new Promise<Response>((resolve) => {
-            serverResponse._setResolver(resolve);
+            serverResponse.end = (chunk?: any) => {
+              if (chunk !== undefined) {
+                body += chunk;
+              }
+              resolve(new Response(body, {
+                status: statusCode,
+                statusText: statusMessage,
+                headers: headers as HeadersInit,
+              }));
+            };
           });
         },
         error: createErrorResponse,

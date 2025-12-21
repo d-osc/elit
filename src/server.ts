@@ -13,7 +13,7 @@ import { watch } from './chokidar';
 import { readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
-import { isBun, isDeno, runtime } from './runtime';
+import { isBun, isDeno } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
 
@@ -129,17 +129,27 @@ const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res,
 const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
 
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
-const ELIT_IMPORT_MAP = `<script type="importmap">{"imports":{` +
-  `"elit":"/dist/index.mjs",` +
-  `"elit/":"/dist/",` +
-  `"elit/dom":"/dist/dom.mjs",` +
-  `"elit/state":"/dist/state.mjs",` +
-  `"elit/style":"/dist/style.mjs",` +
-  `"elit/el":"/dist/el.mjs",` +
-  `"elit/router":"/dist/router.mjs",` +
-  `"elit/hmr":"/dist/hmr.mjs",` +
-  `"elit/types":"/dist/types.mjs"` +
-  `}}</script>`;
+const createElitImportMap = (basePath: string = '', mode: 'dev' | 'preview' = 'dev'): string => {
+  // In dev mode, use source files from node_modules/elit/src
+  // In preview mode, use built files from dist
+  const srcPath = mode === 'dev'
+    ? (basePath ? `${basePath}/node_modules/elit/src` : '/node_modules/elit/src')
+    : (basePath ? `${basePath}/dist` : '/dist');
+
+  const fileExt = mode === 'dev' ? '.ts' : '.mjs';
+
+  return `<script type="importmap">{"imports":{` +
+    `"elit":"${srcPath}/index${fileExt}",` +
+    `"elit/":"${srcPath}/",` +
+    `"elit/dom":"${srcPath}/dom${fileExt}",` +
+    `"elit/state":"${srcPath}/state${fileExt}",` +
+    `"elit/style":"${srcPath}/style${fileExt}",` +
+    `"elit/el":"${srcPath}/el${fileExt}",` +
+    `"elit/router":"${srcPath}/router${fileExt}",` +
+    `"elit/hmr":"${srcPath}/hmr${fileExt}",` +
+    `"elit/types":"${srcPath}/types${fileExt}"` +
+    `}}</script>`;
+};
 
 // Helper function to generate HMR script (reused in serveFile and serveSSR)
 const createHMRScript = (port: number, wsPath: string): string =>
@@ -148,13 +158,38 @@ const createHMRScript = (port: number, wsPath: string): string =>
 // Helper function to rewrite relative paths with basePath (reused in serveFile and serveSSR)
 const rewriteRelativePaths = (html: string, basePath: string): string => {
   if (!basePath) return html;
-  html = html.replace(/(<script[^>]+src=["'])\.\/([^"']+)(["'])/g, `$1${basePath}/$2$3`);
-  html = html.replace(/(<link[^>]+href=["'])\.\/([^"']+)(["'])/g, `$1${basePath}/$2$3`);
+  // Rewrite paths starting with ./ or just relative paths (not starting with /, http://, https://)
+  html = html.replace(/(<script[^>]+src=["'])(?!https?:\/\/|\/)(\.\/)?([^"']+)(["'])/g, `$1${basePath}/$3$4`);
+  html = html.replace(/(<link[^>]+href=["'])(?!https?:\/\/|\/)(\.\/)?([^"']+)(["'])/g, `$1${basePath}/$3$4`);
   return html;
 };
 
 // Helper function to normalize basePath (reused in serveFile and serveSSR)
 const normalizeBasePath = (basePath?: string): string => basePath && basePath !== '/' ? basePath : '';
+
+// Helper function to find dist or node_modules directory by walking up the directory tree
+async function findSpecialDir(startDir: string, targetDir: string): Promise<string | null> {
+  let currentDir = startDir;
+  const maxLevels = 5; // Prevent infinite loop
+
+  for (let i = 0; i < maxLevels; i++) {
+    const targetPath = resolve(currentDir, targetDir);
+    try {
+      const stats = await stat(targetPath);
+      if (stats.isDirectory()) {
+        return currentDir; // Return the parent directory containing the target
+      }
+    } catch {
+      // Directory doesn't exist, try parent
+    }
+
+    const parentDir = resolve(currentDir, '..');
+    if (parentDir === currentDir) break; // Reached filesystem root
+    currentDir = parentDir;
+  }
+
+  return null;
+}
 
 // ===== Middleware =====
 
@@ -549,7 +584,8 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
   ignore: ['node_modules/**', 'dist/**', '.git/**', '**/*.d.ts'],
   logging: true,
   middleware: [],
-  worker: []
+  worker: [],
+  mode: 'dev'
 };
 
 interface NormalizedClient {
@@ -559,6 +595,7 @@ interface NormalizedClient {
   ssr?: () => Child | string;
   api?: ServerRouter;
   proxyHandler?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
+  mode: 'dev' | 'preview';
 }
 
 export function createDevServer(options: DevServerOptions): DevServer {
@@ -567,7 +604,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const stateManager = new StateManager();
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
-  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy }] : null;
+  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, mode: config.mode }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
   const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
@@ -595,7 +632,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
       index: indexPath,
       ssr: client.ssr,
       api: client.api,
-      proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined
+      proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined,
+      mode: client.mode || 'dev'
     };
   });
 
@@ -688,16 +726,27 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     // Resolve file path
     const rootDir = await realpath(resolve(matchedClient.root));
-    const baseDir = (isDistRequest || isNodeModulesRequest) ? await realpath(resolve(matchedClient.root, '../..')) : rootDir;
+    let baseDir = rootDir;
+
+    // Auto-detect base directory for /dist/* and /node_modules/* requests
+    if (isDistRequest || isNodeModulesRequest) {
+      const targetDir = isDistRequest ? 'dist' : 'node_modules';
+      const foundDir = await findSpecialDir(matchedClient.root, targetDir);
+      baseDir = foundDir ? await realpath(foundDir) : rootDir;
+    }
+
     let fullPath;
 
     try {
-      fullPath = await realpath(resolve(join(baseDir, normalizedPath)));
-      // Security: Ensure path is strictly within the allowed root directory
-      if (!fullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
-        if (config.logging) console.log(`[403] File access outside of root: ${fullPath}`);
+      // First check path without resolving symlinks for security
+      const unresolvedPath = resolve(join(baseDir, normalizedPath));
+      if (!unresolvedPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
+        if (config.logging) console.log(`[403] File access outside of root (before symlink): ${unresolvedPath}`);
         return send403(res, '403 Forbidden');
       }
+
+      // Then resolve symlinks to get actual file
+      fullPath = await realpath(unresolvedPath);
       if (config.logging && filePath === '/src/pages') {
         console.log(`[DEBUG] Initial resolve succeeded: ${fullPath}`);
       }
@@ -802,15 +851,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
       return send404(res, '404 Not Found');
     }
 
-    // Security: Ensure the resolved path is within allowed directories
-    const parentDir = await realpath(resolve(matchedClient.root, '../..'));
-    const isInRoot = fullPath.startsWith(rootDir + sep) || fullPath === rootDir;
-    const isInParent = (isDistRequest || isNodeModulesRequest) && (fullPath.startsWith(parentDir + sep) || fullPath === parentDir);
-
-    if (!isInRoot && !isInParent) {
-      if (config.logging) console.log(`[403] Path outside allowed directories: ${filePath}`);
-      return send403(res, '403 Forbidden');
-    }
+    // Security check already done before resolving symlinks (line 733)
+    // No need to check again after symlink resolution as that would block legitimate symlinks
 
     try {
       const stats = await stat(fullPath);
@@ -842,25 +884,34 @@ export function createDevServer(options: DevServerOptions): DevServer {
   async function serveFile(filePath: string, res: ServerResponse, client: NormalizedClient) {
     try {
       const rootDir = await realpath(resolve(client.root));
-      const parentDir = await realpath(resolve(client.root, '../..'));
+
+      // Security: Check path before resolving symlinks
+      const unresolvedPath = resolve(filePath);
+      const isNodeModules = filePath.includes('/node_modules/') || filePath.includes('\\node_modules\\');
+      const isDist = filePath.includes('/dist/') || filePath.includes('\\dist\\');
+
+      // Check if path is within project root (for symlinked packages like node_modules/elit)
+      const projectRoot = await realpath(resolve(client.root, '..'));
+      const isInProjectRoot = unresolvedPath.startsWith(projectRoot + sep) || unresolvedPath === projectRoot;
+
+      if (!unresolvedPath.startsWith(rootDir + sep) && unresolvedPath !== rootDir && !isInProjectRoot) {
+        // Allow if it's in node_modules or dist directories (these may be symlinks)
+        if (!isNodeModules && !isDist) {
+          if (config.logging) console.log(`[403] Attempted to serve file outside allowed directories: ${filePath}`);
+          return send403(res, '403 Forbidden');
+        }
+      }
+
+      // Resolve symlinks to get actual file path
       let resolvedPath;
       try {
-        resolvedPath = await realpath(resolve(filePath));
+        resolvedPath = await realpath(unresolvedPath);
       } catch {
         // If index.html not found but SSR function exists, use SSR
         if (filePath.endsWith('index.html') && client.ssr) {
           return serveSSR(res, client);
         }
         return send404(res, '404 Not Found');
-      }
-
-      // Allow files in root directory or parent directory (for /dist and /node_modules)
-      const isInRoot = resolvedPath.startsWith(rootDir + sep) || resolvedPath === rootDir;
-      const isInParent = resolvedPath.startsWith(parentDir + sep) || resolvedPath === parentDir;
-
-      if (!isInRoot && !isInParent) {
-        if (config.logging) console.log(`[403] Attempted to serve file outside allowed directories: ${filePath}`);
-        return send403(res, '403 Forbidden');
       }
 
       let content = await readFile(resolvedPath);
@@ -995,7 +1046,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
         }
 
         // Inject import map and SSR styles into <head>
-        const headInjection = ssrStyles ? `${ssrStyles}\n${ELIT_IMPORT_MAP}` : ELIT_IMPORT_MAP;
+        const elitImportMap = createElitImportMap(basePath, client.mode);
+        const headInjection = ssrStyles ? `${ssrStyles}\n${elitImportMap}` : elitImportMap;
         html = html.includes('</head>') ? html.replace('</head>', `${headInjection}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
         content = Buffer.from(html);
@@ -1068,7 +1120,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
       const hmrScript = createHMRScript(config.port, basePath);
 
       // Inject import map in head, HMR script in body
-      html = html.includes('</head>') ? html.replace('</head>', `${ELIT_IMPORT_MAP}</head>`) : html;
+      const elitImportMap = createElitImportMap(basePath, client.mode);
+      html = html.includes('</head>') ? html.replace('</head>', `${elitImportMap}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
       res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });

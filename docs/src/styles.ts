@@ -992,6 +992,633 @@ styles.add({
   }
 });
 
+// Pros & Cons Section
+styles.addClass('pros-cons-grid', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '2rem',
+  marginTop: '3rem'
+});
+
+styles.addClass('pros-cons-card', {
+  background: styles.var(bgCard),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '12px',
+  padding: '2rem',
+  transition: 'border-color 0.2s, background-color 0.3s ease'
+});
+
+styles.addClass('pros-title', {
+  fontSize: '1.5rem',
+  fontWeight: 700,
+  marginBottom: '1.5rem',
+  color: '#22c55e',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+});
+
+styles.addClass('cons-title', {
+  fontSize: '1.5rem',
+  fontWeight: 700,
+  marginBottom: '1.5rem',
+  color: '#ef4444',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+});
+
+styles.addClass('pros-cons-list', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem'
+});
+
+styles.addClass('pros-cons-item', {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '0.75rem',
+  fontSize: '1rem',
+  lineHeight: 1.6,
+  padding: '0.75rem',
+  borderRadius: '8px',
+  transition: 'background-color 0.2s'
+});
+
+styles.add({
+  '.pros-cons-item.pros': {
+    color: '#22c55e',
+    background: 'rgba(34, 197, 94, 0.1)',
+    border: '1px solid rgba(34, 197, 94, 0.2)'
+  }
+});
+
+styles.add({
+  '.pros-cons-item.cons': {
+    color: '#ef4444',
+    background: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid rgba(239, 68, 68, 0.2)'
+  }
+});
+
+styles.addPseudoClass('hover', {
+  background: 'rgba(34, 197, 94, 0.15)'
+}, '.pros-cons-item.pros');
+
+styles.addPseudoClass('hover', {
+  background: 'rgba(239, 68, 68, 0.15)'
+}, '.pros-cons-item.cons');
+
+// All Frameworks Comparison Section
+styles.addClass('all-frameworks-comparison', {
+  padding: '5rem 0',
+  background: styles.var(bg)
+});
+
+styles.addClass('frameworks-table-wrapper', {
+  marginTop: '3rem',
+  overflowX: 'auto',
+  borderRadius: '12px',
+  border: `1px solid ${styles.var(border)}`,
+  background: styles.var(bgCard)
+});
+
+styles.addClass('frameworks-table', {
+  display: 'grid',
+  minWidth: '800px',
+  background: styles.var(bgCard)
+});
+
+styles.addClass('frameworks-row', {
+  display: 'grid',
+  gridTemplateColumns: '2fr repeat(5, 1fr)',
+  borderBottom: `1px solid ${styles.var(border)}`,
+  transition: 'background-color 0.2s'
+});
+
+styles.add({
+  '.frameworks-row:last-child': {
+    borderBottom: 'none'
+  }
+});
+
+styles.add({
+  '.frameworks-row.header': {
+    background: styles.var(bgCode),
+    fontWeight: 700,
+    fontSize: '0.95rem',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    borderBottom: `2px solid ${styles.var(border)}`
+  }
+});
+
+styles.addPseudoClass('hover', {
+  background: 'rgba(99, 102, 241, 0.05)'
+}, '.frameworks-row:not(.header)');
+
+styles.addClass('frameworks-cell', {
+  padding: '1rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  borderRight: `1px solid ${styles.var(border)}`,
+  fontSize: '0.9rem',
+  lineHeight: 1.4,
+  transition: 'background-color 0.2s'
+});
+
+styles.add({
+  '.frameworks-cell:last-child': {
+    borderRight: 'none'
+  }
+});
+
+styles.add({
+  '.frameworks-cell:first-child': {
+    justifyContent: 'flex-start',
+    textAlign: 'left',
+    fontWeight: 500,
+    paddingLeft: '1.5rem'
+  }
+});
+
+styles.add({
+  '.frameworks-cell.highlight': {
+    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%)',
+    color: styles.var(primary),
+    fontWeight: 700,
+    borderLeft: `2px solid ${styles.var(primary)}`,
+    borderRight: `2px solid ${styles.var(primary)}`
+  }
+});
+
+styles.add({
+  '.frameworks-row.header .frameworks-cell.highlight': {
+    fontSize: '1.05rem',
+    color: styles.var(primary)
+  }
+});
+
+styles.add({
+  '.frameworks-cell.label': {
+    background: 'rgba(99, 102, 241, 0.03)',
+    fontWeight: 600
+  }
+});
+
+styles.add({
+  '.frameworks-cell.best': {
+    color: '#22c55e',
+    fontWeight: 600
+  }
+});
+
+styles.add({
+  '.frameworks-cell.good': {
+    color: '#10b981',
+    fontWeight: 500
+  }
+});
+
+// Responsive design for Framework Comparison
+styles.add({
+  '@media (max-width: 1200px)': {
+    '.frameworks-table': {
+      minWidth: '700px',
+      fontSize: '0.85rem'
+    },
+    '.frameworks-cell': {
+      padding: '0.875rem'
+    },
+    '.frameworks-cell:first-child': {
+      paddingLeft: '1rem'
+    }
+  }
+});
+
+styles.add({
+  '@media (max-width: 768px)': {
+    '.pros-cons-grid': {
+      gridTemplateColumns: '1fr',
+      gap: '1.5rem'
+    },
+    '.frameworks-table': {
+      minWidth: '600px',
+      fontSize: '0.8rem'
+    },
+    '.frameworks-cell': {
+      padding: '0.75rem 0.5rem'
+    },
+    '.frameworks-cell:first-child': {
+      paddingLeft: '0.75rem'
+    },
+    '.frameworks-row': {
+      gridTemplateColumns: '1.5fr repeat(5, 1fr)'
+    }
+  }
+});
+
+// Light theme adjustments for new components
+styles.add({
+  '[data-theme="light"] .pros-cons-item.pros': {
+    background: 'rgba(34, 197, 94, 0.08)',
+    border: '1px solid rgba(34, 197, 94, 0.25)'
+  },
+  '[data-theme="light"] .pros-cons-item.cons': {
+    background: 'rgba(239, 68, 68, 0.08)',
+    border: '1px solid rgba(239, 68, 68, 0.25)'
+  },
+  '[data-theme="light"] .frameworks-cell.highlight': {
+    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(99, 102, 241, 0.04) 100%)'
+  },
+  '[data-theme="light"] .frameworks-cell.label': {
+    background: 'rgba(99, 102, 241, 0.05)'
+  }
+});
+
+// Performance Benchmark Section
+styles.addClass('performance-benchmark', {
+  padding: '5rem 0',
+  background: styles.var(bg)
+});
+
+styles.addClass('benchmark-content-multi', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: '2rem',
+  marginTop: '3rem'
+});
+
+styles.addClass('runtime-benchmark', {
+  background: styles.var(bgCard),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '12px',
+  padding: '1.5rem',
+  transition: 'transform 0.2s, box-shadow 0.2s'
+});
+
+styles.addPseudoClass('hover', {
+  transform: 'translateY(-4px)',
+  boxShadow: '0 8px 24px rgba(99, 102, 241, 0.15)'
+}, '.runtime-benchmark');
+
+styles.addClass('runtime-header', {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '1rem',
+  marginBottom: '1.5rem',
+  paddingBottom: '1rem',
+  borderBottom: `2px solid ${styles.var(border)}`
+});
+
+styles.addClass('runtime-icon', {
+  fontSize: '2rem',
+  flexShrink: 0
+});
+
+styles.addClass('runtime-title', {
+  fontSize: '1.2rem',
+  fontWeight: 700,
+  margin: 0,
+  flex: 1
+});
+
+styles.addClass('runtime-badge', {
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  padding: '0.25rem 0.75rem',
+  borderRadius: '12px',
+  background: styles.var(primary),
+  color: 'white',
+  whiteSpace: 'nowrap'
+});
+
+styles.addClass('badge-fast', {
+  background: '#22c55e'
+});
+
+styles.addClass('badge-secure', {
+  background: '#3b82f6'
+});
+
+styles.addClass('runtime-summary', {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  marginTop: '1rem',
+  padding: '0.75rem',
+  background: styles.var(bgCode),
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  fontWeight: 500,
+  color: styles.var(primary)
+});
+
+styles.addClass('summary-icon', {
+  fontSize: '1.25rem'
+});
+
+// Footer section styles
+styles.addClass('benchmark-footer', {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1.5fr',
+  gap: '3rem',
+  marginTop: '3rem'
+});
+
+styles.addClass('benchmark-config', {
+  background: styles.var(bgCard),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '12px',
+  padding: '2rem'
+});
+
+styles.addClass('config-grid', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '0.75rem'
+});
+
+styles.addClass('benchmark-reasons', {
+  background: styles.var(bgCard),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '12px',
+  padding: '2rem'
+});
+
+styles.addClass('reasons-grid', {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: '1rem'
+});
+
+styles.addClass('reason-content', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem'
+});
+
+styles.addClass('reason-title', {
+  fontWeight: 700,
+  fontSize: '0.95rem',
+  color: styles.var(textColor)
+});
+
+styles.addClass('reason-desc', {
+  fontSize: '0.85rem',
+  color: styles.var(textMuted)
+});
+
+styles.addClass('chart-header', {
+  marginBottom: '2rem'
+});
+
+styles.descendant('.chart-header', 'h3', {
+  fontSize: '1.3rem',
+  marginBottom: '0.5rem'
+});
+
+styles.addClass('chart-note', {
+  fontSize: '0.85rem',
+  color: styles.var(textMuted),
+  marginTop: '0.5rem'
+});
+
+styles.addClass('chart-bars', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+  marginBottom: '2rem'
+});
+
+styles.addClass('chart-bar-wrapper', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem'
+});
+
+styles.addClass('chart-label', {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '0.25rem'
+});
+
+styles.addClass('framework-name', {
+  fontWeight: 600,
+  fontSize: '1rem'
+});
+
+styles.add({
+  '.framework-name.elit': {
+    color: styles.var(primary)
+  }
+});
+
+styles.addClass('chart-value', {
+  fontSize: '0.95rem',
+  fontWeight: 700,
+  color: styles.var(textColor)
+});
+
+styles.addClass('chart-bar-container', {
+  background: styles.var(bgCode),
+  borderRadius: '6px',
+  height: '40px',
+  overflow: 'hidden',
+  position: 'relative'
+});
+
+styles.addClass('chart-bar', {
+  height: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  padding: '0 1rem',
+  borderRadius: '6px',
+  transition: 'width 0.5s ease',
+  position: 'relative'
+});
+
+styles.addClass('bar-elit', {
+  background: 'linear-gradient(90deg, rgba(99, 102, 241, 0.8) 0%, rgba(99, 102, 241, 1) 100%)'
+});
+
+styles.addClass('bar-express', {
+  background: 'linear-gradient(90deg, rgba(156, 163, 175, 0.6) 0%, rgba(156, 163, 175, 0.8) 100%)'
+});
+
+styles.addClass('bar-elysia', {
+  background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.6) 0%, rgba(34, 197, 94, 0.8) 100%)'
+});
+
+styles.addClass('chart-latency', {
+  fontSize: '0.85rem',
+  color: styles.var(textMuted),
+  marginTop: '0.25rem'
+});
+
+styles.addClass('chart-legend', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  padding: '1.5rem',
+  background: styles.var(bgCode),
+  borderRadius: '8px'
+});
+
+styles.addClass('legend-item', {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  fontSize: '0.9rem'
+});
+
+styles.addClass('legend-color', {
+  width: '20px',
+  height: '20px',
+  borderRadius: '4px',
+  flexShrink: 0
+});
+
+styles.add({
+  '.legend-color.elit': {
+    background: styles.var(primary)
+  },
+  '.legend-color.express': {
+    background: '#9ca3af'
+  },
+  '.legend-color.elysia': {
+    background: '#22c55e'
+  }
+});
+
+styles.addClass('benchmark-details', {
+  background: styles.var(bgCard),
+  border: `1px solid ${styles.var(border)}`,
+  borderRadius: '12px',
+  padding: '2rem'
+});
+
+styles.descendant('.benchmark-details', 'h4', {
+  fontSize: '1.2rem',
+  marginBottom: '1rem',
+  color: styles.var(textColor)
+});
+
+styles.addClass('config-list', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  marginBottom: '2rem'
+});
+
+styles.addClass('config-item', {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '0.75rem',
+  background: styles.var(bgCode),
+  borderRadius: '6px'
+});
+
+styles.addClass('config-label', {
+  fontSize: '0.9rem',
+  color: styles.var(textMuted)
+});
+
+styles.addClass('config-value', {
+  fontSize: '0.95rem',
+  fontWeight: 600,
+  color: styles.var(primary)
+});
+
+styles.addClass('reasons-list', {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  marginBottom: '2rem'
+});
+
+styles.addClass('reason-item', {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '0.75rem',
+  padding: '1rem',
+  background: styles.var(bgCode),
+  borderRadius: '8px',
+  lineHeight: 1.6
+});
+
+styles.addClass('reason-icon', {
+  fontSize: '1.5rem',
+  flexShrink: 0
+});
+
+styles.addClass('benchmark-note', {
+  padding: '1.5rem',
+  background: styles.var(bgCode),
+  borderRadius: '8px',
+  marginTop: '1.5rem'
+});
+
+// Responsive design for Benchmark
+styles.add({
+  '@media (max-width: 1200px)': {
+    '.benchmark-content-multi': {
+      gridTemplateColumns: '1fr',
+      gap: '1.5rem'
+    },
+    '.benchmark-footer': {
+      gridTemplateColumns: '1fr',
+      gap: '2rem'
+    }
+  }
+});
+
+styles.add({
+  '@media (max-width: 1024px)': {
+    '.reasons-grid': {
+      gridTemplateColumns: '1fr'
+    },
+    '.config-grid': {
+      gridTemplateColumns: '1fr'
+    }
+  }
+});
+
+styles.add({
+  '@media (max-width: 768px)': {
+    '.performance-benchmark': {
+      padding: '3rem 0'
+    },
+    '.chart-bar-container': {
+      height: '35px'
+    },
+    '.chart-label': {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '0.25rem'
+    },
+    '.framework-name': {
+      fontSize: '0.95rem'
+    },
+    '.chart-value': {
+      fontSize: '0.85rem'
+    },
+    '.runtime-header': {
+      flexDirection: 'column',
+      alignItems: 'flex-start'
+    },
+    '.runtime-badge': {
+      alignSelf: 'flex-start'
+    }
+  }
+});
+
 // Inject styles
 export function injectStyles() {
   styles.inject('elit-docs-styles');
