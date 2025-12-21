@@ -3,7 +3,7 @@ name: Publish create-elit to NPM
 on:
   push:
     tags:
-      - 'create-elit-v*'
+      - 'v*'
 
 jobs:
   publish:
@@ -22,7 +22,7 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          TAG=${GITHUB_REF#refs/tags/create-elit-v}
+          TAG=${GITHUB_REF#refs/tags/}
           echo "version=$TAG" >> $GITHUB_OUTPUT
           echo "Publishing create-elit version: $TAG"
 
