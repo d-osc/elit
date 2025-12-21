@@ -11,3 +11,4 @@ nul
 # License copied during build
 server/LICENSE
 .claude
+bun.lock
