@@ -71,7 +71,7 @@ async function generateTemplate(projectPath, projectName, template) {
             preview: 'elit preview'
         },
         dependencies: {
-            elit: '^2.0.0'
+            elit: '^3.0.1'
         }
     };
     await writeFile(join(projectPath, 'package.json'), JSON.stringify(packageJson, null, 2));
