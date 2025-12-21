@@ -10,6 +10,7 @@ import { RPGGameContent } from './rpg-game';
 import { ChatAppContent } from './chat-app';
 import { AIChatContent } from './ai-chat';
 import { ThreeDSceneContent } from './3d-scene';
+import { MonacoEditorContent } from './monaco-editor';
 
 export interface ExampleItem {
   id: string;
@@ -180,5 +181,19 @@ export const examplesList: ExampleItem[] = [
     difficulty: 'advanced',
     tags: ['3D', 'Canvas', 'Animation', 'Graphics', 'Geometry', 'Lighting', 'Camera'],
     content: ThreeDSceneContent
+  },
+  {
+    id: 'monaco-editor',
+    title: {
+      en: 'Monaco Editor Integration',
+      th: 'การผสานรวม Monaco Editor'
+    },
+    description: {
+      en: 'Integration of Monaco Editor (VS Code\'s editor) with Elit, featuring syntax highlighting, IntelliSense, multiple themes, and keyboard shortcuts.',
+      th: 'การผสานรวม Monaco Editor (โปรแกรมแก้ไขของ VS Code) กับ Elit พร้อมไฮไลต์ไวยากรณ์ IntelliSense หลายธีม และแป้นพิมพ์ลัด'
+    },
+    difficulty: 'intermediate',
+    tags: ['Editor', 'Code Editor', 'Monaco', 'VS Code', 'IntelliSense', 'Syntax Highlighting'],
+    content: MonacoEditorContent
   }
 ];
