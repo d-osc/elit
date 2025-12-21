@@ -1,6 +1,6 @@
 {
   "name": "elit",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -101,7 +101,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --emitDeclarationOnly",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "benchmark": "node benchmark/server-benchmark.js",
@@ -162,6 +162,7 @@
   },
   "files": [
     "dist",
+    "src",
     "README.md",
     "LICENSE"
   ]

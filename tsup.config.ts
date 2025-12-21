@@ -14,7 +14,7 @@ export default defineConfig([
             runtime: 'src/runtime.ts'
         },
         format: ['cjs', 'esm'],
-        dts: true,
+        dts: false, // Generated separately with tsc
         clean: true,
         minify: false,
         splitting: false,
@@ -23,7 +23,8 @@ export default defineConfig([
         target: 'es2020',
         outExtension({ format }) {
             return {
-                js: format === 'cjs' ? '.js' : '.mjs'
+                js: format === 'cjs' ? '.js' : '.mjs',
+                dts: '.d.ts'
             };
         }
     },
@@ -43,7 +44,7 @@ export default defineConfig([
             path: 'src/path.ts'
         },
         format: ['cjs', 'esm'],
-        dts: true,
+        dts: false, // Generated separately with tsc
         clean: false,
         minify: false,
         splitting: false,
@@ -60,7 +61,8 @@ export default defineConfig([
         },
         outExtension({ format }) {
             return {
-                js: format === 'cjs' ? '.js' : '.mjs'
+                js: format === 'cjs' ? '.js' : '.mjs',
+                dts: '.d.ts'
             };
         }
     },

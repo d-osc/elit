@@ -85,7 +85,7 @@ async function generateTemplate(projectPath: string, projectName: string, templa
       preview: 'elit preview'
     },
     dependencies: {
-      elit: '^3.0.1'
+      elit: '^3.0.2'
     }
   };
 
@@ -162,7 +162,7 @@ import { client } from './src/client';
 export default {
   dev: {
     port: 3003,
-    host: '0.0.0.0',
+    host: 'localhost',
     open: ${template === 'basic' ? 'true' : 'false'},
     logging: true,
     clients: [{
@@ -186,7 +186,7 @@ export default {
   }],
   preview: {
     port: 3000,
-    host: '0.0.0.0',
+    host: 'localhost',
     open: false,
     logging: true,
     root: './dist',

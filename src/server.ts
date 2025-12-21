@@ -130,25 +130,27 @@ const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => se
 
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
 const createElitImportMap = (basePath: string = '', mode: 'dev' | 'preview' = 'dev'): string => {
-  // In dev mode, use source files from node_modules/elit/src
+  // In dev mode, use built files from node_modules/elit/dist
   // In preview mode, use built files from dist
   const srcPath = mode === 'dev'
     ? (basePath ? `${basePath}/node_modules/elit/src` : '/node_modules/elit/src')
-    : (basePath ? `${basePath}/dist` : '/dist');
+    : (basePath ? `${basePath}/node_modules/elit/dist` : '/node_modules/elit/dist');
 
   const fileExt = mode === 'dev' ? '.ts' : '.mjs';
 
-  return `<script type="importmap">{"imports":{` +
-    `"elit":"${srcPath}/index${fileExt}",` +
-    `"elit/":"${srcPath}/",` +
-    `"elit/dom":"${srcPath}/dom${fileExt}",` +
-    `"elit/state":"${srcPath}/state${fileExt}",` +
-    `"elit/style":"${srcPath}/style${fileExt}",` +
-    `"elit/el":"${srcPath}/el${fileExt}",` +
-    `"elit/router":"${srcPath}/router${fileExt}",` +
-    `"elit/hmr":"${srcPath}/hmr${fileExt}",` +
-    `"elit/types":"${srcPath}/types${fileExt}"` +
-    `}}</script>`;
+  return `<script type="importmap">{
+  "imports": {
+    "elit": "${srcPath}/index${fileExt}",
+    "elit/": "${srcPath}/",
+    "elit/dom": "${srcPath}/dom${fileExt}",
+    "elit/state": "${srcPath}/state${fileExt}",
+    "elit/style": "${srcPath}/style${fileExt}",
+    "elit/el": "${srcPath}/el${fileExt}",
+    "elit/router": "${srcPath}/router${fileExt}",
+    "elit/hmr": "${srcPath}/hmr${fileExt}",
+    "elit/types": "${srcPath}/types${fileExt}"
+  }
+}</script>`;
 };
 
 // Helper function to generate HMR script (reused in serveFile and serveSSR)
