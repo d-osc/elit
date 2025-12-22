@@ -1,17 +1,18 @@
 import { div, h1, h2, button, p } from 'elit/el';
 import { createState, reactive } from 'elit/state';
 import { render } from 'elit/dom';
+import { compact } from 'lodash-es';
 import './styles.ts';
 
 // Create reactive state (shared between SSR and client)
 export const count = createState(0);
-
+const arr = compact([0, 1, false, 2, '', 3]);
 // Create app (shared between SSR and client)
 export const app = div({ className: 'container' },
   div({ className: 'card' },
     h1('Welcome to Elit! 🚀'),
     p('A lightweight TypeScript framework with reactive state management'),
-
+    p(`Filtered array: ${arr.join(', ')}`),
     div({ className: 'counter' },
       h2('Counter Example'),
       reactive(count, (value) =>

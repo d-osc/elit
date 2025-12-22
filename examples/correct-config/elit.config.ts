@@ -3,8 +3,8 @@ import { client } from './src/client';
 
 export default {
   dev: {
-    port: 3003,
-    host: '0.0.0.0',
+    port: 3020,
+    host: 'localhost',
     open: false,
     logging: true,
     clients: [{
@@ -28,7 +28,7 @@ export default {
   }],
   preview: {
     port: 3000,
-    host: '0.0.0.0',
+    host: 'localhost',
     open: false,
     logging: true,
     root: './dist',

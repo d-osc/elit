@@ -8,10 +8,12 @@
     "preview": "npx tsx ../../src/cli.ts preview"
   },
   "dependencies": {
-    "elit": "file:../.."
+    "elit": "file:../..",
+    "lodash-es": "^4.17.22"
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0"
+    "@types/lodash-es": "^4.17.12",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
   }
 }

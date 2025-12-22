@@ -210,8 +210,10 @@ interface PackageJson {
   name?: string;
   main?: string;
   module?: string;
-  browser?: string;
+  browser?: string | Record<string, string | false>;
   exports?: string | PackageExports | { [key: string]: any };
+  type?: 'module' | 'commonjs';
+  sideEffects?: boolean | string[];
 }
 
 interface ImportMapEntry {
@@ -220,6 +222,13 @@ interface ImportMapEntry {
 
 // Cache for generated import maps to avoid re-scanning
 const importMapCache = new Map<string, ImportMapEntry>();
+
+/**
+ * Clear import map cache (useful when packages are added/removed)
+ */
+export function clearImportMapCache(): void {
+  importMapCache.clear();
+}
 
 /**
  * Scan node_modules and generate import maps for external libraries
@@ -282,6 +291,89 @@ async function findNodeModules(startDir: string): Promise<string | null> {
 }
 
 /**
+ * Check if a package is browser-compatible
+ */
+function isBrowserCompatible(pkgName: string, pkgJson: PackageJson): boolean {
+  // Skip build tools, compilers, and Node.js-only packages
+  const buildTools = [
+    'typescript', 'esbuild', '@esbuild/',
+    'tsx', 'tsup', 'rollup', 'vite', 'webpack', 'parcel',
+    'terser', 'uglify', 'babel', '@babel/',
+    'postcss', 'autoprefixer', 'cssnano',
+    'sass', 'less', 'stylus'
+  ];
+
+  const nodeOnly = [
+    'node-', '@node-', 'fsevents', 'chokidar',
+    'express', 'koa', 'fastify', 'nest',
+    'commander', 'yargs', 'inquirer', 'chalk', 'ora',
+    'nodemon', 'pm2', 'dotenv'
+  ];
+
+  const testingTools = [
+    'jest', 'vitest', 'mocha', 'chai', 'jasmine',
+    '@jest/', '@testing-library/', '@vitest/',
+    'playwright', 'puppeteer', 'cypress'
+  ];
+
+  const linters = [
+    'eslint', '@eslint/', 'prettier', 'tslint',
+    'stylelint', 'commitlint'
+  ];
+
+  const typeDefinitions = [
+    '@types/', '@typescript-eslint/'
+  ];
+
+  const utilities = [
+    'get-tsconfig', 'resolve-pkg-maps', 'pkg-types',
+    'fast-glob', 'globby', 'micromatch',
+    'execa', 'cross-spawn', 'shelljs'
+  ];
+
+  // Combine all skip lists
+  const skipPatterns = [
+    ...buildTools,
+    ...nodeOnly,
+    ...testingTools,
+    ...linters,
+    ...typeDefinitions,
+    ...utilities
+  ];
+
+  // Check if package name matches skip patterns
+  if (skipPatterns.some(pattern => pkgName.startsWith(pattern))) {
+    return false;
+  }
+
+  // Skip CommonJS-only lodash (prefer lodash-es)
+  if (pkgName === 'lodash') {
+    return false;
+  }
+
+  // Prefer packages with explicit browser field or module field (ESM)
+  if (pkgJson.browser || pkgJson.module) {
+    return true;
+  }
+
+  // Prefer packages with exports field that includes "import" or "browser"
+  if (pkgJson.exports) {
+    const exportsStr = JSON.stringify(pkgJson.exports);
+    if (exportsStr.includes('"import"') || exportsStr.includes('"browser"')) {
+      return true;
+    }
+  }
+
+  // Skip packages that are explicitly marked as type: "commonjs" without module/browser fields
+  if (pkgJson.type === 'commonjs' && !pkgJson.module && !pkgJson.browser) {
+    return false;
+  }
+
+  // Default: allow if it has exports or is type: "module"
+  return !!(pkgJson.exports || pkgJson.type === 'module' || pkgJson.module);
+}
+
+/**
  * Process a single package and add its exports to the import map
  */
 async function processPackage(
@@ -296,6 +388,11 @@ async function processPackage(
   try {
     const pkgJsonContent = await readFile(pkgJsonPath);
     const pkgJson: PackageJson = JSON.parse(pkgJsonContent.toString());
+
+    // Check if package is browser-compatible
+    if (!isBrowserCompatible(pkgName, pkgJson)) {
+      return;
+    }
 
     const baseUrl = basePath ? `${basePath}/node_modules/${pkgName}` : `/node_modules/${pkgName}`;
 
@@ -382,6 +479,12 @@ function resolveExport(exportValue: any): string | null {
   if (typeof exportValue === 'object' && exportValue !== null) {
     // Prefer import over require over default
     const resolved = exportValue.import || exportValue.browser || exportValue.default || exportValue.require;
+
+    // Handle nested objects recursively (e.g., TypeScript's complex exports)
+    if (typeof resolved === 'object' && resolved !== null) {
+      return resolveExport(resolved);
+    }
+
     if (typeof resolved === 'string') {
       return resolved.startsWith('./') ? resolved.slice(2) : resolved;
     }
@@ -1063,13 +1166,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
             return send403(res, '403 Forbidden');
           }
           await stat(indexPath);
-          return serveFile(indexPath, res, matchedClient);
+          return serveFile(indexPath, res, matchedClient, isDistRequest || isNodeModulesRequest);
         } catch {
           return send404(res, '404 Not Found');
         }
       }
 
-      await serveFile(fullPath, res, matchedClient);
+      await serveFile(fullPath, res, matchedClient, isDistRequest || isNodeModulesRequest);
     } catch (error) {
       // Only send 404 if response hasn't been sent yet
       if (!res.headersSent) {
@@ -1080,22 +1183,17 @@ export function createDevServer(options: DevServerOptions): DevServer {
   });
 
   // Serve file helper
-  async function serveFile(filePath: string, res: ServerResponse, client: NormalizedClient) {
+  async function serveFile(filePath: string, res: ServerResponse, client: NormalizedClient, isNodeModulesOrDist: boolean = false) {
     try {
       const rootDir = await realpath(resolve(client.root));
 
       // Security: Check path before resolving symlinks
       const unresolvedPath = resolve(filePath);
-      const isNodeModules = filePath.includes('/node_modules/') || filePath.includes('\\node_modules\\');
-      const isDist = filePath.includes('/dist/') || filePath.includes('\\dist\\');
 
-      // Check if path is within project root (for symlinked packages like node_modules/elit)
-      const projectRoot = await realpath(resolve(client.root, '..'));
-      const isInProjectRoot = unresolvedPath.startsWith(projectRoot + sep) || unresolvedPath === projectRoot;
-
-      if (!unresolvedPath.startsWith(rootDir + sep) && unresolvedPath !== rootDir && !isInProjectRoot) {
-        // Allow if it's in node_modules or dist directories (these may be symlinks)
-        if (!isNodeModules && !isDist) {
+      // Skip security check for node_modules and dist (these may be symlinks)
+      if (!isNodeModulesOrDist) {
+        // Check if path is within project root
+        if (!unresolvedPath.startsWith(rootDir + sep) && unresolvedPath !== rootDir) {
           if (config.logging) console.log(`[403] Attempted to serve file outside allowed directories: ${filePath}`);
           return send403(res, '403 Forbidden');
         }
@@ -1105,6 +1203,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
       let resolvedPath;
       try {
         resolvedPath = await realpath(unresolvedPath);
+
+        // For symlinked packages (like node_modules/elit), allow serving from outside rootDir
+        if (isNodeModulesOrDist && resolvedPath) {
+          // Allow it - this is a symlinked package
+          if (config.logging && !resolvedPath.startsWith(rootDir + sep)) {
+            console.log(`[DEBUG] Serving symlinked file: ${resolvedPath}`);
+          }
+        }
       } catch {
         // If index.html not found but SSR function exists, use SSR
         if (filePath.endsWith('index.html') && client.ssr) {
