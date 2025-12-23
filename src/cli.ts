@@ -247,11 +247,6 @@ async function runPreview(args: string[]) {
         options.https = mergedOptions.https;
     }
 
-    // Add middleware if configured
-    if (mergedOptions.middleware) {
-        options.middleware = mergedOptions.middleware;
-    }
-
     // Add SSR if configured
     if (mergedOptions.ssr) {
         options.ssr = mergedOptions.ssr;
@@ -403,23 +398,20 @@ Worker Configuration:
     2. Global workers (defined in dev.worker or preview.worker)
     Both global and client-specific workers will be loaded.
 
-API and Middleware Configuration:
-  Configure REST API endpoints and custom middleware per client or globally.
+API Configuration:
+  Configure REST API endpoints per client or globally.
   Supports both global configuration and client-specific configuration.
 
-  Client-specific API and Middleware:
+  Client-specific API:
     - Each client can have its own API router (clients[].api)
-    - Each client can have its own middleware chain (clients[].middleware)
     - Client-specific configuration is isolated to that client's routes
     - API paths are automatically prefixed with the client's basePath
       Example: If basePath is '/app1' and route is '/api/health',
                the full path will be '/app1/api/health'
 
   Priority:
-    1. Client-specific middleware runs first (defined in clients[].middleware)
-    2. Global middleware runs second (defined in dev.middleware or preview.middleware)
-    3. Client-specific API routes are matched (defined in clients[].api)
-    4. Global API routes are matched (defined in dev.api or preview.api)
+    1. Client-specific API routes are matched first (defined in clients[].api)
+    2. Global API routes are matched second (defined in dev.api or preview.api)
 
 Examples:
   elit dev

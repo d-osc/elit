@@ -690,13 +690,12 @@ export function createProxyHandler(proxyConfigs: ProxyConfig[]) {
         }
       }
 
-      // Change origin if requested
+      // Change origin if requested (or remove host header if not)
       if (changeOrigin) {
         proxyReqHeaders.host = targetUrl.host;
+      } else {
+        delete proxyReqHeaders['host'];
       }
-
-      // Remove headers that shouldn't be forwarded
-      delete proxyReqHeaders['host'];
 
       const proxyReqOptions = {
         method: req.method,
@@ -885,7 +884,6 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
   watch: ['**/*.ts', '**/*.js', '**/*.html', '**/*.css'],
   ignore: ['node_modules/**', 'dist/**', '.git/**', '**/*.d.ts'],
   logging: true,
-  middleware: [],
   worker: [],
   mode: 'dev'
 };

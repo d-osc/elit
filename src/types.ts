@@ -96,8 +96,6 @@ export interface ClientConfig {
     worker?: WorkerConfig[];
     /** API router for REST endpoints specific to this client */
     api?: Router;
-    /** Custom middleware specific to this client */
-    middleware?: ((req: any, res: any, next: () => void) => void)[];
     /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
     mode?: 'dev' | 'preview';
 }
@@ -151,8 +149,6 @@ export interface DevServerOptions {
     worker?: WorkerConfig[];
     /** Enable logging (default: true) */
     logging?: boolean;
-    /** Custom middleware */
-    middleware?: ((req: any, res: any, next: () => void) => void)[];
     /** API router for REST endpoints */
     api?: Router;
     /** SSR render function - returns HTML VNode or string */
@@ -250,8 +246,6 @@ export interface PreviewOptions {
     open?: boolean;
     /** Enable logging (default: true) */
     logging?: boolean;
-    /** Custom middleware */
-    middleware?: ((req: any, res: any, next: () => void) => void)[];
     /** API router for REST endpoints */
     api?: Router;
     /** SSR render function - returns HTML VNode or string */
