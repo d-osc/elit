@@ -1182,6 +1182,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
   // Serve file helper
   async function serveFile(filePath: string, req: IncomingMessage, res: ServerResponse, client: NormalizedClient, isNodeModulesOrDist: boolean = false) {
+    // Escape arbitrary text for safe embedding inside a JavaScript template literal.
+    // This ensures that backslashes, backticks and `${` sequences are correctly escaped.
+    function escapeForTemplateLiteral(input: string): string {
+      return input
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`')
+        .replace(/\$\{/g, '\\${');
+    }
+
     try {
       const rootDir = await realpath(resolve(client.root));
 
@@ -1228,7 +1237,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
       if (ext === '.css' && isInlineCSS) {
         // Transform CSS to JavaScript module that injects styles
-        const cssContent = content.toString().replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        const cssContent = escapeForTemplateLiteral(content.toString());
         const jsModule = `
 const css = \`${cssContent}\`;
 const style = document.createElement('style');
