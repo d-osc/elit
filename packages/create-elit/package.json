@@ -1,6 +1,6 @@
 {
   "name": "create-elit",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "Scaffolding tool for creating Elit projects",
   "type": "module",
   "bin": {

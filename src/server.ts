@@ -1164,13 +1164,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
             return send403(res, '403 Forbidden');
           }
           await stat(indexPath);
-          return serveFile(indexPath, res, matchedClient, isDistRequest || isNodeModulesRequest);
+          return serveFile(indexPath, req, res, matchedClient, isDistRequest || isNodeModulesRequest);
         } catch {
           return send404(res, '404 Not Found');
         }
       }
 
-      await serveFile(fullPath, res, matchedClient, isDistRequest || isNodeModulesRequest);
+      await serveFile(fullPath, req, res, matchedClient, isDistRequest || isNodeModulesRequest);
     } catch (error) {
       // Only send 404 if response hasn't been sent yet
       if (!res.headersSent) {
@@ -1181,7 +1181,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   });
 
   // Serve file helper
-  async function serveFile(filePath: string, res: ServerResponse, client: NormalizedClient, isNodeModulesOrDist: boolean = false) {
+  async function serveFile(filePath: string, req: IncomingMessage, res: ServerResponse, client: NormalizedClient, isNodeModulesOrDist: boolean = false) {
     try {
       const rootDir = await realpath(resolve(client.root));
 
@@ -1220,6 +1220,26 @@ export function createDevServer(options: DevServerOptions): DevServer {
       let content = await readFile(resolvedPath);
       const ext = extname(resolvedPath);
       let mimeType = lookup(resolvedPath) || 'application/octet-stream';
+
+      // Handle CSS imports as JavaScript modules (like Vite)
+      // When CSS is imported in JS/TS with ?inline query, transform it to a JS module that injects styles
+      const urlQuery = req.url?.split('?')[1] || '';
+      const isInlineCSS = urlQuery.includes('inline');
+
+      if (ext === '.css' && isInlineCSS) {
+        // Transform CSS to JavaScript module that injects styles
+        const cssContent = content.toString().replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        const jsModule = `
+const css = \`${cssContent}\`;
+const style = document.createElement('style');
+style.setAttribute('data-file', '${filePath}');
+style.textContent = css;
+document.head.appendChild(style);
+export default css;
+`;
+        content = Buffer.from(jsModule);
+        mimeType = 'application/javascript';
+      }
 
       // Handle TypeScript files - transpile only (no bundling)
       if (ext === '.ts' || ext === '.tsx') {
@@ -1284,6 +1304,17 @@ export function createDevServer(options: DevServerOptions): DevServer {
           transpiled = transpiled.replace(
             /import\s+["']([^"']+)\.ts(x?)["']/g,
             (_, path, tsx) => `import "${path}.js${tsx}"`
+          );
+
+          // Rewrite CSS imports to add ?inline query parameter
+          // This tells the server to return CSS as a JavaScript module
+          transpiled = transpiled.replace(
+            /import\s+["']([^"']+\.css)["']/g,
+            (_, path) => `import "${path}?inline"`
+          );
+          transpiled = transpiled.replace(
+            /from\s+["']([^"']+\.css)["']/g,
+            (_, path) => `from "${path}?inline"`
           );
 
           content = Buffer.from(transpiled);

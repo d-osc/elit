@@ -2,6 +2,7 @@ import { dom, div, main, reactive } from 'elit';
 import { injectStyles } from './styles';
 import { Header, Footer } from './components';
 import { router, RouterView } from './router';
+import './index.css';
 
 // Inject styles
 injectStyles();
