@@ -4,6 +4,7 @@ export default defineConfig([
     // Browser-compatible modules (no require shim needed)
     {
         entry: {
+            index: 'src/index.ts',
             dom: 'src/dom.ts',
             el: 'src/el.ts',
             router: 'src/router.ts',
@@ -31,7 +32,6 @@ export default defineConfig([
     // Node.js-only modules (with require shim for ESM)
     {
         entry: {
-            index: 'src/index.ts',
             server: 'src/server.ts',
             build: 'src/build.ts',
             http: 'src/http.ts',
