@@ -590,7 +590,7 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.deps'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, 'v3.0.6'),
+          span({ className: 'stat-number' }, 'v3.0.8'),
           span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
