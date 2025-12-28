@@ -183,6 +183,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 define,
                 logLevel: config.logging ? 'info' : 'silent',
                 metafile: true,
+                // Prioritize browser field for browser builds
+                mainFields: platform === 'browser' ? ['browser', 'module', 'main'] : ['module', 'main'],
                 // Additional optimizations
                 ...getMinifyOptions(config.minify)
             });
