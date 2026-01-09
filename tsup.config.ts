@@ -15,7 +15,7 @@ export default defineConfig([
             runtime: 'src/runtime.ts'
         },
         format: ['cjs', 'esm'],
-        dts: false, // Generated separately with tsc
+        dts: true,
         clean: true,
         minify: false,
         splitting: false,
@@ -44,7 +44,7 @@ export default defineConfig([
             path: 'src/path.ts'
         },
         format: ['cjs', 'esm'],
-        dts: false, // Generated separately with tsc
+        dts: true,
         clean: false,
         minify: false,
         splitting: false,
@@ -72,7 +72,7 @@ export default defineConfig([
             cli: 'src/cli.ts'
         },
         format: ['cjs'],
-        dts: false,
+        dts: true,
         clean: false,
         splitting: false
     }

@@ -74,16 +74,64 @@ export class ServerRouter {
     return query;
   }
 
-  private parseBody(req: IncomingMessage): Promise<any> {
+  private async parseBody(req: IncomingMessage): Promise<any> {
+    // Bun compatibility: Check if req has text() method (Bun Request)
+    if (typeof (req as any).text === 'function') {
+      try {
+        const text = await (req as any).text();
+        if (!text) return {};
+        
+        const contentType = req.headers['content-type'];
+        const ct = (Array.isArray(contentType) ? contentType[0] : (contentType || '')).toLowerCase();
+        
+        // Parse JSON (either by content-type or if it looks like JSON)
+        if (ct.includes('application/json') || ct.includes('json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          try {
+            return JSON.parse(text);
+          } catch {
+            return text;
+          }
+        }
+        
+        // Parse URL-encoded
+        if (ct.includes('application/x-www-form-urlencoded') || ct.includes('urlencoded')) {
+          return Object.fromEntries(new URLSearchParams(text));
+        }
+        
+        // Return raw text
+        return text;
+      } catch (e) {
+        console.log('[ServerRouter] Bun body parse error:', e);
+        return {};
+      }
+    }
+
+    // Node.js stream-based parsing
     return new Promise((resolve, reject) => {
-      let body = '';
-      req.on('data', chunk => body += chunk);
+      const contentLengthHeader = req.headers['content-length'];
+      const contentLength = parseInt(Array.isArray(contentLengthHeader) ? contentLengthHeader[0] : (contentLengthHeader || '0'), 10);
+      
+      if (contentLength === 0) {
+        resolve({});
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      
+      req.on('data', chunk => {
+        chunks.push(Buffer.from(chunk));
+      });
+      
       req.on('end', () => {
+        const body = Buffer.concat(chunks).toString();
         try {
           const ct = req.headers['content-type'] || '';
           resolve(ct.includes('json') ? (body ? JSON.parse(body) : {}) : ct.includes('urlencoded') ? Object.fromEntries(new URLSearchParams(body)) : body);
-        } catch (e) { reject(e); }
+        } catch (e) { 
+          reject(e); 
+        }
       });
+      
       req.on('error', reject);
     });
   }
@@ -98,21 +146,32 @@ export class ServerRouter {
 
       let body: any = {};
       if (['POST', 'PUT', 'PATCH'].includes(method)) {
-        try { body = await this.parseBody(req); }
-        catch { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"Invalid request body"}'); return true; }
+        try { 
+          body = await this.parseBody(req);
+        }
+        catch (e) { 
+          res.writeHead(400, { 'Content-Type': 'application/json' }); 
+          res.end('{"error":"Invalid request body"}'); 
+          return true; 
+        }
       }
 
       const ctx: ServerRouteContext = { req, res, params, query: this.parseQuery(url), body, headers: req.headers as any };
       let i = 0;
       const next = async () => i < this.middlewares.length && await this.middlewares[i++](ctx, next);
 
-      try { await next(); await route.handler(ctx); }
+      try { 
+        await next(); 
+        await route.handler(ctx); 
+      }
       catch (e) {
-        console.error('Route error:', e);
+        console.error('[ServerRouter] Route error:', e);
         !res.headersSent && (res.writeHead(500, { 'Content-Type': 'application/json' }), res.end(JSON.stringify({ error: 'Internal Server Error', message: e instanceof Error ? e.message : 'Unknown' })));
       }
       return true;
     }
+
+    // No route matched
     return false;
   }
 }
@@ -903,6 +962,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const wsClients = new Set<WebSocket>();
   const stateManager = new StateManager();
 
+  // Clear import map cache in dev mode to ensure fresh scans
+  if (config.mode === 'dev') {
+    clearImportMapCache();
+  }
+
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
   const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, mode: config.mode }] : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
@@ -986,6 +1050,16 @@ export function createDevServer(options: DevServerOptions): DevServer {
     if (config.api && url.startsWith('/api')) {
       const handled = await config.api.handle(req, res);
       if (handled) return;
+    }
+
+    // If we reach here and it's a POST/PUT/PATCH to /api/*, return 405
+    if (url.startsWith('/api') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method || '')) {
+      if (!res.headersSent) {
+        if (config.logging) console.log(`[405] ${req.method} ${url} - Method not allowed`);
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method Not Allowed', message: 'No API route found for this request' }));
+      }
+      return;
     }
 
     // For root path requests, prioritize SSR over index files if SSR is configured
