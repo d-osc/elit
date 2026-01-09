@@ -31,6 +31,7 @@ export interface RouterOptions {
 
 export interface Router {
     currentRoute: State<RouteLocation>;
+    navigate: (path: string, replace?: boolean) => void;
     push: (path: string) => void;
     replace: (path: string) => void;
     back: () => void;
@@ -182,6 +183,7 @@ export function createRouter(options: RouterOptions): Router {
 
     return {
         currentRoute,
+        navigate,
         push: (path: string) => navigate(path, false),
         replace: (path: string) => navigate(path, true),
         back: () => window.history.back(),

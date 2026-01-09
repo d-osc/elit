@@ -85,7 +85,7 @@ async function generateTemplate(projectPath: string, projectName: string, templa
       preview: 'elit preview'
     },
     dependencies: {
-      elit: '^3.1.0'
+      elit: '^3.1.1'
     }
   };
 
