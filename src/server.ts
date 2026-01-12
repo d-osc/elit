@@ -28,6 +28,7 @@ export interface ServerRouteContext {
   query: Record<string, string>;
   body: any;
   headers: Record<string, string | string[] | undefined>;
+  user?: any;
 }
 
 export type ServerRouteHandler = (ctx: ServerRouteContext) => void | Promise<void>;
@@ -38,6 +39,7 @@ interface ServerRoute {
   pattern: RegExp;
   paramNames: string[];
   handler: ServerRouteHandler;
+  middlewares: Middleware[];
 }
 
 export class ServerRouter {
@@ -49,16 +51,21 @@ export class ServerRouter {
     return this;
   }
 
-  get = (path: string, handler: ServerRouteHandler): this => this.addRoute('GET', path, handler);
-  post = (path: string, handler: ServerRouteHandler): this => this.addRoute('POST', path, handler);
-  put = (path: string, handler: ServerRouteHandler): this => this.addRoute('PUT', path, handler);
-  delete = (path: string, handler: ServerRouteHandler): this => this.addRoute('DELETE', path, handler);
-  patch = (path: string, handler: ServerRouteHandler): this => this.addRoute('PATCH', path, handler);
-  options = (path: string, handler: ServerRouteHandler): this => this.addRoute('OPTIONS', path, handler);
+  // Support per-route middleware: accept middleware(s) before the final handler
+  get = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('GET', path, handlers as any);
+  post = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('POST', path, handlers as any);
+  put = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('PUT', path, handlers as any);
+  delete = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('DELETE', path, handlers as any);
+  patch = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('PATCH', path, handlers as any);
+  options = (path: string, ...handlers: Array<Middleware | ServerRouteHandler>): this => this.addRoute('OPTIONS', path, handlers as any);
 
-  private addRoute(method: HttpMethod, path: string, handler: ServerRouteHandler): this {
+  private addRoute(method: HttpMethod, path: string, handlers: Array<Middleware | ServerRouteHandler>): this {
     const { pattern, paramNames } = this.pathToRegex(path);
-    this.routes.push({ method, pattern, paramNames, handler });
+    // Last item is the actual route handler, preceding items are middlewares
+    if (!handlers || handlers.length === 0) throw new Error('Route must include a handler');
+    const last = handlers[handlers.length - 1] as ServerRouteHandler;
+    const middlewares = handlers.slice(0, handlers.length - 1).map(h => h as Middleware);
+    this.routes.push({ method, pattern, paramNames, handler: last, middlewares });
     return this;
   }
 
@@ -157,12 +164,20 @@ export class ServerRouter {
       }
 
       const ctx: ServerRouteContext = { req, res, params, query: this.parseQuery(url), body, headers: req.headers as any };
+
+      // Build middleware chain: global middlewares -> route middlewares -> final handler
+      const routeMiddlewares = route.middlewares || [];
+      const chain: Middleware[] = [ ...this.middlewares, ...routeMiddlewares, async (c, _next) => { await route.handler(c); } ];
+
       let i = 0;
-      const next = async () => i < this.middlewares.length && await this.middlewares[i++](ctx, next);
+      const next = async () => {
+        if (i >= chain.length) return;
+        const mw = chain[i++];
+        await mw(ctx, next);
+      };
 
       try { 
         await next(); 
-        await route.handler(ctx); 
       }
       catch (e) {
         console.error('[ServerRouter] Route error:', e);
