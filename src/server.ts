@@ -19,7 +19,7 @@ import { dom } from './dom';
 
 // ===== Router =====
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | 'ALL';
 
 export interface ServerRouteContext {
   req: IncomingMessage;
@@ -29,6 +29,10 @@ export interface ServerRouteContext {
   body: any;
   headers: Record<string, string | string[] | undefined>;
   user?: any;
+  // Express-compatible response helpers
+  send?(data: any): ServerResponse;
+  json?(data: any): ServerResponse;
+  status?(code: number): ServerResponse;
 }
 
 export type ServerRouteHandler = (ctx: ServerRouteContext, next?: () => Promise<void>) => void | Promise<void>;
@@ -47,10 +51,31 @@ export class ServerRouter {
   private middlewares: Middleware[] = [];
 
   // Accept both internal Middleware and Express-style `(req, res, next?)` functions
-  use(mw: Middleware | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)): this {
-    this.middlewares.push(this.toMiddleware(mw as any));
+  // Also support path-based middleware like Express: use(path, middleware)
+  use(...args: Array<any>): this {
+    if (typeof args[0] === 'string') {
+      // Path-based middleware: use(path, ...middlewares)
+      const path = args[0];
+      const middlewares = args.slice(1);
+      return this.addRoute('ALL', path, middlewares);
+    }
+    // Global middleware
+    const mw = args[0];
+    this.middlewares.push(this.toMiddleware(mw));
     return this;
   }
+
+  // Express-like .all() method - matches all HTTP methods
+  all = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('ALL', path, handlers as any);
+
+  // Support per-route middleware: accept middleware(s) before the final handler
+  get = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('GET', path, handlers as any);
+  post = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('POST', path, handlers as any);
+  put = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PUT', path, handlers as any);
+  delete = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('DELETE', path, handlers as any);
+  patch = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PATCH', path, handlers as any);
+  options = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('OPTIONS', path, handlers as any);
+  head = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('HEAD', path, handlers as any);
 
   // Convert Express-like handler/middleware to internal Middleware
   private toMiddleware(fn: Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)): Middleware {
@@ -90,14 +115,6 @@ export class ServerRouter {
       await next();
     };
   }
-
-  // Support per-route middleware: accept middleware(s) before the final handler
-  get = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('GET', path, handlers as any);
-  post = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('POST', path, handlers as any);
-  put = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PUT', path, handlers as any);
-  delete = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('DELETE', path, handlers as any);
-  patch = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PATCH', path, handlers as any);
-  options = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('OPTIONS', path, handlers as any);
 
   private addRoute(method: HttpMethod, path: string, handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this {
     const { pattern, paramNames } = this.pathToRegex(path);
@@ -216,7 +233,8 @@ export class ServerRouter {
     const method = req.method as HttpMethod, url = req.url || '/', path = url.split('?')[0];
 
     for (const route of this.routes) {
-      if (route.method !== method || !route.pattern.test(path)) continue;
+      if (route.method !== 'ALL' && route.method !== method) continue;
+      if (!route.pattern.test(path)) continue;
       const match = path.match(route.pattern)!;
       const params = Object.fromEntries(route.paramNames.map((name, i) => [name, match[i + 1]]));
 
@@ -232,7 +250,39 @@ export class ServerRouter {
         }
       }
 
-      const ctx: ServerRouteContext = { req, res, params, query: this.parseQuery(url), body, headers: req.headers as any };
+      // Add Express-like response helpers to context
+      const ctx: ServerRouteContext = { 
+        req, 
+        res, 
+        params, 
+        query: this.parseQuery(url), 
+        body, 
+        headers: req.headers as any,
+        send: (data: any) => { 
+          if (!res.headersSent) {
+            if (typeof data === 'object') {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(data));
+            } else {
+              res.end(String(data));
+            }
+          }
+          return res;
+        },
+        json: (data: any) => {
+          if (!res.headersSent) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(data));
+          }
+          return res;
+        },
+        status: (code: number) => {
+          if (!res.headersSent) {
+            res.statusCode = code;
+          }
+          return res;
+        }
+      };
 
       // Build middleware chain: global middlewares -> route middlewares -> final handler
       // Pass `next` to the final handler so it can optionally call await next()
