@@ -109,7 +109,7 @@
     "benchmark": "node benchmark/server-benchmark.js",
     "benchmark:router": "node benchmark/router-benchmark.js",
     "docs:dev": "npm run --prefix docs dev",
-    "docs:build": "npm run --prefix docs build && node -e \"require('fs').copyFileSync('docs/googleb820e1884218aee0.html','docs/dist/googleb820e1884218aee0.html')\"",
+    "docs:build": "npm run --prefix docs build",
     "docs:preview": "npm run --prefix docs preview",
     "docs:deploy": "npm run docs:build && gh-pages -d docs/dist"
   },

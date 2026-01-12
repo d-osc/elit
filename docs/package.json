@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx tsx ../src/cli.ts dev",
-    "build": "npx tsx ../src/cli.ts build",
+    "build": "npx tsx ../src/cli.ts build && node -e \"require('fs').copyFileSync('googleb820e1884218aee0.html','dist/googleb820e1884218aee0.html')\"",
     "preview": "npx tsx ../src/cli.ts preview"
   },
   "dependencies": {
