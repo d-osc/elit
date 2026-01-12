@@ -65,9 +65,7 @@ export class ServerRouter {
       // Express-style with (req, res, next)
       if (f.length >= 3) {
         // Provide a next that triggers our next
-        let called = false;
         const expressNext = () => {
-          called = true;
           // call our next but don't await here
           void next();
         };
