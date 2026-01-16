@@ -34,12 +34,18 @@ class ElitHMR implements HMRClient {
       return;
     }
 
+    // Skip HMR for file:// protocol
+    if (window.location.protocol === 'file:') {
+      console.log('[Elit HMR] Disabled for file:// protocol');
+      return;
+    }
+
     this.connect();
   }
 
   private connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname || 'localhost';
+    const host = window.location.hostname;
     const port = window.location.port || '3000';
 
     this.ws = new WebSocket(`${protocol}//${host}:${port}`);
