@@ -39,7 +39,7 @@ class ElitHMR implements HMRClient {
 
   private connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
+    const host = window.location.hostname || 'localhost';
     const port = window.location.port || '3000';
 
     this.ws = new WebSocket(`${protocol}//${host}:${port}`);
