@@ -1074,7 +1074,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env'> = {
   port: 3000,
   host: 'localhost',
   https: false,
