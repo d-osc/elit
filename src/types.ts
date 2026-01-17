@@ -157,6 +157,8 @@ export interface DevServerOptions {
     proxy?: ProxyConfig[];
     /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
     mode?: 'dev' | 'preview';
+    /** Environment variables to inject (prefix with VITE_ for client access) */
+    env?: Record<string, string>;
 }
 
 export interface DevServer {
@@ -259,4 +261,6 @@ export interface PreviewOptions {
     proxy?: ProxyConfig[];
     /** Global worker scripts (applies to all clients) */
     worker?: WorkerConfig[];
+    /** Environment variables to inject (prefix with VITE_ for client access) */
+    env?: Record<string, string>;
 }

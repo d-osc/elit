@@ -53,11 +53,10 @@ function validateEntry(entry: string | undefined, buildIndex?: number): void {
 
 /**
  * Helper: Ensure env is set (eliminates duplication in runBuild)
+ * Merges .env files with config.env, with .env files taking precedence
  */
 function ensureEnv(options: BuildOptions, env: Record<string, string>): void {
-    if (!options.env) {
-        options.env = env;
-    }
+    options.env = { ...options.env, ...env };
 }
 
 /**
@@ -115,6 +114,13 @@ async function runDev(args: string[]) {
     const options = config?.dev
         ? mergeConfig(config.dev, cliOptions)
         : cliOptions as DevServerOptions;
+
+    // Load environment variables
+    const mode = process.env.MODE || 'development';
+    const env = loadEnv(mode);
+
+    // Merge env from config and .env files
+    options.env = { ...options.env, ...env };
 
     // Ensure we have at least root or clients
     if (!options.root && (!options.clients || options.clients.length === 0)) {
@@ -251,6 +257,13 @@ async function runPreview(args: string[]) {
     if (mergedOptions.ssr) {
         options.ssr = mergedOptions.ssr;
     }
+
+    // Load environment variables
+    const mode = process.env.MODE || 'production';
+    const env = loadEnv(mode);
+
+    // Merge env from config and .env files
+    options.env = { ...mergedOptions.env, ...env };
 
     // Set mode to 'preview' for preview command
     options.mode = 'preview';
