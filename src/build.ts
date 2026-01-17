@@ -167,7 +167,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
             // Node.js - use esbuild
             const { build: esbuild } = await import('esbuild');
 
-            result = await esbuild({
+            const baseOptions = {
                 entryPoints: [entryPath],
                 bundle: true,
                 outfile: outputPath,
@@ -185,9 +185,18 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
                 metafile: true,
                 // Prioritize browser field for browser builds
                 mainFields: platform === 'browser' ? ['browser', 'module', 'main'] : ['module', 'main'],
-                // Additional optimizations
+            };
+
+            const esbuildOptions: any = {
+                ...baseOptions,
                 ...getMinifyOptions(config.minify)
-            });
+            };
+
+            if (config.resolve?.alias) {
+                esbuildOptions.resolve = { alias: config.resolve.alias };
+            }
+
+            result = await esbuild(esbuildOptions);
 
             ({ buildTime, size } = calculateBuildMetrics(startTime, outputPath));
         } else if (runtime === 'bun') {

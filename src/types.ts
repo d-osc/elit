@@ -204,6 +204,11 @@ export interface BuildOptions {
     basePath?: string;
     /** External dependencies (not bundled) */
     external?: string[];
+    /** Module resolution options */
+    resolve?: {
+        /** Alias imports to other paths or modules */
+        alias?: Record<string, string>;
+    };
     /** Enable tree shaking */
     treeshake?: boolean;
     /** Enable logging */
