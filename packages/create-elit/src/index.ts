@@ -1,16 +1,8 @@
 #!/usr/bin/env node
 
-import { mkdir, writeFile, readdir } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { existsSync } from 'fs';
-
-const templates = {
-  basic: 'Basic Elit app with counter example',
-  full: 'Full-stack app with dev server and API routes',
-  minimal: 'Minimal setup with just DOM rendering'
-} as const;
-
-type Template = keyof typeof templates;
 
 // Colors for terminal output
 const colors = {
@@ -31,17 +23,7 @@ function getProjectName(): string {
   return args[0] || 'my-elit-app';
 }
 
-function getTemplate(): Template {
-  const args = process.argv.slice(2);
-  const templateArg = args.find(arg => arg.startsWith('--template='));
-  if (templateArg) {
-    const template = templateArg.split('=')[1] as Template;
-    if (template in templates) return template;
-  }
-  return 'basic';
-}
-
-async function createProject(projectName: string, template: Template) {
+async function createProject(projectName: string) {
   const projectPath = resolve(process.cwd(), projectName);
 
   // Check if directory exists
@@ -55,8 +37,8 @@ async function createProject(projectName: string, template: Template) {
   // Create project directory
   await mkdir(projectPath, { recursive: true });
 
-  // Generate files based on template
-  await generateTemplate(projectPath, projectName, template);
+  // Generate files
+  await generateTemplate(projectPath, projectName);
 
   log('\nSuccess! Created ' + projectName, 'green');
   log('\nInside that directory, you can run several commands:', 'dim');
@@ -73,7 +55,7 @@ async function createProject(projectName: string, template: Template) {
   log('Happy coding! 🚀', 'green');
 }
 
-async function generateTemplate(projectPath: string, projectName: string, template: Template) {
+async function generateTemplate(projectPath: string, projectName: string) {
   // Create package.json
   const packageJson = {
     name: projectName,
@@ -139,7 +121,7 @@ npm install
 npm run dev
 \`\`\`
 
-Visit http://localhost:3003 to view your app.
+Visit http://localhost:3000 to view your app.
 
 ## Available Scripts
 
@@ -155,7 +137,7 @@ Visit http://localhost:3003 to view your app.
 
   await writeFile(join(projectPath, 'README.md'), readme);
 
-  // Create elit.config.ts (TypeScript config)
+  // Create elit.config.ts
   const elitConfig = `import { server } from './src/server';
 import { client } from './src/client';
 
@@ -163,7 +145,7 @@ export default {
   dev: {
     port: 3000,
     host: 'localhost',
-    open: ${template === 'basic' ? 'true' : 'false'},
+    open: true,
     logging: true,
     clients: [{
       root: '.',
@@ -222,27 +204,16 @@ export default {
   // Create src directory
   await mkdir(join(projectPath, 'src'), { recursive: true });
 
-  // Generate template-specific files
-  if (template === 'basic') {
-    await generateBasicTemplate(projectPath, projectName);
-  } else if (template === 'full') {
-    await generateFullTemplate(projectPath, projectName);
-  } else {
-    await generateMinimalTemplate(projectPath, projectName);
-  }
-}
-
-async function generateBasicTemplate(projectPath: string, projectName: string) {
   // src/main.ts - Client-side application
   const mainTs = `import { div, h1, h2, button, p } from 'elit/el';
 import { createState, reactive } from 'elit/state';
 import { render } from 'elit/dom';
 import './styles.ts';
 
-// Create reactive state (shared between SSR and client)
+// Create reactive state
 export const count = createState(0);
 
-// Create app (shared between SSR and client)
+// Create app
 export const app = div({ className: 'container' },
   div({ className: 'card' },
     h1('Welcome to Elit! 🚀'),
@@ -277,6 +248,7 @@ console.log('[Main] App rendered');
 
   await writeFile(join(projectPath, 'src', 'main.ts'), mainTs);
 
+  // src/styles.ts
   const stylesTs = `import styles from 'elit/style';
 
 // Global styles
@@ -395,7 +367,7 @@ export default styles;
 
   await writeFile(join(projectPath, 'src', 'styles.ts'), stylesTs);
 
-  // Create client.ts for SSR template
+  // src/client.ts - SSR template
   const clientTs = `import { div, html, head, body, title, link, script, meta } from 'elit/el';
 
 export const client = html(
@@ -415,7 +387,7 @@ export const client = html(
 
   await writeFile(join(projectPath, 'src', 'client.ts'), clientTs);
 
-  // Create server.ts for API routes
+  // src/server.ts - API routes
   const serverTs = `import { ServerRouter } from 'elit/server';
 
 export const router = new ServerRouter();
@@ -424,318 +396,6 @@ router.get('/api/hello', async (ctx) => {
   ctx.res.setHeader('Content-Type', 'application/json');
   ctx.res.end(JSON.stringify({ message: 'Hello from Elit ServerRouter!' }));
 });
-
-export const server = router;
-`;
-
-  await writeFile(join(projectPath, 'src', 'server.ts'), serverTs);
-
-  // Create router.ts for routing (if needed)
-  const routerTs = `import { createRouter, createRouterView, Route } from 'elit/router';
-import { div } from 'elit';
-import { currentUser } from './state';
-import { Login } from './components/Login';
-import { Register } from './components/Register';
-
-router.get('/api/hello', async (ctx) => {
-  ctx.res.setHeader('Content-Type', 'application/json');
-  ctx.res.end(JSON.stringify({ message: 'Hello from Elit ServerRouter!' }));
-});
-
-export const server = router;
-`;
-  await writeFile(join(projectPath, 'src', 'router.ts'), routerTs);
-}
-
-async function generateFullTemplate(projectPath: string, projectName: string) {
-  // src/main.ts - Client-side application with API integration
-  const mainTs = `import { div, h1, h2, button, p } from 'elit/el';
-import { createState, reactive } from 'elit/state';
-import { render } from 'elit/dom';
-import './styles.ts';
-
-// Create reactive state
-export const count = createState(0);
-export const message = createState<string>('');
-
-// Fetch from API
-async function fetchMessage() {
-  try {
-    const res = await fetch('/api/hello');
-    const data = await res.json();
-    message.value = data.message;
-  } catch (err) {
-    message.value = 'Error loading message';
-  }
-}
-
-// Create app
-export const app = div({ className: 'container' },
-  div({ className: 'card' },
-    h1('Elit Full-Stack App 🚀'),
-    p('Counter and API integration example'),
-
-    div({ className: 'counter' },
-      h2('Counter Example'),
-      reactive(count, (value) =>
-        div({ className: 'count-display' }, \`Count: \${value}\`)
-      ),
-      div({ className: 'button-group' },
-        button({
-          onclick: () => count.value--,
-          className: 'btn btn-secondary'
-        }, '- Decrement'),
-        button({
-          onclick: () => count.value = 0,
-          className: 'btn btn-secondary'
-        }, 'Reset'),
-        button({
-          onclick: () => count.value++,
-          className: 'btn btn-primary'
-        }, '+ Increment')
-      )
-    ),
-
-    div({ className: 'api-section' },
-      h2('API Example'),
-      button({
-        onclick: () => fetchMessage(),
-        className: 'btn btn-primary'
-      }, 'Fetch from API'),
-      reactive(message, (msg) =>
-        msg ? p({ className: 'api-message' }, \`API says: \${msg}\`) : p('')
-      )
-    )
-  )
-);
-
-render('root', app);
-console.log('[Main] App rendered');
-`;
-
-  await writeFile(join(projectPath, 'src', 'main.ts'), mainTs);
-
-  // src/server.ts - API routes with ServerRouter
-  const serverTs = `import { ServerRouter } from 'elit/server';
-
-export const router = new ServerRouter();
-
-router.get('/api/hello', async (ctx) => {
-  ctx.res.setHeader('Content-Type', 'application/json');
-  ctx.res.end(JSON.stringify({ message: 'Hello from Elit ServerRouter!' }));
-});
-
-router.get('/api/count', async (ctx) => {
-  ctx.res.setHeader('Content-Type', 'application/json');
-  ctx.res.end(JSON.stringify({ count: Math.floor(Math.random() * 100) }));
-});
-
-export const server = router;
-`;
-
-  await writeFile(join(projectPath, 'src', 'server.ts'), serverTs);
-
-  // src/styles.ts - CSS-in-JS styles
-  const stylesTs = `import styles from 'elit/style';
-
-// Global styles
-styles.addTag('*', {
-  margin: 0,
-  padding: 0,
-  boxSizing: 'border-box'
-});
-
-styles.addTag('body', {
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  minHeight: '100vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '2rem'
-});
-
-// Container
-styles.addClass('container', {
-  width: '100%',
-  maxWidth: '600px'
-});
-
-// Card
-styles.addClass('card', {
-  background: 'white',
-  borderRadius: '16px',
-  padding: '3rem',
-  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-});
-
-// Typography
-styles.addTag('h1', {
-  fontSize: '2.5rem',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  backgroundClip: 'text',
-  marginBottom: '1rem'
-});
-
-styles.addTag('h2', {
-  fontSize: '1.5rem',
-  color: '#333',
-  marginBottom: '1rem'
-});
-
-styles.addTag('p', {
-  color: '#666',
-  marginBottom: '2rem',
-  lineHeight: 1.6
-});
-
-// Counter section
-styles.addClass('counter', {
-  marginTop: '2rem',
-  paddingTop: '2rem',
-  borderTop: '2px solid #f0f0f0'
-});
-
-styles.addClass('count-display', {
-  fontSize: '3rem',
-  fontWeight: 'bold',
-  color: '#667eea',
-  textAlign: 'center',
-  margin: '2rem 0'
-});
-
-// API section
-styles.addClass('api-section', {
-  marginTop: '2rem',
-  paddingTop: '2rem',
-  borderTop: '2px solid #f0f0f0'
-});
-
-styles.addClass('api-message', {
-  marginTop: '1rem',
-  padding: '1rem',
-  background: '#f0f0f0',
-  borderRadius: '8px',
-  color: '#333',
-  textAlign: 'center'
-});
-
-// Button group
-styles.addClass('button-group', {
-  display: 'flex',
-  gap: '1rem',
-  justifyContent: 'center'
-});
-
-// Buttons
-styles.addClass('btn', {
-  padding: '0.75rem 1.5rem',
-  border: 'none',
-  borderRadius: '8px',
-  fontSize: '1rem',
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all 0.2s'
-});
-
-styles.addClass('btn-primary', {
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  color: 'white'
-});
-
-styles.addPseudoClass('hover', {
-  transform: 'translateY(-2px)',
-  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
-}, '.btn-primary');
-
-styles.addClass('btn-secondary', {
-  background: '#f0f0f0',
-  color: '#333'
-});
-
-styles.addPseudoClass('hover', {
-  background: '#e0e0e0',
-  transform: 'translateY(-2px)'
-}, '.btn-secondary');
-
-styles.addPseudoClass('active', {
-  transform: 'translateY(0)'
-}, '.btn');
-
-styles.inject('global-styles');
-export default styles;
-`;
-
-  await writeFile(join(projectPath, 'src', 'styles.ts'), stylesTs);
-
-  // src/client.ts - SSR template
-  const clientTs = `import { div, html, head, body, title, link, script, meta } from 'elit/el';
-
-export const client = html(
-  head(
-    title('${projectName} - Elit Full-Stack App'),
-    link({ rel: 'icon', type: 'image/svg+xml', href: 'favicon.svg' }),
-    meta({ charset: 'UTF-8' }),
-    meta({ name: 'viewport', content: 'width=device-width, initial-scale=1.0' }),
-    meta({ name: 'description', content: 'Full-stack TypeScript framework with dev server, HMR, routing, SSR, and REST API.' })
-  ),
-  body(
-    div({ id: 'root' }),
-    script({ type: 'module', src: '/src/main.js' })
-  )
-);
-`;
-
-  await writeFile(join(projectPath, 'src', 'client.ts'), clientTs);
-}
-
-async function generateMinimalTemplate(projectPath: string, projectName: string) {
-  // src/main.ts - Minimal client-side application
-  const mainTs = `import { div, h1 } from 'elit/el';
-import { render } from 'elit/dom';
-
-// Create app
-export const app = div(
-  h1('Hello Elit! 👋')
-);
-
-render('root', app);
-console.log('[Main] App rendered');
-`;
-
-  await writeFile(join(projectPath, 'src', 'main.ts'), mainTs);
-
-  // src/client.ts - SSR template
-  const clientTs = `import { div, html, head, body, title, meta, script } from 'elit/el';
-
-export const client = html(
-  head(
-    title('${projectName}'),
-    meta({ charset: 'UTF-8' }),
-    meta({ name: 'viewport', content: 'width=device-width, initial-scale=1.0' })
-  ),
-  body(
-    div({ id: 'root' }),
-    script({ type: 'module', src: '/src/main.js' })
-  )
-);
-`;
-
-  await writeFile(join(projectPath, 'src', 'client.ts'), clientTs);
-
-  // src/server.ts - Empty API router (for consistency)
-  const serverTs = `import { ServerRouter } from 'elit/server';
-
-export const router = new ServerRouter();
-
-// Add your API routes here
-// Example:
-// router.get('/api/hello', async (ctx) => {
-//   ctx.res.setHeader('Content-Type', 'application/json');
-//   ctx.res.end(JSON.stringify({ message: 'Hello!' }));
-// });
 
 export const server = router;
 `;
@@ -745,11 +405,10 @@ export const server = router;
 
 // Main execution
 const projectName = getProjectName();
-const template = getTemplate();
 
 log('\n🚀 Create Elit App\n', 'cyan');
 
-createProject(projectName, template).catch((err) => {
+createProject(projectName).catch((err) => {
   log(`Error: ${err.message}`, 'red');
   process.exit(1);
 });
