@@ -90,7 +90,6 @@ export class Database {
         throw new Error(`Module ${specifier} is not allowed or not found.`);
     }
 
-
     private async vmRun(code: string | Function, _options?: vm.RunningCodeOptions | string) {
         const logs: any[] = [];
 
@@ -99,8 +98,19 @@ export class Database {
             return acc;
         }, {});
 
+        const systemBase = {
+            update: update,
+            remove: remove,
+            rename: rename,
+            read: read,
+            create: create,
+            save: save
+        }
+
+
+
         this.register({
-            console: customConsole
+            dbConsole: { ...customConsole, ...systemBase }
         });
 
         let stringCode: string;
@@ -235,6 +245,340 @@ export class Database {
 
 }
 
+function create(dbName: string, code: string | Function): void {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR);
+    const dbPath = path.join(baseDir, `${dbName}.ts`);
+    // Prepare the export line
+    fs.appendFileSync(dbPath, code.toString(), 'utf8');
+}
+
+function read(dbName: string): string {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR);
+    const dbPath = path.join(baseDir, `${dbName}.ts`);
+
+    if (!fs.existsSync(dbPath)) {
+        throw new Error(`Database '${dbName}' not found`);
+    }
+
+    return fs.readFileSync(dbPath, 'utf8');
+}
+
+function remove(dbName: string, fnName: string) {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
+    const dbPath = path.join(baseDir, `${dbName}.ts`);
+    if (!fs.existsSync(dbPath)) return false;
+
+    // if no functionName provided -> remove the whole file (after backup)
+    if (!fnName) {
+        const bak = `${dbPath}.bak`;
+        try {
+            fs.copyFileSync(dbPath, bak);
+        } catch (e) {
+            // ignore backup errors
+        }
+        try {
+            fs.unlinkSync(dbPath);
+            return "Removed successfully";
+        } catch (e) {
+            return "Removed failed";
+        }
+    }
+
+    // create a backup before editing the file in-place
+    const bak = `${dbPath}.bak`;
+    try {
+        fs.copyFileSync(dbPath, bak);
+    } catch (e) {
+        // ignore backup errors but continue carefully
+    }
+
+    let src = fs.readFileSync(dbPath, "utf8");
+    const escaped = fnName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+
+    // regex to find a declaration of the named symbol (function, class, or var/const/let assignment)
+    const startRe = new RegExp(
+        `function\\s+${escaped}\\s*\\(|\\bclass\\s+${escaped}\\b|\\b(?:const|let|var)\\s+${escaped}\\s*=\\s*(?:function\\b|class\\b|\\(|\\{|\\[)`,
+        "m"
+    );
+
+    const startMatch = src.match(startRe);
+
+    if (startMatch) {
+        const startIdx = startMatch.index;
+
+        // find the first meaningful character after startIdx: {, [, or ; or newline
+        const len = src.length;
+        const idxCurly = src.indexOf("{", startIdx);
+        const idxBracket = src.indexOf("[", startIdx);
+        let braceOpen = -1;
+        if (idxCurly === -1) braceOpen = idxBracket;
+        else if (idxBracket === -1) braceOpen = idxCurly;
+        else braceOpen = Math.min(idxCurly, idxBracket);
+
+        if (braceOpen !== -1) {
+            const openingChar = src[braceOpen];
+            const closingChar = openingChar === "[" ? "]" : "}";
+            let i = braceOpen + 1;
+            let depth = 1;
+            while (i < len && depth > 0) {
+                const ch = src[i];
+                if (ch === openingChar) depth++;
+                else if (ch === closingChar) depth--;
+                i++;
+            }
+            let braceClose = i;
+            let endIdx = braceClose;
+            if (src.slice(braceClose, braceClose + 1) === ";")
+                endIdx = braceClose + 1;
+
+            const before = src.slice(0, startIdx);
+            const after = src.slice(endIdx);
+            src = before + after;
+        } else {
+            // fallback: remove until next semicolon or a blank line
+            const semi = src.indexOf(";", startIdx);
+            let endIdx = semi !== -1 ? semi + 1 : src.indexOf("\n\n", startIdx);
+            if (endIdx === -1) endIdx = len;
+            src = src.slice(0, startIdx) + src.slice(endIdx);
+        }
+    }
+
+    // remove any export const <name>: any = <name>; lines
+    const exportRe = new RegExp(
+        `export\\s+const\\s+${escaped}\\s*:\\s*any\\s*=\\s*${escaped}\\s*;?`,
+        "g"
+    );
+    src = src.replace(exportRe, "");
+
+    // tidy up multiple blank lines
+    src = src.replace(/\n{3,}/g, "\n\n");
+
+    fs.writeFileSync(dbPath, src, "utf8");
+
+    return `Removed ${fnName} from database ${dbName}.`;
+}
+
+function rename(oldName: string, newName: string): string {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
+    const oldPath = path.join(baseDir, `${oldName}.ts`);
+    const newPath = path.join(baseDir, `${newName}.ts`);
+
+    // Check if the source file exists
+    if (!fs.existsSync(oldPath)) {
+        return `Error: File '${oldName}.ts' does not exist in the database`;
+    }
+
+    // Check if the destination file already exists
+    if (fs.existsSync(newPath)) {
+        return `Error: File '${newName}.ts' already exists in the database`;
+    }
+
+    try {
+        // Rename the file
+        fs.renameSync(oldPath, newPath);
+        return `Successfully renamed '${oldName}.ts' to '${newName}.ts'`;
+    } catch (error) {
+        return `Error renaming file: ${error instanceof Error ? error.message : String(error)}`;
+    }
+}
+
+function save(dbName: string, code: string | Function | any): void {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
+    const dbPath = path.join(baseDir, `${dbName}.ts`);
+
+    let fileContent = typeof code === 'function' ? code.toString() : code;
+
+    fs.writeFileSync(dbPath, fileContent, 'utf8');
+}
+
+function update(dbName: string, fnName: string, code: string | Function) {
+    const DIR = "databases";
+    const basePath = process.cwd();
+    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต
+    const dbPath = path.join(baseDir, `${dbName}.ts`);
+
+    let src;
+
+    if (!fs.existsSync(dbPath)) {
+        // If dbPath doesn't exist, create an empty module file so we can insert into it.
+        try {
+            fs.writeFileSync(dbPath, "", "utf8");
+            // console.log("Created new database file:", dbPath);
+            return `Created new database file: ${dbPath}`;
+        } catch (e) {
+            // console.error("Failed to create dbPath file:", dbPath, e && e.message ? e.message : e);
+            return `Failed to create dbPath file: ${dbPath}`;
+        }
+    }
+
+    src = fs.readFileSync(dbPath, "utf8");
+
+    const originalSrc = src;
+
+    const escaped = fnName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const startRe = new RegExp(
+        `function\\s+${escaped}\\s*\\(|\\bclass\\s+${escaped}\\b|\\b(?:const|let|var)\\s+${escaped}\\s*=\\s*(?:function\\b|class\\b|\\(|\\{|\\[)`,
+        "m"
+    );
+    const startMatch = src.match(startRe);
+
+    // determine declKind in the current file (if present)
+    let declKind = null;
+
+    if (startMatch) {
+        let startIdx: any = startMatch.index;
+        const snippet = src.slice(startIdx, startIdx + 80);
+        if (/^function\b/.test(snippet)) declKind = "functionDecl";
+        else if (/^class\b/.test(snippet)) declKind = "classDecl";
+        else if (/^\b(?:const|let|var)\b/.test(snippet)) declKind = "varAssign";
+    }
+
+    // build replacement code for this value
+    let newCode;
+    if (typeof code === "function") {
+        const fnStr = code.toString();
+        // prefer const assignment for anonymous functions/classes or arrow functions
+        if (declKind === "functionDecl") {
+            if (/^function\s+\w+/.test(fnStr)) newCode = fnStr;
+            else
+                newCode = `function ${fnName}${fnStr.replace(
+                    /^function\s*\(/,
+                    "("
+                )}`;
+        } else if (declKind === "classDecl") {
+            if (/^class\s+\w+/.test(fnStr)) newCode = fnStr;
+            else if (/^class\s*\{/.test(fnStr))
+                newCode = fnStr.replace(/^class\s*\{/, `class ${fnName} {`);
+            else newCode = `const ${fnName} = ${fnStr};`;
+        } else {
+            newCode = `const ${fnName} = ${fnStr};`;
+        }
+    } else {
+        newCode = `const ${fnName} = ${valueToCode(code, 0)};`;
+    }
+
+    // replacement: if found startMatch, find block and replace between startIdx and endIdx
+    if (startMatch) {
+        const startIdx = startMatch.index;
+        // find first '{' or '[' after startIdx
+        const idxCurly = src.indexOf("{", startIdx);
+        const idxBracket = src.indexOf("[", startIdx);
+        let braceOpen = -1;
+        if (idxCurly === -1) braceOpen = idxBracket;
+        else if (idxBracket === -1) braceOpen = idxCurly;
+        else braceOpen = Math.min(idxCurly, idxBracket);
+
+        if (braceOpen === -1) {
+            // no block — fallback: replace export or append
+            const exportRe = new RegExp(
+                `export\\s+const\\s+${escaped}\\s*:\\s*any\\s*=\\s*${escaped}\\s*;?`,
+                "m"
+            );
+            if (exportRe.test(src)) {
+                src = src.replace(
+                    exportRe,
+                    `${newCode}\n\nexport const ${fnName}: any = ${fnName};`
+                );
+            } else {
+                src =
+                    src + `\n\n${newCode}\n\nexport const ${fnName}: any = ${fnName};`;
+            }
+        } else {
+            const openingChar = src[braceOpen];
+            const closingChar = openingChar === "[" ? "]" : "}";
+            let i = braceOpen + 1;
+            let depth = 1;
+            const len = src.length;
+            while (i < len && depth > 0) {
+                const ch = src[i];
+                if (ch === openingChar) depth++;
+                else if (ch === closingChar) depth--;
+                i++;
+            }
+            let braceClose = i;
+            let endIdx = braceClose;
+            if (src.slice(braceClose, braceClose + 1) === ";")
+                endIdx = braceClose + 1;
+
+            const before = src.slice(0, startIdx);
+            const after = src.slice(endIdx);
+            src = before + newCode + after;
+        }
+    } else {
+        // not found — try to insert before existing export or append
+        const exportRe = new RegExp(
+            `export\\s+const\\s+${escaped}\\s*:\\s*any\\s*=\\s*${escaped}\\s*;?`,
+            "m"
+        );
+        if (exportRe.test(src)) {
+            src = src.replace(
+                exportRe,
+                `${newCode}\n\nexport const ${fnName}: any = ${fnName};`
+            );
+        } else {
+            src =
+                src + `\n\n${newCode}\n\nexport const ${fnName}: any = ${fnName};`;
+        }
+    }
+
+    fs.writeFileSync(dbPath, src, "utf8");
+
+    if (src === originalSrc) {
+        return `Saved ${fnName} to database ${dbName}.`;
+    } else {
+        return `Updated ${dbName} with ${fnName}.`;
+    }
+}
+
+function valueToCode(val: any, depth: number = 0): string {
+    const indentUnit = "    ";
+    const indent = indentUnit.repeat(depth);
+    const indentInner = indentUnit.repeat(depth + 1);
+
+    if (val === null) return "null";
+    const t = typeof val;
+    if (t === "string") return JSON.stringify(val);
+    if (t === "number" || t === "boolean") return String(val);
+    if (t === "function") return val.toString();
+    if (Array.isArray(val)) {
+        if (val.length === 0) return "[]";
+        const items = val.map((v) => valueToCode(v, depth + 1));
+        return (
+            "[\n" +
+            items.map((it) => indentInner + it).join(",\n") +
+            "\n" +
+            indent +
+            "]"
+        );
+    }
+    if (t === "object") {
+        const keys = Object.keys(val);
+        if (keys.length === 0) return "{}";
+        const entries = keys.map((k) => {
+            const keyPart = isIdentifier(k) ? k : JSON.stringify(k);
+            const v = valueToCode(val[k], depth + 1);
+            return indentInner + keyPart + ": " + v;
+        });
+        return "{\n" + entries.join(",\n") + "\n" + indent + "}";
+    }
+    return String(val);
+}
+
+function isIdentifier(key: any) {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
+}
+
+
 // Default database instance
 
 export function database() {
@@ -243,4 +587,22 @@ export function database() {
     });
 }
 
+export interface DatabaseConsole extends Console {
+    create?(dbName: string, code: string | Function): void;
+    read(dbName: string): string;
+    remove(dbName: string, fnName: string): any;
+    rename(oldName: string, newName: string): string;
+    save(dbName: string, code: string | Function | any): void;
+    update(dbName: string, fnName: string, code: string | Function): any;
+}
+
+export const dbConsole: DatabaseConsole = {
+    create: create,
+    read: read,
+    remove: remove,
+    rename: rename,
+    save: save,
+    update: update,
+    ...console
+}
 export default database;
