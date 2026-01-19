@@ -22,18 +22,24 @@ import { Database, DatabaseConfig } from './database';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | 'ALL';
 
+export interface ElitRequest extends IncomingMessage {
+  body?: any;
+}
+
+export interface ElitResponse extends ServerResponse {
+  json(data: any, statusCode?: number): this;
+  send(data: any): this;
+  status(code: number): this;
+}
+
 export interface ServerRouteContext {
-  req: IncomingMessage;
-  res: ServerResponse;
+  req: ElitRequest;
+  res: ElitResponse;
   params: Record<string, string>;
   query: Record<string, string>;
   body: any;
   headers: Record<string, string | string[] | undefined>;
   user?: any;
-  // Express-compatible response helpers
-  send?(data: any): ServerResponse;
-  json?(data: any): ServerResponse;
-  status?(code: number): ServerResponse;
 }
 
 export type ServerRouteHandler = (ctx: ServerRouteContext, next?: () => Promise<void>) => void | Promise<void>;
@@ -86,19 +92,19 @@ export class ServerRouter {
   }
 
   // Express-like .all() method - matches all HTTP methods
-  all = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('ALL', path, handlers as any);
+  all = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('ALL', path, handlers as any);
 
   // Support per-route middleware: accept middleware(s) before the final handler
-  get = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('GET', path, handlers as any);
-  post = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('POST', path, handlers as any);
-  put = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PUT', path, handlers as any);
-  delete = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('DELETE', path, handlers as any);
-  patch = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PATCH', path, handlers as any);
-  options = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('OPTIONS', path, handlers as any);
-  head = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('HEAD', path, handlers as any);
+  get = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('GET', path, handlers as any);
+  post = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('POST', path, handlers as any);
+  put = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PUT', path, handlers as any);
+  delete = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('DELETE', path, handlers as any);
+  patch = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('PATCH', path, handlers as any);
+  options = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('OPTIONS', path, handlers as any);
+  head = (path: string, ...handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this => this.addRoute('HEAD', path, handlers as any);
 
   // Convert Express-like handler/middleware to internal Middleware
-  private toMiddleware(fn: Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)): Middleware {
+  private toMiddleware(fn: Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)): Middleware {
     // If it's already our Middleware, return as-is
     if ((fn as Middleware).length === 2 && (fn as any).name !== 'bound ') {
       // Cannot reliably detect, so always wrap to normalize behavior
@@ -136,7 +142,7 @@ export class ServerRouter {
     };
   }
 
-  private addRoute(method: HttpMethod, path: string, handlers: Array<Middleware | ServerRouteHandler | ((req: IncomingMessage, res: ServerResponse, next?: () => void) => any)>): this {
+  private addRoute(method: HttpMethod, path: string, handlers: Array<Middleware | ServerRouteHandler | ((req: ElitRequest, res: ServerResponse, next?: () => void) => any)>): this {
     const { pattern, paramNames } = this.pathToRegex(path);
     // Last item is the actual route handler, preceding items are middlewares
     if (!handlers || handlers.length === 0) throw new Error('Route must include a handler');
@@ -262,6 +268,8 @@ export class ServerRouter {
       if (['POST', 'PUT', 'PATCH'].includes(method)) {
         try {
           body = await this.parseBody(req);
+          // Attach body to req for Express-like compatibility
+          (req as ElitRequest).body = body;
         }
         catch (e) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -272,36 +280,12 @@ export class ServerRouter {
 
       // Add Express-like response helpers to context
       const ctx: ServerRouteContext = {
-        req,
-        res,
+        req: req as ElitRequest,
+        res: res as ElitResponse,
         params,
         query: this.parseQuery(url),
         body,
-        headers: req.headers as any,
-        send: (data: any) => {
-          if (!res.headersSent) {
-            if (typeof data === 'object') {
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify(data));
-            } else {
-              res.end(String(data));
-            }
-          }
-          return res;
-        },
-        json: (data: any) => {
-          if (!res.headersSent) {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(data));
-          }
-          return res;
-        },
-        status: (code: number) => {
-          if (!res.headersSent) {
-            res.statusCode = code;
-          }
-          return res;
-        }
+        headers: req.headers as any
       };
 
       // Build middleware chain: global middlewares -> route middlewares -> final handler

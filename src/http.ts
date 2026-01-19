@@ -361,6 +361,32 @@ export class ServerResponse extends EventEmitter {
   _setResolver(resolve: (response: Response) => void): void {
     this._resolve = resolve;
   }
+
+  // Express.js-like methods
+  json(data: any, statusCode = 200): this {
+    if (!this.headersSent) {
+      this.setHeader('Content-Type', 'application/json');
+    }
+    this.statusCode = statusCode;
+    this.end(JSON.stringify(data));
+    return this;
+  }
+
+  send(data: any): this {
+    if (typeof data === 'object') {
+      return this.json(data);
+    }
+    if (!this.headersSent) {
+      this.setHeader('Content-Type', 'text/plain');
+    }
+    this.end(String(data));
+    return this;
+  }
+
+  status(code: number): this {
+    this.statusCode = code;
+    return this;
+  }
 }
 
 /**
