@@ -161,8 +161,14 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
                 write: true,
                 target: 'es2020',
                 // Bundle everything including elit/* so config can use elit modules
-                // Only mark Node.js built-ins as external
-                external: ['node:*'],
+                // Only mark Node.js built-ins and runtime-specific packages as external
+                external: [
+                    'node:*',
+                    'bun',
+                    'bun:*',
+                    'deno',
+                    'deno:*'
+                ],
                 // Use the config directory as the working directory for resolution
                 absWorkingDir: configDir,
             });
