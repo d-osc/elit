@@ -2,7 +2,7 @@ import vm from "node:vm";
 import { resolve } from "./path";
 import path from "node:path";
 import fs from "node:fs";
-import * as esbuild from 'esbuild';
+import Bun from "bun";
 
 export interface DatabaseConfig {
     dir?: string;
@@ -11,6 +11,7 @@ export interface DatabaseConfig {
 }
 
 export class Database {
+    private _transpiler: Bun.Transpiler;
     private _ctx: vm.Context;
     private _registerModules: { [key: string]: any };
     private _config: DatabaseConfig = {
@@ -21,6 +22,9 @@ export class Database {
         this._config = { ...this._config, ...config };
         this._registerModules = config.registerModules || {};
         this._ctx = vm.createContext(this._registerModules);
+        this._transpiler = new Bun.Transpiler({
+            loader: config?.language || 'ts',
+        });
     }
 
     set config(config: DatabaseConfig) {
@@ -213,19 +217,7 @@ export class Database {
             stringCode = code;
         }
 
-        // Transpile using esbuild
-        const result = await esbuild.build({
-            stdin: {
-                contents: stringCode,
-                loader: this._config.language || 'ts',
-            },
-            format: 'esm',
-            target: 'es2020',
-            write: false,
-            bundle: false,
-            sourcemap: false,
-        });
-        const js = result.outputFiles[0].text;
+        const js = this._transpiler.transformSync(stringCode);
 
         const mod = new vm.SourceTextModule(js, { context: this._ctx, identifier: path.join(this._config.dir || resolve(process.cwd(), 'databases'), 'virtual-entry.js') });
         await mod.link(this.moduleLinker.bind(this));
