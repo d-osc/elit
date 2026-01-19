@@ -42,7 +42,8 @@ export default defineConfig([
             'mime-types': 'src/mime-types.ts',
             chokidar: 'src/chokidar.ts',
             path: 'src/path.ts',
-            database: 'src/database.ts'
+            database: 'src/database.ts',
+            config: 'src/config.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
@@ -52,7 +53,7 @@ export default defineConfig([
         treeshake: false,
         sourcemap: false,
         target: 'es2020',
-        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode','bun'],
+        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode', 'bun'],
         banner({ format }) {
             if (format === 'esm') {
                 return {

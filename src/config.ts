@@ -144,14 +144,44 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
         // Load TypeScript config by transpiling it with esbuild
         try {
             const { build } = await import('esbuild');
-            const { tmpdir } = await import('os');
             const { join, dirname } = await import('./path');
 
-            // Create temporary output file
-            const tempFile = join(tmpdir(), `elit-config-${Date.now()}.mjs`);
-
-            // Bundle the TypeScript config with proper path resolution
+            // Create temporary output file in the same directory as the config
+            // This ensures that imports like 'elit/server' can be resolved correctly
             const configDir = dirname(configPath);
+            const tempFile = join(configDir, `.elit-config-${Date.now()}.mjs`);
+
+            // Custom plugin to external all dependencies
+            const externalAllPlugin = {
+                name: 'external-all',
+                setup(build: any) {
+                    build.onResolve({ filter: /.*/ }, (args: any) => {
+                        // Skip relative imports (local files)
+                        if (args.path.startsWith('./') || args.path.startsWith('../')) {
+                            return undefined;
+                        }
+
+                        // External everything in node_modules
+                        if (args.path.includes('node_modules') || args.resolveDir?.includes('node_modules')) {
+                            return { path: args.path, external: true };
+                        }
+
+                        // External known packages by exact match or prefix
+                        const knownPackages = ['esbuild', 'elit', 'fs', 'path', 'os', 'vm', 'crypto', 'http', 'https', 'url', 'bun'];
+                        if (knownPackages.some(pkg => args.path === pkg || args.path.startsWith(pkg + '/'))) {
+                            return { path: args.path, external: true };
+                        }
+
+                        // External any imports from dist directory (elit package)
+                        if (args.resolveDir?.includes('elit/dist') || args.path.includes('elit/dist')) {
+                            return { path: args.path, external: true };
+                        }
+
+                        return undefined;
+                    });
+                }
+            };
+
             await build({
                 entryPoints: [configPath],
                 bundle: true,
@@ -160,14 +190,12 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
                 outfile: tempFile,
                 write: true,
                 target: 'es2020',
-                // Bundle everything including elit/* so config can use elit modules
-                // Only mark Node.js built-ins and runtime-specific packages as external
+                plugins: [externalAllPlugin],
+                // External Node.js built-ins and runtime-specific packages
                 external: [
                     'node:*',
-                    'bun',
-                    'bun:*',
-                    'deno',
-                    'deno:*'
+                    'fs', 'path', 'os', 'vm', 'crypto', 'http', 'https',
+                    'bun', 'bun:*', 'deno', 'deno:*'
                 ],
                 // Use the config directory as the working directory for resolution
                 absWorkingDir: configDir,
