@@ -72,6 +72,7 @@ export type ElementFactory = {
 
 import type { Server } from 'http';
 import type { WebSocketServer } from 'ws';
+import { DatabaseConfig } from './database';
 
 // Forward declarations to avoid circular dependency
 export type Router = import('./server').ServerRouter;
@@ -161,6 +162,8 @@ export interface DevServerOptions {
     mode?: 'dev' | 'preview';
     /** Environment variables to inject (prefix with VITE_ for client access) */
     env?: Record<string, string>;
+    /** List of database directories to load */
+    database?: DatabaseConfig;
 }
 
 export interface DevServer {

@@ -3,6 +3,7 @@ import vm from "node:vm";
 import { resolve } from "./path";
 import path from "node:path";
 import fs from "node:fs";
+import { serverDatabase } from "./server"
 
 export interface DatabaseConfig {
     dir?: string;
@@ -10,7 +11,7 @@ export interface DatabaseConfig {
     registerModules?: { [key: string]: any };
 }
 
-class Database {
+export class Database {
     private _transpiler: Bun.Transpiler;
     private _ctx: vm.Context;
     private _registerModules: { [key: string]: any };
@@ -39,7 +40,7 @@ class Database {
     }
 
     plugin(moduleName: string, moduleContent: any) {
-       this.register({ [moduleName]: moduleContent });
+        this.register({ [moduleName]: moduleContent });
     }
 
     private resolvePath(fileList: any[], query: string) {
@@ -111,35 +112,35 @@ class Database {
         let stringCode: string;
         if (typeof code === 'function') {
             const funcStr = code.toString();
-        // ตัด arrow function หรือ function keyword และ opening brace ออก
-        const arrowMatch = funcStr.match(/^[\s]*\(?\s*\)?\s*=>\s*{?/);
-        const functionMatch = funcStr.match(/^[\s]*function\s*\(?[\w\s]*\)?\s*{/);
-        const match = arrowMatch || functionMatch;
-        const start = match ? match[0].length : 0;
-        const end = funcStr.lastIndexOf('}');
-        stringCode = funcStr.substring(start, end);
-        // Trim leading newline, spaces, and trailing
-        stringCode = stringCode.replace(/^[\s\r\n]+/, '').replace(/[\s\r\n]+$/, '');
+            // ตัด arrow function หรือ function keyword และ opening brace ออก
+            const arrowMatch = funcStr.match(/^[\s]*\(?\s*\)?\s*=>\s*{?/);
+            const functionMatch = funcStr.match(/^[\s]*function\s*\(?[\w\s]*\)?\s*{/);
+            const match = arrowMatch || functionMatch;
+            const start = match ? match[0].length : 0;
+            const end = funcStr.lastIndexOf('}');
+            stringCode = funcStr.substring(start, end);
+            // Trim leading newline, spaces, and trailing
+            stringCode = stringCode.replace(/^[\s\r\n]+/, '').replace(/[\s\r\n]+$/, '');
 
-        // Transform import(aa).from("module") to import aa from "module"
-        stringCode = stringCode.replace(
-            /import\s*\(\s*([^)]+?)\s*\)\s*\.from\s*\(\s*(['"])([^'"]+)\2\s*\)/g,
-            (_, importArg, quote, modulePath) => {
-                // Check if importArg is wrapped in braces (destructuring)
-                const trimmed = importArg.trim();
-                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                    // Destructuring: import({bb}) -> import { bb }
-                    const inner = trimmed.slice(1, -1).trim();
-                    return `import { ${inner} } from ${quote}${modulePath}${quote}`;
-                } else {
-                    // Default: import(aa) -> import aa
-                    return `import ${trimmed} from ${quote}${modulePath}${quote}`;
+            // Transform import(aa).from("module") to import aa from "module"
+            stringCode = stringCode.replace(
+                /import\s*\(\s*([^)]+?)\s*\)\s*\.from\s*\(\s*(['"])([^'"]+)\2\s*\)/g,
+                (_, importArg, quote, modulePath) => {
+                    // Check if importArg is wrapped in braces (destructuring)
+                    const trimmed = importArg.trim();
+                    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                        // Destructuring: import({bb}) -> import { bb }
+                        const inner = trimmed.slice(1, -1).trim();
+                        return `import { ${inner} } from ${quote}${modulePath}${quote}`;
+                    } else {
+                        // Default: import(aa) -> import aa
+                        return `import ${trimmed} from ${quote}${modulePath}${quote}`;
+                    }
                 }
-            }
-        );
+            );
 
-        // Trim leading whitespace from each line
-        stringCode = stringCode.split('\n').map(line => line.trim()).join('\n').trim();
+            // Trim leading whitespace from each line
+            stringCode = stringCode.split('\n').map(line => line.trim()).join('\n').trim();
         } else {
             stringCode = code;
         }
@@ -164,10 +165,6 @@ class Database {
 
 }
 
-export function database() {
-    return new Database({
-        dir: resolve(process.cwd(), 'databases')
-    });
-}
+export const database = serverDatabase.database;
 
 export default database;

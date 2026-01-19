@@ -16,6 +16,7 @@ import { lookup } from './mime-types';
 import { isBun, isDeno } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
+import { Database, DatabaseConfig } from './database';
 
 // ===== Router =====
 
@@ -46,6 +47,25 @@ interface ServerRoute {
   middlewares: Middleware[];
 }
 
+class ServerDatabase {
+  private _db: Database | null = null;
+
+  constructor() {
+
+  }
+
+  async initialize(config: DatabaseConfig) {
+    this._db = new Database(config);
+  }
+
+  database(){
+    return this._db;
+  }
+}
+
+export const serverDatabase = new ServerDatabase();
+
+export const database = serverDatabase.database;
 export class ServerRouter {
   private routes: ServerRoute[] = [];
   private middlewares: Middleware[] = [];
@@ -173,10 +193,10 @@ export class ServerRouter {
       try {
         const text = await (req as any).text();
         if (!text) return {};
-        
+
         const contentType = req.headers['content-type'];
         const ct = (Array.isArray(contentType) ? contentType[0] : (contentType || '')).toLowerCase();
-        
+
         // Parse JSON (either by content-type or if it looks like JSON)
         if (ct.includes('application/json') || ct.includes('json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
           try {
@@ -185,12 +205,12 @@ export class ServerRouter {
             return text;
           }
         }
-        
+
         // Parse URL-encoded
         if (ct.includes('application/x-www-form-urlencoded') || ct.includes('urlencoded')) {
           return Object.fromEntries(new URLSearchParams(text));
         }
-        
+
         // Return raw text
         return text;
       } catch (e) {
@@ -203,28 +223,28 @@ export class ServerRouter {
     return new Promise((resolve, reject) => {
       const contentLengthHeader = req.headers['content-length'];
       const contentLength = parseInt(Array.isArray(contentLengthHeader) ? contentLengthHeader[0] : (contentLengthHeader || '0'), 10);
-      
+
       if (contentLength === 0) {
         resolve({});
         return;
       }
 
       const chunks: Buffer[] = [];
-      
+
       req.on('data', chunk => {
         chunks.push(Buffer.from(chunk));
       });
-      
+
       req.on('end', () => {
         const body = Buffer.concat(chunks).toString();
         try {
           const ct = req.headers['content-type'] || '';
           resolve(ct.includes('json') ? (body ? JSON.parse(body) : {}) : ct.includes('urlencoded') ? Object.fromEntries(new URLSearchParams(body)) : body);
-        } catch (e) { 
-          reject(e); 
+        } catch (e) {
+          reject(e);
         }
       });
-      
+
       req.on('error', reject);
     });
   }
@@ -240,25 +260,25 @@ export class ServerRouter {
 
       let body: any = {};
       if (['POST', 'PUT', 'PATCH'].includes(method)) {
-        try { 
+        try {
           body = await this.parseBody(req);
         }
-        catch (e) { 
-          res.writeHead(400, { 'Content-Type': 'application/json' }); 
-          res.end('{"error":"Invalid request body"}'); 
-          return true; 
+        catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end('{"error":"Invalid request body"}');
+          return true;
         }
       }
 
       // Add Express-like response helpers to context
-      const ctx: ServerRouteContext = { 
-        req, 
-        res, 
-        params, 
-        query: this.parseQuery(url), 
-        body, 
+      const ctx: ServerRouteContext = {
+        req,
+        res,
+        params,
+        query: this.parseQuery(url),
+        body,
         headers: req.headers as any,
-        send: (data: any) => { 
+        send: (data: any) => {
           if (!res.headersSent) {
             if (typeof data === 'object') {
               res.setHeader('Content-Type', 'application/json');
@@ -300,8 +320,8 @@ export class ServerRouter {
         await mw(ctx, next);
       };
 
-      try { 
-        await next(); 
+      try {
+        await next();
       }
       catch (e) {
         console.error('[ServerRouter] Route error:', e);
@@ -1074,7 +1094,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'database'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -1105,6 +1125,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
   if (config.mode === 'dev') {
     clearImportMapCache();
   }
+
+  // Initialize database connections if provided
+  if (config.database) {
+    serverDatabase.initialize(config.database);
+  }
+
+
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
   const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, mode: config.mode }] : null;
