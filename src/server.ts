@@ -16,7 +16,6 @@ import { lookup } from './mime-types';
 import { isBun, isDeno } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
 import { dom } from './dom';
-import { Database, DatabaseConfig } from './database';
 
 // ===== Router =====
 
