@@ -66,8 +66,8 @@ class ElitHMR implements HMRClient {
 
     this.ws.onclose = () => {
       this.enabled = false;
-      console.log('[Elit HMR] Disconnected - Attempting reconnect...');
-      setTimeout(() => this.reload(), 1000);
+      console.log('[Elit HMR] Disconnected - HMR disabled until manual refresh');
+      // Don't auto-reload, let user decide when to refresh
     };
 
     this.ws.onerror = (error) => {
@@ -93,17 +93,18 @@ class ElitHMR implements HMRClient {
         this.disposeCallbacks.forEach(cb => cb());
         this.disposeCallbacks = [];
 
-        // Run accept callbacks or reload
+        // Run accept callbacks or log (don't auto-reload)
         if (this.acceptCallbacks.length > 0) {
           this.acceptCallbacks.forEach(cb => cb());
+          console.log('[Elit HMR] Update accepted via callback');
         } else {
-          this.reload();
+          console.log('[Elit HMR] Update detected - manually refresh to see changes');
         }
         break;
 
       case 'reload':
-        console.log('[Elit HMR] Full reload requested');
-        this.reload();
+        console.log('[Elit HMR] Full reload requested - manually refresh to see changes');
+        // Don't auto-reload
         break;
 
       case 'error':
