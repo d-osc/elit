@@ -2,7 +2,6 @@ import vm from "node:vm";
 import { resolve } from "./path";
 import path from "node:path";
 import fs from "node:fs";
-import { serverDatabase } from "./server"
 import * as esbuild from 'esbuild';
 
 export interface DatabaseConfig {
@@ -236,6 +235,12 @@ export class Database {
 
 }
 
-export const database = serverDatabase.database;
+// Default database instance
+
+export function database() {
+    return new Database({
+        dir: resolve(process.cwd(), 'databases')
+    });
+}
 
 export default database;
