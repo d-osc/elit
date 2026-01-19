@@ -152,7 +152,6 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
 
             // Bundle the TypeScript config with proper path resolution
             const configDir = dirname(configPath);
-
             await build({
                 entryPoints: [configPath],
                 bundle: true,
@@ -161,16 +160,9 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
                 outfile: tempFile,
                 write: true,
                 target: 'es2020',
-                // Don't bundle any dependencies, only bundle the config file itself
-                packages: 'external',
-                // Mark all Node.js built-ins as external
-                external: [
-                    'fs', 'path', 'os', 'crypto', 'http', 'https', 'stream', 'util',
-                    'url', 'querystring', 'events', 'buffer', 'child_process', 'cluster',
-                    'dgram', 'dns', 'net', 'tls', 'worker_threads', 'zlib', 'readline',
-                    'repl', 'vm', 'assert', 'console', 'timers', 'async_hooks', 'perf_hooks',
-                    'module', 'process', 'v8', 'inspector'
-                ],
+                // Bundle everything including elit/* so config can use elit modules
+                // Only mark Node.js built-ins as external
+                external: ['node:*'],
                 // Use the config directory as the working directory for resolution
                 absWorkingDir: configDir,
             });

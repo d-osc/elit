@@ -53,25 +53,7 @@ interface ServerRoute {
   middlewares: Middleware[];
 }
 
-class ServerDatabase {
-  private _db: Database | null = null;
 
-  constructor() {
-
-  }
-
-  async initialize(config: DatabaseConfig) {
-    this._db = new Database(config);
-  }
-
-  database() {
-    return this._db;
-  }
-}
-
-export const serverDatabase = new ServerDatabase();
-
-export const database = serverDatabase.database;
 export class ServerRouter {
   private routes: ServerRoute[] = [];
   private middlewares: Middleware[] = [];
@@ -1078,7 +1060,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'database'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -1109,14 +1091,6 @@ export function createDevServer(options: DevServerOptions): DevServer {
   if (config.mode === 'dev') {
     clearImportMapCache();
   }
-
-  // Initialize database connections if provided
-  serverDatabase.initialize(config.database ? config.database : {
-    dir: resolve(process.cwd(), 'databases')
-  })
-
-
-
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
   const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, mode: config.mode }] : null;
