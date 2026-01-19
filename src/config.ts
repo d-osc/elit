@@ -153,33 +153,27 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
             // Bundle the TypeScript config with proper path resolution
             const configDir = dirname(configPath);
 
-            const buildOptions: any = {
+            await build({
                 entryPoints: [configPath],
                 bundle: true,
                 format: 'esm',
-                platform: 'neutral',
+                platform: 'node',
                 outfile: tempFile,
                 write: true,
                 target: 'es2020',
                 // Don't bundle any dependencies, only bundle the config file itself
                 packages: 'external',
-                // External node_modules but allow inline of elit package
-                external: (context: { path: string }) => {
-                    // Inline elit modules (they're in the same package)
-                    if (context.path.includes('node_modules/elit') || context.path.startsWith('elit/')) {
-                        return false;
-                    }
-                    // External everything else from node_modules
-                    if (context.path.includes('node_modules')) {
-                        return true;
-                    }
-                    return false;
-                },
+                // Mark all Node.js built-ins as external
+                external: [
+                    'fs', 'path', 'os', 'crypto', 'http', 'https', 'stream', 'util',
+                    'url', 'querystring', 'events', 'buffer', 'child_process', 'cluster',
+                    'dgram', 'dns', 'net', 'tls', 'worker_threads', 'zlib', 'readline',
+                    'repl', 'vm', 'assert', 'console', 'timers', 'async_hooks', 'perf_hooks',
+                    'module', 'process', 'v8', 'inspector'
+                ],
                 // Use the config directory as the working directory for resolution
                 absWorkingDir: configDir,
-            };
-
-            await build(buildOptions);
+            });
 
             // Import the compiled config
             const config = await importConfigModule(tempFile);
