@@ -58,7 +58,7 @@ class ServerDatabase {
     this._db = new Database(config);
   }
 
-  database(){
+  database() {
     return this._db;
   }
 }
@@ -1127,9 +1127,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
   }
 
   // Initialize database connections if provided
-  if (config.database) {
-    serverDatabase.initialize(config.database);
-  }
+  serverDatabase.initialize(config.database ? config.database : {
+    dir: resolve(process.cwd(), 'databases')
+  })
+
 
 
 
