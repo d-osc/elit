@@ -1074,7 +1074,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -1146,6 +1146,19 @@ export function createDevServer(options: DevServerOptions): DevServer {
   // HTTP Server
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const originalUrl = req.url || '/';
+    const hostHeader = req.headers.host;
+    const hostName = hostHeader ? (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader).split(':')[0] : '';
+
+    // Handle domain mapping: redirect localhost:port to configured domain
+    if (config.domain && hostName === (config.host || 'localhost')) {
+      const redirectUrl = `http://${config.domain}${originalUrl}`;
+      if (config.logging) {
+        console.log(`[Domain Map] ${hostName}:${config.port}${originalUrl} -> ${redirectUrl}`);
+      }
+      res.writeHead(302, { Location: redirectUrl });
+      res.end();
+      return;
+    }
 
     // Find matching client based on basePath
     const matchedClient = normalizedClients.find(c => c.basePath && originalUrl.startsWith(c.basePath)) || normalizedClients.find(c => !c.basePath);

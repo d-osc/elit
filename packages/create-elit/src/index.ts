@@ -85,7 +85,7 @@ async function generateTemplate(projectPath: string, projectName: string, templa
       preview: 'elit preview'
     },
     dependencies: {
-      elit: '^3.1.6'
+      elit: '^3.1.7'
     }
   };
 
@@ -161,7 +161,7 @@ import { client } from './src/client';
 
 export default {
   dev: {
-    port: 3003,
+    port: 3000,
     host: 'localhost',
     open: ${template === 'basic' ? 'true' : 'false'},
     logging: true,
@@ -429,6 +429,22 @@ export const server = router;
 `;
 
   await writeFile(join(projectPath, 'src', 'server.ts'), serverTs);
+
+  // Create router.ts for routing (if needed)
+  const routerTs = `import { createRouter, createRouterView, Route } from 'elit/router';
+import { div } from 'elit';
+import { currentUser } from './state';
+import { Login } from './components/Login';
+import { Register } from './components/Register';
+
+router.get('/api/hello', async (ctx) => {
+  ctx.res.setHeader('Content-Type', 'application/json');
+  ctx.res.end(JSON.stringify({ message: 'Hello from Elit ServerRouter!' }));
+});
+
+export const server = router;
+`;
+  await writeFile(join(projectPath, 'src', 'router.ts'), routerTs);
 }
 
 async function generateFullTemplate(projectPath: string, projectName: string) {

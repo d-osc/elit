@@ -129,6 +129,8 @@ export interface DevServerOptions {
     port?: number;
     /** Host to bind to (default: 'localhost') */
     host?: string;
+    /** Domain to map (e.g., 'idevcoder.com') - redirects domain traffic to this server's port */
+    domain?: string;
     /** Root directory to serve files from */
     root?: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
@@ -239,6 +241,8 @@ export interface PreviewOptions {
     port?: number;
     /** Host to bind to (default: 'localhost') */
     host?: string;
+    /** Domain to map (e.g., 'idevcoder.com') - redirects domain traffic to this server's port */
+    domain?: string;
     /** Root directory to serve files from (default: dist or build.outDir) */
     root?: string;
     /** Base path for the application (e.g., '/app') */

@@ -210,7 +210,8 @@ async function runPreview(args: string[]) {
         port: mergedOptions.port || 4173,
         host: mergedOptions.host || 'localhost',
         open: mergedOptions.open ?? true,
-        logging: mergedOptions.logging ?? true
+        logging: mergedOptions.logging ?? true,
+        domain: mergedOptions.domain
     };
 
     // Support both single root and clients array
