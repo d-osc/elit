@@ -97,7 +97,7 @@ export class Database {
     }
 
 
-    private async vmRun(code: string | Function, options?: vm.RunningCodeOptions | string) {
+    private async vmRun(code: string | Function, _options?: vm.RunningCodeOptions | string) {
         const logs: any[] = [];
 
         const customConsole = ['log', 'error', 'warn', 'info', 'debug', 'trace'].reduce((acc: any, type: any) => {
