@@ -1,9 +1,9 @@
-import Bun from "bun";
 import vm from "node:vm";
 import { resolve } from "./path";
 import path from "node:path";
 import fs from "node:fs";
 import { serverDatabase } from "./server"
+import * as esbuild from 'esbuild';
 
 export interface DatabaseConfig {
     dir?: string;
@@ -12,19 +12,14 @@ export interface DatabaseConfig {
 }
 
 export class Database {
-    private _transpiler: Bun.Transpiler;
     private _ctx: vm.Context;
     private _registerModules: { [key: string]: any };
-    private _language: 'ts' | 'js' = 'ts';
     private _config: DatabaseConfig = {
         dir: resolve(process.cwd(), 'databases'),
     };
 
     constructor(config: DatabaseConfig) {
         this._config = { ...this._config, ...config };
-        this._transpiler = new Bun.Transpiler({
-            loader: config.language || this._language,
-        });
         this._registerModules = config.registerModules || {};
         this._ctx = vm.createContext(this._registerModules);
     }
@@ -145,8 +140,20 @@ export class Database {
             stringCode = code;
         }
 
+        // Transpile using esbuild
+        const result = await esbuild.build({
+            stdin: {
+                contents: stringCode,
+                loader: this._config.language || 'ts',
+            },
+            format: 'esm',
+            target: 'es2020',
+            write: false,
+            bundle: false,
+            sourcemap: false,
+        });
+        const js = result.outputFiles[0].text;
 
-        const js = this._transpiler.transformSync(stringCode);
         const mod = new vm.SourceTextModule(js, { context: this._ctx, identifier: path.join(this._config.dir || resolve(process.cwd(), 'databases'), 'virtual-entry.js') });
         await mod.link(this.moduleLinker.bind(this));
         await mod.evaluate();

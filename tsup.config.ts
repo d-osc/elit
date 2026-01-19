@@ -41,7 +41,8 @@ export default defineConfig([
             fs: 'src/fs.ts',
             'mime-types': 'src/mime-types.ts',
             chokidar: 'src/chokidar.ts',
-            path: 'src/path.ts'
+            path: 'src/path.ts',
+            database: 'src/database.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
@@ -51,7 +52,7 @@ export default defineConfig([
         treeshake: false,
         sourcemap: false,
         target: 'es2020',
-        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode'],
+        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode','bun'],
         banner({ format }) {
             if (format === 'esm') {
                 return {
@@ -74,6 +75,14 @@ export default defineConfig([
         format: ['cjs'],
         dts: true,
         clean: false,
-        splitting: false
+        splitting: false,
+        external: ['bun'],
+        target: 'es2020',
+        outExtension() {
+            return {
+                js: '.js',
+                dts: '.d.ts'
+            };
+        }
     }
 ]);
