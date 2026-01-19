@@ -107,35 +107,99 @@ export class Database {
         let stringCode: string;
         if (typeof code === 'function') {
             const funcStr = code.toString();
+
             // ตัด arrow function หรือ function keyword และ opening brace ออก
-            const arrowMatch = funcStr.match(/^[\s]*\(?\s*\)?\s*=>\s*{?/);
-            const functionMatch = funcStr.match(/^[\s]*function\s*\(?[\w\s]*\)?\s*{/);
-            const match = arrowMatch || functionMatch;
-            const start = match ? match[0].length : 0;
-            const end = funcStr.lastIndexOf('}');
-            stringCode = funcStr.substring(start, end);
+            // ใช้ string methods แทน regex เพื่อหลีด ReDoS vulnerability
+
+            // Check for arrow function first
+            if (funcStr.includes('=>')) {
+                const arrowIndex = funcStr.indexOf('=>');
+                // Find opening brace after =>
+                let start = arrowIndex + 2;
+                while (start < funcStr.length && funcStr[start] === ' ') start++;
+                if (funcStr[start] === '{') start++;
+
+                // Find closing brace
+                let end = funcStr.lastIndexOf('}');
+
+                if (start < end) {
+                    stringCode = funcStr.substring(start, end);
+                } else {
+                    stringCode = funcStr.substring(start);
+                }
+            } else if (funcStr.includes('function')) {
+                const funcIndex = funcStr.indexOf('function');
+                // Find opening parenthesis after function
+                let start = funcIndex + 8; // 'function'.length
+                while (start < funcStr.length && funcStr[start] === ' ') start++;
+                if (funcStr[start] === '(') start++;
+
+                // Skip function name if exists
+                if (start < funcStr.length && funcStr[start] !== '(') {
+                    while (start < funcStr.length && funcStr[start] !== ' ' && funcStr[start] !== '(') start++;
+                }
+                if (funcStr[start] === '(') start++;
+
+                // Find opening brace
+                while (start < funcStr.length && funcStr[start] === ' ') start++;
+                if (funcStr[start] === '{') start++;
+
+                // Find closing brace
+                const end = funcStr.lastIndexOf('}');
+
+                if (start < end) {
+                    stringCode = funcStr.substring(start, end);
+                } else {
+                    stringCode = funcStr.substring(start);
+                }
+            } else {
+                stringCode = funcStr;
+            }
+
             // Trim leading newline, spaces, and trailing
-            stringCode = stringCode.replace(/^[\s\r\n]+/, '').replace(/[\s\r\n]+$/, '');
+            stringCode = stringCode.trim();
 
             // Transform import(aa).from("module") to import aa from "module"
-            stringCode = stringCode.replace(
-                /import\s*\(\s*([^)]+?)\s*\)\s*\.from\s*\(\s*(['"])([^'"]+)\2\s*\)/g,
-                (_, importArg, quote, modulePath) => {
-                    // Check if importArg is wrapped in braces (destructuring)
-                    const trimmed = importArg.trim();
-                    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                        // Destructuring: import({bb}) -> import { bb }
-                        const inner = trimmed.slice(1, -1).trim();
-                        return `import { ${inner} } from ${quote}${modulePath}${quote}`;
-                    } else {
-                        // Default: import(aa) -> import aa
-                        return `import ${trimmed} from ${quote}${modulePath}${quote}`;
-                    }
+            // ใช้ string methods แทน regex เพื่อหลีด ReDoS vulnerability
+            let importPos = 0;
+            while ((importPos = stringCode.indexOf('import(', importPos)) !== -1) {
+                const fromPos = stringCode.indexOf('.from(', importPos);
+                if (fromPos === -1) break;
+
+                const quoteStart = stringCode.indexOf('(', fromPos + 7) + 1;
+                if (quoteStart === -1) break;
+
+                const quoteChar = stringCode[quoteStart];
+                if (quoteChar !== '"' && quoteChar !== "'") break;
+
+                const quoteEnd = stringCode.indexOf(quoteChar, quoteStart + 1);
+                if (quoteEnd === -1) break;
+
+                const modulePath = stringCode.substring(quoteStart + 1, quoteEnd);
+                const importArgEnd = fromPos - 1;
+                const importArgStart = importPos + 7;
+
+                const trimmed = stringCode.substring(importArgStart, importArgEnd).trim();
+
+                let replacement: string;
+                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                    // Destructuring: import({bb}) -> import { bb }
+                    const inner = trimmed.slice(1, -1).trim();
+                    replacement = `import { ${inner} } from "${modulePath}"`;
+                } else {
+                    // Default: import(aa) -> import aa
+                    replacement = `import ${trimmed} from "${modulePath}"`;
                 }
-            );
+
+                const before = stringCode.substring(0, importPos);
+                const after = stringCode.substring(quoteEnd + 2);
+                stringCode = before + replacement + after;
+            }
 
             // Trim leading whitespace from each line
-            stringCode = stringCode.split('\n').map(line => line.trim()).join('\n').trim();
+            const lines = stringCode.split('\n');
+            const trimmedLines = lines.map(line => line.trim());
+            stringCode = trimmedLines.join('\n').trim();
         } else {
             stringCode = code;
         }
