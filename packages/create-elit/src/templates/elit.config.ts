@@ -1,6 +1,5 @@
 import { server } from './src/server';
 import { client } from './src/client';
-import { resolve } from 'elit/path';
 
 export default {
   dev: {
@@ -23,13 +22,15 @@ export default {
     minify: true,
     sourcemap: true,
     target: 'es2020',
-    external: [],
     copy: [
       {
         from: './public/index.html', to: './index.html',
-        transform: (content: string, config: { basePath: any; }) => {
+        transform: (content: string, config: { basePath: string; projectName: string; }) => {
           // Replace script src
           let html = content.replace('src="../src/main.ts"', 'src="main.js"');
+
+          // Replace project name placeholder
+          html = html.replace(/ELIT_PROJECT_NAME/g, config.projectName);
 
           // Inject base tag if basePath is configured
           if (config.basePath) {

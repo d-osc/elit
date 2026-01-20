@@ -40,7 +40,7 @@ export function Header(router: Router) {
     nav({ className: 'nav' },
       div({ className: 'nav-brand' },
         a({ href: '#/', className: 'brand-link' },
-          h1({ className: 'brand-title' }, 'My Elit App')
+          h1({ className: 'brand-title' }, 'ELIT_PROJECT_NAME')
         )
       ),
 

@@ -1,0 +1,14 @@
+{
+  "name": "ELIT_PROJECT_NAME",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "elit dev",
+    "build": "elit build",
+    "preview": "elit preview"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.9",
+     "elit": "^ELIT_VERSION"
+  }
+}

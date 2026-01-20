@@ -1496,22 +1496,16 @@ export default css;
             transpiled = transpiler.transformSync(content.toString());
           } else {
             // Node.js - use esbuild
-            const { build } = await import('esbuild');
-            const result = await build({
-              stdin: {
-                contents: content.toString(),
-                loader: ext === '.tsx' ? 'tsx' : 'ts',
-                resolveDir: resolve(resolvedPath, '..'),
-                sourcefile: resolvedPath
-              },
+            const { transformSync } = await import('esbuild');
+            const loader = ext === '.tsx' ? 'tsx' : 'ts';
+            const result = transformSync(content.toString(), {
+              loader: loader as any,
               format: 'esm',
               target: 'es2020',
-              write: false,
-              bundle: false,
               sourcemap: 'inline'
             });
 
-            transpiled = result.outputFiles[0].text;
+            transpiled = result.code;
           }
 
           // Rewrite .ts imports to .js for browser compatibility

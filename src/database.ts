@@ -1,75 +1,165 @@
 import vm from "node:vm";
-import { resolve } from "./path";
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
+import { transformSync } from 'esbuild';
 
-export interface DatabaseConfig {
-    dir?: string;
+interface VMOptions {
     language?: 'ts' | 'js';
     registerModules?: { [key: string]: any };
+    dir?: string;
 }
 
-export class Database {
-    private _transpiler: any;
-    private _ctx: vm.Context;
+class VM {
+    private transpiler: typeof transformSync;
+    private ctx: vm.Context;
+    private registerModules: { [key: string]: any };
+    private DATABASE_DIR: string;
+    private SCRIPTDB_DIR: string;
+    private pkgScriptDB: { dependencies?: Record<string, string> } = {};
+    private language: 'ts' | 'js';
     private _registerModules: { [key: string]: any };
-    private _config: DatabaseConfig = {
-        dir: resolve(process.cwd(), 'databases'),
-    };
+    constructor(options?: VMOptions) {
+        // Set directories based on options or defaults
+        this.DATABASE_DIR = options?.dir || path.join(process.cwd(), 'databases');
+        this.SCRIPTDB_DIR = process.cwd();
 
-    constructor(config: DatabaseConfig) {
-        this._config = { ...this._config, ...config };
-        this._registerModules = config.registerModules || {};
-        this._ctx = vm.createContext(this._registerModules);
-        // Initialize transpiler lazily
-        this._initTranspiler();
-    }
-
-    private async _initTranspiler() {
-        if (!this._transpiler) {
-            try {
-                // Dynamic import Bun to avoid esbuild bundling issues
-                const BunModule = await import('bun');
-                this._transpiler = new BunModule.default.Transpiler({
-                    loader: this._config.language || 'ts',
-                });
-            } catch {
-                // Bun not available, will use esbuild fallback
-                const { buildSync } = await import('esbuild');
-                this._transpiler = {
-                    transformSync: (code: string) => {
-                        const result = buildSync({
-                            stdin: { contents: code },
-                            loader: (this._config.language === 'ts' ? 'ts' : 'js') as any,
-                            format: 'esm',
-                            platform: 'node',
-                            target: 'es2020',
-                            bundle: false,
-                        });
-                        return result.outputFiles?.[0]?.text || '';
-                    }
-                };
-            }
+        // Ensure directories exist
+        if (!fs.existsSync(this.DATABASE_DIR)) {
+            fs.mkdirSync(this.DATABASE_DIR, { recursive: true });
         }
-        return this._transpiler;
+        if (!fs.existsSync(this.SCRIPTDB_DIR)) {
+            fs.mkdirSync(this.SCRIPTDB_DIR, { recursive: true });
+        }
+
+        // Load scriptdb workspace package.json if it exists
+        const pkgPath = path.join(this.SCRIPTDB_DIR, 'package.json');
+        if (fs.existsSync(pkgPath)) {
+            this.pkgScriptDB = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        }
+        this.language = options?.language || 'ts';
+        this.transpiler = transformSync;
+
+        this.registerModules = options?.registerModules || {};
+        this._registerModules = { ...this.registerModules };
+
+        // Add require function to initial context for fallback path
+        this._registerModules.require = ((moduleId: string) => this.createRequire(moduleId)).bind(this);
+
+        this.ctx = vm.createContext(this._registerModules);
+
+
     }
 
-    set config(config: DatabaseConfig) {
-        this._config = { ...this._config, ...config };
-    }
-
-    private register(context: { [key: string]: any }) {
+    register(context: { [key: string]: any }) {
+        this.registerModules = { ...this.registerModules, ...context };
         this._registerModules = { ...this._registerModules, ...context };
-        // Register any custom modules or plugins here if needed
-        this._ctx = vm.createContext(this._registerModules);
+        // Always ensure our custom require function is present (with @db alias support)
+        // Store the original require if it exists in context
+        const originalRequire = context.require;
+        this._registerModules.require = ((moduleId: string) => {
+            // Try custom require first (handles @db aliases and database files)
+            try {
+                return this.createRequire(moduleId);
+            } catch (e) {
+                // Fall back to original require for node_modules
+                if (originalRequire) {
+                    return originalRequire(moduleId);
+                }
+                throw e;
+            }
+        }).bind(this);
+        // Update context with all modules including require
+        this.ctx = vm.createContext(this._registerModules);
     }
 
-    plugin(moduleName: string, moduleContent: any) {
-        this.register({ [moduleName]: moduleContent });
+    private createRequire(moduleId: string): any {
+        // Validate moduleId
+        if (!moduleId) {
+            console.error('[createRequire] moduleId is undefined');
+            return {};
+        }
+
+        console.log('[createRequire] Loading module:', moduleId, 'from DATABASE_DIR:', this.DATABASE_DIR);
+
+        // Handle @db/ path alias
+        if (moduleId.startsWith('@db/')) {
+            const relativePath = moduleId.substring(4); // Remove '@db/'
+            moduleId = './' + relativePath;
+            console.log('[createRequire] Resolved @db/ alias to:', moduleId);
+        }
+
+        // Handle relative paths (e.g., './users')
+        if (moduleId.startsWith('./') || moduleId.startsWith('../')) {
+            const dbDir = this.DATABASE_DIR || process.cwd();
+            const fullPath = path.join(dbDir, moduleId);
+
+            console.log('[createRequire] Full path:', fullPath);
+
+            // Try to find the file with an extension
+            let actualPath: string | undefined = fullPath;
+            if (fs.existsSync(fullPath)) {
+                actualPath = fullPath;
+            } else {
+                const extensions = ['.ts', '.tsx', '.js', '.mjs'];
+                for (const ext of extensions) {
+                    if (fs.existsSync(fullPath + ext)) {
+                        actualPath = fullPath + ext;
+                        break;
+                    }
+                }
+            }
+
+            console.log('[createRequire] Actual path:', actualPath);
+
+            if (!actualPath || !fs.existsSync(actualPath)) {
+                console.log('[createRequire] File not found, throwing error');
+                throw new Error(`Module '${moduleId}' not found at ${fullPath}`);
+            }
+
+            // For TypeScript files, read and transpile the content
+            if (actualPath.endsWith('.ts') || actualPath.endsWith('.tsx')) {
+                const content = fs.readFileSync(actualPath, 'utf8');
+                const js = this.transpiler(content, { loader: 'ts', format: 'cjs' }).code;
+
+                // Create a wrapper object to capture the final exports
+                const moduleWrapper = { exports: {} };
+                const originalModule = this._registerModules.module;
+                const originalExports = this._registerModules.exports;
+
+                this._registerModules.module = moduleWrapper;
+                this._registerModules.exports = moduleWrapper.exports;
+
+                try {
+                    vm.runInContext(js, this.ctx, { filename: actualPath });
+                } finally {
+                    if (originalModule) {
+                        this._registerModules.module = originalModule;
+                    } else {
+                        delete this._registerModules.module;
+                    }
+                    if (originalExports) {
+                        this._registerModules.exports = originalExports;
+                    } else {
+                        delete this._registerModules.exports;
+                    }
+                }
+
+                console.log('[createRequire] Returning exports:', moduleWrapper.exports);
+                return moduleWrapper.exports;
+            }
+
+            // For JS files, use standard require
+            const result = require(actualPath);
+            console.log('[createRequire] Returning (JS):', result);
+            return result;
+        }
+
+        // For node_modules, use standard require
+        return require(moduleId);
     }
 
-    private resolvePath(fileList: any[], query: string) {
-        const aliases = { '@db': this._config.dir || resolve(process.cwd(), 'databases') };
+    resolvePath(fileList: any[], query: string) {
+        const aliases = { '@db': this.DATABASE_DIR };
 
         let resolvedPath = query;
         for (const [alias, target] of Object.entries(aliases)) {
@@ -92,13 +182,19 @@ export class Database {
         });
     }
 
-    private async moduleLinker(specifier: any, referencingModule: any) {
+    async moduleLinker(specifier: any, referencingModule: any) {
+        console.log('[moduleLinker] Loading specifier:', specifier, 'from DATABASE_DIR:', this.DATABASE_DIR);
+
         // Try database files first
-        const dbFiles = fs.readdirSync(this._config.dir || resolve(process.cwd(), 'databases'))
+        const dbFiles = fs.readdirSync(this.DATABASE_DIR)
             .filter(f => f.endsWith(".ts"))
-            .map(f => path.join(this._config.dir || resolve(process.cwd(), 'databases'), f));
+            .map(f => path.join(this.DATABASE_DIR, f));
+
+        console.log('[moduleLinker] Database files:', dbFiles);
 
         const dbResult = this.resolvePath(dbFiles, specifier);
+        console.log('[moduleLinker] Resolved path:', dbResult);
+
         if (dbResult) {
             try {
                 const actualModule = await import(dbResult);
@@ -118,10 +214,33 @@ export class Database {
             }
         }
 
+        // Try workspace packages
+        const allowedPackages = Object.keys(this.pkgScriptDB.dependencies || {});
+        if (allowedPackages.includes(specifier)) {
+            try {
+                // Import from scriptdb workspace node_modules
+                const modulePath = path.join(this.SCRIPTDB_DIR, 'node_modules', specifier);
+                const actualModule = await import(modulePath);
+                const exportNames = Object.keys(actualModule);
+                return new vm.SyntheticModule(
+                    exportNames,
+                    function () {
+                        exportNames.forEach(key => {
+                            this.setExport(key, actualModule[key]);
+                        });
+                    },
+                    { identifier: specifier, context: referencingModule.context }
+                );
+            } catch (err) {
+                console.error(`Failed to load workspace module ${specifier}:`, err);
+                throw err;
+            }
+        }
+
         throw new Error(`Module ${specifier} is not allowed or not found.`);
     }
 
-    private async vmRun(code: string | Function, _options?: vm.RunningCodeOptions | string) {
+    async run(code: string) {
         const logs: any[] = [];
 
         const customConsole = ['log', 'error', 'warn', 'info', 'debug', 'trace'].reduce((acc: any, type: any) => {
@@ -129,147 +248,97 @@ export class Database {
             return acc;
         }, {});
 
-        const systemBase = {
-            update: update,
-            remove: remove,
-            rename: rename,
-            read: read,
-            create: create,
-            save: save
-        }
-
-
-
         this.register({
-            dbConsole: { ...customConsole, ...systemBase }
+            console: customConsole
         });
 
-        let stringCode: string;
-        if (typeof code === 'function') {
-            const funcStr = code.toString();
+        const systemModules = await SystemModuleResolver();
+        this.register(systemModules);
 
-            // ตัด arrow function หรือ function keyword และ opening brace ออก
-            // ใช้ string methods แทน regex เพื่อหลีด ReDoS vulnerability
+        const js = this.transpiler(code, { loader: this.language, format: 'cjs' }).code;
+        console.log('[run] Transpiled code:', js);
 
-            // Check for arrow function first
-            if (funcStr.includes('=>')) {
-                const arrowIndex = funcStr.indexOf('=>');
-                // Find opening brace after =>
-                let start = arrowIndex + 2;
-                while (start < funcStr.length && funcStr[start] === ' ') start++;
-                if (funcStr[start] === '{') start++;
+        // Try to use SourceTextModule if available (requires Node.js --experimental-vm-modules)
+        try {
+            const SourceTextModule = (vm as any).SourceTextModule;
+            console.log('[run] SourceTextModule available:', typeof SourceTextModule === 'function');
+            if (typeof SourceTextModule === 'function') {
+                const mod = new SourceTextModule(js, { context: this.ctx, identifier: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js') });
+                await mod.link(this.moduleLinker.bind(this));
+                await mod.evaluate();
 
-                // Find closing brace
-                let end = funcStr.lastIndexOf('}');
-
-                if (start < end) {
-                    stringCode = funcStr.substring(start, end);
-                } else {
-                    stringCode = funcStr.substring(start);
-                }
-            } else if (funcStr.includes('function')) {
-                const funcIndex = funcStr.indexOf('function');
-                // Find opening parenthesis after function
-                let start = funcIndex + 8; // 'function'.length
-                while (start < funcStr.length && funcStr[start] === ' ') start++;
-                if (funcStr[start] === '(') start++;
-
-                // Skip function name if exists
-                if (start < funcStr.length && funcStr[start] !== '(') {
-                    while (start < funcStr.length && funcStr[start] !== ' ' && funcStr[start] !== '(') start++;
-                }
-                if (funcStr[start] === '(') start++;
-
-                // Find opening brace
-                while (start < funcStr.length && funcStr[start] === ' ') start++;
-                if (funcStr[start] === '{') start++;
-
-                // Find closing brace
-                const end = funcStr.lastIndexOf('}');
-
-                if (start < end) {
-                    stringCode = funcStr.substring(start, end);
-                } else {
-                    stringCode = funcStr.substring(start);
-                }
-            } else {
-                stringCode = funcStr;
+                return {
+                    namespace: mod.namespace,
+                    logs: logs
+                };
             }
-
-            // Trim leading newline, spaces, and trailing
-            stringCode = stringCode.trim();
-
-            // Transform import(aa).from("module") to import aa from "module"
-            // ใช้ string methods แทน regex เพื่อหลีด ReDoS vulnerability
-            let importPos = 0;
-            while ((importPos = stringCode.indexOf('import(', importPos)) !== -1) {
-                const fromPos = stringCode.indexOf('.from(', importPos);
-                if (fromPos === -1) break;
-
-                const quoteStart = stringCode.indexOf('(', fromPos + 7) + 1;
-                if (quoteStart === -1) break;
-
-                const quoteChar = stringCode[quoteStart];
-                if (quoteChar !== '"' && quoteChar !== "'") break;
-
-                const quoteEnd = stringCode.indexOf(quoteChar, quoteStart + 1);
-                if (quoteEnd === -1) break;
-
-                const modulePath = stringCode.substring(quoteStart + 1, quoteEnd);
-                const importArgEnd = fromPos - 1;
-                const importArgStart = importPos + 7;
-
-                const trimmed = stringCode.substring(importArgStart, importArgEnd).trim();
-
-                let replacement: string;
-                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                    // Destructuring: import({bb}) -> import { bb }
-                    const inner = trimmed.slice(1, -1).trim();
-                    replacement = `import { ${inner} } from "${modulePath}"`;
-                } else {
-                    // Default: import(aa) -> import aa
-                    replacement = `import ${trimmed} from "${modulePath}"`;
-                }
-
-                const before = stringCode.substring(0, importPos);
-                const after = stringCode.substring(quoteEnd + 2);
-                stringCode = before + replacement + after;
-            }
-
-            // Trim leading whitespace from each line
-            const lines = stringCode.split('\n');
-            const trimmedLines = lines.map(line => line.trim());
-            stringCode = trimmedLines.join('\n').trim();
-        } else {
-            stringCode = code;
+        } catch (e) {
+            console.log('[run] SourceTextModule failed, using fallback:', e);
+            // SourceTextModule not available, fall through to alternative approach
         }
 
-        // Ensure transpiler is initialized
-        const transpiler = await this._initTranspiler();
-        const js = transpiler.transformSync(stringCode);
+        // Fallback: Pre-process imports and use vm.runInContext
+        let processedCode = js;
 
-        const mod = new vm.SourceTextModule(js, { context: this._ctx, identifier: path.join(this._config.dir || resolve(process.cwd(), 'databases'), 'virtual-entry.js') });
-        await mod.link(this.moduleLinker.bind(this));
-        await mod.evaluate();
-        return {
-            namespace: mod.namespace,
-            logs: logs
+        console.log('[run] Original transpiled code:', processedCode);
+
+        // esbuild converts: import { users } from './users'
+        // to: var import_users = require("./users");
+        // and uses: import_users.users
+        // But our module exports: exports.users = []
+        // So we need to convert import_users.users -> import_users
+
+        // First, convert static imports to require calls
+        processedCode = processedCode.replace(
+            /var\s+(\w+)\s+=\s+require\((['"])([^'"]+)\2\);/g,
+            (_match: string, varName: string, quote: string, modulePath: string) => {
+                return `const ${varName} = require(${quote}${modulePath}${quote});`;
+            }
+        );
+
+        // Convert any remaining static imports to require calls
+        processedCode = processedCode.replace(
+            /import\s+\{([^}]+)\}\s+from\s+(['"])([^'"]+)\2/g,
+            (_match: string, imports: string, quote: string, modulePath: string) => {
+                return `const { ${imports} } = require(${quote}${modulePath}${quote});`;
+            }
+        );
+
+        processedCode = processedCode.replace(
+            /import\s+(\w+)\s+from\s+(['"])([^'"]+)\2/g,
+            (_match: string, name: string, quote: string, modulePath: string) => {
+                return `const ${name} = require(${quote}${modulePath}${quote});`;
+            }
+        );
+
+        // Convert dynamic import() to require()
+        processedCode = processedCode.replace(/import\(([^)]+)\)/g, 'require($1)');
+
+        console.log('[run] Processed code:', processedCode);
+
+        console.log('[run] Context has require:', typeof this._registerModules.require);
+        console.log('[run] DATABASE_DIR:', this.DATABASE_DIR);
+
+        try {
+            const result = vm.runInContext(processedCode, this.ctx, {
+                filename: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js')
+            });
+
+            return {
+                namespace: result,
+                logs: logs
+            };
+        } catch (e) {
+            console.log('[run] Error executing code:', e);
+            throw e;
         }
     }
-
-    /**
-     * Execute database code and return results
-     */
-    async execute(code: string | Function, options?: vm.RunningCodeOptions | string) {
-        return await this.vmRun(code, options);
-    }
-
 }
 
 function create(dbName: string, code: string | Function): void {
     const DIR = "databases";
-    const basePath = process.cwd();
-    const baseDir: string = path.resolve(basePath, DIR);
+    const basePath = path.join(process.cwd());
+    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
     const dbPath = path.join(baseDir, `${dbName}.ts`);
     // Prepare the export line
     fs.appendFileSync(dbPath, code.toString(), 'utf8');
@@ -277,7 +346,7 @@ function create(dbName: string, code: string | Function): void {
 
 function read(dbName: string): string {
     const DIR = "databases";
-    const basePath = process.cwd();
+    const basePath = path.join(process.cwd());
     const baseDir: string = path.resolve(basePath, DIR);
     const dbPath = path.join(baseDir, `${dbName}.ts`);
 
@@ -290,7 +359,7 @@ function read(dbName: string): string {
 
 function remove(dbName: string, fnName: string) {
     const DIR = "databases";
-    const basePath = process.cwd();
+    const basePath = path.join(process.cwd());
     const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
     const dbPath = path.join(baseDir, `${dbName}.ts`);
     if (!fs.existsSync(dbPath)) return false;
@@ -387,7 +456,7 @@ function remove(dbName: string, fnName: string) {
 
 function rename(oldName: string, newName: string): string {
     const DIR = "databases";
-    const basePath = process.cwd();
+    const basePath = path.join(process.cwd());
     const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
     const oldPath = path.join(baseDir, `${oldName}.ts`);
     const newPath = path.join(baseDir, `${newName}.ts`);
@@ -413,7 +482,7 @@ function rename(oldName: string, newName: string): string {
 
 function save(dbName: string, code: string | Function | any): void {
     const DIR = "databases";
-    const basePath = process.cwd();
+    const basePath = path.join(process.cwd());
     const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
     const dbPath = path.join(baseDir, `${dbName}.ts`);
 
@@ -424,7 +493,7 @@ function save(dbName: string, code: string | Function | any): void {
 
 function update(dbName: string, fnName: string, code: string | Function) {
     const DIR = "databases";
-    const basePath = process.cwd();
+    const basePath = path.join(process.cwd());
     const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต
     const dbPath = path.join(baseDir, `${dbName}.ts`);
 
@@ -599,31 +668,65 @@ function isIdentifier(key: any) {
     return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
 }
 
+async function SystemModuleResolver() {
 
-// Default database instance
+    const moduleRegistry = new Map<string, any>();
 
-export function database() {
-    return new Database({
-        dir: resolve(process.cwd(), 'databases')
-    });
+    moduleRegistry.set("update", update);
+    moduleRegistry.set("remove", remove);
+    moduleRegistry.set("create", create);
+    moduleRegistry.set("save", save);
+    moduleRegistry.set("read", read);
+
+    const context: Record<string, any> = {
+        // Add require-like functionality
+        require: (moduleName: string) => {
+            const module = moduleRegistry.get(moduleName);
+            if (!module) {
+                throw new Error(`Module '${moduleName}' not found`);
+            }
+            // Return the default export if available, otherwise the module itself
+            return module.default || module;
+        },
+
+        // Add import functionality (simulated)
+        import: async (moduleName: string) => {
+            const module = moduleRegistry.get(moduleName);
+            if (!module) {
+                throw new Error(`Module '${moduleName}' not found`);
+            }
+            return {
+                default: module.default || module
+            };
+        }
+    };
+
+    for (const [name, moduleExports] of moduleRegistry) {
+        context[name] = moduleExports.default || moduleExports;
+    }
+
+    return context;
 }
 
-export interface DatabaseConsole extends Console {
-    create?(dbName: string, code: string | Function): void;
-    read(dbName: string): string;
-    remove(dbName: string, fnName: string): any;
-    rename(oldName: string, newName: string): string;
-    save(dbName: string, code: string | Function | any): void;
-    update(dbName: string, fnName: string, code: string | Function): any;
+export class Database {
+    private vm: VM;
+    constructor(options?: VMOptions) {
+        this.vm = new VM({
+            language: 'ts', registerModules: {},
+            ...options
+        });
+    }
+
+    register(context: { [key: string]: any }) {
+        this.vm.register(context);
+    }
+
+    async execute(code: string) {
+        return await this.vm.run(code);
+    }
 }
 
-export const dbConsole: DatabaseConsole = {
-    create: create,
-    read: read,
-    remove: remove,
-    rename: rename,
-    save: save,
-    update: update,
-    ...console
-}
-export default database;
+// Export helper functions
+export { create, read, remove, rename, save, update };
+
+
