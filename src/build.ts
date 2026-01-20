@@ -128,12 +128,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
             });
 
             // Intercept imports from elit server-side modules
-            build.onLoad({ filter: /[\\/](server|config|cli)\.ts$/ }, () => {
-                return {
-                    contents: 'export {}',
-                    loader: 'js',
-                };
-            });
+            build.onLoad({ filter: /[\\/](server|config|cli)\.ts$/ }, () => ({
+                contents: 'export default {};',
+            }));
         },
     };
 
