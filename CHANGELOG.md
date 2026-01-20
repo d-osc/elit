@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Remove `targetPort` option, use `port` directly for domain mapping
 
-## [3.2.9] - 2025-01-21
+## [3.3.0] - 2025-01-21
 
 ### Added
 - **create-elit Template System** - Refactored to use template files with placeholder replacement
@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `package.json` files array to only include `dist` folder
   - Template `gitignore` file automatically renamed to `.gitignore` in generated projects
 
-## [3.1.7] - 2024-XX-XX
+## [3.1.7] - 2025-01-21
 
 ### Added
 - Domain mapping support for dev and preview servers
@@ -70,14 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved dev server configuration handling
 - Enhanced proxy configuration with better path rewriting
 
-## [3.1.6] - 2024-XX-XX
+## [3.1.6] - 2025-01-21
 
 ### Added
 - Multi-client support for dev server
 - Client-specific API routes and proxy configuration
 - Web Worker support for background processing
 
-## [3.1.5] - 2024-XX-XX
+## [3.1.5] - 2025-01-21
 
 ### Added
 - SSR (Server-Side Rendering) support
