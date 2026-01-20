@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Templates now stored in `packages/create-elit/src/templates/`
   - Placeholders `ELIT_PROJECT_NAME` and `ELIT_VERSION` replaced during project creation
   - Version dynamically read from `create-elit` package.json
+  - Templates automatically copied to `dist/templates` during build
   - Easier to maintain and update templates independently
 - **Domain Mapping** - Add `domain` option to `DevServerOptions` and `PreviewOptions` for redirecting localhost to custom domain
   - Configure domain in `elit.config.ts`: `dev: { port: 3000, domain: 'idevcoder.com' }`
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed inline template generation (2500+ lines)
   - Now copies from templates directory with placeholder replacement
   - Templates include: full-stack app with authentication, routing, and chat features
+  - Build process copies templates to `dist/templates` for distribution
 - **HMR Behavior** - Disabled automatic page reload on file changes
   - HMR now logs updates but doesn't auto-reload
   - Users must manually refresh (F5 or Ctrl+R) to see changes
@@ -48,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Remove `targetPort` option, use `port` directly for domain mapping
+
+## [3.2.8] - 2025-01-21
+
+### Added
+- **create-elit Template System** - Refactored to use template files with placeholder replacement
+  - Templates now stored in `packages/create-elit/src/templates/`
+  - Placeholders `ELIT_PROJECT_NAME` and `ELIT_VERSION` replaced during project creation
+  - Version dynamically read from `create-elit` package.json
+  - Templates automatically copied to `dist/templates` during build
+  - Easier to maintain and update templates independently
+
+### Changed
+- **create-elit** - Simplified scaffolding logic
+  - Removed inline template generation (2500+ lines)
+  - Now copies from templates directory with placeholder replacement
+  - Templates include: full-stack app with authentication, routing, and chat features
+  - Build process copies templates to `dist/templates` for distribution
+  - Updated `package.json` files array to only include `dist` folder
 
 ## [3.1.7] - 2024-XX-XX
 

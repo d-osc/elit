@@ -1,14 +1,13 @@
 {
   "name": "create-elit",
-  "version": "3.2.7",
+  "version": "3.2.8",
   "description": "Scaffolding tool for creating Elit projects",
   "type": "module",
   "bin": {
     "create-elit": "./dist/index.js"
   },
   "files": [
-    "dist",
-    "templates"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",
