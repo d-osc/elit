@@ -25,12 +25,9 @@ export default {
     copy: [
       {
         from: './public/index.html', to: './index.html',
-        transform: (content: string, config: { basePath: string; projectName: string; }) => {
+        transform: (content: string, config: { basePath: string }) => {
           // Replace script src
           let html = content.replace('src="../src/main.ts"', 'src="main.js"');
-
-          // Replace project name placeholder
-          html = html.replace(/ELIT_PROJECT_NAME/g, config.projectName);
 
           // Inject base tag if basePath is configured
           if (config.basePath) {

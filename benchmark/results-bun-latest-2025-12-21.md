@@ -25,7 +25,7 @@
 **Package Versions:**
 - Express: v5.2.1 (latest)
 - Elysia: v1.4.19
-- Elit: v3.2.8
+- Elit: v3.2.9
 
 **Test Date**: 2025-12-21
 

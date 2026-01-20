@@ -69,7 +69,12 @@ async function copyAndReplaceFile(
     content = content.split(placeholder).join(value);
   }
 
-  await writeFile(dest, content, 'utf-8');
+  // If the file is 'gitignore', save it as '.gitignore'
+  const finalDest = dest.endsWith('gitignore') && !dest.endsWith('.gitignore')
+    ? join(dirname(dest), '.gitignore')
+    : dest;
+
+  await writeFile(finalDest, content, 'utf-8');
 }
 
 async function createProject(projectName: string) {
