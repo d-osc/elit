@@ -31,6 +31,7 @@ export interface RouterOptions {
 
 export interface Router {
     currentRoute: State<RouteLocation>;
+    mode: 'history' | 'hash';
     navigate: (path: string, replace?: boolean) => void;
     push: (path: string) => void;
     replace: (path: string) => void;
@@ -157,7 +158,23 @@ export function createRouter(options: RouterOptions): Router {
             if (!executeGuard(match.route.beforeEnter, location, currentRoute.value, navigate, replace)) return;
         }
 
-        const url = mode === 'hash' ? '#' + path : base + path;
+        // Remove leading slash from path if base has trailing slash, or add slash if needed
+        let urlPath = path;
+        let url: string;
+        if (mode === 'hash') {
+            url = '#' + path;
+        } else {
+            // Ensure proper path joining
+            const hasBaseSlash = base.endsWith('/');
+            const hasPathSlash = path.startsWith('/');
+            if (hasBaseSlash && hasPathSlash) {
+                urlPath = path.slice(1); // Remove duplicate slash
+            } else if (!hasBaseSlash && !hasPathSlash && path !== '/') {
+                urlPath = '/' + path; // Add slash between
+            }
+            url = base + urlPath;
+        }
+
         if (replace) {
             window.history.replaceState({ path }, '', url);
         } else {
@@ -183,6 +200,7 @@ export function createRouter(options: RouterOptions): Router {
 
     return {
         currentRoute,
+        mode,
         navigate,
         push: (path: string) => navigate(path, false),
         replace: (path: string) => navigate(path, true),
@@ -224,11 +242,14 @@ export function createRouterView(router: Router, options: RouterOptions): () => 
 
 // Link component - prevents default and uses router
 export const routerLink = (router: Router, props: Props & { to: string }, ...children: Child[]): VNode => {
+    // Use router.mode to determine href format
+    const href = router.mode === 'hash' ? `#${props.to}` : props.to;
+
     return {
         tagName: 'a',
         props: {
             ...props,
-            href: props.to,
+            href,
             onclick: (e: MouseEvent) => {
                 e.preventDefault();
                 router.push(props.to);

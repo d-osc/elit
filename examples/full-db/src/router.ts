@@ -10,7 +10,7 @@ import { PrivateChatPage } from './pages/PrivateChatPage';
 
 // Initialize router
 export const router = createRouter({
-  mode: 'hash',
+  // mode: 'hash', // Commented to test history mode
   base: '/',
   routes: []
 });
@@ -27,4 +27,4 @@ const routes = [
   { path: '/chat/dm/:userId', component: (params: RouteParams) => PrivateChatPage(router, params.userId as string) }
 ];
 
-export const RouterView = createRouterView(router, { mode: 'hash', routes });
+export const RouterView = createRouterView(router, { /*mode: 'hash', */ routes });

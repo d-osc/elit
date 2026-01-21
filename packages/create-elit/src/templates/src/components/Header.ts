@@ -1,5 +1,6 @@
-import { header, nav, div, a, h1, button, span } from 'elit/el';
+import { header, nav, div, h1, button, span } from 'elit/el';
 import { createState, reactive } from 'elit/state';
+import { routerLink } from 'elit/router';
 import type { Router } from 'elit';
 
 export function Header(router: Router) {
@@ -39,7 +40,7 @@ export function Header(router: Router) {
   return header({ className: 'header' },
     nav({ className: 'nav' },
       div({ className: 'nav-brand' },
-        a({ href: '#/', className: 'brand-link' },
+        routerLink(router, { to: '/', className: 'brand-link' },
           h1({ className: 'brand-title' }, 'ELIT_PROJECT_NAME')
         )
       ),
@@ -47,8 +48,8 @@ export function Header(router: Router) {
       reactive(isLoggedIn, (loggedIn) => {
         if (loggedIn) {
           return div({ className: 'nav-menu' },
-            a({ href: '#/chat/list', className: 'nav-link' }, 'Messages'),
-            a({ href: '#/profile', className: 'nav-link' }, 'Profile'),
+            routerLink(router, { to: '/chat/list', className: 'nav-link' }, 'Messages'),
+            routerLink(router, { to: '/profile', className: 'nav-link' }, 'Profile'),
             reactive(user, (u) => u ? span({ className: 'nav-user' }, `Welcome, ${u.name}`) : null),
             button({
               className: 'btn btn-secondary btn-sm',
@@ -58,7 +59,7 @@ export function Header(router: Router) {
         }
 
         return div({ className: 'nav-menu' },
-          a({ href: '#/login', className: 'nav-link' }, 'Login'),
+          routerLink(router, { to: '/login', className: 'nav-link' }, 'Login'),
           button({
             className: 'btn btn-primary btn-sm',
             onclick: () => router.push('/register')

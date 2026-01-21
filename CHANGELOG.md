@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.2] - 2025-01-21
+
+### Changed
+- **Router Mode Detection** - Router now automatically exposes mode property
+  - `router.mode` now returns `'history'` or `'hash'` for mode detection
+  - `routerLink` component automatically uses router mode for href generation
+  - No need to manually detect URL format for hash vs history mode
+
+### Fixed
+- **URL Path Joining** - Fixed duplicate slash issue when base and path both contain slashes
+  - Properly handles `/` + `/login` → `/login` instead of `//login`
+  - Prevents `SecurityError` when using history mode with invalid URLs
+- **Template Header** - Updated to use `routerLink` from `'elit/router'`
+  - Replaced `<a href="#/">` with `routerLink(router, { to: '/', ... })`
+  - Ensures proper routing in both hash and history modes
+
 ## [3.3.1] - 2025-01-21
 
 ### Added

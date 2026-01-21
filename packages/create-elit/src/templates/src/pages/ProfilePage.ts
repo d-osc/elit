@@ -1,4 +1,4 @@
-import { div, h2, h3, p, button, span, input, label } from 'elit/el';
+import { div, h3, p, button, span, input, label } from 'elit/el';
 import { createState, reactive, reactiveAs } from 'elit/state';
 import type { Router } from 'elit';
 
