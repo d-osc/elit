@@ -47,12 +47,42 @@ export class DomNode {
     renderToDOM(vNode: Child, parent: HTMLElement | SVGElement | DocumentFragment): void {
         if (vNode == null || vNode === false) return;
 
+        // Handle primitive values (strings, numbers)
         if (typeof vNode !== 'object') {
             parent.appendChild(document.createTextNode(String(vNode)));
             return;
         }
 
+        // Handle arrays (Child[])
+        if (Array.isArray(vNode)) {
+            for (const child of vNode) {
+                this.renderToDOM(child, parent);
+            }
+            return;
+        }
+
+        // Handle VNode
         const { tagName, props, children } = vNode;
+
+        // Handle fragment (empty tagName) - render children directly to parent
+        if (!tagName) {
+            // Fragments don't have their own element, so skip ref handling
+            // The ref will be handled by the wrapper element created by reactive()
+            // Render children directly to parent
+            for (const child of children) {
+                if (shouldSkipChild(child)) continue;
+
+                if (Array.isArray(child)) {
+                    for (const c of child) {
+                        !shouldSkipChild(c) && this.renderToDOM(c, parent);
+                    }
+                } else {
+                    this.renderToDOM(child, parent);
+                }
+            }
+            return;
+        }
+
         const isSVG = tagName === 'svg' || (tagName[0] === 's' && tagName[1] === 'v' && tagName[2] === 'g') ||
             (parent as any).namespaceURI === 'http://www.w3.org/2000/svg';
 

@@ -8,7 +8,7 @@ export interface VNode {
     children: Children;
 }
 
-export type Child = VNode | string | number | boolean | null | undefined;
+export type Child = VNode | string | number | boolean | null | undefined | Child[];
 export type Children = Child[];
 
 export interface Props {

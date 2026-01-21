@@ -147,6 +147,25 @@ export const {
 export const el = elements;
 // Export elements object for dynamic access
 export { elements };
+// Fragment element factory - groups children without a wrapper element
+// Similar to React's Fragment: <><div>1</div><div>2</div></>
+export const frag: ElementFactory = function(...children: Child[]): VNode {
+    const flatChildren: Child[] = [];
+    for (let i = 0, len = children.length; i < len; i++) {
+        const child = children[i];
+        if (child == null || child === false) continue;
+
+        if (Array.isArray(child)) {
+            for (let j = 0, cLen = child.length; j < cLen; j++) {
+                const c = child[j];
+                c != null && c !== false && flatChildren.push(c);
+            }
+        } else {
+            flatChildren.push(child);
+        }
+    }
+    return { tagName: '', props: {}, children: flatChildren };
+} as ElementFactory;
 
 // DOM utility functions - Shorthand helpers for common document operations
 export const doc = hasDocument ? document : undefined as any;

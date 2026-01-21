@@ -307,10 +307,15 @@ const scheduleRAFUpdate = (rafId: number | null, updateFn: () => void): number =
 };
 
 // Helper function to render content to fragment (reused in reactive and reactiveAs)
-const renderToFragment = (content: VNode | Child, isVNode?: boolean): DocumentFragment => {
+const renderToFragment = (content: VNode | Child | Child[], isVNode?: boolean): DocumentFragment => {
     const fragment = document.createDocumentFragment();
 
-    if (isVNode && content && typeof content === 'object' && 'tagName' in content) {
+    if (Array.isArray(content)) {
+        // Handle array of children
+        for (const child of content) {
+            dom.renderToDOM(child, fragment);
+        }
+    } else if (isVNode && content && typeof content === 'object' && 'tagName' in content) {
         const { children } = content as VNode;
         for (const child of children) {
             dom.renderToDOM(child, fragment);
@@ -344,7 +349,7 @@ const updateElementProps = (element: HTMLElement | SVGElement, props: Props): vo
 };
 
 // Reactive element helpers
-export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Child): VNode => {
+export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Child | Child[]): VNode => {
     let rafId: number | null = null;
     let elementRef: HTMLElement | SVGElement | null = null;
     let placeholder: Comment | null = null;
@@ -379,7 +384,7 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
                     const { props } = newResult as VNode;
                     updateElementProps(elementRef, props);
                 }
-                const fragment = renderToFragment(newResult, isCurrentVNode);
+                const fragment = renderToFragment(newResult as any, isCurrentVNode);
                 elementRef.textContent = '';
                 elementRef.appendChild(fragment);
                 dom.getElementCache().set(elementRef, true);
@@ -412,14 +417,18 @@ export const reactive = <T>(state: State<T>, renderFn: (value: T) => VNode | Chi
         };
     }
 
-    return { tagName: 'span', props: { ref: refCallback }, children: [initialResult] };
+    // Handle array result - wrap in fragment-like VNode
+    const initialChildren = Array.isArray(initialResult) ? initialResult : [initialResult];
+
+    // Use span with display: contents as wrapper (doesn't affect layout)
+    return { tagName: 'span', props: { ref: refCallback, style: { display: 'contents' } }, children: initialChildren };
 };
 
 // Reactive element with custom wrapper tag
 export const reactiveAs = <T>(
     tagName: string,
     state: State<T>,
-    renderFn: (value: T) => VNode | Child,
+    renderFn: (value: T) => VNode | Child | Child[],
     props: Props = {}
 ): VNode => {
     let rafId: number | null = null;
@@ -435,7 +444,7 @@ export const reactiveAs = <T>(
                     elementRef.textContent = '';
                 } else {
                     (elementRef as HTMLElement).style.display = '';
-                    const fragment = renderToFragment(newResult, false);
+                    const fragment = renderToFragment(newResult as any, false);
                     elementRef.textContent = '';
                     elementRef.appendChild(fragment);
                 }
@@ -449,7 +458,10 @@ export const reactiveAs = <T>(
         elementRef = el;
     };
 
-    return { tagName, props: { ...props, ref: refCallback }, children: [renderFn(state.value)] };
+    const initialResult = renderFn(state.value);
+    const initialChildren = Array.isArray(initialResult) ? initialResult : [initialResult];
+
+    return { tagName, props: { ...props, ref: refCallback }, children: initialChildren };
 };
 
 export const text = (state: State<any> | any): VNode | string =>
