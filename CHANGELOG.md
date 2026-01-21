@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.3] - 2025-01-21
+
+### Fixed
+- **Build Process Exit** - Build command now properly exits after completion
+  - Added `process.exit(0)` after all build paths complete
+  - Prevents build process from hanging after successful builds
+  - Works for both config-based and CLI-only builds
+
 ## [3.3.2] - 2025-01-21
 
 ### Changed

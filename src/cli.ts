@@ -156,6 +156,7 @@ async function runBuild(args: string[]) {
             validateEntry(options.entry);
 
             await executeBuild(options);
+            process.exit(0);
         } else {
             // Run all builds from config
             console.log(`Building ${builds.length} ${builds.length === 1 ? 'entry' : 'entries'}...\n`);
@@ -181,6 +182,7 @@ async function runBuild(args: string[]) {
             }
 
             console.log(`\n✓ All ${builds.length} builds completed successfully`);
+            process.exit(0);
         }
     } else {
         // No config, use CLI options only
@@ -190,6 +192,8 @@ async function runBuild(args: string[]) {
         validateEntry(options.entry);
 
         await executeBuild(options);
+        console.log('\n✓ Build completed successfully');
+        process.exit(0);
     }
 }
 
