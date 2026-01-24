@@ -292,6 +292,23 @@ export interface TestCoverageOptions {
     all?: boolean;
 }
 
+export interface TestE2EOptions {
+    /** Enable or disable E2E mode (default: false) */
+    enabled?: boolean;
+    /** E2E-specific include patterns (default: patterns matching *.e2e.test.ts, *.e2e.test.js, *.test.e2e.ts, *.test.e2e.js, *.e2e.spec.ts, *.e2e.spec.js, *.spec.e2e.ts, *.spec.e2e.js) */
+    include?: string[];
+    /** E2E-specific exclude patterns (default: excludes node_modules, dist, coverage, and html files) */
+    exclude?: string[];
+    /** Enable coverage for E2E tests (default: false - E2E tests don't generate coverage by default) */
+    coverage?: boolean | TestCoverageOptions;
+    /** Reporter for E2E tests (default: verbose) */
+    reporter?: 'verbose' | 'dot' | 'json';
+    /** Timeout for E2E tests in milliseconds (default: 5000) */
+    testTimeout?: number;
+    /** Stop test run on first failure (default: false) */
+    bail?: boolean;
+}
+
 export interface TestOptions {
     environment?: TestEnvironment;
     globals?: boolean;
@@ -320,6 +337,10 @@ export interface TestOptions {
     ui?: boolean;
     reporter?: 'verbose' | 'dot' | 'json' | 'tap';
     bail?: number | boolean;
+    /** E2E test configuration */
+    e2e?: TestE2EOptions;
+    /** Enable E2E mode (set via --e2e flag) */
+    endToEnd?: boolean;
     pattern?: string | RegExp;
     colors?: boolean;
     retry?: number;

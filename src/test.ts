@@ -114,6 +114,10 @@ function findTestFiles(
                 } else if (entry.isFile()) {
                     // Check if file matches include patterns
                     const relativePath = normalizePathForPattern(relative(root, fullPath));
+                    // First check if file should be excluded
+                    if (exclude.some(pattern => matchesPattern(relativePath, pattern))) {
+                        continue;
+                    }
                     for (const pattern of include) {
                         if (matchesPattern(relativePath, pattern)) {
                             files.push(fullPath);

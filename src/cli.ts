@@ -6,7 +6,7 @@
 import { loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
-import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions, TestE2EOptions } from './types';
 
 const COMMANDS = ['dev', 'build', 'preview', 'test', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
@@ -292,11 +292,11 @@ async function runTest(args: string[]) {
 
     // E2E mode: special handling for automation testing
     if (options.endToEnd) {
-        // E2E mode uses different patterns and disables coverage by default
-        // Check if coverage was explicitly enabled via CLI (not from config)
-        const cliEnabledCoverage = cliOptions.coverage?.enabled;
+        // Get E2E configuration from config file or use defaults
+        const e2eConfig = options.e2e || {};
 
-        const e2eInclude = [
+        // Default E2E include patterns
+        const defaultE2eInclude = [
             '**/*.e2e.test.ts', '**/*.e2e.test.js', '**/*.e2e.test.mjs', '**/*.e2e.test.cjs',
             '**/*.e2e.test.tsx', '**/*.e2e.test.jsx',
             '**/*.e2e.spec.ts', '**/*.e2e.spec.js', '**/*.e2e.spec.mjs', '**/*.e2e.spec.cjs',
@@ -307,16 +307,47 @@ async function runTest(args: string[]) {
             '**/*.spec.e2e.tsx', '**/*.spec.e2e.jsx',
         ];
 
+        // Default E2E exclude patterns
+        const defaultE2eExclude = [
+            '**/node_modules/**',
+            '**/dist/**',
+            '**/coverage/**',
+            '**/benchmark/**',
+            '**/docs/**',
+            '**/*.html',
+        ];
+
+        // Check if coverage was explicitly enabled via CLI (not from config)
+        const cliEnabledCoverage = cliOptions.coverage?.enabled;
+        // Check if coverage was enabled via e2e config
+        const e2eCoverage = e2eConfig.coverage;
+
         options = {
             ...options,
-            // Override include to match e2e test files (using flat patterns)
-            include: e2eInclude,
-            // Disable coverage by default in e2e mode (unless explicitly enabled via CLI)
+            // Override include to match e2e test files
+            include: e2eConfig.include || defaultE2eInclude,
+            // Exclude non-test directories and files
+            exclude: e2eConfig.exclude || defaultE2eExclude,
+            // Handle coverage: CLI flag > e2e config > disabled
             coverage: cliEnabledCoverage
                 ? options.coverage!
-                : { enabled: false, provider: 'v8' },
-            // Use verbose reporter by default for e2e
-            reporter: options.reporter || 'verbose',
+                : e2eCoverage
+                    ? (typeof e2eCoverage === 'boolean'
+                        ? { enabled: e2eCoverage, provider: 'v8' }
+                        : {
+                            enabled: true,
+                            provider: e2eCoverage.provider || 'v8',
+                            reporter: e2eCoverage.reporter?.filter(r => r !== 'lcovonly') as ('text' | 'html' | 'lcov' | 'json' | 'coverage-final.json' | 'clover')[] || undefined,
+                            include: e2eCoverage.include,
+                            exclude: e2eCoverage.exclude,
+                          })
+                    : { enabled: false, provider: 'v8' },
+            // Use verbose reporter by default for e2e (or from e2e config)
+            reporter: e2eConfig.reporter || options.reporter || 'verbose',
+            // E2E test timeout from config or default
+            testTimeout: e2eConfig.testTimeout || options.testTimeout || 5000,
+            // Bail on first failure from e2e config
+            bail: e2eConfig.bail !== undefined ? e2eConfig.bail : (options.bail ?? false),
             // Run once by default in e2e mode
             watch: false,
         };
@@ -367,10 +398,12 @@ interface TestOptions {
     exclude?: string[];
     reporter?: 'default' | 'dot' | 'json' | 'verbose';
     timeout?: number;
+    testTimeout?: number;
     bail?: boolean;
     run?: boolean;
     watch?: boolean;
     endToEnd?: boolean;
+    e2e?: TestE2EOptions;
     describe?: string;
     testName?: string;
     coverage?: {

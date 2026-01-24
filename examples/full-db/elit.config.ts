@@ -57,7 +57,7 @@ export default {
   },
   test: {
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', 'benchmark', 'docs'],
+    exclude: ['node_modules', 'dist', 'benchmark', 'docs', '**/*.e2e.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', '**/*.{test,spec}.e2e.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     testTimeout: 5000,
     bail: false,
     globals: true,
