@@ -335,20 +335,16 @@ class VM {
     }
 }
 
-function create(dbName: string, code: string | Function): void {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
-    const dbPath = path.join(baseDir, `${dbName}.ts`);
+function create(dbName: string, code: string | Function, options?: VMOptions): void {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const dbPath = path.join(DIR, `${dbName}.ts`);
     // Prepare the export line
     fs.appendFileSync(dbPath, code.toString(), 'utf8');
 }
 
-function read(dbName: string): string {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR);
-    const dbPath = path.join(baseDir, `${dbName}.ts`);
+function read(dbName: string, options?: VMOptions): string {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const dbPath = path.join(DIR, `${dbName}.ts`);
 
     if (!fs.existsSync(dbPath)) {
         throw new Error(`Database '${dbName}' not found`);
@@ -357,11 +353,9 @@ function read(dbName: string): string {
     return fs.readFileSync(dbPath, 'utf8');
 }
 
-function remove(dbName: string, fnName: string) {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
-    const dbPath = path.join(baseDir, `${dbName}.ts`);
+function remove(dbName: string, fnName: string, options?: VMOptions) {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const dbPath = path.join(DIR, `${dbName}.ts`);
     if (!fs.existsSync(dbPath)) return false;
 
     // if no functionName provided -> remove the whole file (after backup)
@@ -454,12 +448,10 @@ function remove(dbName: string, fnName: string) {
     return `Removed ${fnName} from database ${dbName}.`;
 }
 
-function rename(oldName: string, newName: string): string {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
-    const oldPath = path.join(baseDir, `${oldName}.ts`);
-    const newPath = path.join(baseDir, `${newName}.ts`);
+function rename(oldName: string, newName: string, options?: VMOptions): string {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const oldPath = path.join(DIR, `${oldName}.ts`);
+    const newPath = path.join(DIR, `${newName}.ts`);
 
     // Check if the source file exists
     if (!fs.existsSync(oldPath)) {
@@ -480,22 +472,18 @@ function rename(oldName: string, newName: string): string {
     }
 }
 
-function save(dbName: string, code: string | Function | any): void {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต   
-    const dbPath = path.join(baseDir, `${dbName}.ts`);
+function save(dbName: string, code: string | Function | any, options?: VMOptions): void {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const dbPath = path.join(DIR, `${dbName}.ts`);
 
     let fileContent = typeof code === 'function' ? code.toString() : code;
 
     fs.writeFileSync(dbPath, fileContent, 'utf8');
 }
 
-function update(dbName: string, fnName: string, code: string | Function) {
-    const DIR = "databases";
-    const basePath = path.join(process.cwd());
-    const baseDir: string = path.resolve(basePath, DIR); // โฟลเดอร์ที่อนุญาต
-    const dbPath = path.join(baseDir, `${dbName}.ts`);
+function update(dbName: string, fnName: string, code: string | Function, options?: VMOptions) {
+    const DIR = options?.dir || path.join(process.cwd(), 'databases');
+    const dbPath = path.join(DIR, `${dbName}.ts`);
 
     let src;
 
@@ -710,11 +698,15 @@ async function SystemModuleResolver() {
 
 export class Database {
     private vm: VM;
+    private options: VMOptions;
+
     constructor(options?: VMOptions) {
-        this.vm = new VM({
-            language: 'ts', registerModules: {},
+        this.options = {
+            language: 'ts',
+            registerModules: {},
             ...options
-        });
+        };
+        this.vm = new VM(this.options);
     }
 
     register(context: { [key: string]: any }) {
@@ -724,9 +716,53 @@ export class Database {
     async execute(code: string) {
         return await this.vm.run(code);
     }
+
+    // ===== Database Helper Methods =====
+
+    /**
+     * Create a new database file with the given code
+     */
+    create(dbName: string, code: string | Function): void {
+        return create(dbName, code, this.options);
+    }
+
+    /**
+     * Read the contents of a database file
+     */
+    read(dbName: string): string {
+        return read(dbName, this.options);
+    }
+
+    /**
+     * Remove a function or the entire database file
+     */
+    remove(dbName: string, fnName?: string): string | boolean {
+       return remove(dbName, fnName || "", this.options);
+    }
+
+    /**
+     * Rename a database file
+     */
+    rename(oldName: string, newName: string): string {
+       return rename(oldName, newName, this.options);
+    }
+
+    /**
+     * Save code to a database file (overwrites existing content)
+     */
+    save(dbName: string, code: string | Function | any): void {
+       return save(dbName, code, this.options);
+    }
+
+    /**
+     * Update a function in a database file
+     */
+    update(dbName: string, fnName: string, code: string | Function): string {
+       return update(dbName, fnName, code, this.options);
+    }
 }
 
-// Export helper functions
+// Export Database class and keep helper functions for backward compatibility
 export { create, read, remove, rename, save, update };
 
 

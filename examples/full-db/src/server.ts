@@ -1,5 +1,5 @@
 import { ElitRequest, ElitResponse, ServerRouter } from 'elit/server';
-import {  Database } from 'elit/database';
+import { Database } from 'elit/database';
 import { resolve } from 'path';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
@@ -56,7 +56,7 @@ async function verifyPassword(storedHash: string, suppliedPassword: string): Pro
 // GET /api/hello
 router.get('/api/hello', async (req: ElitRequest, res: ElitResponse) => {
   res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-  res.send("Hello from Elit ServerRouter!");
+  return res.send("Hello from Elit ServerRouter!");
 });
 
 // POST /api/auth/register
@@ -378,9 +378,9 @@ router.get('/api/users', async (_req: ElitRequest, res: ElitResponse) => {
     // Extract the user list from the first log entry's args and parse if string
     const userLog = result.logs && result.logs.length > 0 ? result.logs[0]?.args?.[0] : [];
     const userList = typeof userLog === 'string' ? JSON.parse(userLog) : userLog;
-    res.json({ users: userList, count: Array.isArray(userList) ? userList.length : 0 });
+    return res.json({ users: userList, count: Array.isArray(userList) ? userList.length : 0 });
   } catch (error: any) {
-    res.json({ users: [], count: 0 });
+    return res.json({ users: [], count: 0 });
   }
 });
 
@@ -420,7 +420,7 @@ router.get('/api/users/:id', async (req: ElitRequest, res: ElitResponse) => {
     }
 
     const user = typeof userLog === 'string' ? JSON.parse(userLog) : userLog;
-    res.json({ user });
+    return res.json({ user });
   } catch (error: any) {
     if (error.message === 'User not found') {
       return res.status(404).json({ error: error.message });
@@ -590,6 +590,111 @@ router.get('/api/chat/events', async (req: ElitRequest, res: ElitResponse) => {
     clearInterval(heartbeat);
     clients.delete(res);
   });
+
+  // Return early to prevent router from continuing
+  return;
 });
+
+export interface ErrorResponse {
+  success: false
+  error: {
+    code: string
+    message: string
+    details?: any
+    stack?: string
+  }
+}
+
+export function errorResponse(
+  code: string,
+  message: string,
+  details?: any,
+  includeStack: boolean = false
+): ErrorResponse {
+  const response: ErrorResponse = {
+    success: false,
+    error: {
+      code,
+      message
+    }
+  }
+
+  if (details) {
+    response.error.details = details
+  }
+
+  if (includeStack) {
+    const err = new Error()
+    if (err.stack) {
+      response.error.stack = err.stack
+    }
+  }
+
+  return response
+}
+
+export const HttpStatus = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  TOO_MANY_REQUESTS: 429,
+  INTERNAL_SERVER_ERROR: 500
+} as const
+
+export const ErrorCodes = {
+  // Authentication errors
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  EXPIRED_TOKEN: 'EXPIRED_TOKEN',
+  NO_TOKEN: 'NO_TOKEN',
+
+  // Authorization errors
+  FORBIDDEN: 'FORBIDDEN',
+  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+
+  // Validation errors
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  INVALID_INPUT: 'INVALID_INPUT',
+  MISSING_FIELD: 'MISSING_FIELD',
+
+  // Resource errors
+  NOT_FOUND: 'NOT_FOUND',
+  ALREADY_EXISTS: 'ALREADY_EXISTS',
+  CONFLICT: 'CONFLICT',
+
+  // Rate limiting
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+
+  // Server errors
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE'
+} as const
+
+export function notFoundHandler(req: ElitRequest, res: ElitResponse,  next: any) {
+  // Only send 404 if headers haven't been sent yet
+
+  const isPath = router.listRoutes().filter(route => {
+    return route.method === req.method && RegExp(route.pattern).test(req.url);
+  })
+
+  if (!isPath.length) {
+    return res.status(HttpStatus.NOT_FOUND).json(
+      errorResponse(
+        ErrorCodes.NOT_FOUND,
+        `Route ${req.method} ${req.url} not found`
+      )
+    );
+  }
+  return next();
+}
+router.use(notFoundHandler)
 
 export const server = router;

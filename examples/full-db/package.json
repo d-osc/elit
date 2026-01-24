@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "elit dev",
     "build": "elit build",
-    "preview": "elit preview"
+    "preview": "elit preview",
+    "test": "elit test",
+    "test:watch": "elit test --watch",
+    "test:coverage": "elit test --coverage"
   },
   "dependencies": {
     "@types/node": "^25.0.9",
-     "elit": "file:../.."
+    "elit": "file:../../"
   }
 }

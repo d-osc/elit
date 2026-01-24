@@ -54,5 +54,28 @@ export default {
     root: './dist',
     basePath: '',
     index: './index.html'
+  },
+  test: {
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', 'benchmark', 'docs'],
+    testTimeout: 5000,
+    bail: false,
+    globals: true,
+    watch: true,
+    reporter: 'verbose',
+    coverage: {
+      dir: './coverage',
+      reporter: ['text', 'html'],
+      include: ['src/**/*.ts'], // หรือ path ที่ต้องการครอบคลุม
+      exclude: ['**/*.test.ts', '**/*.spec.ts']
+    }
+  },
+  // Add scripts for running tests
+  scripts: {
+    'test': 'elit test',
+    'test:run': 'elit test --run',
+    'test:unit': 'elit test --run',
+    'test:e2e': 'elit test --e2e --run',
+    'test:watch': 'elit test --watch'
   }
 };

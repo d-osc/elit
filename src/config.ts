@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from './fs';
 import { resolve } from './path';
-import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions, TestOptions } from './types';
 
 /**
  * Helper: Read file and ensure string output (eliminates duplication in file reading)
@@ -54,6 +54,8 @@ export interface ElitConfig {
     build?: BuildOptions | BuildOptions[];
     /** Preview server configuration */
     preview?: PreviewOptions;
+    /** Test configuration */
+    test?: TestOptions;
 }
 
 /**

@@ -174,6 +174,18 @@ export class ServerRouter {
     return query;
   }
 
+  /**
+   * List all registered routes for debugging
+   */
+  listRoutes(): Array<{ method: string; pattern: string; paramNames: string[]; handler: string }> {
+    return this.routes.map(route => ({
+      method: route.method,
+      pattern: route.pattern.source,
+      paramNames: route.paramNames,
+      handler: route.handler.name || '(anonymous)'
+    }));
+  }
+
   private async parseBody(req: IncomingMessage): Promise<any> {
     // Bun compatibility: Check if req has text() method (Bun Request)
     if (typeof (req as any).text === 'function') {

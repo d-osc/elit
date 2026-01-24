@@ -8,7 +8,7 @@ import { createDevServer } from './server';
 import { build } from './build';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -96,6 +96,9 @@ async function main() {
             break;
         case 'preview':
             await runPreview(args.slice(1));
+            break;
+        case 'test':
+            await runTest(args.slice(1));
             break;
         case 'version':
             printVersion();
@@ -278,6 +281,123 @@ async function runPreview(args: string[]) {
     setupShutdownHandlers(() => devServer.close());
 }
 
+async function runTest(args: string[]) {
+    const options = parseTestArgs(args);
+
+    // Import test runner dynamically
+    const { runJestTests, runWatchMode } = await import('./test');
+
+    // Determine run mode based on flags
+    // Default behavior: run once, use --watch/-w for watch mode
+    const isWatch = options.watch;
+
+    if (isWatch) {
+        // Watch mode (explicit --watch or -w flag)
+        await runWatchMode({
+            files: options.files,
+            include: options.include,
+            exclude: options.exclude,
+            reporter: options.reporter,
+            timeout: options.timeout,
+            bail: options.bail,
+            coverage: options.coverage,
+            describePattern: options.describe,
+            testPattern: options.testName,
+        });
+    } else {
+        // Run once mode (default behavior)
+        await runJestTests({
+            files: options.files,
+            include: options.include,
+            exclude: options.exclude,
+            reporter: options.reporter,
+            timeout: options.timeout,
+            bail: options.bail,
+            coverage: options.coverage,
+            describePattern: options.describe,
+            testPattern: options.testName,
+        });
+
+        // Exit with appropriate code
+        process.exit(0);
+    }
+}
+
+interface TestOptions {
+    files?: string[];
+    include?: string[];
+    exclude?: string[];
+    reporter?: 'default' | 'dot' | 'json' | 'verbose';
+    timeout?: number;
+    bail?: boolean;
+    run?: boolean;
+    watch?: boolean;
+    describe?: string;
+    testName?: string;
+    coverage?: {
+        enabled: boolean;
+        provider: 'v8' | 'istanbul';
+        reporter?: ('text' | 'html' | 'lcov' | 'json')[];
+        include?: string[];
+        exclude?: string[];
+    };
+}
+
+function parseTestArgs(args: string[]): TestOptions {
+    const options: TestOptions = {};
+
+    // Parse flags first to determine mode
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+
+        switch (arg) {
+            case '--run':
+            case '-r':
+                options.run = true;
+                break;
+            case '--watch':
+            case '-w':
+                options.watch = true;
+                break;
+            case '--coverage':
+            case '-c':
+                options.coverage = {
+                    enabled: true,
+                    provider: 'v8',
+                    reporter: ['text', 'html'],
+                };
+                break;
+            case '--file':
+            case '-f':
+                // Parse comma-separated file list
+                const filesValue = args[++i];
+                if (filesValue) {
+                    // Split by comma and trim whitespace
+                    options.files = filesValue.split(',').map(f => f.trim());
+                }
+                break;
+            case '--describe':
+            case '-d':
+                // Parse describe name filter
+                const describeValue = args[++i];
+                if (describeValue) {
+                    options.describe = describeValue;
+                }
+                break;
+            case '--it':
+            case '-t':
+                // Parse test name filter
+                const testValue = args[++i];
+                if (testValue) {
+                    options.testName = testValue;
+                }
+                break;
+        }
+    }
+
+    return options;
+}
+
 function parseDevArgs(args: string[]): Partial<DevServerOptions> {
     const options: Partial<DevServerOptions> = {};
 
@@ -345,6 +465,7 @@ Commands:
   dev       Start development server
   build     Build for production
   preview   Preview production build
+  test      Run tests
   version   Show version number
   help      Show this help message
 
@@ -381,6 +502,23 @@ Note: Preview mode has full feature parity with dev mode:
       - REST API endpoints (use api option in config)
       - Proxy forwarding and Web Workers
       - HTTPS support, custom middleware, and SSR
+
+Test Options:
+  -r, --run               Run all tests once (default, same as no flags)
+  -w, --watch             Run in watch mode
+  -f, --file <files>      Run specific files (comma-separated), e.g.: --file ./test1.test.ts,./test2.spec.ts
+  -d, --describe <name>   Run only tests matching describe name, e.g.: --describe "Footer Component"
+  -t, --it <name>         Run only tests matching test name, e.g.: --it "should create"
+  -c, --coverage          Generate coverage report
+
+Note: Test command behaviors:
+      - elit test                     Run all tests once (default)
+      - elit test --run               Run all tests once (same as default)
+      - elit test -f ./test.ts        Run specific file(s) once
+      - elit test -d "Footer"         Run only tests in describe blocks matching "Footer"
+      - elit test -t "should create"  Run only tests matching "should create"
+      - elit test --watch             Run in watch mode
+      - elit test --coverage          Run with coverage report
 
 Config File:
   Create elit.config.ts, elit.config.js, or elit.config.json in project root

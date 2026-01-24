@@ -105,12 +105,39 @@
       "types": "./dist/database.d.ts",
       "import": "./dist/database.mjs",
       "require": "./dist/database.js"
+    },
+    "./test": {
+      "types": "./dist/test.d.ts",
+      "import": "./dist/test.mjs",
+      "require": "./dist/test.js"
+    },
+    "./test-runtime": {
+      "types": "./dist/test-runtime.d.ts",
+      "import": "./dist/test-runtime.mjs",
+      "require": "./dist/test-runtime.js"
+    },
+    "./test-reporter": {
+      "types": "./dist/test-reporter.d.ts",
+      "import": "./dist/test-reporter.mjs",
+      "require": "./dist/test-reporter.js"
+    },
+    "./test-globals": {
+      "types": "./dist/test-globals.d.ts"
+    },
+    "./types":{
+      "types":"./dist/types.d.ts",
+      "import": "./dist/types.mjs",
+      "require": "./dist/types.js"
     }
   },
   "scripts": {
-    "build": "tsup && tsc --emitDeclarationOnly",
+    "build": "rm -rf dist && tsup && node -e \"require('fs').copyFileSync('src/test-globals.d.ts', 'dist/test-globals.d.ts')\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "elit test",
+    "test:run": "elit test --run",
+    "test:coverage": "elit test --coverage",
+    "test:e2e": "elit test --e2e",
     "benchmark": "node benchmark/server-benchmark.js",
     "benchmark:router": "node benchmark/router-benchmark.js",
     "docs:dev": "npm run --prefix docs dev",
@@ -140,7 +167,9 @@
     "real-time",
     "build",
     "bundler",
-    "esbuild"
+    "esbuild",
+    "testing",
+    "test-utilities"
   ],
   "author": "",
   "license": "MIT",
@@ -154,17 +183,20 @@
   "homepage": "https://d-osc.github.io/elit/",
   "dependencies": {
     "esbuild": "^0.24.2",
-    "open": "^11.0.0"
+    "open": "^11.0.0",
+    "source-map": "^0.7.6"
   },
   "devDependencies": {
     "@types/bun": "^1.3.6",
     "@types/express": "^5.0.6",
     "@types/mime-types": "^2.1.4",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.0.10",
     "@types/ws": "^8.5.13",
+    "copyfiles": "^2.4.1",
     "elysia": "^1.4.19",
     "express": "^5.2.1",
     "terser": "^5.44.1",
+    "ts-node": "^10.9.2",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   },
