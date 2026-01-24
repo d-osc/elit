@@ -143,6 +143,9 @@ let currentSuite: TestSuite = {
 const testResults: TestResult[] = [];
 let hasOnly = false;
 
+// Track all source files that are loaded during test execution for coverage
+const coveredFiles = new Set<string>();
+
 // Filter patterns for running specific tests
 let describePattern: string | undefined = undefined;
 let testPattern: string | undefined = undefined;
@@ -963,6 +966,7 @@ export async function runTests(options: {
             const importParamNames: string[] = [];
             const importAssignments: string[] = [];
 
+            // Check if imports were extracted
             if (Object.keys(imports).length > 0) {
                 for (const [, { path, named }] of Object.entries(imports)) {
                     // Resolve relative imports against the test file's directory
@@ -1015,6 +1019,11 @@ export async function runTests(options: {
                                 return require(id);
                             };
                             fn(moduleObj, moduleExports, requireFn, resolvedPath, dirname(resolvedPath));
+
+                            // Track this file for coverage (only source files, not test files)
+                            if (!resolvedPath.includes('.test.') && !resolvedPath.includes('.spec.')) {
+                                coveredFiles.add(resolvedPath);
+                            }
 
                             // Extract the named export
                             // esbuild CommonJS exports can be either directly on exports or on exports.default
@@ -1317,4 +1326,19 @@ export function clearGlobals() {
     delete (global as any).beforeEach;
     delete (global as any).afterEach;
     delete (global as any).vi;
+}
+
+/**
+ * Get all source files that were loaded during test execution
+ * Used for coverage reporting
+ */
+export function getCoveredFiles(): Set<string> {
+    return coveredFiles;
+}
+
+/**
+ * Reset covered files tracking (call before running tests)
+ */
+export function resetCoveredFiles(): void {
+    coveredFiles.clear();
 }

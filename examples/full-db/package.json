@@ -1,7 +1,10 @@
 {
   "name": "my-elit-app",
   "version": "0.0.0",
-  "type": "module",
+  "dependencies": {
+    "@types/node": "^25.0.9",
+    "elit": "file:../../"
+  },
   "scripts": {
     "dev": "elit dev",
     "build": "elit build",
@@ -10,8 +13,5 @@
     "test:watch": "elit test --watch",
     "test:coverage": "elit test --coverage"
   },
-  "dependencies": {
-    "@types/node": "^25.0.9",
-    "elit": "file:../../"
-  }
+  "type": "module"
 }

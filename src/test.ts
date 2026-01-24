@@ -6,7 +6,7 @@
 
 import { readdirSync } from './fs';
 import { join, relative } from './path';
-import { runTests, setupGlobals, clearGlobals } from './test-runtime';
+import { runTests, setupGlobals, clearGlobals, resetCoveredFiles, getCoveredFiles } from './test-runtime';
 import { TestReporter, DotReporter, JsonReporter, VerboseReporter } from './test-reporter';
 
 export interface TestOptions {
@@ -16,7 +16,9 @@ export interface TestOptions {
     reporter?: 'default' | 'dot' | 'json' | 'verbose';
     timeout?: number;
     bail?: boolean;
+    run?: boolean;
     watch?: boolean;
+    endToEnd?: boolean;
     colors?: boolean;
     globals?: boolean;
     describePattern?: string;
@@ -24,7 +26,7 @@ export interface TestOptions {
     coverage?: {
         enabled: boolean;
         provider: 'v8' | 'istanbul';
-        reporter?: ('text' | 'html' | 'lcov' | 'json')[];
+        reporter?: ('text' | 'html' | 'lcov' | 'json' | 'coverage-final.json' | 'clover')[];
         include?: string[];
         exclude?: string[];
     };
@@ -181,6 +183,9 @@ export async function runJestTests(options: TestOptions = {}) {
         testReporter.onRunStart(files);
     }
 
+    // Reset coverage tracking before running tests
+    resetCoveredFiles();
+
     // Run tests
     const results = await runTests({
         files,
@@ -208,7 +213,7 @@ export async function runJestTests(options: TestOptions = {}) {
 
     // Generate coverage if enabled
     if (options.coverage?.enabled) {
-        await generateCoverage(options.coverage);
+        await generateCoverage(options.coverage, results.results);
     }
 
     return {
@@ -222,29 +227,46 @@ export async function runJestTests(options: TestOptions = {}) {
 /**
  * Generate coverage report
  */
-async function generateCoverage(options: {
-    provider: 'v8' | 'istanbul';
-    reporter?: ('text' | 'html' | 'lcov' | 'json')[];
-    include?: string[];
-    exclude?: string[];
-}) {
-    const { processCoverage, generateTextReport, generateHtmlReport } = await import('./coverage');
+async function generateCoverage(
+    options: {
+        provider: 'v8' | 'istanbul';
+        reporter?: ('text' | 'html' | 'lcov' | 'json' | 'coverage-final.json' | 'clover')[];
+        include?: string[];
+        exclude?: string[];
+    },
+    testResults?: any[]
+) {
+    const { processCoverage, generateTextReport, generateHtmlReport, generateCoverageFinalJson, generateCloverXml } = await import('./coverage');
+
+    // Get covered files from test execution
+    const coveredFilesForCoverage = getCoveredFiles();
 
     const coverageMap = await processCoverage({
         reportsDirectory: './coverage',
         include: options.include || ['**/*.ts', '**/*.js'],
         exclude: options.exclude || ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**'],
         reporter: options.reporter || ['text', 'html'],
+        coveredFiles: coveredFilesForCoverage,
     });
 
     const reporters = options.reporter || ['text', 'html'];
     if (reporters.includes('text')) {
-        console.log('\n' + generateTextReport(coverageMap));
+        console.log('\n' + generateTextReport(coverageMap, testResults));
     }
 
     if (reporters.includes('html')) {
         generateHtmlReport(coverageMap, './coverage');
         console.log(`\n Coverage report: coverage/index.html\n`);
+    }
+
+    if (reporters.includes('coverage-final.json')) {
+        generateCoverageFinalJson(coverageMap, './coverage');
+        console.log(`\n Coverage report: coverage/coverage-final.json\n`);
+    }
+
+    if (reporters.includes('clover')) {
+        generateCloverXml(coverageMap, './coverage');
+        console.log(`\n Coverage report: coverage/clover.xml\n`);
     }
 }
 

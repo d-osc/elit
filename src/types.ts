@@ -275,7 +275,7 @@ export type TestEnvironment = 'node' | 'jsdom' | 'happy-dom' | 'edge-runtime';
 
 export type TestCoverageProvider = 'v8' | 'istanbul';
 
-export type TestCoverageReporter = 'text' | 'json' | 'html' | 'lcov' | 'lcovonly';
+export type TestCoverageReporter = 'text' | 'json' | 'html' | 'lcov' | 'lcovonly' | 'coverage-final.json' | 'clover';
 
 export interface TestCoverageOptions {
     provider?: TestCoverageProvider;

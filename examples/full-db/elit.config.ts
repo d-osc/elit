@@ -61,13 +61,14 @@ export default {
     testTimeout: 5000,
     bail: false,
     globals: true,
-    watch: true,
+    watch: false,
     reporter: 'verbose',
     coverage: {
-      dir: './coverage',
-      reporter: ['text', 'html'],
-      include: ['src/**/*.ts'], // หรือ path ที่ต้องการครอบคลุม
-      exclude: ['**/*.test.ts', '**/*.spec.ts']
+      enabled: true,
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov', 'json', 'coverage-final.json', 'clover'],
+      include: ['**/*.ts'], // รวมทุกไฟล์ TypeScript ในโปรเจกต์
+      exclude: ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**', '**/dist/**', '**/coverage/**']
     }
   },
   // Add scripts for running tests
