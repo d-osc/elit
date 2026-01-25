@@ -33,22 +33,53 @@ export interface TestOptions {
 }
 
 /**
- * Convert glob pattern to regex
+ * Convert glob pattern to regex (safe from ReDoS)
  */
 function globToRegex(pattern: string): RegExp {
     // Handle brace expansion: {ts,js} -> (ts|js)
+    // Use string slicing instead of regex to avoid ReDoS
     let expanded = pattern;
     const braceMatch = pattern.match(/\{([^}]+)\}/);
-    if (braceMatch) {
+    if (braceMatch && braceMatch.index !== undefined) {
         const options = braceMatch[1].split(',');
-        expanded = pattern.replace(/\{[^}]+\}/, `(${options.join('|')})`);
+        const before = pattern.slice(0, braceMatch.index);
+        const after = pattern.slice(braceMatch.index + braceMatch[0].length);
+        expanded = before + '(' + options.join('|') + ')' + after;
     }
 
-    // Convert to regex
-    const regexStr = '^' + expanded
-        .replace(/\./g, '\\.')
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.');
+    // Convert to regex using character-by-character processing
+    // This avoids using .replace() with regex on user input
+    let regexStr = '^';
+    for (let i = 0; i < expanded.length; i++) {
+        const char = expanded[i];
+        switch (char) {
+            case '.':
+                regexStr += '\\.';
+                break;
+            case '*':
+                regexStr += '.*';
+                break;
+            case '?':
+                regexStr += '.';
+                break;
+            case '+':
+            case '^':
+            case '$':
+            case '|':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '\\':
+                regexStr += '\\' + char;
+                break;
+            default:
+                regexStr += char;
+        }
+    }
+    regexStr += '$';
 
     return new RegExp(regexStr);
 }
@@ -64,9 +95,12 @@ function matchesPattern(relativePath: string, pattern: string): boolean {
         // Expand braces to multiple patterns
         const options = braceMatch[1].split(',');
 
-        // Try each option
+        // Try each option - use string manipulation instead of regex to avoid ReDoS
+        const before = pattern.slice(0, braceMatch.index);
+        const after = pattern.slice(braceMatch.index + braceMatch[0].length);
+
         for (const option of options) {
-            const testPattern = pattern.replace(/\{[^}]+\}/, option);
+            const testPattern = before + option + after;
             if (matchesPattern(relativePath, testPattern)) {
                 return true;
             }

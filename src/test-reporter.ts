@@ -59,9 +59,9 @@ export class TestReporter {
     }
 
     onTestResult(result: TestResult) {
-        // Format file path as relative with forward slashes
+        // Format file path as relative with forward slashes (safe from ReDoS)
         const filePath = result.file
-            ? relative(process.cwd(), result.file).replace(/\\/g, '/')
+            ? relative(process.cwd(), result.file).split('\\').join('/')
             : undefined;
 
         // Print file header when file changes
@@ -90,8 +90,8 @@ export class TestReporter {
                 // Show file path with line number
                 const filePath = result.file;
                 if (filePath) {
-                    // Convert to relative path from current working directory
-                    const relativePath = relative(process.cwd(), filePath).replace(/\\/g, '/');
+                    // Convert to relative path from current working directory (safe from ReDoS)
+                    const relativePath = relative(process.cwd(), filePath).split('\\').join('/');
                     const lineSuffix = result.lineNumber ? `:${result.lineNumber}` : '';
                     console.log(`    ${this.c('cyan', `📄 ${relativePath}${lineSuffix}`)}`);
                 }

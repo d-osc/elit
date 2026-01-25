@@ -64,7 +64,7 @@ export default {
     watch: false,
     reporter: 'verbose',
     coverage: {
-      enabled: true,
+      enabled: false,
       provider: 'v8',
       reporter: ['text', 'html', 'lcov', 'json', 'coverage-final.json', 'clover'],
       include: ['**/*.ts'], // รวมทุกไฟล์ TypeScript ในโปรเจกต์
