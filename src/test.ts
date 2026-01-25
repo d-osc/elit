@@ -37,14 +37,17 @@ export interface TestOptions {
  */
 function globToRegex(pattern: string): RegExp {
     // Handle brace expansion: {ts,js} -> (ts|js)
-    // Use string slicing instead of regex to avoid ReDoS
+    // Use string operations instead of regex to avoid ReDoS
     let expanded = pattern;
-    const braceMatch = pattern.match(/\{([^}]+)\}/);
-    if (braceMatch && braceMatch.index !== undefined) {
-        const options = braceMatch[1].split(',');
-        const before = pattern.slice(0, braceMatch.index);
-        const after = pattern.slice(braceMatch.index + braceMatch[0].length);
-        expanded = before + '(' + options.join('|') + ')' + after;
+    const openBraceIndex = pattern.indexOf('{');
+    if (openBraceIndex !== -1) {
+        const closeBraceIndex = pattern.indexOf('}', openBraceIndex);
+        if (closeBraceIndex !== -1) {
+            const options = pattern.slice(openBraceIndex + 1, closeBraceIndex).split(',');
+            const before = pattern.slice(0, openBraceIndex);
+            const after = pattern.slice(closeBraceIndex + 1);
+            expanded = before + '(' + options.join('|') + ')' + after;
+        }
     }
 
     // Convert to regex using character-by-character processing
@@ -85,27 +88,29 @@ function globToRegex(pattern: string): RegExp {
 }
 
 /**
- * Check if a file path matches a pattern
+ * Check if a file path matches a pattern (safe from ReDoS)
  */
 function matchesPattern(relativePath: string, pattern: string): boolean {
     // Handle brace expansion: {test,spec} or {ts,js,tsx,etc}
-    const braceMatch = pattern.match(/\{([^}]+)\}/);
+    // Use string operations instead of regex to avoid ReDoS
+    const openBraceIndex = pattern.indexOf('{');
 
-    if (braceMatch && braceMatch.index !== undefined) {
-        // Expand braces to multiple patterns
-        const options = braceMatch[1].split(',');
+    if (openBraceIndex !== -1) {
+        const closeBraceIndex = pattern.indexOf('}', openBraceIndex);
+        if (closeBraceIndex !== -1) {
+            // Expand braces to multiple patterns
+            const options = pattern.slice(openBraceIndex + 1, closeBraceIndex).split(',');
+            const before = pattern.slice(0, openBraceIndex);
+            const after = pattern.slice(closeBraceIndex + 1);
 
-        // Try each option - use string manipulation instead of regex to avoid ReDoS
-        const before = pattern.slice(0, braceMatch.index);
-        const after = pattern.slice(braceMatch.index + braceMatch[0].length);
-
-        for (const option of options) {
-            const testPattern = before + option + after;
-            if (matchesPattern(relativePath, testPattern)) {
-                return true;
+            for (const option of options) {
+                const testPattern = before + option + after;
+                if (matchesPattern(relativePath, testPattern)) {
+                    return true;
+                }
             }
+            return false;
         }
-        return false;
     }
 
     // Simple glob to regex conversion

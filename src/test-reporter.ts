@@ -24,6 +24,99 @@ const colors = {
 };
 
 // ============================================================================
+// Helper Functions (safe from ReDoS)
+// ============================================================================
+
+/**
+ * Extract argument from function call using safe string operations
+ * Example: extractArg(".toBe('value')", "toBe") returns "'value'"
+ */
+function extractArg(code: string, functionName: string): string | null {
+    const searchStr = `.${functionName}(`;
+    const startIndex = code.indexOf(searchStr);
+    if (startIndex === -1) return null;
+
+    let parenCount = 0;
+    let inString = false;
+    let stringChar = '';
+    let argStart = startIndex + searchStr.length;
+
+    for (let i = argStart; i < code.length; i++) {
+        const char = code[i];
+
+        if (!inString) {
+            if (char === '(') parenCount++;
+            else if (char === ')') {
+                parenCount--;
+                if (parenCount < 0) {
+                    return code.slice(argStart, i);
+                }
+            } else if (char === '"' || char === "'" || char === '`') {
+                inString = true;
+                stringChar = char;
+            }
+        } else {
+            if (char === '\\' && i + 1 < code.length) {
+                i++; // Skip escaped character
+            } else if (char === stringChar) {
+                inString = false;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Extract received value from error message using safe string operations
+ */
+function extractReceivedValue(errorMsg: string): string | null {
+    const receivedIndex = errorMsg.indexOf('Received:');
+    if (receivedIndex === -1) return null;
+
+    const afterReceived = errorMsg.slice(receivedIndex + 9).trimStart();
+    const newlineIndex = afterReceived.indexOf('\n');
+    if (newlineIndex !== -1) {
+        return afterReceived.slice(0, newlineIndex).trimEnd();
+    }
+    return afterReceived.trimEnd();
+}
+
+/**
+ * Check if a string is quoted and extract quote and content
+ * Returns null if not quoted
+ */
+function parseQuotedString(str: string): { quote: string; content: string } | null {
+    if (str.length < 2) return null;
+    const firstChar = str[0];
+    const lastChar = str[str.length - 1];
+
+    if ((firstChar === '"' || firstChar === "'" || firstChar === '`') &&
+        firstChar === lastChar) {
+        return {
+            quote: firstChar,
+            content: str.slice(1, -1)
+        };
+    }
+    return null;
+}
+
+/**
+ * Strip quotes from a string (first and last matching quotes)
+ */
+function stripQuotes(str: string): string {
+    if (str.length < 2) return str;
+    const firstChar = str[0];
+    const lastChar = str[str.length - 1];
+
+    if ((firstChar === '"' || firstChar === "'" || firstChar === '`') &&
+        firstChar === lastChar) {
+        return str.slice(1, -1);
+    }
+    return str;
+}
+
+// ============================================================================
 // Default Jest-style Reporter
 // ============================================================================
 
@@ -114,21 +207,15 @@ export class TestReporter {
                     let suggestion = '';
                     const code = result.codeSnippet;
 
-                    // Extract the actual (received) value from the error message
-                    // Error format: "Expected values to be strictly equal (using ===)\n  Expected: "footers"\n  Received: "footer""
-                    let receivedValue: string | undefined = undefined;
+                    // Extract the actual (received) value from the error message (safe from ReDoS)
                     const errorMsg = result.error?.message || '';
-                    const receivedMatch = errorMsg.match(/Received:\s*(.+)/);
-                    if (receivedMatch) {
-                        receivedValue = receivedMatch[1].trim();
-                    }
+                    const receivedValue = extractReceivedValue(errorMsg);
 
-                    // Common patterns for suggestions
+                    // Common patterns for suggestions (safe from ReDoS)
                     // Order matters: check longer patterns first to avoid false matches
                     if (code.includes('.toBeGreaterThanOrEqual(')) {
-                        const match = code.match(/\.toBeGreaterThanOrEqual\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const currentValue = match[1];
+                        const currentValue = extractArg(code, 'toBeGreaterThanOrEqual');
+                        if (currentValue && receivedValue) {
                             const actualValue = Number(receivedValue);
                             if (!isNaN(actualValue)) {
                                 suggestion = code.replace(
@@ -138,9 +225,8 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toBeGreaterThan(')) {
-                        const match = code.match(/\.toBeGreaterThan\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const currentValue = match[1];
+                        const currentValue = extractArg(code, 'toBeGreaterThan');
+                        if (currentValue && receivedValue) {
                             const actualValue = Number(receivedValue);
                             if (!isNaN(actualValue)) {
                                 suggestion = code.replace(
@@ -150,9 +236,8 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toBeLessThanOrEqual(')) {
-                        const match = code.match(/\.toBeLessThanOrEqual\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const currentValue = match[1];
+                        const currentValue = extractArg(code, 'toBeLessThanOrEqual');
+                        if (currentValue && receivedValue) {
                             const actualValue = Number(receivedValue);
                             if (!isNaN(actualValue)) {
                                 suggestion = code.replace(
@@ -162,9 +247,8 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toBeLessThan(')) {
-                        const match = code.match(/\.toBeLessThan\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const currentValue = match[1];
+                        const currentValue = extractArg(code, 'toBeLessThan');
+                        if (currentValue && receivedValue) {
                             const actualValue = Number(receivedValue);
                             if (!isNaN(actualValue)) {
                                 suggestion = code.replace(
@@ -174,16 +258,14 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toStrictEqual(')) {
-                        const match = code.match(/\.toStrictEqual\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const expectedValue = match[1];
-                            const quoteMatch = expectedValue.match(/^(['"])(.*)\1$/);
-                            if (quoteMatch) {
-                                const quote = quoteMatch[1];
-                                const strippedReceived = receivedValue.replace(/^['"]|['"]$/g, '');
+                        const expectedValue = extractArg(code, 'toStrictEqual');
+                        if (expectedValue && receivedValue) {
+                            const quoted = parseQuotedString(expectedValue);
+                            if (quoted) {
+                                const strippedReceived = stripQuotes(receivedValue);
                                 suggestion = code.replace(
                                     `.toStrictEqual(${expectedValue})`,
-                                    `.toStrictEqual(${quote}${strippedReceived}${quote})`
+                                    `.toStrictEqual(${quoted.quote}${strippedReceived}${quoted.quote})`
                                 );
                             } else {
                                 suggestion = code.replace(
@@ -193,16 +275,14 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toEqual(')) {
-                        const match = code.match(/\.toEqual\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const expectedValue = match[1];
-                            const quoteMatch = expectedValue.match(/^(['"])(.*)\1$/);
-                            if (quoteMatch) {
-                                const quote = quoteMatch[1];
-                                const strippedReceived = receivedValue.replace(/^['"]|['"]$/g, '');
+                        const expectedValue = extractArg(code, 'toEqual');
+                        if (expectedValue && receivedValue) {
+                            const quoted = parseQuotedString(expectedValue);
+                            if (quoted) {
+                                const strippedReceived = stripQuotes(receivedValue);
                                 suggestion = code.replace(
                                     `.toEqual(${expectedValue})`,
-                                    `.toEqual(${quote}${strippedReceived}${quote})`
+                                    `.toEqual(${quoted.quote}${strippedReceived}${quoted.quote})`
                                 );
                             } else {
                                 suggestion = code.replace(
@@ -212,30 +292,26 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toMatch(')) {
-                        const match = code.match(/\.toMatch\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const expectedPattern = match[1];
-                            const quoteMatch = expectedPattern.match(/^(['"])(.*)\1$/);
-                            if (quoteMatch) {
-                                const quote = quoteMatch[1];
-                                const strippedReceived = receivedValue.replace(/^['"]|['"]$/g, '');
+                        const expectedPattern = extractArg(code, 'toMatch');
+                        if (expectedPattern && receivedValue) {
+                            const quoted = parseQuotedString(expectedPattern);
+                            if (quoted) {
+                                const strippedReceived = stripQuotes(receivedValue);
                                 suggestion = code.replace(
                                     `.toMatch(${expectedPattern})`,
-                                    `.toMatch(${quote}${strippedReceived}${quote})`
+                                    `.toMatch(${quoted.quote}${strippedReceived}${quoted.quote})`
                                 );
                             }
                         }
                     } else if (code.includes('.toContain(')) {
-                        const match = code.match(/\.toContain\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const expectedValue = match[1];
-                            const quoteMatch = expectedValue.match(/^(['"])(.*)\1$/);
-                            if (quoteMatch) {
-                                const quote = quoteMatch[1];
-                                const strippedReceived = receivedValue.replace(/^['"]|['"]$/g, '');
+                        const expectedValue = extractArg(code, 'toContain');
+                        if (expectedValue && receivedValue) {
+                            const quoted = parseQuotedString(expectedValue);
+                            if (quoted) {
+                                const strippedReceived = stripQuotes(receivedValue);
                                 suggestion = code.replace(
                                     `.toContain(${expectedValue})`,
-                                    `.toContain(${quote}${strippedReceived}${quote})`
+                                    `.toContain(${quoted.quote}${strippedReceived}${quoted.quote})`
                                 );
                             } else {
                                 suggestion = code.replace(
@@ -245,9 +321,8 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toHaveLength(')) {
-                        const match = code.match(/\.toHaveLength\(([^)]+)\)/);
-                        if (match && receivedValue) {
-                            const expectedLength = match[1];
+                        const expectedLength = extractArg(code, 'toHaveLength');
+                        if (expectedLength && receivedValue) {
                             const actualLength = Number(receivedValue);
                             if (!isNaN(actualLength)) {
                                 suggestion = code.replace(
@@ -257,17 +332,15 @@ export class TestReporter {
                             }
                         }
                     } else if (code.includes('.toBe(')) {
-                        const match = code.match(/\.toBe\(([^)]+)\)/);
-                        if (match) {
-                            const expectedValue = match[1];
+                        const expectedValue = extractArg(code, 'toBe');
+                        if (expectedValue) {
                             if (receivedValue) {
-                                const quoteMatch = expectedValue.match(/^(['"])(.*)\1$/);
-                                if (quoteMatch) {
-                                    const quote = quoteMatch[1];
-                                    const strippedReceived = receivedValue.replace(/^['"]|['"]$/g, '');
+                                const quoted = parseQuotedString(expectedValue);
+                                if (quoted) {
+                                    const strippedReceived = stripQuotes(receivedValue);
                                     suggestion = code.replace(
                                         `.toBe(${expectedValue})`,
-                                        `.toBe(${quote}${strippedReceived}${quote})`
+                                        `.toBe(${quoted.quote}${strippedReceived}${quoted.quote})`
                                     );
                                 } else {
                                     suggestion = code.replace(
