@@ -5,10 +5,8 @@ import type { Router } from 'elit';
 export function HomePage(router: Router) {
   // Check if user is logged in
   const isLoggedIn = createState(!!localStorage.getItem('token'));
-  const user = createState(() => {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-  });
+  const userStr = localStorage.getItem('user');
+  const user = createState(userStr ? JSON.parse(userStr) : null);
 
   // Listen for storage changes
   const handleStorageChange = () => {

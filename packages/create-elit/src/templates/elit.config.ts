@@ -52,5 +52,21 @@ export default {
     root: './dist',
     basePath: '',
     index: './index.html'
+  },
+  test: {
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', 'benchmark', 'docs', 'coverage'],
+    testTimeout: 5000,
+    bail: false,
+    globals: true,
+    watch: false,
+    reporter: 'verbose',
+    coverage: {
+      enabled: true,
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov', 'json', 'coverage-final.json', 'clover'],
+      include: ['**/*.ts'], // รวมทุกไฟล์ TypeScript ในโปรเจกต์
+      exclude: ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**', '**/dist/**', '**/coverage/**']
+    }
   }
 };

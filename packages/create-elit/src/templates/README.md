@@ -16,6 +16,7 @@ Visit http://localhost:3003 to view your app.
 - `npm run dev` - Start development server with HMR
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
+- `npm run test` - Run Test
 
 ## Learn More
 
