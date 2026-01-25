@@ -57,7 +57,7 @@ export default {
   },
   test: {
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', 'benchmark', 'docs', '**/*.e2e.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', '**/*.{test,spec}.e2e.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', 'benchmark', 'docs', 'coverage'],
     testTimeout: 5000,
     bail: false,
     globals: true,
@@ -76,7 +76,6 @@ export default {
     'test': 'elit test',
     'test:run': 'elit test --run',
     'test:unit': 'elit test --run',
-    'test:e2e': 'elit test --e2e --run',
     'test:watch': 'elit test --watch'
   }
 };

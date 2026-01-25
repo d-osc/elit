@@ -6,10 +6,8 @@ import type { Router } from 'elit';
 export function Header(router: Router) {
   // Check if user is logged in (has token in localStorage)
   const isLoggedIn = createState(!!localStorage.getItem('token'));
-  const user = createState(() => {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-  });
+  const userStr = localStorage.getItem('user');
+  const user = createState(userStr ? JSON.parse(userStr) : null);
 
   // Listen for storage changes to update header when login/logout happens
   const handleStorageChange = (e: StorageEvent) => {

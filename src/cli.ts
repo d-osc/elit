@@ -6,7 +6,7 @@
 import { loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
-import type { DevServerOptions, BuildOptions, PreviewOptions, TestE2EOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
 const COMMANDS = ['dev', 'build', 'preview', 'test', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
@@ -290,69 +290,6 @@ async function runTest(args: string[]) {
         ? { ...config.test, ...cliOptions } as TestOptions
         : cliOptions;
 
-    // E2E mode: special handling for automation testing
-    if (options.endToEnd) {
-        // Get E2E configuration from config file or use defaults
-        const e2eConfig = options.e2e || {};
-
-        // Default E2E include patterns
-        const defaultE2eInclude = [
-            '**/*.e2e.test.ts', '**/*.e2e.test.js', '**/*.e2e.test.mjs', '**/*.e2e.test.cjs',
-            '**/*.e2e.test.tsx', '**/*.e2e.test.jsx',
-            '**/*.e2e.spec.ts', '**/*.e2e.spec.js', '**/*.e2e.spec.mjs', '**/*.e2e.spec.cjs',
-            '**/*.e2e.spec.tsx', '**/*.e2e.spec.jsx',
-            '**/*.test.e2e.ts', '**/*.test.e2e.js', '**/*.test.e2e.mjs', '**/*.test.e2e.cjs',
-            '**/*.test.e2e.tsx', '**/*.test.e2e.jsx',
-            '**/*.spec.e2e.ts', '**/*.spec.e2e.js', '**/*.spec.e2e.mjs', '**/*.spec.e2e.cjs',
-            '**/*.spec.e2e.tsx', '**/*.spec.e2e.jsx',
-        ];
-
-        // Default E2E exclude patterns
-        const defaultE2eExclude = [
-            '**/node_modules/**',
-            '**/dist/**',
-            '**/coverage/**',
-            '**/benchmark/**',
-            '**/docs/**',
-            '**/*.html',
-        ];
-
-        // Check if coverage was explicitly enabled via CLI (not from config)
-        const cliEnabledCoverage = cliOptions.coverage?.enabled;
-        // Check if coverage was enabled via e2e config
-        const e2eCoverage = e2eConfig.coverage;
-
-        options = {
-            ...options,
-            // Override include to match e2e test files
-            include: e2eConfig.include || defaultE2eInclude,
-            // Exclude non-test directories and files
-            exclude: e2eConfig.exclude || defaultE2eExclude,
-            // Handle coverage: CLI flag > e2e config > disabled
-            coverage: cliEnabledCoverage
-                ? options.coverage!
-                : e2eCoverage
-                    ? (typeof e2eCoverage === 'boolean'
-                        ? { enabled: e2eCoverage, provider: 'v8' }
-                        : {
-                            enabled: true,
-                            provider: e2eCoverage.provider || 'v8',
-                            reporter: e2eCoverage.reporter?.filter(r => r !== 'lcovonly') as ('text' | 'html' | 'lcov' | 'json' | 'coverage-final.json' | 'clover')[] || undefined,
-                            include: e2eCoverage.include,
-                            exclude: e2eCoverage.exclude,
-                          })
-                    : { enabled: false, provider: 'v8' },
-            // Use verbose reporter by default for e2e (or from e2e config)
-            reporter: e2eConfig.reporter || options.reporter || 'verbose',
-            // E2E test timeout from config or default
-            testTimeout: e2eConfig.testTimeout || options.testTimeout || 5000,
-            // Bail on first failure from e2e config
-            bail: e2eConfig.bail !== undefined ? e2eConfig.bail : (options.bail ?? false),
-            // Run once by default in e2e mode
-            watch: false,
-        };
-    }
-
     // Import test runner dynamically
     const { runJestTests, runWatchMode } = await import('./test');
 
@@ -402,8 +339,6 @@ interface TestOptions {
     bail?: boolean;
     run?: boolean;
     watch?: boolean;
-    endToEnd?: boolean;
-    e2e?: TestE2EOptions;
     describe?: string;
     testName?: string;
     coverage?: {
@@ -481,11 +416,6 @@ function parseTestArgs(args: string[]): TestOptions {
                 if (testValue) {
                     options.testName = testValue;
                 }
-                break;
-            case '--end-to-end':
-            case '--e2e':
-            case '-e2e':
-                options.endToEnd = true;
                 break;
         }
     }
@@ -601,7 +531,6 @@ Note: Preview mode has full feature parity with dev mode:
 Test Options:
   -r, --run               Run all tests once (default, same as no flags)
   -w, --watch             Run in watch mode
-  -e2e, --end-to-end     Run end-to-end tests
   -f, --file <files>      Run specific files (comma-separated), e.g.: --file ./test1.test.ts,./test2.spec.ts
   -d, --describe <name>   Run only tests matching describe name, e.g.: --describe "Footer Component"
   -t, --it <name>         Run only tests matching test name, e.g.: --it "should create"
@@ -611,7 +540,6 @@ Test Options:
 Note: Test command behaviors:
       - elit test                     Run all tests once (default)
       - elit test --run               Run all tests once (same as default)
-      - elit test -e2e                Run end-to-end tests
       - elit test -f ./test.ts        Run specific file(s) once
       - elit test -d "Footer"         Run only tests in describe blocks matching "Footer"
       - elit test -t "should create"  Run only tests matching "should create"
