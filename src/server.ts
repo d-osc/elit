@@ -1769,7 +1769,19 @@ export default css;
   watcher.on('change', (path: string) => {
     if (config.logging) console.log(`[HMR] File changed: ${path}`);
     const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
-    wsClients.forEach(client => client.readyState === ReadyState.OPEN && client.send(message));
+    // Broadcast to all open clients with error handling
+    wsClients.forEach(client => {
+      if (client.readyState === ReadyState.OPEN) {
+        client.send(message, {}, (err?: Error) => {
+          // Silently ignore connection errors during HMR
+          const code = (err as any)?.code;
+          if (code === 'ECONNABORTED' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'WS_NOT_OPEN') {
+            // Client disconnected - will be removed from clients set by close event
+            return;
+          }
+        });
+      }
+    });
   });
 
   watcher.on('add', (path: string) => config.logging && console.log(`[HMR] File added: ${path}`));

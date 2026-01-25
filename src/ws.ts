@@ -348,15 +348,45 @@ export class WebSocketServer extends EventEmitter {
     });
 
     socket.on('error', (error: Error) => {
+      // Silently ignore connection errors (ECONNABORTED, ECONNRESET, etc.)
+      // These are normal when clients disconnect during HMR
+      const errorCode = (error as any).code;
+      if (errorCode === 'ECONNABORTED' || errorCode === 'ECONNRESET' || errorCode === 'EPIPE') {
+        // Silently ignore - connection was closed by client
+        return;
+      }
+      // Only emit other errors
       client.emit('error', error);
     });
 
     // Override send method
     client.send = (data: Data, _options?: any, callback?: (err?: Error) => void) => {
+      // Check if socket is still writable
+      if (!socket.writable || client.readyState !== ReadyState.OPEN) {
+        const err = new Error('WebSocket is not open');
+        (err as any).code = 'WS_NOT_OPEN';
+        queueCallback(callback, err);
+        return;
+      }
+
       try {
         const frame = this._createFrame(data);
-        socket.write(frame);
-        queueCallback(callback);
+        socket.write(frame, (err?: Error) => {
+          // Handle async write errors (ECONNABORTED, ECONNRESET, etc.)
+          if (err) {
+            const errorCode = (err as any).code;
+            // Silently ignore connection errors - these are normal during HMR
+            if (errorCode !== 'ECONNABORTED' && errorCode !== 'ECONNRESET' && errorCode !== 'EPIPE') {
+              queueCallback(callback, err);
+            } else {
+              // Connection closed - mark client as closed
+              client.readyState = ReadyState.CLOSED;
+              queueCallback(callback); // Call without error for graceful handling
+            }
+          } else {
+            queueCallback(callback);
+          }
+        });
       } catch (error) {
         queueCallback(callback, error as Error);
       }

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.5] - 2025-01-25
+
+### Fixed
+- **WebSocket HMR Error Handling** - Fixed ECONNABORTED errors during Hot Module Replacement
+  - Added graceful error handling for connection interruptions (ECONNABORTED, ECONNRESET, EPIPE)
+  - WebSocket send method now checks if socket is writable before sending
+  - HMR broadcast properly handles client disconnections without crashing the server
+  - Connection errors are now silently ignored instead of crashing the dev server
+  - Fixes issue where closing browser tab or network issues would crash the development server
+
 ## [3.3.4] - 2025-01-25
 
 ### Added
