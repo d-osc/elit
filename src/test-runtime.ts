@@ -20,6 +20,18 @@ import type { RawSourceMap } from 'source-map';
 export { type TestResult };
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Escape special regex characters to prevent regex injection
+ * This sanitizes user input before using it in RegExp constructor
+ */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -1136,18 +1148,20 @@ export async function runTests(options: {
 }
 
 async function executeSuite(suite: TestSuite, timeout: number, bail: boolean, parentMatched: boolean = false): Promise<void> {
-    // Check if this suite directly matches the describe pattern
+    // Check if this suite directly matches the describe pattern (safe from regex injection)
     let directMatch = false;
     if (describePattern) {
-        const regex = new RegExp(describePattern, 'i');
+        const escapedPattern = escapeRegex(describePattern);
+        const regex = new RegExp(escapedPattern, 'i');
         directMatch = regex.test(suite.name);
     }
 
-    // Helper function to check if this suite or any descendant matches the describe pattern
+    // Helper function to check if this suite or any descendant matches the describe pattern (safe from regex injection)
     function suiteOrDescendantMatches(s: TestSuite): boolean {
         if (!describePattern) return true;
 
-        const regex = new RegExp(describePattern, 'i');
+        const escapedPattern = escapeRegex(describePattern);
+        const regex = new RegExp(escapedPattern, 'i');
         // Check if this suite matches
         if (regex.test(s.name)) return true;
 
@@ -1197,10 +1211,11 @@ async function executeSuite(suite: TestSuite, timeout: number, bail: boolean, pa
             continue;
         }
 
-        // Check if this test matches the test name pattern
+        // Check if this test matches the test name pattern (safe from regex injection)
         let testMatches = true;
         if (testPattern) {
-            const regex = new RegExp(testPattern, 'i');
+            const escapedPattern = escapeRegex(testPattern);
+            const regex = new RegExp(escapedPattern, 'i');
             testMatches = regex.test(test.name);
         }
 
