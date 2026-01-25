@@ -131,7 +131,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsup && node -e \"require('fs').copyFileSync('src/test-globals.d.ts', 'dist/test-globals.d.ts')\"",
+    "build": "rm -rf dist && tsup && node -e \"require('fs').copyFileSync('src/test-globals.d.ts', 'dist/test-globals.d.ts')\" && tsc --emitDeclarationOnly --outDir dist --declaration --declarationMap",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "elit test",
