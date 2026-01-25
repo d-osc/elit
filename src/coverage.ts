@@ -143,6 +143,69 @@ export interface FileCoverage {
 }
 
 /**
+ * Convert glob pattern to regex using safe character-by-character processing
+ * This avoids ReDoS vulnerabilities from using .replace() with regex on user input
+ *
+ * @param pattern - Glob pattern (e.g., "**&#47;*.test.ts", "src&#47;**&#47;*", "*.js")
+ * @returns RegExp object for matching file paths
+ */
+function globToRegex(pattern: string): RegExp {
+    let regexStr = '^';
+
+    // Process pattern character by character to avoid regex on user input
+    for (let i = 0; i < pattern.length; i++) {
+        const char = pattern[i];
+
+        switch (char) {
+            case '.':
+                // Escape literal dot
+                regexStr += '\\.';
+                break;
+            case '*':
+                // Handle ** as a special case for matching directories
+                if (i + 1 < pattern.length && pattern[i + 1] === '*') {
+                    // ** matches any number of directories (including none)
+                    regexStr += '(?:[^/]*(?:\/|$))*';
+                    i++; // Skip the next *
+                } else {
+                    // * matches any characters except /
+                    regexStr += '[^/]*';
+                }
+                break;
+            case '?':
+                // ? matches exactly one character except /
+                regexStr += '[^/]';
+                break;
+            case '/':
+                // Match directory separator
+                regexStr += '/';
+                break;
+            // Escape special regex characters
+            case '^':
+            case '$':
+            case '+':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '|':
+            case '\\':
+                regexStr += '\\' + char;
+                break;
+            default:
+                // Literal character
+                regexStr += char;
+                break;
+        }
+    }
+
+    regexStr += '$';
+    return new RegExp(regexStr);
+}
+
+/**
  * Check if a file path matches any of the include patterns
  */
 function matchesInclude(filePath: string, include: string[]): boolean {
@@ -151,12 +214,7 @@ function matchesInclude(filePath: string, include: string[]): boolean {
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     for (const pattern of include) {
-        const regex = new RegExp(
-            '^' + pattern
-                .replace(/\./g, '\\.')
-                .replace(/\*/g, '.*')
-                .replace(/\?/g, '.') + '$'
-        );
+        const regex = globToRegex(pattern);
         if (regex.test(normalizedPath)) {
             return true;
         }
@@ -171,12 +229,7 @@ function matchesExclude(filePath: string, exclude: string[]): boolean {
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     for (const pattern of exclude) {
-        const regex = new RegExp(
-            '^' + pattern
-                .replace(/\./g, '\\.')
-                .replace(/\*/g, '.*')
-                .replace(/\?/g, '.') + '$'
-        );
+        const regex = globToRegex(pattern);
         if (regex.test(normalizedPath)) {
             return true;
         }
