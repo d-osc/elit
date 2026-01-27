@@ -23,6 +23,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS'
 
 export interface ElitRequest extends IncomingMessage {
   body?: any;
+  query?: Record<string, string>;
 }
 
 export interface ElitResponse extends ServerResponse {
@@ -170,7 +171,15 @@ export class ServerRouter {
 
   private parseQuery(url: string): Record<string, string> {
     const query: Record<string, string> = {};
-    url.split('?')[1]?.split('&').forEach(p => { const [k, v] = p.split('='); if (k) query[k] = v || ''; });
+    const queryString = url.split('?')[1];
+    if (!queryString) return query;
+
+    queryString.split('&').forEach(p => {
+      const [k, v] = p.split('=');
+      if (k) {
+        query[k] = v !== undefined ? v : '';
+      }
+    });
     return query;
   }
 
@@ -271,12 +280,16 @@ export class ServerRouter {
         }
       }
 
+      // Parse query string and attach to req for Express-like compatibility
+      const query = this.parseQuery(url);
+      (req as ElitRequest).query = query;
+
       // Add Express-like response helpers to context
       const ctx: ServerRouteContext = {
         req: req as ElitRequest,
         res: res as ElitResponse,
         params,
-        query: this.parseQuery(url),
+        query,
         body,
         headers: req.headers as any
       };

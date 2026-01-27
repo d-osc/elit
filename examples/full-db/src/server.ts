@@ -55,6 +55,7 @@ async function verifyPassword(storedHash: string, suppliedPassword: string): Pro
 
 // GET /api/hello
 router.get('/api/hello', async (req: ElitRequest, res: ElitResponse) => {
+  console.log('Received request at /api/hello',req.query);
   res.setHeader('Content-Type', 'text/html; charset=UTF-8');
   return res.send("Hello from Elit ServerRouter!");
 });
@@ -682,7 +683,8 @@ export function notFoundHandler(req: ElitRequest, res: ElitResponse,  next: any)
   // Only send 404 if headers haven't been sent yet
 
   const isPath = router.listRoutes().filter(route => {
-    return route.method === req.method && RegExp(route.pattern).test(req.url);
+     const cleanPath = req.url.split('?')[0];
+    return route.method === req.method && RegExp(route.pattern).test(cleanPath);
   })
 
   if (!isPath.length) {
