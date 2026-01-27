@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.3.6] - 2025-01-28
 
 ### Added
-- **Express-like Request Interface** - Added `query` property to `ElitRequest` for better Express compatibility
+- **Express-like Request Interface** - Added `query` and `params` properties to `ElitRequest` for better Express compatibility
   - `req.query` now provides direct access to parsed query parameters
+  - `req.params` now provides direct access to route parameters (e.g., `/users/:id`)
   - Works alongside `req.body` for complete request data access
   - Compatible with both context-based handlers and direct (req, res) handlers
-  - Query parameters are automatically parsed and attached to every request
+  - Query and params are automatically parsed and attached to every request
 
 ## [3.3.5] - 2025-01-25
 

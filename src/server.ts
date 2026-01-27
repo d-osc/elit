@@ -24,6 +24,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS'
 export interface ElitRequest extends IncomingMessage {
   body?: any;
   query?: Record<string, string>;
+  params?: Record<string, string>;
 }
 
 export interface ElitResponse extends ServerResponse {
@@ -283,6 +284,9 @@ export class ServerRouter {
       // Parse query string and attach to req for Express-like compatibility
       const query = this.parseQuery(url);
       (req as ElitRequest).query = query;
+
+      // Attach params to req for Express-like compatibility
+      (req as ElitRequest).params = params;
 
       // Add Express-like response helpers to context
       const ctx: ServerRouteContext = {

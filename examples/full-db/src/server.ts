@@ -59,7 +59,11 @@ router.get('/api/hello', async (req: ElitRequest, res: ElitResponse) => {
   res.setHeader('Content-Type', 'text/html; charset=UTF-8');
   return res.send("Hello from Elit ServerRouter!");
 });
-
+router.get('/api/path/:id', async (req: ElitRequest, res: ElitResponse) => {
+  console.log('Received request at /api/path',req.params);
+  res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+  return res.send("Hello from Elit ServerRouter!");
+});
 // POST /api/auth/register
 router.post('/api/auth/register', async (req: ElitRequest, res: ElitResponse) => {
   const { name, email, password } = req.body;
