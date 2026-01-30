@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from './fs';
 import { resolve } from './path';
-import type { DevServerOptions, BuildOptions, PreviewOptions, TestOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions, TestOptions, MobileConfig } from './types';
 
 /**
  * Helper: Read file and ensure string output (eliminates duplication in file reading)
@@ -56,6 +56,8 @@ export interface ElitConfig {
     preview?: PreviewOptions;
     /** Test configuration */
     test?: TestOptions;
+    /** Mobile build configuration (Android & iOS) */
+    mobile?: MobileConfig;
 }
 
 /**

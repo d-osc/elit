@@ -47,7 +47,8 @@ export default defineConfig([
             coverage: 'src/coverage.ts',
             'test-runtime': 'src/test-runtime.ts',
             'test-reporter': 'src/test-reporter.ts',
-            test: 'src/test.ts'
+            test: 'src/test.ts',
+            mobile: 'src/mobile.ts'
         },
         format: ['cjs', 'esm'],
         dts: true,
@@ -57,7 +58,7 @@ export default defineConfig([
         treeshake: false,
         sourcemap: true,
         target: 'es2020',
-        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode', 'bun', 'monocart-coverage-reports', 'esbuild', 'source-map'],
+        external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode', 'bun', 'monocart-coverage-reports', 'esbuild', 'source-map', '@capacitor/cli', '@capacitor/core', '@capacitor/android', '@capacitor/ios'],
         outExtension({ format }) {
             return {
                 js: format === 'cjs' ? '.js' : '.mjs',

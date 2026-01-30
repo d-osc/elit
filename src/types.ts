@@ -327,3 +327,41 @@ export interface TestOptions {
     excludeSrc?: string[];
     env?: Record<string, string>;
 }
+
+// ===== Mobile Build Types =====
+
+export type MobilePlatform = 'android' | 'ios';
+
+export interface MobileConfig {
+    /** Enable mobile builds */
+    enabled?: boolean;
+    /** App name (display name) */
+    appName?: string;
+    /** Application ID (Android: com.example.app, iOS: com.example.app) */
+    appId?: string;
+    /** App version (e.g., "1.0.0") */
+    version?: string;
+    /** Build version (e.g., "1") */
+    buildNumber?: string;
+    /** Web directory to sync (relative to project root) */
+    webDir?: string;
+    /** Capacitor configuration file path */
+    capacitorConfigPath?: string;
+    /** Android output directory */
+    androidDir?: string;
+    /** iOS output directory */
+    iosDir?: string;
+    /** Platforms to build */
+    platforms?: MobilePlatform[];
+    /** Custom icons and splash screens */
+    assets?: {
+        icon?: string;
+        splash?: string;
+    };
+    /** Android-specific permissions */
+    androidPermissions?: string[];
+    /** iOS-specific permissions */
+    iosPermissions?: string[];
+    /** Capacitor plugins to install */
+    plugins?: string[];
+}

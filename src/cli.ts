@@ -8,7 +8,7 @@ import { createDevServer } from './server';
 import { build } from './build';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'android', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -99,6 +99,9 @@ async function main() {
             break;
         case 'test':
             await runTest(args.slice(1));
+            break;
+        case 'android':
+            await runAndroid(args.slice(1));
             break;
         case 'version':
             printVersion();
@@ -479,6 +482,213 @@ function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string;
     return parseArgs(args, handlers, options);
 }
 
+async function runAndroid(args: string[]) {
+    const { initMobile, syncMobile, buildMobile, openMobile } = await import('./mobile');
+    type MobilePlatform = import('./types').MobilePlatform;
+
+    const subCommand = args[0];
+
+    switch (subCommand) {
+        case 'init': {
+            const cliOptions = parseAndroidArgs(args.slice(1));
+            const config = await loadConfig();
+
+            const mobileConfig = config?.mobile || {};
+
+            // Determine platforms - validate and filter
+            let platforms: MobilePlatform[] = ['android'];
+            if (cliOptions.platforms) {
+                const validPlatforms = cliOptions.platforms.filter((p): p is MobilePlatform =>
+                    p === 'android' || p === 'ios'
+                );
+                if (validPlatforms.length > 0) {
+                    platforms = validPlatforms;
+                }
+            } else if (mobileConfig?.platforms) {
+                platforms = mobileConfig.platforms;
+            }
+
+            // Merge CLI options with config
+            const mergedConfig: import('./types').MobileConfig = {
+                ...mobileConfig,
+                ...(cliOptions.appId && { appId: cliOptions.appId }),
+                ...(cliOptions.appName && { appName: cliOptions.appName }),
+                ...(cliOptions.webDir && { webDir: cliOptions.webDir }),
+            };
+
+            await initMobile({
+                cwd: process.cwd(),
+                config: mergedConfig,
+                platforms,
+                logging: true
+            });
+            break;
+        }
+        case 'sync': {
+            const cliOptions = parseAndroidArgs(args.slice(1));
+            const config = await loadConfig();
+
+            const mobileConfig = config?.mobile || {};
+
+            // Determine platforms - validate and filter
+            let platforms: MobilePlatform[] = ['android'];
+            if (cliOptions.platforms) {
+                const validPlatforms = cliOptions.platforms.filter((p): p is MobilePlatform =>
+                    p === 'android' || p === 'ios'
+                );
+                if (validPlatforms.length > 0) {
+                    platforms = validPlatforms;
+                }
+            } else if (mobileConfig?.platforms) {
+                platforms = mobileConfig.platforms;
+            }
+
+            await syncMobile({
+                cwd: process.cwd(),
+                config: mobileConfig,
+                platforms,
+                logging: true
+            });
+            break;
+        }
+        case 'open': {
+            const cliOptions = parseAndroidArgs(args.slice(1));
+            const platform = (cliOptions.platform === 'ios' || cliOptions.platform === 'android')
+                ? cliOptions.platform as MobilePlatform
+                : 'android';
+
+            await openMobile(process.cwd(), platform, true);
+            break;
+        }
+        case 'build': {
+            const cliOptions = parseAndroidArgs(args.slice(1));
+            const config = await loadConfig();
+
+            const mobileConfig = config?.mobile || {};
+            const platform = (cliOptions.platform === 'ios' || cliOptions.platform === 'android')
+                ? cliOptions.platform as MobilePlatform
+                : 'android';
+
+            await buildMobile({
+                cwd: process.cwd(),
+                config: mobileConfig,
+                platform,
+                target: cliOptions.target,
+                outputType: cliOptions.outputType,
+                logging: true
+            });
+            break;
+        }
+        default:
+            printAndroidHelp();
+            break;
+    }
+}
+
+interface AndroidCliOptions {
+    appId?: string;
+    appName?: string;
+    webDir?: string;
+    platforms?: string[];
+    platform?: string;
+    target?: 'debug' | 'release';
+    outputType?: 'apk' | 'aab' | 'ipa';
+}
+
+function parseAndroidArgs(args: string[]): AndroidCliOptions {
+    const options: AndroidCliOptions = {};
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+
+        switch (arg) {
+            case '--app-id':
+            case '-a':
+                options.appId = args[++i];
+                break;
+            case '--app-name':
+            case '-n':
+                options.appName = args[++i];
+                break;
+            case '--web-dir':
+            case '-w':
+                options.webDir = args[++i];
+                break;
+            case '--platforms':
+            case '-p':
+                const platforms = args[++i];
+                if (platforms) {
+                    options.platforms = platforms.split(',').map(p => p.trim());
+                }
+                break;
+            case '--platform':
+                options.platform = args[++i];
+                break;
+            case '--target':
+                options.target = args[++i] as 'debug' | 'release';
+                break;
+            case '--output':
+            case '-o':
+                options.outputType = args[++i] as 'apk' | 'aab' | 'ipa';
+                break;
+        }
+    }
+
+    return options;
+}
+
+function printAndroidHelp() {
+    console.log(`
+Elit Mobile - Build native Android & iOS apps
+
+Usage:
+  elit android <command> [options]
+
+Commands:
+  init              Initialize mobile project
+  sync              Sync web build to mobile platforms
+  open              Open project in native IDE
+  build             Build native app (APK/AAB/IPA)
+
+Init Options:
+  --app-id <id>           Package name (e.g., com.example.app)
+  --app-name <name>       Display name
+  --web-dir <dir>         Web directory (default: dist)
+  --platforms <list>      Platforms to init (default: android)
+                          Comma-separated: android,ios
+
+Sync Options:
+  --platforms <list>      Platforms to sync (default: android,ios)
+
+Open Options:
+  --platform <platform>   Platform to open (android|ios, default: android)
+
+Build Options:
+  --platform <platform>   Platform to build (android|ios, default: android)
+  --target <type>         Build target (debug|release, default: release)
+  --output <type>         Output format (apk|aab for Android, default: aab)
+
+Examples:
+  elit android init                                    # Init Android only
+  elit android init --platforms android,ios            # Init both platforms
+  elit android init --app-id com.myapp --app-name "My App"
+
+  elit build                                           # Build web assets
+  elit android sync                                    # Sync to all platforms
+  elit android sync --platforms android                # Sync to Android only
+
+  elit android open --platform android                 # Open Android Studio
+  elit android open --platform ios                     # Open Xcode (macOS only)
+
+  elit android build --platform android --target release --output aab
+
+Note: Requires @capacitor/cli and native SDKs:
+      - Android: Java JDK 17+, Android Studio
+      - iOS: macOS, Xcode, CocoaPods
+      Capacitor packages are auto-installed during init.
+`);
+}
+
 function printHelp() {
     console.log(`
 Elit - Modern Web Development Toolkit
@@ -491,6 +701,7 @@ Commands:
   build     Build for production
   preview   Preview production build
   test      Run tests
+  android   Build native mobile apps (Android & iOS)
   version   Show version number
   help      Show this help message
 
