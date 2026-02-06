@@ -22,7 +22,6 @@ async function execCommand(command: string, args: string[], cwd: string): Promis
 
         const proc = spawn(command, args, {
             cwd,
-            shell: true,
             env: { ...process.env }
         });
 
