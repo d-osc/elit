@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Mobile Build Support** - Build native Android & iOS apps using Capacitor
+  - `elit android init` - Initialize mobile project with auto-install of Capacitor dependencies
+  - `elit android sync` - Sync web build to mobile platforms
+  - `elit android open --platform <android|ios>` - Open project in Android Studio or Xcode
+  - `elit android build --platform <android|ios>` - Build native APK/AAB or IPA
+  - New `MobileConfig` interface in `elit/types.ts`
+  - Mobile configuration option in `elit.config.ts`
+  - Support for both Android and iOS platforms
+  - Auto-detection of platform requirements (Java JDK, Android SDK, Xcode, CocoaPods)
+
+### Changed
+- **HMR Configuration** - Added `hmr` option to disable Hot Module Replacement
+  - Set `hmr: false` in `elit.config.ts` dev section to disable auto-reload
+  - When disabled, WebSocket server and file watcher are not created
+  - Useful for debugging or when auto-reload is not desired
+
 ## [3.3.6] - 2025-01-28
 
 ### Added
