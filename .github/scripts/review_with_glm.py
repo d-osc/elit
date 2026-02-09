@@ -27,7 +27,7 @@ def get_pr_diff():
 
 # 2. ส่งข้อมูลไปถาม GLM (Zhipu AI)
 def ask_glm(diff_text):
-    url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    url = "https://api.z.ai/api/paas/v4/chat/completions"
     headers = {
         "Authorization": f"Bearer {ZHIPU_API_KEY}",
         "Content-Type": "application/json"
