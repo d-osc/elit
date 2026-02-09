@@ -98,6 +98,12 @@ npx elit build
 
 # Preview production build
 npx elit preview
+
+# Mobile app builds (Android & iOS)
+npx elit android init              # Initialize mobile project
+npx elit android sync               # Sync web build to mobile
+npx elit android open --platform android  # Open Android Studio
+npx elit android build --platform android  # Build APK/AAB
 ```
 
 ### Configuration
@@ -114,6 +120,7 @@ export default {
     host: '0.0.0.0',
     open: false,
     logging: true,
+    hmr: true,  // Enable/disable Hot Module Replacement
     clients: [{
       root: '.',
       basePath: '',
@@ -141,6 +148,13 @@ export default {
     root: './dist',
     basePath: '',
     index: './index.html'
+  },
+  mobile: {
+    appId: 'com.example.myapp',
+    appName: 'My App',
+    webDir: 'dist',
+    version: '1.0.0',
+    platforms: ['android', 'ios']
   }
 };
 ```
@@ -949,6 +963,66 @@ const apiUrl = import.meta.env.VITE_API_URL;
 const isProd = import.meta.env.PROD;
 ```
 
+## Mobile Builds (Android & iOS)
+
+Elit supports building native mobile apps using Capacitor. You can build your web app as a native Android APK/AAB or iOS IPA.
+
+### Quick Start
+
+```bash
+# Initialize mobile project
+npx elit android init --app-id com.myapp --app-name "My App"
+
+# Build your web app
+npx elit build
+
+# Sync to mobile platforms
+npx elit android sync
+
+# Open in Android Studio
+npx elit android open --platform android
+
+# Build release APK/AAB
+npx elit android build --platform android --target release --output aab
+```
+
+### Configuration
+
+Add mobile configuration to `elit.config.ts`:
+
+```typescript
+export default {
+  mobile: {
+    appId: 'com.example.myapp',
+    appName: 'My App',
+    webDir: 'dist',
+    version: '1.0.0',
+    platforms: ['android', 'ios']
+  }
+}
+```
+
+### Requirements
+
+**Android:**
+- Node.js 18+
+- Java JDK 17+
+- Android Studio (for Android SDK)
+
+**iOS:**
+- macOS with Xcode
+- Node.js 18+
+- CocoaPods (`sudo gem install cocoapods`)
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `elit android init` | Initialize mobile project |
+| `elit android sync` | Sync web build to mobile |
+| `elit android open --platform <android\|ios>` | Open in native IDE |
+| `elit android build --platform <android\|ios>` | Build native app |
+
 ## Comparison with Other Frameworks
 
 | Feature | Elit | Vite + React | Next.js | SvelteKit | Express.js |
@@ -957,8 +1031,9 @@ const isProd = import.meta.env.PROD;
 | **Backend Size** | 51KB (Server) | N/A | N/A | N/A | ~200KB+ |
 | **Prod Dependencies** | **0** (Zero!) | Many | Many | Many | Many |
 | **Dev Server** | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in | ❌ |
-| **HMR** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **HMR** | ✅ Configurable | ✅ | ✅ | ✅ | ❌ |
 | **Build Tool** | ✅ esbuild | ✅ Vite | ✅ Turbopack | ✅ Vite | ❌ |
+| **Mobile Builds** | ✅ Android/iOS | ➕ Via setup | ✅ | ➕ Via setup | ❌ |
 | **REST API** | ✅ 10K+ req/s | ❌ | ✅ | ✅ | ✅ 8K+ req/s |
 | **Middleware** | ✅ Built-in | ❌ | ✅ | ✅ | ✅ |
 | **WebSocket** | ✅ Built-in | ❌ | ❌ | ❌ | ➕ Via package |
