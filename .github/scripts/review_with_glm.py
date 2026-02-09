@@ -34,7 +34,7 @@ def ask_glm(diff_text):
     }
     
     payload = {
-        "model": "glm-4.7", # หรือจะใช้ glm-4-flash ถ้าต้องการราคาถูกกว่า/เร็วกว่า
+        "model": "glm-4.7-flash", # หรือจะใช้ glm-4-flash ถ้าต้องการราคาถูกกว่า/เร็วกว่า
         "messages": [
             {
                 "role": "user", 
