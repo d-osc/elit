@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Fixed
+- **Import Map 404 Error** - Fixed import map paths for dev server with basePath
+  - Import map now correctly points to compiled `.mjs` files instead of source `.ts` files
+  - Added special handling for `/basePath/dist/*` requests to serve from parent package
+  - Fixes 404 errors when using `file:..` dependency references in development
 - **Mobile Build Support** - Build native Android & iOS apps using Capacitor
   - `elit android init` - Initialize mobile project with auto-install of Capacitor dependencies
   - `elit android sync` - Sync web build to mobile platforms
