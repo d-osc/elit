@@ -288,10 +288,40 @@ export class ServerRouter {
       // Attach params to req for Express-like compatibility
       (req as ElitRequest).params = params;
 
+      // Add Express-like response helpers to res object
+      let _statusCode = 200;
+      const elitRes = res as ElitResponse;
+
+      // Implement status() method
+      elitRes.status = function(code: number): ElitResponse {
+        _statusCode = code;
+        return this;
+      };
+
+      // Implement json() method
+      elitRes.json = function(data: any, statusCode?: number): ElitResponse {
+        const code = statusCode !== undefined ? statusCode : _statusCode;
+        this.writeHead(code, { 'Content-Type': 'application/json' });
+        this.end(JSON.stringify(data));
+        return this;
+      };
+
+      // Implement send() method
+      elitRes.send = function(data: any): ElitResponse {
+        if (typeof data === 'string') {
+          this.writeHead(_statusCode, { 'Content-Type': 'text/html' });
+          this.end(data);
+        } else {
+          this.writeHead(_statusCode, { 'Content-Type': 'application/json' });
+          this.end(JSON.stringify(data));
+        }
+        return this;
+      };
+
       // Add Express-like response helpers to context
       const ctx: ServerRouteContext = {
         req: req as ElitRequest,
-        res: res as ElitResponse,
+        res: elitRes,
         params,
         query,
         body,
