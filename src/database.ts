@@ -18,7 +18,9 @@ class VM {
     private pkgScriptDB: { dependencies?: Record<string, string> } = {};
     private language: 'ts' | 'js';
     private _registerModules: { [key: string]: any };
+    private options: VMOptions;
     constructor(options?: VMOptions) {
+        this.options = options || {};
         // Set directories based on options or defaults
         this.DATABASE_DIR = options?.dir || path.join(process.cwd(), 'databases');
         this.SCRIPTDB_DIR = process.cwd();
@@ -252,7 +254,7 @@ class VM {
             console: customConsole
         });
 
-        const systemModules = await SystemModuleResolver();
+        const systemModules = await SystemModuleResolver(this.options);
         this.register(systemModules);
 
         const js = this.transpiler(code, { loader: this.language, format: 'cjs' }).code;
@@ -656,15 +658,21 @@ function isIdentifier(key: any) {
     return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
 }
 
-async function SystemModuleResolver() {
+async function SystemModuleResolver(customOptions?: VMOptions) {
 
     const moduleRegistry = new Map<string, any>();
 
-    moduleRegistry.set("update", update);
-    moduleRegistry.set("remove", remove);
-    moduleRegistry.set("create", create);
-    moduleRegistry.set("save", save);
-    moduleRegistry.set("read", read);
+    // Wrap functions to automatically pass customOptions when called from within VM
+    moduleRegistry.set("update", (dbName: string, fnName: string, code: string | Function) =>
+        update(dbName, fnName, code, customOptions));
+    moduleRegistry.set("remove", (dbName: string, fnName: string) =>
+        remove(dbName, fnName, customOptions));
+    moduleRegistry.set("create", (dbName: string, code: string | Function) =>
+        create(dbName, code, customOptions));
+    moduleRegistry.set("save", (dbName: string, code: string | Function | any) =>
+        save(dbName, code, customOptions));
+    moduleRegistry.set("read", (dbName: string) =>
+        read(dbName, customOptions));
 
     const context: Record<string, any> = {
         // Add require-like functionality

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Database Custom Directory** - Fixed Database class not saving to custom `dir` option
+  - When creating a Database with `dir: 'databases/system'`, it now correctly saves to that directory
+  - Previously fell back to default `databases` directory when called from within VM
+  - SystemModuleResolver now properly passes customOptions to all database functions
 - **Import Map 404 Error** - Fixed import map paths for dev server with basePath
   - Import map now correctly points to compiled `.mjs` files instead of source `.ts` files
   - Added special handling for `/basePath/dist/*` requests to serve from parent package
