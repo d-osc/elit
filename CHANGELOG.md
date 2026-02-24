@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-02-24
+
+### Added
+- **Config Hot Reload** - Dev server now automatically restarts when config file changes
+  - Watches for changes to `elit.config.ts`, `elit.config.js`, `elit.config.mjs`, and `elit.config.json`
+  - Server restarts with reloaded config without needing to manually Ctrl+C
+  - 300ms debounce to handle rapid file saves gracefully
+  - Restart is guarded against concurrent triggers
+
+### Fixed
+- **API Route Handling with basePath** - Fixed client-specific API routes not matching when `basePath` is set
+  - `matchedClient.api` now correctly strips `basePath` from the request URL before pattern matching
+  - `config.api` (global) correctly matches against the original full URL
+  - API routes no longer require a `/api` prefix — any path can be used as an API route
+  - 405 Method Not Allowed response now fires when API routes are configured but no route matched (regardless of path prefix)
+- **HMR File Add/Remove** - Browser now reloads when files are added or deleted
+  - `add` event broadcasts `update` message to all connected HMR clients
+  - `unlink` event broadcasts `reload` message to all connected HMR clients
+  - Previously only `change` events triggered browser reload
+
 ### Fixed
 - **Database Custom Directory** - Fixed Database class not saving to custom `dir` option
   - When creating a Database with `dir: 'databases/system'`, it now correctly saves to that directory

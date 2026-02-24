@@ -590,7 +590,7 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.deps'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, 'v3.3.9'),
+          span({ className: 'stat-number' }, 'v3.4.0'),
           span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
@@ -1040,7 +1040,7 @@ export const Footer = () =>
         p(
           t('footer.license'), ' | ',
           a({ href: 'https://github.com/d-osc/elit' }, 'GitHub'),
-          ' | ', t('footer.builtWith'), ' v3.3.9 | ',
+          ' | ', t('footer.builtWith'), ' v3.4.0 | ',
           'Created by ', a({ href: 'https://github.com/n-devs', target: '_blank' }, 'n-devs')
         )
       )
