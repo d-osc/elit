@@ -1834,8 +1834,21 @@ export default css;
     });
   });
 
-  watcher.on('add', (path: string) => config.logging && console.log(`[HMR] File added: ${path}`));
-  watcher.on('unlink', (path: string) => config.logging && console.log(`[HMR] File removed: ${path}`));
+  watcher.on('add', (path: string) => {
+    if (config.logging) console.log(`[HMR] File added: ${path}`);
+    const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
+    wsClients.forEach(client => {
+      if (client.readyState === ReadyState.OPEN) client.send(message, {});
+    });
+  });
+
+  watcher.on('unlink', (path: string) => {
+    if (config.logging) console.log(`[HMR] File removed: ${path}`);
+    const message = JSON.stringify({ type: 'reload', path, timestamp: Date.now() } as HMRMessage);
+    wsClients.forEach(client => {
+      if (client.readyState === ReadyState.OPEN) client.send(message, {});
+    });
+  });
 
   // Increase max listeners to prevent warnings
   server.setMaxListeners(20);

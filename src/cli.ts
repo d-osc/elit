@@ -112,31 +112,58 @@ async function main() {
 
 async function runDev(args: string[]) {
     const cliOptions = parseDevArgs(args);
-    const config = await loadConfig();
+    const cwd = process.cwd();
+    const CONFIG_FILES = ['elit.config.ts', 'elit.config.js', 'elit.config.mjs', 'elit.config.json'];
 
-    const options = config?.dev
-        ? mergeConfig(config.dev, cliOptions)
-        : cliOptions as DevServerOptions;
+    let devServer: Awaited<ReturnType<typeof createDevServer>> | null = null;
+    let restarting = false;
 
-    // Load environment variables
-    const mode = process.env.MODE || 'development';
-    const env = loadEnv(mode);
+    async function start() {
+        const config = await loadConfig();
+        const options = config?.dev
+            ? mergeConfig(config.dev, cliOptions)
+            : cliOptions as DevServerOptions;
 
-    // Merge env from config and .env files
-    options.env = { ...options.env, ...env };
+        const mode = process.env.MODE || 'development';
+        options.env = { ...options.env, ...loadEnv(mode) };
 
-    // Ensure we have at least root or clients
-    if (!options.root && (!options.clients || options.clients.length === 0)) {
-        options.root = process.cwd();
+        if (!options.root && (!options.clients || options.clients.length === 0)) {
+            options.root = cwd;
+        }
+
+        options.mode = 'dev';
+        devServer = createDevServer(options);
     }
 
-    // Set mode to 'dev' for dev command
-    options.mode = 'dev';
+    async function restart() {
+        if (restarting) return;
+        restarting = true;
+        console.log('\n[Config] Config changed, restarting...');
+        try {
+            if (devServer) await devServer.close();
+            await start();
+        } finally {
+            restarting = false;
+        }
+    }
 
-    const devServer = createDevServer(options);
+    await start();
+
+    // Watch config files — restart server on change
+    const { watch } = await import('fs');
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const configWatcher = watch(cwd, (_, filename) => {
+        if (filename && CONFIG_FILES.includes(filename)) {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(restart, 300);
+        }
+    });
 
     // Handle graceful shutdown
-    setupShutdownHandlers(() => devServer.close());
+    setupShutdownHandlers(async () => {
+        configWatcher.close();
+        if (devServer) await devServer.close();
+    });
 }
 
 async function runBuild(args: string[]) {
