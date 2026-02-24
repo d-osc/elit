@@ -1237,19 +1237,22 @@ export function createDevServer(options: DevServerOptions): DevServer {
     const url = matchedClient.basePath ? (originalUrl.slice(matchedClient.basePath.length) || '/') : originalUrl;
 
     // Try client-specific API routes first
-    if (matchedClient.api && url.startsWith('/api')) {
+    // Strip basePath from req.url so route patterns match correctly
+    if (matchedClient.api) {
+      if (matchedClient.basePath) req.url = url;
       const handled = await matchedClient.api.handle(req, res);
+      if (matchedClient.basePath) req.url = originalUrl;
       if (handled) return;
     }
 
-    // Try global API routes (fallback)
-    if (config.api && url.startsWith('/api')) {
+    // Try global API routes (fallback) - matches against originalUrl
+    if (config.api) {
       const handled = await config.api.handle(req, res);
       if (handled) return;
     }
 
-    // If we reach here and it's a POST/PUT/PATCH to /api/*, return 405
-    if (url.startsWith('/api') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method || '')) {
+    // If API routes are configured but none matched, return 405 for mutating methods
+    if ((matchedClient.api || config.api) && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method || '')) {
       if (!res.headersSent) {
         if (config.logging) console.log(`[405] ${req.method} ${url} - Method not allowed`);
         res.writeHead(405, { 'Content-Type': 'application/json' });
