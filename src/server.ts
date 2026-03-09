@@ -877,6 +877,8 @@ export function security(): Middleware {
     ctx.res.setHeader('X-Frame-Options', 'DENY');
     ctx.res.setHeader('X-XSS-Protection', '1; mode=block');
     ctx.res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    ctx.res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    ctx.res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     await next();
   };
 }
@@ -1534,8 +1536,8 @@ export default css;
             const result = await Deno.emit(resolvedPath, {
               check: false,
               compilerOptions: {
-                sourceMap: true,
-                inlineSourceMap: true,
+                sourceMap: config.mode !== 'preview',
+                inlineSourceMap: config.mode !== 'preview',
                 target: 'ES2020',
                 module: 'esnext'
               },
@@ -1558,16 +1560,35 @@ export default css;
             transpiled = transpiler.transformSync(content.toString());
           } else {
             // Node.js - use esbuild
-            const { transformSync } = await import('esbuild');
             const loader = ext === '.tsx' ? 'tsx' : 'ts';
-            const result = transformSync(content.toString(), {
-              loader: loader as any,
-              format: 'esm',
-              target: 'es2020',
-              sourcemap: 'inline'
-            });
+            const { transformSync } = await import('esbuild');
 
-            transpiled = result.code;
+            if (config.mode === 'preview') {
+              // Preview mode: transpile then obfuscate via esbuild-obfuscator-plugin's
+              // underlying javascript-obfuscator library
+              const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
+
+              const tsResult = transformSync(content.toString(), {
+                loader: loader as any,
+                format: 'esm',
+                target: 'es2020',
+                sourcemap: false
+              });
+
+              transpiled = JavaScriptObfuscator.obfuscate(tsResult.code, {
+                compact: true,
+                renameGlobals: false
+              }).getObfuscatedCode();
+            } else {
+              // Dev mode: transpile with inline source maps
+              const result = transformSync(content.toString(), {
+                loader: loader as any,
+                format: 'esm',
+                target: 'es2020',
+                sourcemap: 'inline'
+              });
+              transpiled = result.code;
+            }
           }
 
           // Rewrite .ts imports to .js for browser compatibility
@@ -1604,7 +1625,7 @@ export default css;
       // Inject HMR client and import map for HTML files
       if (ext === '.html') {
         const wsPath = normalizeBasePath(client.basePath);
-        const hmrScript = createHMRScript(config.port, wsPath);
+        const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port, wsPath) : '';
         let html = content.toString();
 
         // If SSR is configured, extract and inject styles from SSR
@@ -1670,7 +1691,11 @@ export default css;
 
       const headers: any = {
         'Content-Type': mimeType,
-        'Cache-Control': cacheControl
+        'Cache-Control': cacheControl,
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin'
       };
 
       // Apply gzip compression for text-based files
@@ -1726,15 +1751,22 @@ export default css;
       const basePath = normalizeBasePath(client.basePath);
       html = rewriteRelativePaths(html, basePath);
 
-      // Inject HMR script
-      const hmrScript = createHMRScript(config.port, basePath);
+      // Inject HMR script (dev mode only)
+      const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port, basePath) : '';
 
       // Inject import map in head, HMR script in body
       const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
       html = html.includes('</head>') ? html.replace('</head>', `${elitImportMap}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
-      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      res.writeHead(200, {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin'
+      });
       res.end(html);
 
       if (config.logging) console.log(`[200] SSR rendered`);
@@ -1744,111 +1776,117 @@ export default css;
     }
   }
 
-  // WebSocket Server for HMR
-  const wss = new WebSocketServer({ server });
-
-  if (config.logging) {
-    console.log('[HMR] WebSocket server initialized');
-  }
-
-  wss.on('connection', (ws: WebSocket, req) => {
-    wsClients.add(ws);
-
-    const message: HMRMessage = { type: 'connected', timestamp: Date.now() };
-    ws.send(JSON.stringify(message));
+  // WebSocket Server for HMR - only in dev mode (not needed for preview)
+  let wss: any = null;
+  if (config.mode !== 'preview') {
+    wss = new WebSocketServer({ server });
 
     if (config.logging) {
-      console.log('[HMR] Client connected from', req.socket.remoteAddress);
+      console.log('[HMR] WebSocket server initialized');
     }
 
-    // Handle incoming messages
-    ws.on('message', (data: string) => {
-      try {
-        const msg = JSON.parse(data.toString());
+    wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      wsClients.add(ws);
 
-        // Handle state subscription
-        if (msg.type === 'state:subscribe') {
-          stateManager.subscribe(msg.key, ws);
-          if (config.logging) {
-            console.log(`[State] Client subscribed to "${msg.key}"`);
-          }
-        }
+      const message: HMRMessage = { type: 'connected', timestamp: Date.now() };
+      ws.send(JSON.stringify(message));
 
-        // Handle state unsubscribe
-        else if (msg.type === 'state:unsubscribe') {
-          stateManager.unsubscribe(msg.key, ws);
-          if (config.logging) {
-            console.log(`[State] Client unsubscribed from "${msg.key}"`);
-          }
-        }
-
-        // Handle state change from client
-        else if (msg.type === 'state:change') {
-          stateManager.handleStateChange(msg.key, msg.value);
-          if (config.logging) {
-            console.log(`[State] Client updated "${msg.key}"`);
-          }
-        }
-      } catch (error) {
-        if (config.logging) {
-          console.error('[WebSocket] Message parse error:', error);
-        }
-      }
-    });
-
-    ws.on('close', () => {
-      wsClients.delete(ws);
-      stateManager.unsubscribeAll(ws);
       if (config.logging) {
-        console.log('[HMR] Client disconnected');
+        console.log('[HMR] Client connected from', req.socket.remoteAddress);
       }
-    });
-  });
 
-  // File watcher - watch all client roots
-  const watchPaths = normalizedClients.flatMap(client =>
-    config.watch.map(pattern => join(client.root, pattern))
-  );
+      // Handle incoming messages
+      ws.on('message', (data: string) => {
+        try {
+          const msg = JSON.parse(data.toString());
 
-  const watcher = watch(watchPaths, {
-    ignored: (path: string) => config.ignore.some(pattern => path.includes(pattern.replace('/**', '').replace('**/', ''))),
-    ignoreInitial: true,
-    persistent: true
-  });
-
-  watcher.on('change', (path: string) => {
-    if (config.logging) console.log(`[HMR] File changed: ${path}`);
-    const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
-    // Broadcast to all open clients with error handling
-    wsClients.forEach(client => {
-      if (client.readyState === ReadyState.OPEN) {
-        client.send(message, {}, (err?: Error) => {
-          // Silently ignore connection errors during HMR
-          const code = (err as any)?.code;
-          if (code === 'ECONNABORTED' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'WS_NOT_OPEN') {
-            // Client disconnected - will be removed from clients set by close event
-            return;
+          // Handle state subscription
+          if (msg.type === 'state:subscribe') {
+            stateManager.subscribe(msg.key, ws);
+            if (config.logging) {
+              console.log(`[State] Client subscribed to "${msg.key}"`);
+            }
           }
-        });
-      }
-    });
-  });
 
-  watcher.on('add', (path: string) => {
-    if (config.logging) console.log(`[HMR] File added: ${path}`);
-    const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
-    wsClients.forEach(client => {
-      if (client.readyState === ReadyState.OPEN) client.send(message, {});
-    });
-  });
+          // Handle state unsubscribe
+          else if (msg.type === 'state:unsubscribe') {
+            stateManager.unsubscribe(msg.key, ws);
+            if (config.logging) {
+              console.log(`[State] Client unsubscribed from "${msg.key}"`);
+            }
+          }
 
-  watcher.on('unlink', (path: string) => {
-    if (config.logging) console.log(`[HMR] File removed: ${path}`);
-    const message = JSON.stringify({ type: 'reload', path, timestamp: Date.now() } as HMRMessage);
-    wsClients.forEach(client => {
-      if (client.readyState === ReadyState.OPEN) client.send(message, {});
+          // Handle state change from client
+          else if (msg.type === 'state:change') {
+            stateManager.handleStateChange(msg.key, msg.value);
+            if (config.logging) {
+              console.log(`[State] Client updated "${msg.key}"`);
+            }
+          }
+        } catch (error) {
+          if (config.logging) {
+            console.error('[WebSocket] Message parse error:', error);
+          }
+        }
+      });
+
+      ws.on('close', () => {
+        wsClients.delete(ws);
+        stateManager.unsubscribeAll(ws);
+        if (config.logging) {
+          console.log('[HMR] Client disconnected');
+        }
+      });
     });
-  });
+  }
+
+  // File watcher - only in dev mode (not needed for preview)
+  let watcher: any = null;
+  if (config.mode !== 'preview') {
+    const watchPaths = normalizedClients.flatMap(client =>
+      config.watch.map(pattern => join(client.root, pattern))
+    );
+
+    watcher = watch(watchPaths, {
+      ignored: (path: string) => config.ignore.some(pattern => path.includes(pattern.replace('/**', '').replace('**/', ''))),
+      ignoreInitial: true,
+      persistent: true
+    });
+
+    watcher.on('change', (path: string) => {
+      if (config.logging) console.log(`[HMR] File changed: ${path}`);
+      const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
+      // Broadcast to all open clients with error handling
+      wsClients.forEach(client => {
+        if (client.readyState === ReadyState.OPEN) {
+          client.send(message, {}, (err?: Error) => {
+            // Silently ignore connection errors during HMR
+            const code = (err as any)?.code;
+            if (code === 'ECONNABORTED' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'WS_NOT_OPEN') {
+              // Client disconnected - will be removed from clients set by close event
+              return;
+            }
+          });
+        }
+      });
+    });
+
+    watcher.on('add', (path: string) => {
+      if (config.logging) console.log(`[HMR] File added: ${path}`);
+      const message = JSON.stringify({ type: 'update', path, timestamp: Date.now() } as HMRMessage);
+      wsClients.forEach(client => {
+        if (client.readyState === ReadyState.OPEN) client.send(message, {});
+      });
+    });
+
+    watcher.on('unlink', (path: string) => {
+      if (config.logging) console.log(`[HMR] File removed: ${path}`);
+      const message = JSON.stringify({ type: 'reload', path, timestamp: Date.now() } as HMRMessage);
+      wsClients.forEach(client => {
+        if (client.readyState === ReadyState.OPEN) client.send(message, {});
+      });
+    });
+  }
 
   // Increase max listeners to prevent warnings
   server.setMaxListeners(20);
@@ -1873,7 +1911,7 @@ export default css;
         }
       }
 
-      console.log(`\n[HMR] Watching for file changes...\n`);
+      if (config.mode !== 'preview') console.log(`\n[HMR] Watching for file changes...\n`);
     }
 
     // Open browser to first client
@@ -1897,10 +1935,12 @@ export default css;
     if (isClosing) return;
     isClosing = true;
     if (config.logging) console.log('\n[Server] Shutting down...');
-    await watcher.close();
-    wss.close();
-    wsClients.forEach(client => client.close());
-    wsClients.clear();
+    if (watcher) await watcher.close();
+    if (wss) {
+      wss.close();
+      wsClients.forEach(client => client.close());
+      wsClients.clear();
+    }
     return new Promise<void>((resolve) => {
       server.close(() => {
         if (config.logging) console.log('[Server] Closed');

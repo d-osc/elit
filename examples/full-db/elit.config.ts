@@ -1,6 +1,5 @@
 import { server } from './src/server';
 import { client } from './src/client';
-import { resolve } from 'elit/path';
 
 export default {
   dev: {
@@ -51,9 +50,12 @@ export default {
     host: 'localhost',
     open: false,
     logging: true,
-    root: './dist',
-    basePath: '',
-    index: './index.html'
+     clients: [{
+      root: '.',
+      basePath: '',
+      ssr: () => client,
+      api: server
+    }]
   },
   test: {
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],

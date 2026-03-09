@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-03-09
+
+### Security
+- **Preview Mode Hardening** - Significant security improvements when running `elit preview`
+  - Security response headers (`X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`) are now automatically set on all file and SSR responses
+  - HMR WebSocket script is no longer injected into HTML pages in preview mode
+  - WebSocket server is not created in preview mode, eliminating an unnecessary open endpoint
+  - File watcher is not started in preview mode, reducing attack surface
+  - Source maps are disabled in preview mode to avoid exposing source code structure
+  - JavaScript files are obfuscated in preview mode using `javascript-obfuscator` (via `esbuild-obfuscator-plugin`)
+- **Enhanced `security()` middleware** - Added `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- **Safe `close()` cleanup** - `close()` now guards against null `wss`/`watcher` when called in preview mode
+
 ## [3.4.0] - 2026-02-24
 
 ### Added
