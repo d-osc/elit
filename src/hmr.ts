@@ -40,6 +40,11 @@ class ElitHMR implements HMRClient {
       return;
     }
 
+    // Skip HMR in preview mode (no WebSocket server is running)
+    if ((window as any).__ELIT_MODE__ === 'preview') {
+      return;
+    }
+
     this.connect();
   }
 

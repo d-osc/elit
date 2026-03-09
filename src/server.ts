@@ -1678,7 +1678,8 @@ export default css;
 
         // Inject import map and SSR styles into <head>
         const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
-        const headInjection = ssrStyles ? `${ssrStyles}\n${elitImportMap}` : elitImportMap;
+        const modeScript = config.mode === 'preview' ? '<script>window.__ELIT_MODE__=\'preview\';</script>' : '';
+        const headInjection = `${modeScript}${ssrStyles ? '\n' + ssrStyles : ''}\n${elitImportMap}`;
         html = html.includes('</head>') ? html.replace('</head>', `${headInjection}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
         content = Buffer.from(html);
@@ -1756,7 +1757,8 @@ export default css;
 
       // Inject import map in head, HMR script in body
       const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
-      html = html.includes('</head>') ? html.replace('</head>', `${elitImportMap}</head>`) : html;
+      const modeScript = config.mode === 'preview' ? '<script>window.__ELIT_MODE__=\'preview\';</script>\n' : '';
+      html = html.includes('</head>') ? html.replace('</head>', `${modeScript}${elitImportMap}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
       res.writeHead(200, {

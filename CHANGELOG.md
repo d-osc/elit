@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-03-09
+
+### Fixed
+- **HMR WebSocket Error in Preview Mode** - Fixed `WebSocket connection failed` error when app imports `elit/hmr` in preview mode
+  - `ElitHMR` constructor now checks `window.__ELIT_MODE__` before attempting to connect
+  - Server injects `<script>window.__ELIT_MODE__='preview';</script>` into HTML head in preview mode
+  - Applies to both static file responses (`serveFile`) and SSR responses (`serveSSR`)
+  - No more `[Elit HMR] WebSocket error:` noise in browser console during preview
+
 ## [3.4.1] - 2026-03-09
 
 ### Security
