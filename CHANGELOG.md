@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-04-01
+
+### Fixed
+- **Database `save()` and `update()` preserve typed exports** - Saving structured data into existing database modules now keeps typed declarations intact
+  - `save()` updates existing bindings like `export const users: User[] = ...` in place instead of overwriting the module structure
+  - `update()` replaces the declaration body without appending duplicate fallback exports
+  - Added unit tests covering typed `save()` and `update()` flows
+
 ## [3.4.2] - 2026-03-09
 
 ### Fixed
