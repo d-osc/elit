@@ -474,150 +474,416 @@ function rename(oldName: string, newName: string, options?: VMOptions): string {
     }
 }
 
-function save(dbName: string, code: string | Function | any, options?: VMOptions): void {
+type DeclarationKind = "valueDecl" | "functionDecl" | "classDecl";
+type UpdateValue = unknown;
+
+interface DeclarationMatch {
+    kind: DeclarationKind;
+    start: number;
+    end: number;
+    exported: boolean;
+    prefixEnd?: number;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function findMatchingBlockEnd(source: string, openIndex: number): number {
+    let depth = 0;
+    let stringChar: string | null = null;
+
+    for (let index = openIndex; index < source.length; index += 1) {
+        const char = source[index];
+        const nextChar = source[index + 1];
+
+        if (stringChar) {
+            if (char === "\\") {
+                index += 1;
+                continue;
+            }
+
+            if (char === stringChar) {
+                stringChar = null;
+            }
+            continue;
+        }
+
+        if (char === "/" && nextChar === "/") {
+            index += 2;
+            while (index < source.length && source[index] !== "\n") {
+                index += 1;
+            }
+            continue;
+        }
+
+        if (char === "/" && nextChar === "*") {
+            index += 2;
+            while (index < source.length && !(source[index] === "*" && source[index + 1] === "/")) {
+                index += 1;
+            }
+            index += 1;
+            continue;
+        }
+
+        if (char === '"' || char === "'" || char === "`") {
+            stringChar = char;
+            continue;
+        }
+
+        if (char === "{") {
+            depth += 1;
+        } else if (char === "}") {
+            depth -= 1;
+            if (depth === 0) {
+                return index;
+            }
+        }
+    }
+
+    return source.length - 1;
+}
+
+function findInitializerEnd(source: string, startIndex: number): number {
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let parenDepth = 0;
+    let stringChar: string | null = null;
+
+    for (let index = startIndex; index < source.length; index += 1) {
+        const char = source[index];
+        const nextChar = source[index + 1];
+
+        if (stringChar) {
+            if (char === "\\") {
+                index += 1;
+                continue;
+            }
+
+            if (char === stringChar) {
+                stringChar = null;
+            }
+            continue;
+        }
+
+        if (char === "/" && nextChar === "/") {
+            index += 2;
+            while (index < source.length && source[index] !== "\n") {
+                index += 1;
+            }
+            continue;
+        }
+
+        if (char === "/" && nextChar === "*") {
+            index += 2;
+            while (index < source.length && !(source[index] === "*" && source[index + 1] === "/")) {
+                index += 1;
+            }
+            index += 1;
+            continue;
+        }
+
+        if (char === '"' || char === "'" || char === "`") {
+            stringChar = char;
+            continue;
+        }
+
+        if (char === "{") {
+            braceDepth += 1;
+        } else if (char === "}") {
+            braceDepth = Math.max(0, braceDepth - 1);
+        } else if (char === "[") {
+            bracketDepth += 1;
+        } else if (char === "]") {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+        } else if (char === "(") {
+            parenDepth += 1;
+        } else if (char === ")") {
+            parenDepth = Math.max(0, parenDepth - 1);
+        } else if (char === ";" && braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+            return index;
+        }
+    }
+
+    return source.length;
+}
+
+function looksLikeDeclarationSnippet(source: string): boolean {
+    const trimmed = source.trim();
+    return /^(?:export\s+)?(?:async\s+function\b|function\b|class\b|(?:const|let|var)\b)/.test(trimmed);
+}
+
+function replaceExistingBindingValue(source: string, bindingName: string, serializedValue: string): string | null {
+    const escapedName = escapeRegExp(bindingName);
+    const declarationRegex = new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${escapedName}(?:\\s*:\\s*[^=;]+)?\\s*=`, "m");
+    const declarationMatch = declarationRegex.exec(source);
+
+    if (!declarationMatch || declarationMatch.index === undefined) {
+        return null;
+    }
+
+    const equalsIndex = source.indexOf("=", declarationMatch.index);
+    if (equalsIndex === -1) {
+        return null;
+    }
+
+    const initializerEnd = findInitializerEnd(source, equalsIndex + 1);
+    const suffix = initializerEnd < source.length
+        ? source.slice(initializerEnd)
+        : ";";
+
+    return `${source.slice(0, equalsIndex + 1)} ${serializedValue}${suffix}`;
+}
+
+function buildDatabaseModuleSource(dbName: string, code: unknown, dbPath: string): string {
+    if (typeof code === "string") {
+        return code;
+    }
+
+    if (typeof code === "function") {
+        return code.toString();
+    }
+
+    const serializedValue = valueToCode(code, 0);
+
+    if (fs.existsSync(dbPath) && isIdentifier(dbName)) {
+        const existingSource = fs.readFileSync(dbPath, "utf8");
+        const updatedSource = replaceExistingBindingValue(existingSource, dbName, serializedValue);
+
+        if (updatedSource) {
+            return updatedSource;
+        }
+    }
+
+    if (isIdentifier(dbName)) {
+        return `const ${dbName} = ${serializedValue};\n\nexport { ${dbName} };\nexport default ${dbName};\n`;
+    }
+
+    return `const value = ${serializedValue};\n\nexport default value;\n`;
+}
+
+function toInitializerSource(code: UpdateValue): string {
+    if (typeof code === "function") {
+        return code.toString().trim();
+    }
+
+    if (typeof code === "string") {
+        const trimmed = code.trim();
+        if (
+            looksLikeDeclarationSnippet(trimmed) ||
+            /=>/.test(trimmed) ||
+            /^(?:\{|\[|\(|"|'|`|\d|-\d|true\b|false\b|null\b|undefined\b|new\b|await\b)/.test(trimmed)
+        ) {
+            return trimmed;
+        }
+
+        return valueToCode(code, 0);
+    }
+
+    return valueToCode(code, 0);
+}
+
+function shouldUseDeclarationSource(code: UpdateValue): code is string | Function {
+    return typeof code === "function" || (typeof code === "string" && looksLikeDeclarationSnippet(code));
+}
+
+function normalizeFunctionDeclaration(name: string, code: string): string {
+    const trimmed = code.trim().replace(/^export\s+/, "");
+
+    if (/^async\s+function\s+[A-Za-z_$][\w$]*/.test(trimmed)) {
+        return trimmed.replace(/^async\s+function\s+[A-Za-z_$][\w$]*/, `async function ${name}`);
+    }
+
+    if (/^async\s+function\s*\(/.test(trimmed)) {
+        return trimmed.replace(/^async\s+function\s*\(/, `async function ${name}(`);
+    }
+
+    if (/^function\s+[A-Za-z_$][\w$]*/.test(trimmed)) {
+        return trimmed.replace(/^function\s+[A-Za-z_$][\w$]*/, `function ${name}`);
+    }
+
+    if (/^function\s*\(/.test(trimmed)) {
+        return trimmed.replace(/^function\s*\(/, `function ${name}(`);
+    }
+
+    return `function ${name}() {\n${trimmed}\n}`;
+}
+
+function normalizeClassDeclaration(name: string, code: string): string {
+    const trimmed = code.trim().replace(/^export\s+/, "");
+
+    if (/^class\s+[A-Za-z_$][\w$]*/.test(trimmed)) {
+        return trimmed.replace(/^class\s+[A-Za-z_$][\w$]*/, `class ${name}`);
+    }
+
+    if (/^class(?:\s+extends\b|\s*\{)/.test(trimmed)) {
+        return trimmed.replace(/^class/, `class ${name}`);
+    }
+
+    return `class ${name} ${trimmed}`;
+}
+
+function findDeclaration(source: string, name: string): DeclarationMatch | null {
+    const escaped = escapeRegExp(name);
+    const matches: DeclarationMatch[] = [];
+
+    const valueRegex = new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${escaped}(?:\\s*:\\s*[^=;]+)?\\s*=`, "m");
+    const valueMatch = valueRegex.exec(source);
+    if (valueMatch && valueMatch.index !== undefined) {
+        const equalsIndex = source.indexOf("=", valueMatch.index);
+        if (equalsIndex !== -1) {
+            const initializerEnd = findInitializerEnd(source, equalsIndex + 1);
+            const end = initializerEnd < source.length && source[initializerEnd] === ";"
+                ? initializerEnd + 1
+                : initializerEnd;
+            matches.push({
+                kind: "valueDecl",
+                start: valueMatch.index,
+                end,
+                exported: /^\s*export\b/.test(valueMatch[0]),
+                prefixEnd: equalsIndex + 1,
+            });
+        }
+    }
+
+    const functionRegex = new RegExp(`(?:export\\s+)?(?:async\\s+)?function\\s+${escaped}\\s*\\(`, "m");
+    const functionMatch = functionRegex.exec(source);
+    if (functionMatch && functionMatch.index !== undefined) {
+        const braceOpen = source.indexOf("{", functionMatch.index);
+        if (braceOpen !== -1) {
+            const braceClose = findMatchingBlockEnd(source, braceOpen);
+            const end = braceClose + 1 < source.length && source[braceClose + 1] === ";"
+                ? braceClose + 2
+                : braceClose + 1;
+            matches.push({
+                kind: "functionDecl",
+                start: functionMatch.index,
+                end,
+                exported: /^\s*export\b/.test(functionMatch[0]),
+            });
+        }
+    }
+
+    const classRegex = new RegExp(`(?:export\\s+)?class\\s+${escaped}(?=\\s|\\{)`, "m");
+    const classMatch = classRegex.exec(source);
+    if (classMatch && classMatch.index !== undefined) {
+        const braceOpen = source.indexOf("{", classMatch.index);
+        if (braceOpen !== -1) {
+            const braceClose = findMatchingBlockEnd(source, braceOpen);
+            const end = braceClose + 1 < source.length && source[braceClose + 1] === ";"
+                ? braceClose + 2
+                : braceClose + 1;
+            matches.push({
+                kind: "classDecl",
+                start: classMatch.index,
+                end,
+                exported: /^\s*export\b/.test(classMatch[0]),
+            });
+        }
+    }
+
+    if (matches.length === 0) {
+        return null;
+    }
+
+    matches.sort((left, right) => left.start - right.start);
+    return matches[0];
+}
+
+function createStructuredReplacement(kind: Extract<DeclarationKind, "functionDecl" | "classDecl">, name: string, code: UpdateValue): string {
+    if (!shouldUseDeclarationSource(code)) {
+        return `const ${name} = ${toInitializerSource(code)};`;
+    }
+
+    const source = code.toString();
+    return kind === "functionDecl"
+        ? normalizeFunctionDeclaration(name, source)
+        : normalizeClassDeclaration(name, source);
+}
+
+function createDeclarationSnippet(name: string, code: UpdateValue): string {
+    if (typeof code === "function") {
+        const fnSource = code.toString().trim();
+        if (/^(?:async\s+)?function\b/.test(fnSource)) {
+            return `export ${normalizeFunctionDeclaration(name, fnSource)}`;
+        }
+
+        if (/^class\b/.test(fnSource)) {
+            return `export ${normalizeClassDeclaration(name, fnSource)}`;
+        }
+
+        return `export const ${name} = ${fnSource};`;
+    }
+
+    if (typeof code === "string") {
+        const trimmed = code.trim();
+        if (looksLikeDeclarationSnippet(trimmed)) {
+            return trimmed;
+        }
+    }
+
+    return `export const ${name} = ${toInitializerSource(code)};`;
+}
+
+function save(dbName: string, code: unknown, options?: VMOptions): void {
     const DIR = options?.dir || path.join(process.cwd(), 'databases');
     const dbPath = path.join(DIR, `${dbName}.ts`);
 
-    let fileContent = typeof code === 'function' ? code.toString() : code;
-
+    const fileContent = buildDatabaseModuleSource(dbName, code, dbPath);
     fs.writeFileSync(dbPath, fileContent, 'utf8');
 }
 
-function update(dbName: string, fnName: string, code: string | Function, options?: VMOptions) {
+function update(dbName: string, fnName: string, code: UpdateValue, options?: VMOptions): string {
     const DIR = options?.dir || path.join(process.cwd(), 'databases');
     const dbPath = path.join(DIR, `${dbName}.ts`);
 
-    let src;
-
     if (!fs.existsSync(dbPath)) {
-        // If dbPath doesn't exist, create an empty module file so we can insert into it.
         try {
-            fs.writeFileSync(dbPath, "", "utf8");
-            // console.log("Created new database file:", dbPath);
-            return `Created new database file: ${dbPath}`;
-        } catch (e) {
-            // console.error("Failed to create dbPath file:", dbPath, e && e.message ? e.message : e);
+            fs.writeFileSync(dbPath, '', 'utf8');
+        } catch {
             return `Failed to create dbPath file: ${dbPath}`;
         }
     }
 
-    src = fs.readFileSync(dbPath, "utf8");
-
+    let src = fs.readFileSync(dbPath, 'utf8');
     const originalSrc = src;
 
-    const escaped = fnName.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-    const startRe = new RegExp(
-        `function\\s+${escaped}\\s*\\(|\\bclass\\s+${escaped}\\b|\\b(?:const|let|var)\\s+${escaped}\\s*=\\s*(?:function\\b|class\\b|\\(|\\{|\\[)`,
-        "m"
-    );
-    const startMatch = src.match(startRe);
+    const declaration = findDeclaration(src, fnName);
 
-    // determine declKind in the current file (if present)
-    let declKind = null;
-
-    if (startMatch) {
-        let startIdx: any = startMatch.index;
-        const snippet = src.slice(startIdx, startIdx + 80);
-        if (/^function\b/.test(snippet)) declKind = "functionDecl";
-        else if (/^class\b/.test(snippet)) declKind = "classDecl";
-        else if (/^\b(?:const|let|var)\b/.test(snippet)) declKind = "varAssign";
-    }
-
-    // build replacement code for this value
-    let newCode;
-    if (typeof code === "function") {
-        const fnStr = code.toString();
-        // prefer const assignment for anonymous functions/classes or arrow functions
-        if (declKind === "functionDecl") {
-            if (/^function\s+\w+/.test(fnStr)) newCode = fnStr;
-            else
-                newCode = `function ${fnName}${fnStr.replace(
-                    /^function\s*\(/,
-                    "("
-                )}`;
-        } else if (declKind === "classDecl") {
-            if (/^class\s+\w+/.test(fnStr)) newCode = fnStr;
-            else if (/^class\s*\{/.test(fnStr))
-                newCode = fnStr.replace(/^class\s*\{/, `class ${fnName} {`);
-            else newCode = `const ${fnName} = ${fnStr};`;
-        } else {
-            newCode = `const ${fnName} = ${fnStr};`;
-        }
-    } else {
-        newCode = `const ${fnName} = ${valueToCode(code, 0)};`;
-    }
-
-    // replacement: if found startMatch, find block and replace between startIdx and endIdx
-    if (startMatch) {
-        const startIdx = startMatch.index;
-        // find first '{' or '[' after startIdx
-        const idxCurly = src.indexOf("{", startIdx);
-        const idxBracket = src.indexOf("[", startIdx);
-        let braceOpen = -1;
-        if (idxCurly === -1) braceOpen = idxBracket;
-        else if (idxBracket === -1) braceOpen = idxCurly;
-        else braceOpen = Math.min(idxCurly, idxBracket);
-
-        if (braceOpen === -1) {
-            // no block — fallback: replace export or append
-            const exportRe = new RegExp(
-                `export\\s+const\\s+${escaped}\\s*:\\s*any\\s*=\\s*${escaped}\\s*;?`,
-                "m"
-            );
-            if (exportRe.test(src)) {
-                src = src.replace(
-                    exportRe,
-                    `${newCode}\n\nexport const ${fnName}: any = ${fnName};`
-                );
-            } else {
-                src =
-                    src + `\n\n${newCode}\n\nexport const ${fnName}: any = ${fnName};`;
-            }
-        } else {
-            const openingChar = src[braceOpen];
-            const closingChar = openingChar === "[" ? "]" : "}";
-            let i = braceOpen + 1;
-            let depth = 1;
-            const len = src.length;
-            while (i < len && depth > 0) {
-                const ch = src[i];
-                if (ch === openingChar) depth++;
-                else if (ch === closingChar) depth--;
-                i++;
-            }
-            let braceClose = i;
-            let endIdx = braceClose;
-            if (src.slice(braceClose, braceClose + 1) === ";")
-                endIdx = braceClose + 1;
-
-            const before = src.slice(0, startIdx);
-            const after = src.slice(endIdx);
-            src = before + newCode + after;
-        }
-    } else {
-        // not found — try to insert before existing export or append
-        const exportRe = new RegExp(
-            `export\\s+const\\s+${escaped}\\s*:\\s*any\\s*=\\s*${escaped}\\s*;?`,
-            "m"
-        );
-        if (exportRe.test(src)) {
-            src = src.replace(
-                exportRe,
-                `${newCode}\n\nexport const ${fnName}: any = ${fnName};`
-            );
-        } else {
+    if (declaration) {
+        if (declaration.kind === 'valueDecl' && declaration.prefixEnd !== undefined) {
+            const initializer = toInitializerSource(code);
             src =
-                src + `\n\n${newCode}\n\nexport const ${fnName}: any = ${fnName};`;
+                src.slice(0, declaration.start) +
+                src.slice(declaration.start, declaration.prefixEnd) +
+                ` ${initializer};` +
+                src.slice(declaration.end);
+        } else if (declaration.kind === 'functionDecl') {
+            const replacement = createStructuredReplacement('functionDecl', fnName, code);
+            src =
+                src.slice(0, declaration.start) +
+                `${declaration.exported ? 'export ' : ''}${replacement.replace(/^export\s+/, '')}` +
+                src.slice(declaration.end);
+        } else {
+            const replacement = createStructuredReplacement('classDecl', fnName, code);
+            src =
+                src.slice(0, declaration.start) +
+                `${declaration.exported ? 'export ' : ''}${replacement.replace(/^export\s+/, '')}` +
+                src.slice(declaration.end);
         }
+    } else {
+        const snippet = createDeclarationSnippet(fnName, code);
+        const separator = src.trim().length > 0 ? '\n\n' : '';
+        src = `${src.trimEnd()}${separator}${snippet}\n`;
     }
 
-    fs.writeFileSync(dbPath, src, "utf8");
+    fs.writeFileSync(dbPath, src, 'utf8');
 
     if (src === originalSrc) {
         return `Saved ${fnName} to database ${dbName}.`;
-    } else {
-        return `Updated ${dbName} with ${fnName}.`;
     }
+
+    return `Updated ${dbName} with ${fnName}.`;
 }
 
 function valueToCode(val: any, depth: number = 0): string {
@@ -663,13 +929,13 @@ async function SystemModuleResolver(customOptions?: VMOptions) {
     const moduleRegistry = new Map<string, any>();
 
     // Wrap functions to automatically pass customOptions when called from within VM
-    moduleRegistry.set("update", (dbName: string, fnName: string, code: string | Function) =>
+    moduleRegistry.set("update", (dbName: string, fnName: string, code: unknown) =>
         update(dbName, fnName, code, customOptions));
     moduleRegistry.set("remove", (dbName: string, fnName: string) =>
         remove(dbName, fnName, customOptions));
     moduleRegistry.set("create", (dbName: string, code: string | Function) =>
         create(dbName, code, customOptions));
-    moduleRegistry.set("save", (dbName: string, code: string | Function | any) =>
+    moduleRegistry.set("save", (dbName: string, code: unknown) =>
         save(dbName, code, customOptions));
     moduleRegistry.set("read", (dbName: string) =>
         read(dbName, customOptions));
@@ -758,15 +1024,15 @@ export class Database {
     /**
      * Save code to a database file (overwrites existing content)
      */
-    save(dbName: string, code: string | Function | any): void {
-       return save(dbName, code, this.options);
+    save(dbName: string, code: unknown): void {
+        return save(dbName, code, this.options);
     }
 
     /**
      * Update a function in a database file
      */
-    update(dbName: string, fnName: string, code: string | Function): string {
-       return update(dbName, fnName, code, this.options);
+    update(dbName: string, fnName: string, code: unknown): string {
+        return update(dbName, fnName, code, this.options);
     }
 }
 
