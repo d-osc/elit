@@ -171,4 +171,45 @@ describe('wapk helpers', () => {
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
+
+    test('configurable sync interval', async () => {
+        const dir = await createTempWapkProject();
+        try {
+            await packWapkDirectory(dir, { outputPath: path.join(dir, 'test.wapk') });
+            
+            // Prepare with custom sync interval
+            const prepared = prepareWapkApp(path.join(dir, 'test.wapk'), { syncInterval: 100 });
+            expect(prepared.syncInterval).toBe(100);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('event-driven watcher mode', async () => {
+        const dir = await createTempWapkProject();
+        try {
+            await packWapkDirectory(dir, { outputPath: path.join(dir, 'test.wapk') });
+            
+            // Prepare with watcher enabled
+            const prepared = prepareWapkApp(path.join(dir, 'test.wapk'), { useWatcher: true });
+            expect(prepared.useWatcher).toBe(true);
+
+            // Create live sync controller
+            const liveSync = createWapkLiveSync(prepared);
+            
+            // Write a test file
+            fs.writeFileSync(path.join(prepared.workDir, 'test-file.txt'), 'hello');
+
+            // Give watcher time to detect change
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            liveSync.stop();
+
+            // Verify archive was updated
+            const archivePath = prepared.archivePath;
+            const finalArchive = readWapkArchive(archivePath);
+            expect(finalArchive.files.some((file) => file.path === 'test-file.txt')).toBe(true);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
 });

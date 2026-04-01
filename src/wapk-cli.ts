@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -42,6 +42,8 @@ export interface PreparedWapkApp {
     entryPath: string;
     header: WapkHeader;
     runtime: WapkRuntimeName;
+    syncInterval?: number;
+    useWatcher?: boolean;
 }
 
 interface WapkProjectConfig {
@@ -527,8 +529,12 @@ function writeWapkArchiveFromMemory(archivePath: string, header: WapkHeader, fil
 
 export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncController {
     let memoryFiles = collectRuntimeSyncFiles(prepared.workDir);
+    const syncInterval = prepared.syncInterval ?? 300;
+    let stopped = false;
 
     const flush = (): void => {
+        if (stopped) return;
+
         const nextFiles = collectRuntimeSyncFiles(prepared.workDir);
         if (filesEqual(memoryFiles, nextFiles)) {
             return;
@@ -538,10 +544,27 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
         writeWapkArchiveFromMemory(prepared.archivePath, prepared.header, memoryFiles);
     };
 
-    const timer = setInterval(flush, 300);
+    if (prepared.useWatcher) {
+        // Event-driven file watcher mode
+        const watcher = watch(prepared.workDir, { recursive: true }, () => {
+            flush();
+        });
+
+        const stop = (): void => {
+            stopped = true;
+            watcher.close();
+            flush();
+        };
+
+        return { flush, stop };
+    }
+
+    // Polling mode (default)
+    const timer = setInterval(flush, syncInterval);
     timer.unref?.();
 
     const stop = (): void => {
+        stopped = true;
         clearInterval(timer);
         flush();
     };
@@ -719,7 +742,7 @@ export function extractWapkArchive(wapkPath: string, outputDir = '.'): string {
     return extractDirectory;
 }
 
-export function prepareWapkApp(wapkPath: string, options: { runtime?: WapkRuntimeName } = {}): PreparedWapkApp {
+export function prepareWapkApp(wapkPath: string, options: { runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } = {}): PreparedWapkApp {
     const archivePath = resolve(wapkPath);
     if (!existsSync(archivePath)) {
         throw new Error(`WAPK file not found: ${archivePath}`);
@@ -744,6 +767,8 @@ export function prepareWapkApp(wapkPath: string, options: { runtime?: WapkRuntim
         entryPath,
         header: decoded.header,
         runtime,
+        syncInterval: options.syncInterval,
+        useWatcher: options.useWatcher,
     };
 }
 
@@ -833,19 +858,24 @@ function printWapkHelp(): void {
         '  elit wapk <file.wapk>',
         '  elit wapk run <file.wapk>',
         '  elit wapk run <file.wapk> --runtime node|bun|deno',
+        '  elit wapk run <file.wapk> --sync-interval 100',
+        '  elit wapk run <file.wapk> --watcher',
         '  elit wapk pack [directory]',
         '  elit wapk pack [directory] --include-deps',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
         '',
         'Options:',
-        '  -r, --runtime <name>    Runtime override: node, bun, deno',
-        '  --include-deps          Include node_modules in the archive',
-        '  -h, --help              Show this help',
+        '  -r, --runtime <name>         Runtime override: node, bun, deno',
+        '  --sync-interval <ms>         Polling interval for live sync (ms, default 300)',
+        '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
+        '  --include-deps               Include node_modules in the archive',
+        '  -h, --help                   Show this help',
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
-        '  - Run mode keeps files in memory and syncs changes back to the .wapk file.',
+        '  - Run mode keeps files in RAM and syncs changes back to the .wapk file.',
+        '  - Use --watcher for faster file change detection (less CPU usage).',
         '  - Runtime commands use node, bun, or deno from PATH.',
     ].join('\n'));
 }
@@ -858,9 +888,11 @@ function expectSinglePositional(args: string[], usage: string): string {
     return positional[0];
 }
 
-function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName } {
+function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } {
     let file: string | undefined;
     let runtime: WapkRuntimeName | undefined;
+    let syncInterval: number | undefined;
+    let useWatcher = false;
 
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
@@ -872,6 +904,19 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
                     throw new Error(`Unknown WAPK runtime: ${args[index]}`);
                 }
                 runtime = value;
+                break;
+            }
+            case '--sync-interval': {
+                const value = parseInt(args[++index], 10);
+                if (Number.isNaN(value) || value < 50) {
+                    throw new Error('--sync-interval must be a number >= 50 (milliseconds)');
+                }
+                syncInterval = value;
+                break;
+            }
+            case '--use-watcher':
+            case '--watcher': {
+                useWatcher = true;
                 break;
             }
             default:
@@ -890,7 +935,7 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
         throw new Error('Usage: elit wapk run <file.wapk>');
     }
 
-    return { file, runtime };
+    return { file, runtime, syncInterval, useWatcher };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } {
@@ -940,7 +985,11 @@ export async function runWapkCommand(args: string[]): Promise<void> {
     }
 
     const runOptions = args[0] === 'run' ? parseRunArgs(args.slice(1)) : parseRunArgs(args);
-    const prepared = prepareWapkApp(runOptions.file, { runtime: runOptions.runtime });
+    const prepared = prepareWapkApp(runOptions.file, {
+        runtime: runOptions.runtime,
+        syncInterval: runOptions.syncInterval,
+        useWatcher: runOptions.useWatcher,
+    });
     const exitCode = await runPreparedWapkApp(prepared);
     if (exitCode !== 0) {
         process.exit(exitCode);

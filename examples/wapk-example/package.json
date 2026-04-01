@@ -1,0 +1,17 @@
+{
+  "name": "@elit/wapk-example",
+  "version": "1.0.0",
+  "description": "Example WAPK app for testing live-sync and packaging",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "start": "bun run src/server.ts"
+  },
+  "keywords": [
+    "wapk",
+    "example",
+    "http"
+  ],
+  "author": "elit",
+  "license": "MIT"
+}

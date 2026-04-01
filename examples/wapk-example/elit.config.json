@@ -1,0 +1,14 @@
+{
+  "wapk": {
+    "name": "@elit/wapk-example",
+    "version": "1.0.0",
+    "runtime": "bun",
+    "entry": "src/server.ts",
+    "port": 3333,
+    "desktop": {
+      "width": 1024,
+      "height": 768,
+      "title": "WAPK Example App"
+    }
+  }
+}

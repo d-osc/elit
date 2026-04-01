@@ -53,6 +53,8 @@ interface DesktopWapkRunOptions {
     runtime?: WapkRuntimeName;
     release: boolean;
     file: string;
+    syncInterval?: number;
+    useWatcher?: boolean;
 }
 
 const PACKAGE_ROOT = resolve(__dirname, '..');
@@ -241,6 +243,8 @@ function printDesktopHelp(): void {
         '',
         'Desktop WAPK options:',
         '  -r, --runtime <name>     Packaged app runtime: node, bun, deno',
+        '  --sync-interval <ms>     Polling interval for live sync (ms, default 300)',
+        '  --watcher, --use-watcher Use event-driven file watcher instead of polling',
         '  --release                Use the release desktop runtime binary',
         '',
         'Examples:',
@@ -248,6 +252,7 @@ function printDesktopHelp(): void {
         '  elit desktop --runtime node app.ts',
         '  elit desktop wapk app.wapk',
         '  elit desktop wapk run app.wapk --runtime bun',
+        '  elit desktop wapk app.wapk --watcher',
         '  elit desktop build src/main.ts',
         '  elit desktop build --runtime bun --release src/main.ts',
         '',
@@ -258,6 +263,7 @@ function printDesktopHelp(): void {
         '  - The tsx and tsup compilers require those packages to be installed.',
         '  - The build subcommand can be used without an entry to prebuild the native runtime.',
         '  - Desktop WAPK mode expects the packaged entry to start an HTTP app.',
+        '  - Use --watcher for faster file change detection (less CPU usage).',
     ].join('\n'));
 }
 
@@ -268,7 +274,11 @@ async function runDesktopWapkCommand(args: string[]): Promise<void> {
     }
 
     const options = parseDesktopWapkRunArgs(args);
-    const preparedApp = prepareWapkApp(options.file, { runtime: options.runtime });
+    const preparedApp = prepareWapkApp(options.file, {
+        runtime: options.runtime,
+        syncInterval: options.syncInterval,
+        useWatcher: options.useWatcher,
+    });
     const preparedEntry = await createDesktopWapkEntry(preparedApp);
     const liveSync = createWapkLiveSync(preparedApp);
 
@@ -313,6 +323,19 @@ function parseDesktopWapkRunArgs(args: string[]): DesktopWapkRunOptions {
             case '--release':
                 options.release = true;
                 break;
+            case '--sync-interval': {
+                const value = parseInt(normalizedArgs[++i], 10);
+                if (Number.isNaN(value) || value < 50) {
+                    throw new Error('--sync-interval must be a number >= 50 (milliseconds)');
+                }
+                options.syncInterval = value;
+                break;
+            }
+            case '--use-watcher':
+            case '--watcher': {
+                options.useWatcher = true;
+                break;
+            }
             default:
                 if (arg.startsWith('-')) {
                     throw new Error(`Unknown desktop WAPK option: ${arg}`);
