@@ -58,8 +58,21 @@ export interface ElitConfig {
     test?: TestOptions;
     /** Desktop command configuration */
     desktop?: DesktopConfig;
+    /** Mobile command configuration */
+    mobile?: MobileConfig;
     /** WAPK packaging configuration */
     wapk?: WapkConfig;
+}
+
+export interface MobileConfig {
+    /** Project directory for native mobile artifacts */
+    cwd?: string;
+    /** Native app bundle identifier */
+    appId?: string;
+    /** Native app display name */
+    appName?: string;
+    /** Built web assets directory synced into native projects */
+    webDir?: string;
 }
 
 export interface DesktopConfig {

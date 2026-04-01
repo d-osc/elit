@@ -142,6 +142,8 @@ npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
 npx elit desktop build ./src/main.ts --release
+npx elit mobile init
+npx elit mobile run android
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk
@@ -160,6 +162,11 @@ Useful flags:
 - `elit desktop --runtime quickjs|node|bun|deno`
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
 - `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
+- `elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist`
+- `elit mobile sync --cwd . --web-dir dist`
+- `elit mobile open android|ios`
+- `elit mobile run android|ios --cwd . --target <device-id> --prod`
+- `elit mobile build android|ios --cwd . --prod`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
 - `elit wapk run ./app.wapk --sync-interval 100 --watcher`
 - `elit wapk pack . --include-deps`
@@ -176,6 +183,15 @@ Desktop mode notes:
 - `tsx` and `tsup` compiler modes require those packages to be installed in the project.
 - Desktop icon support includes `.ico`, `.png`, and `.svg`.
 - Desktop build auto-detects `icon.*` and `favicon.*` in the entry directory, project directory, and sibling `public/` folders.
+
+Mobile mode notes:
+
+- Mobile mode is implemented by elit directly with native project scaffolding.
+- Run `elit mobile init` once in your project to create `elit.mobile.json` plus native scaffold folders.
+- Android workflow is fully scaffolded: assets are synced to `android/app/src/main/assets/public` and loaded in WebView.
+- Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
+- Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
+- iOS workflow currently creates scaffold placeholders for Xcode integration.
 
 WAPK mode notes:
 
@@ -205,6 +221,12 @@ The config shape is:
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  mobile?: {
+    cwd?: string;
+    appId?: string;
+    appName?: string;
+    webDir?: string;
+  };
   desktop?: {
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
     compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
@@ -272,6 +294,12 @@ export default {
   test: {
     include: ['testing/unit/**/*.test.ts'],
   },
+  mobile: {
+    cwd: '.',
+    appId: 'com.elit.app',
+    appName: 'Elit App',
+    webDir: 'dist',
+  },
   desktop: {
     runtime: 'quickjs',
     compiler: 'auto',
@@ -305,6 +333,7 @@ Important details:
 - `preview` supports the same concepts as `dev`: multiple clients, API routes, proxy rules, workers, SSR, and HTTPS.
 - Only `VITE_` variables are exposed to client code during bundling.
 - `desktop` config provides defaults for `elit desktop`, `elit desktop build`, and `elit desktop wapk`.
+- `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
 

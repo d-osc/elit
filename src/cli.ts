@@ -7,10 +7,11 @@ import { ELIT_CONFIG_FILES, loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
 import { runDesktopCommand } from './desktop-cli';
+import { runMobileCommand } from './mobile-cli';
 import { runWapkCommand } from './wapk-cli';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'wapk', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -105,6 +106,9 @@ async function main() {
         case 'desktop':
             await runDesktop(args.slice(1));
             break;
+        case 'mobile':
+          await runMobile(args.slice(1));
+          break;
         case 'wapk':
           await runWapk(args.slice(1));
           break;
@@ -372,6 +376,15 @@ async function runDesktop(args: string[]) {
     }
 }
 
+async function runMobile(args: string[]) {
+  try {
+    await runMobileCommand(args);
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
   async function runWapk(args: string[]) {
     try {
       await runWapkCommand(args);
@@ -544,6 +557,7 @@ Commands:
   preview   Preview production build
   test      Run tests
   desktop   Run or build a native desktop app
+  mobile    Run native mobile workflow commands
   wapk      Pack, inspect, extract, or run a .wapk app
   version   Show version number
   help      Show this help message
@@ -569,6 +583,13 @@ Desktop Options:
   elit desktop wapk <file.wapk>             Run a packaged app in the desktop shell
   elit desktop --runtime node src/main.ts   Run with Node.js backend runtime
   elit desktop build --release src/main.ts  Build a release desktop executable
+
+Mobile Options:
+  elit mobile init [dir]                    Initialize native mobile config files
+  elit mobile sync                          Sync web assets to native mobile projects
+  elit mobile open android|ios              Open platform project in native IDE
+  elit mobile run android|ios               Run app on device or emulator
+  elit mobile build android|ios             Build native app artifacts
 
 WAPK Options:
   elit wapk <file.wapk>                     Run a packaged app
