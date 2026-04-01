@@ -2,762 +2,502 @@ import {
   div, h2, h3, h4, p, a, nav, section, ul, li, pre, code, reactive
 } from 'elit';
 import { codeBlock } from '../highlight';
-import { t, currentLang } from '../i18n';
+import { currentLang } from '../i18n';
 
-// Helper for highlighted code blocks
 const codeExample = (src: string) => pre(code(...codeBlock(src)));
 
-const Docs = () =>
-  section({ className: 'docs-section container' },
-    reactive(currentLang, () => h2({ className: 'section-title' }, t('docs.title'))),
-    div({ className: 'docs-grid' },
-      reactive(currentLang, () =>
-        nav({ className: 'docs-sidebar' },
-          div({ className: 'docs-nav' },
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('installation')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.installation')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('devserver')?.scrollIntoView({ behavior: 'smooth' }) }, 'Dev Server & Build'),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('elements')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.elements')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('state')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.state')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('reactive')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.reactive')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('createstyle')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.createstyle')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('ssr')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.ssr')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('routing')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.routing')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('performance')?.scrollIntoView({ behavior: 'smooth' }) }, t('docs.performance')),
-            a({ href: 'javascript:void(0)', onclick: () => document.getElementById('deployment')?.scrollIntoView({ behavior: 'smooth' }) }, 'Deployment')
-          )
-        )
-      ),
-      reactive(currentLang, () =>
-        div({ className: 'docs-content' },
-          h2({ id: 'installation' }, t('docs.installation')),
+const scrollLink = (id: string, label: string) =>
+  a({
+    href: 'javascript:void(0)',
+    onclick: () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }, label);
 
-          h3('Quick Start with create-elit'),
-          p('The fastest way to get started is using create-elit to scaffold a new project:'),
-          codeExample(`# Create a new project
-npm create elit my-app
+const moduleMap = [
+  {
+    importPath: 'elit',
+    use: {
+      en: 'Client-side all-in-one entry',
+      th: 'entry ฝั่ง client แบบ all-in-one'
+    },
+    exports: 'DOM helpers, element factories, state, styles, router, HMR'
+  },
+  {
+    importPath: 'elit/dom',
+    use: {
+      en: 'DOM renderer and SSR string rendering',
+      th: 'ตัว render DOM และ SSR string'
+    },
+    exports: 'dom, render, renderToString, mount'
+  },
+  {
+    importPath: 'elit/el',
+    use: {
+      en: 'HTML, SVG, and MathML factories',
+      th: 'factory สำหรับ HTML, SVG และ MathML'
+    },
+    exports: 'div, button, html, body, script, and many more'
+  },
+  {
+    importPath: 'elit/state',
+    use: {
+      en: 'Reactive state and render helpers',
+      th: 'state reactive และ helper สำหรับ render'
+    },
+    exports: 'createState, computed, reactive, text, bindValue, bindChecked, createSharedState'
+  },
+  {
+    importPath: 'elit/style',
+    use: {
+      en: 'CSS generation and injection',
+      th: 'สร้างและ inject CSS'
+    },
+    exports: 'CreateStyle, styles, renderStyle, injectStyle, addClass, addTag'
+  },
+  {
+    importPath: 'elit/router',
+    use: {
+      en: 'Client-side routing',
+      th: 'routing ฝั่ง client'
+    },
+    exports: 'createRouter, createRouterView, routerLink'
+  },
+  {
+    importPath: 'elit/server',
+    use: {
+      en: 'HTTP router, dev server, middleware, and shared server state',
+      th: 'HTTP router, dev server, middleware และ shared state ฝั่ง server'
+    },
+    exports: 'ServerRouter, createDevServer, cors, logger, rateLimit, compress, security, StateManager'
+  },
+  {
+    importPath: 'elit/build',
+    use: {
+      en: 'Programmatic build API',
+      th: 'API สำหรับ build แบบ programmatic'
+    },
+    exports: 'build'
+  },
+  {
+    importPath: 'elit/desktop',
+    use: {
+      en: 'Native desktop window APIs',
+      th: 'API สำหรับ native desktop window'
+    },
+    exports: 'createWindow, createWindowServer, onMessage, windowQuit, windowSetTitle, windowEval'
+  },
+  {
+    importPath: 'elit/database',
+    use: {
+      en: 'VM-backed file database helpers',
+      th: 'helper สำหรับฐานข้อมูลแบบไฟล์ที่รันผ่าน VM'
+    },
+    exports: 'Database, create, read, save, update, rename, remove'
+  },
+  {
+    importPath: 'elit/test',
+    use: {
+      en: 'Test runner module entry',
+      th: 'entry ของ test runner'
+    },
+    exports: 'test runtime helpers used by the CLI'
+  }
+];
 
-# With specific template
-npm create elit my-app -- --template=basic
-npm create elit my-app -- --template=full
-npm create elit my-app -- --template=minimal
-
-# Start development
+const installExample = `npm create elit@latest my-app
 cd my-app
 npm install
-npm run dev`),
+npm run dev`;
 
-          p('Available templates:'),
-          ul(
-            li(code('basic'), ' - Basic Elit app with counter example and SSR (default)'),
-            li(code('full'), ' - Full-stack app with dev server, API routes, and HMR'),
-            li(code('minimal'), ' - Minimal setup with just DOM rendering')
-          ),
+const browserAppTs = `import { div, h1, button } from 'elit/el';
+import { createState, reactive } from 'elit/state';
+import { render } from 'elit/dom';
 
-          h3('Manual Installation'),
-          p(t('docs.installNpm')),
-          codeExample('npm install elit'),
+const count = createState(0);
 
-          h3('Bundle Size'),
-          p('Elit is extremely lightweight - only 30KB minified (~10KB gzipped)'),
-          ul(
-            li('ESM: 29KB minified'),
-            li('CJS: 30KB minified'),
-            li('IIFE: 30KB minified'),
-            li('Tree-shakeable: Import only what you need')
-          ),
+const app = div(
+  { className: 'app' },
+  h1('Hello Elit'),
+  reactive(count, (value) =>
+    button({ onclick: () => count.value++ }, \`Count: \${value}\`)
+  )
+);
 
-          h3('CDN Installation'),
-          p(t('docs.installCdn')),
-          codeExample(`<script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>`),
+render('app', app);`;
 
-          h2({ id: 'devserver' }, t('docs.devServer')),
-          p(t('docs.devServer.desc')),
+const browserAppHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elit App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>`;
 
-          h3('CLI Commands'),
-          p('Elit provides a powerful CLI for development and production:'),
-          codeExample(`# Development server with HMR
-npx elit dev
+const cliCommands = `npx elit dev
+npx elit build --entry ./src/main.ts --out-dir dist
+npx elit preview
+npx elit test
+npx elit desktop ./src/main.ts
+npx elit desktop build ./src/main.ts --release`;
 
-# Production build
-npx elit build
+const desktopEntry = `import { createWindow, onMessage, windowQuit, windowSetTitle } from 'elit/desktop';
 
-# Preview production build
-npx elit preview`),
-
-          h3('Configuration File'),
-          p('Create elit.config.mjs (or .ts, .js, .json) in your project root:'),
-          codeExample(`import { router } from 'elit';
-import { resolve } from 'path';
-
-export default {
-  dev: {
-    port: 3000,
-    host: 'localhost',
-    root: './src',
-    basePath: '/',
-    open: true,
-    https: false,
-
-    // Proxy API requests to backend
-    proxy: [
-      {
-        context: '/api',
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        pathRewrite: { '^/api': '' }
-      }
-    ],
-
-    // Web Workers configuration
-    worker: [
-      {
-        path: 'workers/service-worker.js',
-        name: 'serviceWorker',
-        type: 'module'
-      }
-    ],
-
-    // REST API endpoints
-    api: router()
-      .get('/api/data', (req, res) => {
-        res.json({ message: 'Hello from API' });
-      })
-      .post('/api/data', (req, res) => {
-        res.json({ success: true });
-      }),
-
-    // Custom middleware
-    middleware: [
-      (req, res, next) => {
-        console.log('Request:', req.method, req.url);
-        next();
-      }
-    ]
-  },
-
-  // Build configuration (single or array)
-  build: {
-    entry: './src/main.ts',
-    outDir: './dist',
-    outFile: 'main.js',
-    format: 'esm',
-    minify: true,
-    sourcemap: false,
-    platform: 'browser',
-    basePath: '/app',
-    copy: [
-      {
-        from: 'index.html',
-        to: 'index.html',
-        transform: (content, config) => {
-          return content.replace(
-            '<head>',
-            \`<head><base href="\${config.basePath}/">\`
-          );
-        }
-      },
-      { from: 'assets', to: 'assets' }
-    ],
-    onBuildEnd: (result) => {
-      console.log(\`✅ Build completed in \${result.buildTime}ms\`);
-    }
-  },
-
-  preview: {
-    port: 4173,
-    root: './dist',
-    basePath: '/app',
-    open: true,
-    https: false,
-
-    // Preview supports same features as dev
-    proxy: [...],
-    worker: [...],
-    api: router(),
-    middleware: [...]
+onMessage((message) => {
+  if (message === 'desktop:ready') {
+    windowSetTitle('Elit Desktop');
+    windowQuit();
   }
-};`),
-
-          h3('Multi-Client Development'),
-          p('Develop multiple applications simultaneously on different paths:'),
-          codeExample(`export default {
-  dev: {
-    port: 3000,
-    // Multi-client configuration
-    clients: [
-      {
-        root: './app1',
-        basePath: '/app1',
-        watch: ['app1/**/*.ts'],
-        proxy: [
-          {
-            context: '/api',
-            target: 'http://localhost:8080'
-          }
-        ],
-        worker: [
-          {
-            path: 'workers/app1-worker.js',
-            type: 'module'
-          }
-        ],
-        // API routes prefixed with basePath: /app1/api/...
-        api: router()
-          .get('/api/health', (req, res) => {
-            res.json({ status: 'ok', app: 'app1' });
-          }),
-        middleware: [
-          (req, res, next) => {
-            console.log('App1:', req.url);
-            next();
-          }
-        ]
-      },
-      {
-        root: './app2',
-        basePath: '/app2',
-        watch: ['app2/**/*.ts'],
-        // Each client can have its own config
-        api: router()
-          .get('/api/status', (req, res) => {
-            res.json({ status: 'running', app: 'app2' });
-          })
-      }
-    ]
-  }
-};
-
-// Access:
-// http://localhost:3000/app1  -> serves app1
-// http://localhost:3000/app2  -> serves app2`),
-
-          h3('Dev Server API'),
-          p('Programmatic server control:'),
-          codeExample(`import { createDevServer } from 'elit';
-
-const server = await createDevServer({
-  port: 3000,
-  open: true,
-  logging: true
 });
 
-// Stop server
-await server.stop();
+createWindow({
+  title: 'Elit Desktop',
+  width: 960,
+  height: 640,
+  icon: './public/favicon.svg',
+  html: \`<!doctype html>
+<html lang="en">
+  <body>
+    <main>Hello from Elit Desktop</main>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        window.ipc.postMessage('desktop:ready');
+      });
+    </script>
+  </body>
+</html>\`,
+});`;
 
-// Restart
-await server.restart();`),
+const configShape = `{
+  dev?: DevServerOptions;
+  build?: BuildOptions | BuildOptions[];
+  preview?: PreviewOptions;
+  test?: TestOptions;
+}`;
 
-          h3('Build Tool'),
-          p('Automatic client/server code separation with esbuild:'),
-          codeExample(`import { build } from 'elit';
+const configExample = `import { api } from './src/server';
+import { documentShell } from './src/document';
 
-await build({
-  entry: './src/main.ts',
-  outDir: './dist',
-  minify: true,
-  platform: 'browser', // auto-externals Node.js modules
-  basePath: '/app',
-  copy: [
-    { from: 'index.html', to: 'index.html' },
-    { from: 'assets', to: 'assets' }
-  ],
-  onBuildEnd: (result) => {
-    console.log(\`✅ Built in \${result.buildTime}ms\`);
-  }
-});`),
-
-          h3('Multiple Builds'),
-          p('Build multiple entry points in a single command using array configuration:'),
-          codeExample(`// elit.config.mjs
 export default {
-  // Array of build configurations
+  dev: {
+    port: 3003,
+    host: '0.0.0.0',
+    open: false,
+    logging: true,
+    clients: [
+      {
+        root: '.',
+        basePath: '',
+        ssr: () => documentShell,
+        api,
+      },
+    ],
+  },
   build: [
     {
       entry: './src/main.ts',
       outDir: './dist',
       outFile: 'main.js',
       format: 'esm',
-      minify: true,
-      basePath: '/app',
+      sourcemap: true,
       copy: [
-        { from: 'index.html', to: 'index.html' }
-      ]
+        { from: './public/index.html', to: './index.html' },
+      ],
     },
-    {
-      entry: './src/admin.ts',
-      outDir: './dist',
-      outFile: 'admin.js',
-      format: 'esm',
-      minify: true,
-      basePath: '/admin'
-    },
-    {
-      entry: './src/worker.ts',
-      outDir: './dist/workers',
-      outFile: 'worker.js',
-      format: 'iife',
-      platform: 'browser'
-    }
-  ]
-};
+  ],
+  preview: {
+    root: './dist',
+    index: './index.html',
+    port: 4173,
+  },
+  test: {
+    include: ['testing/unit/**/*.test.ts'],
+  },
+};`;
 
-// Builds sequentially: [1/3], [2/3], [3/3]
-// npx elit build`),
+const serverRouterExample = `import { ServerRouter, cors, logger } from 'elit/server';
 
-          p('CLI options override only the first build configuration:'),
-          codeExample(`# Override first build's minify option
-npx elit build --no-minify
+export const api = new ServerRouter();
 
-# Use config array for all builds
-npx elit build`),
-
-          h3('REST API Router'),
-          p('Built-in server-side routing with middleware:'),
-          codeExample(`import { ServerRouter, json, cors, logger } from 'elit';
-
-const api = new ServerRouter();
-
-// Middleware
 api.use(cors());
 api.use(logger());
 
-// Routes
-api.get('/users/:id', async (ctx) => {
-  const user = await db.getUser(ctx.params.id);
-  return json({ user });
+api.get('/api/hello', async (ctx) => {
+  ctx.res.json({ message: 'Hello from Elit' });
 });
 
-api.post('/users', async (ctx) => {
-  const data = await ctx.json();
-  return json({ user: data }, 201);
+api.post('/api/echo', async (ctx) => {
+  ctx.res.json({ body: ctx.body });
+});`;
+
+const devServerExample = `import { createDevServer } from 'elit/server';
+
+const server = createDevServer({
+  port: 3000,
+  root: '.',
+  open: false,
+  logging: true,
 });
 
-// Use with dev server
-createDevServer({ api });`),
+console.log(server.url);
 
-          h3('Shared State'),
-          p('Real-time state synchronization via WebSocket:'),
-          codeExample(`import { StateManager, SharedState } from 'elit';
+await server.close();`;
 
-// Server-side
-const stateManager = new StateManager();
-const counter = stateManager.create('counter', 0);
+const styleExample = `import { CreateStyle } from 'elit/style';
 
-// Client-side
-const counter = new SharedState('counter', 0);
-counter.value++; // syncs to all clients`),
+const css = new CreateStyle();
 
-          h2({ id: 'elements' }, t('docs.elements')),
-          p(t('docs.elements.desc')),
-          codeExample(`import { div, span, a, button, h1 } from 'elit';
-
-const element = div({ className: 'container' },
-  h1('Hello World'),
-  span('Welcome to Elit'),
-  a({ href: '/about' }, 'Learn more')
-);`),
-          p(t('docs.elements.available')),
-
-          h2({ id: 'state' }, t('docs.state')),
-          p(t('docs.state.desc')),
-          codeExample(`import { createState, computed } from 'elit';
-
-const count = createState(0);
-const doubled = computed([count], (c) => c * 2);
-
-// Update state
-count.value++;
-
-// Subscribe to changes
-count.subscribe((value) => console.log('Count:', value));`),
-
-          h3(t('docs.stateOptions')),
-          ul(
-            li(code('throttle'), ' - Throttle updates (ms)'),
-            li(code('deep'), ' - Deep comparison for objects')
-          ),
-
-          h2({ id: 'reactive' }, t('docs.reactive')),
-          p(t('docs.reactive.desc')),
-          codeExample(`import { reactive, text } from 'elit';
-
-const name = createState('World');
-
-// Full element reactive
-const greeting = reactive(name, (value) =>
-  div({ className: 'greeting' }, \`Hello, \${value}!\`)
-);
-
-// Text-only reactive
-const label = text(name);`),
-
-          h2({ id: 'createstyle' }, t('docs.createstyle')),
-          p(t('docs.createstyle.desc')),
-
-          h3('Basic Usage'),
-          codeExample(`import { CreateStyle } from 'elit';
-
-const styles = new CreateStyle();
-
-// CSS Variables
-const primary = styles.addVar('primary', '#6366f1');
-
-// Tag selectors
-styles.addTag('body', {
-  fontFamily: 'system-ui',
-  background: styles.var(primary)
+css.addClass('app', {
+  minHeight: '100vh',
+  display: 'grid',
+  placeItems: 'center',
+  fontFamily: 'system-ui, sans-serif',
 });
 
-// Class selectors
-styles.addClass('container', {
-  maxWidth: '1200px',
-  margin: '0 auto'
+css.addClass('button', {
+  padding: '12px 18px',
+  borderRadius: '12px',
+  border: '1px solid #222',
+  background: '#111',
+  color: '#fff',
+  cursor: 'pointer',
 });
 
-// ID selectors
-styles.addId('header', { position: 'fixed' });
+css.addPseudoClass('hover', {
+  opacity: 0.92,
+}, '.button');
 
-// Inject into document
-styles.inject();`),
+css.inject('app-styles');`;
 
-          h3('Pseudo Selectors'),
-          codeExample(`// Pseudo-classes
-styles.addPseudoClass('hover', { color: 'blue' }, '.btn');
-styles.addPseudoClass('nth-child(2)', { background: 'gray' }, 'li');
+const routerExample = `import { div, nav } from 'elit/el';
+import { reactive } from 'elit/state';
+import { createRouter, createRouterView, routerLink } from 'elit/router';
 
-// Pseudo-elements
-styles.addPseudoElement('before', { content: '"→"' }, '.link');
-styles.addPseudoElement('placeholder', { color: 'gray' }, 'input');`),
-
-          h3('Attribute Selectors'),
-          codeExample(`// Basic attribute
-styles.addAttribute('disabled', { opacity: 0.5 }, 'button');
-
-// Attribute equals
-styles.attrEquals('type', 'text', { border: '1px solid gray' }, 'input');
-
-// Attribute contains, starts/ends with
-styles.attrContains('href', 'example', { color: 'green' }, 'a');
-styles.attrStartsWith('href', 'https', { fontWeight: 'bold' }, 'a');`),
-
-          h3('Combinators'),
-          codeExample(`// Descendant: .parent .child
-styles.descendant('.parent', '.child', { color: 'red' });
-
-// Child: .parent > .child
-styles.child('.parent', '.child', { margin: 0 });
-
-// Adjacent sibling: h1 + p
-styles.adjacentSibling('h1', 'p', { marginTop: '0.5rem' });
-
-// General sibling: h1 ~ p
-styles.generalSibling('h1', 'p', { color: 'gray' });
-
-// Multiple selectors: h1, h2, h3
-styles.multiple(['h1', 'h2', 'h3'], { fontWeight: 'bold' });`),
-
-          h3('Media Queries'),
-          codeExample(`// Basic media query
-styles.media('screen', 'min-width: 768px', {
-  '.container': { maxWidth: '720px' }
-});
-
-// Shorthand methods
-styles.mediaMinWidth('1024px', { '.sidebar': { display: 'block' } });
-styles.mediaMaxWidth('768px', { '.nav': { display: 'none' } });
-styles.mediaPrint({ '.no-print': { display: 'none' } });
-styles.mediaDark({ ':root': { background: '#000' } });
-styles.mediaReducedMotion({ '*': { animation: 'none' } });`),
-
-          h3('Keyframes & Animations'),
-          codeExample(`// Full keyframes
-styles.keyframe('fadeIn', {
-  from: { opacity: 0 },
-  50: { opacity: 0.5 },
-  to: { opacity: 1 }
-});
-
-// Simple from/to
-styles.keyframeFromTo('slideIn',
-  { transform: 'translateX(-100%)' },
-  { transform: 'translateX(0)' }
-);`),
-
-          h3('Advanced Features'),
-          h4('@font-face'),
-          codeExample(`styles.fontFace({
-  fontFamily: 'MyFont',
-  src: "url('/fonts/myfont.woff2') format('woff2')",
-  fontWeight: 400,
-  fontDisplay: 'swap'
-});`),
-
-          h4('@container queries'),
-          codeExample(`styles.addContainer('card', { containerType: 'inline-size' });
-styles.container('min-width: 400px', {
-  '.card-content': { display: 'grid' }
-}, 'card');`),
-
-          h4('@supports'),
-          codeExample(`styles.supports('display: grid', {
-  '.layout': { display: 'grid' }
-});`),
-
-          h4('@layer'),
-          codeExample(`styles.layerOrder('reset', 'base', 'components');
-styles.layer('base', {
-  'body': { margin: 0 }
-});`),
-
-          h4('@import'),
-          codeExample(`styles.import('https://fonts.googleapis.com/css2?family=Inter');
-styles.import('/print.css', 'print');`),
-
-          h3('Render & Inject'),
-          codeExample(`// Get CSS string
-const cssString = styles.render();
-
-// Inject into document with optional ID
-styles.inject('my-styles');
-
-// Clear all rules
-styles.clear();`),
-
-          h2({ id: 'ssr' }, t('docs.ssr')),
-          p(t('docs.ssr.desc')),
-          codeExample(`import { div, p, renderToString } from 'elit';
-
-const html = renderToString(
-  div({ className: 'app' },
-    p('Server rendered content')
-  ),
-  { pretty: true }
-);`),
-
-          h2({ id: 'routing' }, t('docs.routing')),
-          p(t('docs.routing.desc')),
-          codeExample(`import { createRouter, routerLink } from 'elit';
-
-const router = createRouter({
-  mode: 'history',
+const routerOptions = {
+  mode: 'history' as const,
   routes: [
     { path: '/', component: () => div('Home') },
     { path: '/about', component: () => div('About') },
-    { path: '/user/:id', component: ({ id }) => div(\`User \${id}\`) }
-  ]
-});
+    { path: '/post/:id', component: (params: Record<string, string>) => div(\`Post \${params.id}\`) },
+  ],
+  notFound: () => div('404'),
+};
 
-// Navigate
-router.push('/about');
+const router = createRouter(routerOptions);
+const RouterView = createRouterView(router, routerOptions);
 
-// Create links
-routerLink(router, { to: '/about' }, 'About');`),
+const app = div(
+  nav(
+    routerLink(router, { to: '/' }, 'Home'),
+    routerLink(router, { to: '/about' }, 'About')
+  ),
+  reactive(router.currentRoute, () => RouterView())
+);`;
 
-          h2({ id: 'performance' }, t('docs.performance')),
-          p(t('docs.performance.desc')),
-          codeExample(`import { batchRender, renderChunked, createVirtualList, throttle, debounce } from 'elit';
+const testExample = `npx elit test
+npx elit test --watch
+npx elit test --file ./testing/unit/database.test.ts
+npx elit test --describe "Database"
+npx elit test --it "should save data"
+npx elit test --coverage --coverage-reporter text,html`;
 
-// Batch render
-batchRender('#container', largeArray);
+const deployExample = `npx elit build --entry ./src/main.ts --out-dir dist
+npx elit preview --root dist`;
 
-// Chunked rendering for 1M+ items
-renderChunked('#container', items, 5000, (current, total) => {
-  console.log(\`\${current}/\${total}\`);
-});
+const Docs = () =>
+  section({ className: 'docs-section container' },
+    reactive(currentLang, () => {
+      const isTh = currentLang.value === 'th';
+      const text = (en: string, th: string) => isTh ? th : en;
 
-// Virtual scrolling
-const list = createVirtualList(container, items, renderItem, 50);
-
-// Throttle/debounce
-const throttled = throttle(fn, 100);
-const debounced = debounce(fn, 300);`),
-
-          h3('DOM Utilities'),
-          p('Elit provides convenient helper functions for common DOM operations:'),
-          codeExample(`import { doc, el, els, createEl, elId, elClass, fragment } from 'elit';
-
-// Query selectors (bound to document)
-const element = el('.my-class');        // querySelector
-const elements = els('.my-class');      // querySelectorAll
-const byId = elId('my-id');            // getElementById
-const byClass = elClass('my-class');   // getElementsByClassName
-
-// Create elements
-const div = createEl('div');           // createElement
-const frag = fragment();               // createDocumentFragment
-
-// Access document
-doc.title = 'New Title';`),
-
-          h3('Performance Optimizations'),
-          p('Elit is built with performance in mind:'),
-          ul(
-            li('Direct DOM manipulation - no virtual DOM overhead'),
-            li('Optimized rendering with RAF batching'),
-            li('Smart children rendering with automatic fragment usage'),
-            li('Efficient attribute updates using charCode checks'),
-            li('Minimal function closures and memory allocation'),
-            li('Tree-shakeable ES modules for optimal bundle size')
+      return div(
+        h2({ className: 'section-title' }, text('Documentation', 'เอกสาร')),
+        div({ className: 'docs-grid' },
+          nav({ className: 'docs-sidebar' },
+            div({ className: 'docs-nav' },
+              scrollLink('installation', text('Installation', 'การติดตั้ง')),
+              scrollLink('module-map', text('Module Map', 'แผนที่โมดูล')),
+              scrollLink('browser-app', text('Browser App', 'แอปเบราว์เซอร์')),
+              scrollLink('cli', 'CLI'),
+              scrollLink('desktop', text('Desktop Mode', 'Desktop Mode')),
+              scrollLink('config', text('Config File', 'Config File')),
+              scrollLink('server', text('Server Patterns', 'รูปแบบฝั่ง Server')),
+              scrollLink('styling', text('Styling', 'Styling')),
+              scrollLink('routing', text('Routing', 'Routing')),
+              scrollLink('testing', text('Testing', 'Testing')),
+              scrollLink('deployment', text('Build & Preview', 'Build และ Preview'))
+            )
           ),
+          div({ className: 'docs-content' },
+            h2({ id: 'installation' }, text('Installation', 'การติดตั้ง')),
+            p(text(
+              'Use create-elit when you want a working project quickly. Install Cargo only if you need desktop mode.',
+              'ใช้ create-elit เมื่ออยากได้โปรเจ็กต์ที่พร้อมรันทันที และติดตั้ง Cargo เพิ่มเมื่อจะใช้ desktop mode เท่านั้น.'
+            )),
+            h3(text('Quick Start with create-elit', 'เริ่มต้นเร็วด้วย create-elit')),
+            codeExample(installExample),
+            h3(text('Manual Install', 'ติดตั้งเอง')),
+            codeExample('npm install elit'),
+            ul(
+              li(text('Supported scaffold command:', 'คำสั่ง scaffold ที่แนะนำ: '), code('npm create elit@latest my-app')),
+              li(text('Desktop mode builds a native WebView runtime with Rust.', 'Desktop mode จะ build native WebView runtime ด้วย Rust.')),
+              li(text('Use subpath imports in generated code when possible.', 'ในโค้ดที่สร้างใหม่ควรใช้ subpath imports เมื่อทำได้.'))
+            ),
 
-          h2({ id: 'deployment' }, 'Deployment'),
-          p('Deploy your Elit application to production with these popular platforms:'),
+            h2({ id: 'module-map' }, text('Module Map', 'แผนที่โมดูล')),
+            p(text(
+              'This is the import map the current package exposes. Prefer these boundaries instead of importing everything from one place.',
+              'นี่คือ import map ที่แพ็กเกจปัจจุบัน export ออกมา ควรยึด boundary นี้แทนการ import ทุกอย่างจากจุดเดียว.'
+            )),
+            ul(
+              ...moduleMap.map((entry) =>
+                li(
+                  code(entry.importPath),
+                  ' - ',
+                  text(entry.use.en, entry.use.th),
+                  div({ style: 'opacity: 0.8; margin-top: 0.35rem;' },
+                    text('Main exports: ', 'Exports หลัก: '),
+                    code(entry.exports)
+                  )
+                )
+              )
+            ),
+            p(text(
+              'Advanced subpaths also exist for lower-level adapters and internals: elit/http, elit/https, elit/ws, elit/wss, elit/fs, elit/path, elit/mime-types, elit/chokidar, elit/runtime, elit/test-runtime, elit/test-reporter, and elit/types.',
+              'ยังมี advanced subpaths สำหรับ adapter ระดับล่างและ internals เช่น elit/http, elit/https, elit/ws, elit/wss, elit/fs, elit/path, elit/mime-types, elit/chokidar, elit/runtime, elit/test-runtime, elit/test-reporter และ elit/types.'
+            )),
 
-          h3('Vercel'),
-          p('Deploy to Vercel with zero configuration:'),
-          codeExample(`# Install Vercel CLI
-npm i -g vercel
+            h2({ id: 'browser-app' }, text('Fastest Working Browser App', 'แอปเบราว์เซอร์ที่เล็กและรันได้ทันที')),
+            p(text(
+              'This is the smallest browser app that matches the current CLI and package exports.',
+              'นี่คือตัวอย่าง browser app ที่เล็กที่สุดและตรงกับ CLI กับ exports ปัจจุบัน.'
+            )),
+            h3('src/main.ts'),
+            codeExample(browserAppTs),
+            h3('index.html'),
+            codeExample(browserAppHtml),
+            h4(text('Run it', 'วิธีรัน')),
+            codeExample('npx elit dev'),
+            ul(
+              li(text('render(\'app\', app) and render(\'#app\', app) both work.', 'render(\'app\', app) และ render(\'#app\', app) ใช้ได้ทั้งคู่.')),
+              li(text('During development the browser can load /src/main.ts directly.', 'ระหว่างพัฒนา browser สามารถโหลด /src/main.ts ตรงได้.')),
+              li(text('When you copy HTML into dist, point it at the built JS path such as /main.js.', 'เมื่อ copy HTML ไปที่ dist ต้องชี้ script ไปยังไฟล์ build เช่น /main.js.'))
+            ),
 
-# Build your app
-npm run build
+            h2({ id: 'cli' }, 'CLI'),
+            p(text(
+              'These are the main commands that match the current CLI implementation.',
+              'นี่คือคำสั่งหลักที่ตรงกับ CLI implementation ปัจจุบัน.'
+            )),
+            codeExample(cliCommands),
+            h3(text('Useful Flags', 'Flags ที่ใช้บ่อย')),
+            ul(
+              li(code('elit dev --port 3000 --host 0.0.0.0 --no-open')),
+              li(code('elit build --entry ./src/main.ts --out-dir dist --format esm --sourcemap')),
+              li(code('elit preview --root dist --base-path /app')),
+              li(code('elit test --watch')),
+              li(code('elit test --file ./testing/unit/database.test.ts')),
+              li(code('elit test --coverage --coverage-reporter text,html')),
+              li(code('elit desktop --runtime quickjs|node|bun|deno')),
+              li(code('elit desktop build --platform windows|linux|macos --out-dir dist')),
+              li(code('elit desktop build --compiler auto|none|esbuild|tsx|tsup'))
+            ),
 
-# Deploy
-vercel --prod
+            h2({ id: 'desktop' }, text('Desktop Mode', 'Desktop Mode')),
+            p(text(
+              'Desktop mode runs an Elit entry inside a native WebView shell and exposes the desktop APIs from elit/desktop.',
+              'Desktop mode จะรัน entry ของ Elit ภายใน native WebView shell และเปิดใช้ API จาก elit/desktop.'
+            )),
+            codeExample(desktopEntry),
+            h4(text('Run and Build', 'สั่งรันและ build')),
+            codeExample(`npx elit desktop ./src/main.ts
+npx elit desktop build ./src/main.ts --release`),
+            ul(
+              li(text('Runtime choices: quickjs, node, bun, deno.', 'runtime ที่เลือกได้: quickjs, node, bun, deno.')),
+              li(text('Compiler choices: auto, none, esbuild, tsx, tsup.', 'compiler ที่เลือกได้: auto, none, esbuild, tsx, tsup.')),
+              li(text('tsx is a Node loader mode, not a relocatable bundle mode.', 'tsx เป็น Node loader mode ไม่ใช่ bundle mode ที่ย้ายไฟล์ไปที่อื่นได้ง่าย.')),
+              li(text('Desktop icon input supports .ico, .png, and .svg.', 'desktop icon รองรับ .ico, .png และ .svg.')),
+              li(text('Icon auto-detect checks icon.* and favicon.* in the entry dir, project dir, and sibling public/ folders.', 'ระบบ auto-detect จะหา icon.* และ favicon.* จากโฟลเดอร์ entry, project root และ public/ ที่อยู่ข้างกัน.')),
+              li(text('Use createWindowServer(app, opts) when you want to run an HTTP app inside the desktop shell.', 'ใช้ createWindowServer(app, opts) เมื่อต้องการรัน HTTP app ภายใน desktop shell.'))
+            ),
 
-# Or use vercel.json for configuration:
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "cleanUrls": true,
-  "trailingSlash": false
-}`),
+            h2({ id: 'config' }, text('Config File', 'Config File')),
+            p(text(
+              'Elit loads one of these files from the project root: elit.config.ts, elit.config.js, elit.config.mjs, elit.config.cjs, or elit.config.json.',
+              'Elit จะโหลดไฟล์ใดไฟล์หนึ่งจาก project root: elit.config.ts, elit.config.js, elit.config.mjs, elit.config.cjs หรือ elit.config.json.'
+            )),
+            h3(text('Config Shape', 'โครงสร้าง config')),
+            codeExample(configShape),
+            h3(text('Example', 'ตัวอย่าง')),
+            codeExample(configExample),
+            ul(
+              li(text('build can be a single object or an array. Arrays run sequentially.', 'build อาจเป็น object เดียวหรือ array ก็ได้ และถ้าเป็น array จะรันทีละตัวตามลำดับ.')),
+              li(text('Only VITE_ variables are injected into client bundles.', 'มีเพียงตัวแปรที่ขึ้นต้นด้วย VITE_ เท่านั้นที่ถูก inject เข้า client bundle.')),
+              li(text('Environment files load in this order: .env.{mode}.local, .env.{mode}, .env.local, .env.', 'ไฟล์ env จะถูกโหลดตามลำดับ: .env.{mode}.local, .env.{mode}, .env.local, .env.')),
+              li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.'))
+            ),
 
-          h3('Netlify'),
-          p('Deploy to Netlify using their CLI or Git integration:'),
-          codeExample(`# Install Netlify CLI
-npm i -g netlify-cli
+            h2({ id: 'server' }, text('Server Patterns', 'รูปแบบฝั่ง Server')),
+            p(text(
+              'Server features live on elit/server. Do not use the old elit-server package name.',
+              'ฟีเจอร์ฝั่ง server อยู่บน elit/server และไม่ควรใช้ชื่อเก่า elit-server แล้ว.'
+            )),
+            h3('ServerRouter'),
+            codeExample(serverRouterExample),
+            h3(text('Programmatic Dev Server', 'Programmatic Dev Server')),
+            codeExample(devServerExample),
+            ul(
+              li(text('ServerRouter accepts both ctx-style handlers and Express-style req/res handlers.', 'ServerRouter รองรับทั้ง handler แบบ ctx และแบบ Express-style req/res.')),
+              li(text('createSharedState on the client pairs with server.state.create(...) on the server.', 'createSharedState ฝั่ง client ใช้งานคู่กับ server.state.create(...) ฝั่ง server.'))
+            ),
 
-# Build and deploy
-npm run build
-netlify deploy --prod --dir=dist
+            h2({ id: 'styling' }, text('Styling', 'Styling')),
+            p(text(
+              'Use CreateStyle when you want generated CSS with explicit injection.',
+              'ใช้ CreateStyle เมื่อต้องการสร้าง CSS แบบ programmatic และ inject เองอย่างชัดเจน.'
+            )),
+            codeExample(styleExample),
+            p(text(
+              'The package also exports a shared singleton as the default export of elit/style.',
+              'แพ็กเกจยัง export shared singleton เป็น default export ของ elit/style ด้วย.'
+            )),
 
-# Or use netlify.toml:
-[build]
-  command = "npm run build"
-  publish = "dist"
+            h2({ id: 'routing' }, text('Routing', 'Routing')),
+            p(text(
+              'createRouterView(router, options) returns a function. Render it inside a reactive block tied to router.currentRoute.',
+              'createRouterView(router, options) จะคืนค่าเป็นฟังก์ชัน และควร render ภายใน reactive block ที่อิงกับ router.currentRoute.'
+            )),
+            codeExample(routerExample),
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200`),
+            h2({ id: 'testing' }, text('Testing', 'Testing')),
+            p(text(
+              'Most users should stay on the CLI test runner. The lower-level test modules are available only for advanced integrations.',
+              'ผู้ใช้ส่วนใหญ่ควรใช้ test runner ผ่าน CLI ส่วน test modules ระดับล่างเหมาะกับ integration ขั้นสูงเท่านั้น.'
+            )),
+            codeExample(testExample),
+            ul(
+              li(text('Advanced subpaths: elit/test, elit/test-runtime, elit/test-reporter.', 'subpaths ขั้นสูง: elit/test, elit/test-runtime, elit/test-reporter.')),
+              li(text('The repository itself keeps tests under testing/.', 'ตัว repo นี้เก็บ tests ไว้ใต้โฟลเดอร์ testing/.'))
+            ),
 
-          h3('GitHub Pages'),
-          p('Deploy to GitHub Pages with GitHub Actions:'),
-          codeExample(`# .github/workflows/deploy.yml
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      - run: npm install
-      - run: npm run build
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist`),
-
-          h3('Docker'),
-          p('Containerize your Elit application:'),
-          codeExample(`# Dockerfile
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-
-# nginx.conf
-server {
-  listen 80;
-  location / {
-    root /usr/share/nginx/html;
-    index index.html;
-    try_files $uri $uri/ /index.html;
-
-    # Gzip compression
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript;
-
-    # Cache static assets
-    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-      expires 1y;
-      add_header Cache-Control "public, immutable";
-    }
-  }
-}`),
-
-          h3('Node.js Production Server'),
-          p('Serve your production build with Node.js:'),
-          codeExample(`// server.js
-import { createServer } from 'http';
-import { readFileSync, statSync } from 'fs';
-import { resolve, extname } from 'path';
-import { lookup } from 'mime-types';
-import { gzipSync } from 'zlib';
-
-const port = process.env.PORT || 3000;
-const dist = resolve('./dist');
-
-createServer((req, res) => {
-  let path = req.url === '/' ? '/index.html' : req.url;
-  const filePath = resolve(dist, path.slice(1));
-
-  try {
-    const content = readFileSync(filePath);
-    const mimeType = lookup(filePath) || 'text/html';
-    const ext = extname(filePath);
-
-    // Cache headers
-    const cacheControl = ext === '.html'
-      ? 'no-cache'
-      : 'public, max-age=31536000, immutable';
-
-    // Gzip compression
-    const compressible = /^(text|application\\/(javascript|json))/.test(mimeType);
-    const compressed = compressible ? gzipSync(content) : content;
-
-    res.writeHead(200, {
-      'Content-Type': mimeType,
-      'Cache-Control': cacheControl,
-      ...(compressible && { 'Content-Encoding': 'gzip' })
-    });
-    res.end(compressed);
-  } catch {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
-}).listen(port, () => console.log(\`Server running on port \${port}\`));`),
-
-          h3('Environment Variables'),
-          p('Use environment variables for different deployment environments:'),
-          codeExample(`// .env.production
-VITE_API_URL=https://api.example.com
-VITE_ENV=production
-
-// Access in your code
-const apiUrl = import.meta.env.VITE_API_URL;
-const isProd = import.meta.env.VITE_ENV === 'production';
-
-// Build with environment
-npm run build --mode production`)
+            h2({ id: 'deployment' }, text('Build & Preview', 'Build และ Preview')),
+            p(text(
+              'A minimal production workflow is build first, then preview the generated output.',
+              'workflow แบบ production ที่ง่ายที่สุดคือ build ก่อน แล้วค่อย preview output ที่ได้.'
+            )),
+            codeExample(deployExample),
+            ul(
+              li(text('If you copy index.html during build, update the script path to the built asset such as /main.js.', 'ถ้ามีการ copy index.html ระหว่าง build ต้องแก้ script path ให้ชี้ไปยังไฟล์ build เช่น /main.js.')),
+              li(text('Use preview when you want to verify the same output directory you plan to deploy.', 'ใช้ preview เมื่อต้องการตรวจ output directory เดียวกับที่เตรียม deploy.')),
+              li(text('For deeper API detail, continue to the API page and examples section.', 'ถ้าต้องการรายละเอียด API เพิ่ม ให้ดูต่อที่หน้า API และ examples.'))
+            )
+          )
         )
-      )
-    )
+      );
+    })
   );
 
 export const DocsPage = () =>

@@ -129,7 +129,9 @@ npm run dev
 npm install elit
 
 // 3. Create your app (src/main.ts)
-import { div, h1, button, createState, reactive, dom } from 'elit';
+import { div, h1, button } from 'elit/el';
+import { createState, reactive } from 'elit/state';
+import { render } from 'elit/dom';
 
 const count = createState(0);
 
@@ -144,7 +146,7 @@ const app = div({ className: 'app' },
   )
 );
 
-dom.render('#app', app);
+render('app', app);
 
 // Hot reload automatically on save!`;
 
@@ -165,7 +167,7 @@ export const QuickStart = (router: Router) =>
             div({ className: 'step-number' }, '2'),
             div({ className: 'step-content' },
               h3(t('quickstart.import')),
-              pre(code(...codeBlock("import { div, createState, reactive } from 'elit';")))
+              pre(code(...codeBlock("import { div } from 'elit/el';\nimport { createState, reactive } from 'elit/state';")))
             )
           ),
           div({ className: 'step' },
@@ -179,7 +181,7 @@ export const QuickStart = (router: Router) =>
             div({ className: 'step-number' }, '4'),
             div({ className: 'step-content' },
               h3(t('quickstart.render')),
-              pre(code(...codeBlock('dom.render("#app", app);')))
+              pre(code(...codeBlock('render("app", app);')))
             )
           )
         )
@@ -265,27 +267,27 @@ export const CodeComparison = () =>
   );
 
 // Elit vs Next.js Comparison
-const elitFullStackCode = `// Elit - Full-Stack in One File
-import { div, h1, button, createState, reactive, dom, router } from 'elit';
+const elitFullStackCode = `// Elit - Full-stack in one package
+import { div, h1, button } from 'elit/el';
+import { createState, reactive } from 'elit/state';
+import { render } from 'elit/dom';
+import { ServerRouter } from 'elit/server';
 
-// Client-side state
 const count = createState(0);
 
-// Client router
-const appRouter = router()
-  .get('/', () => div(h1('Home'), reactive(count, c => \`Count: \${c}\`)))
-  .get('/about', () => div(h1('About')));
+export const api = new ServerRouter()
+  .get('/api/data', (ctx) => {
+    ctx.res.json({ count: count.value });
+  });
 
-// Server API (elit.config.mjs)
-export default {
-  dev: {
-    api: router()
-      .get('/api/data', (req, res) => res.json({ count: 42 }))
-  },
-  build: { entry: 'src/main.ts', outDir: 'dist' }
-};
+const app = div(
+  h1('Home'),
+  reactive(count, (value) =>
+    button({ onclick: () => count.value++ }, \`Count: \${value}\`)
+  )
+);
 
-dom.render('#app', appRouter);`;
+render('app', app);`;
 
 const nextjsFullStackCode = `// Next.js - Multiple Files & Conventions
 // pages/index.tsx
@@ -973,12 +975,12 @@ export const FeaturedBlogs = (router: Router) => {
   const featuredBlogPosts = [
     {
       id: '18',
-      title: { en: 'Complete Guide to elit-server', th: 'คู่มือครบวงจร elit-server' },
+      title: { en: 'Guide to Elit Server APIs', th: 'คู่มือ Elit Server APIs' },
       description: {
-        en: 'Learn everything about elit-server - REST API, middleware, WebSocket, and production deployment',
-        th: 'เรียนรู้ทุกอย่างเกี่ยวกับ elit-server - REST API, middleware, WebSocket และการ deploy แบบ production'
+        en: 'Learn the current server surface: elit/server, REST API routes, middleware, WebSocket state, and production patterns',
+        th: 'เรียนรู้ surface ฝั่ง server ปัจจุบัน: elit/server, REST API routes, middleware, WebSocket state และแนวทาง production'
       },
-      tags: ['elit-server', 'REST API', 'Full Stack'],
+      tags: ['elit/server', 'REST API', 'Full Stack'],
       icon: '🚀'
     },
     {

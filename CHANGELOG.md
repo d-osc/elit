@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.4] - 2026-04-01
+
+### Added
+- **Native desktop mode** - Added a first-class desktop runtime and CLI flow for WebView apps
+  - New `elit desktop` command for running entries and building standalone executables
+  - New `elit/desktop` subpath with `createWindow`, `createWindowServer`, IPC helpers, and window control APIs
+  - Desktop runtime now supports QuickJS plus external Bun, Node.js, and Deno execution
+  - Added desktop smoke example and bundled native runtime sources via Cargo
+
+### Changed
+- **Desktop build pipeline** - Expanded desktop entry preparation and package distribution for native apps
+  - `elit desktop build --compiler` now supports `auto`, `none`, `esbuild`, `tsx`, and `tsup`
+  - Desktop build can prebuild the native runtime even without an entry file
+  - Published package now includes the `elit/desktop` export and Cargo files needed to build the native runtime
+- **Documentation refresh** - Reworked the main README and docs content around current module boundaries and workflows
+  - Updated examples to prefer subpath imports such as `elit/el`, `elit/state`, `elit/dom`, and `elit/server`
+  - Added desktop mode guidance, compiler notes, config examples, and AI-oriented usage rules
+
+### Fixed
+- **Desktop icon handling** - Window icons and Windows executable icons now support SVG assets in addition to PNG and ICO
+  - Added shared SVG rasterization for runtime window icons and EXE icon embedding
+  - Desktop icon auto-detection now checks `icon.*` and `favicon.*` in entry, project, and sibling `public/` directories
+
 ## [3.4.3] - 2026-04-01
 
 ### Fixed
