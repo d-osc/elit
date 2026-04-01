@@ -156,13 +156,15 @@ Useful flags:
 - `elit test --coverage --coverage-reporter text,html`
 - `elit desktop --runtime quickjs|node|bun|deno`
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
-- `elit desktop build --compiler auto|none|esbuild`
+- `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
 
 Desktop mode notes:
 
 - Cargo is required the first time the native runtime is built.
 - TypeScript entries are transpiled automatically when needed.
 - Desktop build can prebuild the native runtime even without an entry file.
+- `tsx` compiler mode is Node-only and keeps loading the original source tree instead of bundling it.
+- `tsx` and `tsup` compiler modes require those packages to be installed in the project.
 - Desktop icon support includes `.ico`, `.png`, and `.svg`.
 - Desktop build auto-detects `icon.*` and `favicon.*` in the entry directory, project directory, and sibling `public/` folders.
 
@@ -466,7 +468,8 @@ npx elit desktop build ./src/main.ts --release
 Desktop notes:
 
 - Runtime choices: `quickjs`, `node`, `bun`, `deno`
-- Transpiler choices: `auto`, `none`, `esbuild`
+- Transpiler choices: `auto`, `none`, `esbuild`, `tsx`, `tsup`
+- `tsx` is a Node loader mode, not a bundle mode. Use `esbuild` or `tsup` when you want a relocatable output.
 - Icon input supports `.ico`, `.png`, and `.svg`
 - EXE icon embedding and runtime window icon loading both support SVG now
 - `createWindowServer(app, opts)` is available when you want to run an HTTP app inside the desktop shell

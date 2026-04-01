@@ -1,14 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { build as esbuild } from 'esbuild';
 
 type DesktopRuntimeName = 'quickjs' | 'bun' | 'node' | 'deno';
-type DesktopCompilerName = 'auto' | 'none' | 'esbuild';
+type DesktopCompilerName = 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
 type DesktopFormat = 'iife' | 'cjs' | 'esm';
 type DesktopPlatform = keyof typeof PLATFORMS;
+
+type TsupModule = typeof import('tsup');
 
 interface DesktopRunOptions {
     runtime: DesktopRuntimeName;
@@ -37,7 +41,7 @@ interface PreparedEntry {
 
 const PACKAGE_ROOT = resolve(__dirname, '..');
 const DESKTOP_RUNTIMES: DesktopRuntimeName[] = ['quickjs', 'bun', 'node', 'deno'];
-const DESKTOP_COMPILERS: DesktopCompilerName[] = ['auto', 'none', 'esbuild'];
+const DESKTOP_COMPILERS: DesktopCompilerName[] = ['auto', 'none', 'esbuild', 'tsx', 'tsup'];
 const BUILD_FEATURES: Record<DesktopRuntimeName, string[]> = {
     quickjs: ['runtime-quickjs'],
     bun: ['runtime-external'],
@@ -191,37 +195,40 @@ function parseDesktopBuildArgs(args: string[]): DesktopBuildOptions {
 }
 
 function printDesktopHelp(): void {
-    console.log(`
-Desktop mode for Elit
-
-Usage:
-  elit desktop [options] <entry>
-  elit desktop build [options] <entry>
-  elit desktop build [options]
-
-Run options:
-  -r, --runtime <name>     Desktop runtime: quickjs, bun, node, deno
-  -c, --compiler <name>    Entry transpiler: auto, none, esbuild (default: auto)
-  --release                Use the release desktop runtime binary
-
-Build options:
-  -r, --runtime <name>     Runtime to embed in the app binary
-  -c, --compiler <name>    Entry transpiler: auto, none, esbuild (default: auto)
-  -p, --platform <name>    Target platform (${Object.keys(PLATFORMS).join(', ')})
-  -o, --out-dir <dir>      Output directory (default: dist)
-  --release                Build the desktop runtime in release mode
-
-Examples:
-  elit desktop src/main.ts
-  elit desktop --runtime node app.ts
-  elit desktop build src/main.ts
-  elit desktop build --runtime bun --release src/main.ts
-
-Notes:
-  - Cargo is required to build the native WebView runtime.
-  - TypeScript and module-style QuickJS entries are transpiled automatically.
-  - The build subcommand can be used without an entry to prebuild the native runtime.
-`);
+    console.log([
+        '',
+        'Desktop mode for Elit',
+        '',
+        'Usage:',
+        '  elit desktop [options] <entry>',
+        '  elit desktop build [options] <entry>',
+        '  elit desktop build [options]',
+        '',
+        'Run options:',
+        '  -r, --runtime <name>     Desktop runtime: quickjs, bun, node, deno',
+        '  -c, --compiler <name>    Entry transpiler: auto, none, esbuild, tsx, tsup (default: auto)',
+        '  --release                Use the release desktop runtime binary',
+        '',
+        'Build options:',
+        '  -r, --runtime <name>     Runtime to embed in the app binary',
+        '  -c, --compiler <name>    Entry transpiler: auto, none, esbuild, tsx, tsup (default: auto)',
+        `  -p, --platform <name>    Target platform (${Object.keys(PLATFORMS).join(', ')})`,
+        '  -o, --out-dir <dir>      Output directory (default: dist)',
+        '  --release                Build the desktop runtime in release mode',
+        '',
+        'Examples:',
+        '  elit desktop src/main.ts',
+        '  elit desktop --runtime node app.ts',
+        '  elit desktop build src/main.ts',
+        '  elit desktop build --runtime bun --release src/main.ts',
+        '',
+        'Notes:',
+        '  - Cargo is required to build the native WebView runtime.',
+        '  - TypeScript and module-style QuickJS entries are transpiled automatically.',
+        '  - The tsx compiler is Node-only and keeps loading the original source tree.',
+        '  - The tsx and tsup compilers require those packages to be installed.',
+        '  - The build subcommand can be used without an entry to prebuild the native runtime.',
+    ].join('\n'));
 }
 
 async function runDesktopRuntime(options: DesktopRunOptions): Promise<void> {
@@ -427,17 +434,14 @@ async function prepareEntry(
     const compiledPath = join(dirname(entryPath), `.elit-desktop-${appName}-${randomUUID()}${output.extension}`);
 
     try {
-        await esbuild({
-            absWorkingDir: dirname(entryPath),
-            bundle: true,
-            entryPoints: [entryPath],
-            format: output.format,
-            logLevel: 'silent',
-            mainFields: output.platform === 'node' ? ['module', 'main'] : ['browser', 'module', 'main'],
-            outfile: compiledPath,
-            platform: output.platform,
-            sourcemap: false,
-            target: runtime === 'quickjs' ? ['es2020'] : ['es2022'],
+        await compileDesktopEntry({
+            appName,
+            compiledPath,
+            compiler,
+            entryPath,
+            mode,
+            output,
+            runtime,
         });
     } catch (error) {
         cleanupPreparedEntry({ appName, entryPath: compiledPath, cleanupPath: compiledPath });
@@ -461,11 +465,173 @@ function shouldCompileEntry(
         return false;
     }
 
-    if (compiler === 'esbuild') {
+    if (compiler === 'esbuild' || compiler === 'tsx' || compiler === 'tsup') {
         return true;
     }
 
     return mode === 'build' || runtime === 'quickjs' || TS_LIKE_EXTENSIONS.has(extname(entryPath).toLowerCase());
+}
+
+async function compileDesktopEntry(options: {
+    appName: string;
+    compiledPath: string;
+    compiler: DesktopCompilerName;
+    entryPath: string;
+    mode: 'run' | 'build';
+    output: { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' };
+    runtime: DesktopRuntimeName;
+}): Promise<void> {
+    switch (options.compiler) {
+        case 'tsup':
+            await compileDesktopEntryWithTsup(options);
+            return;
+        case 'tsx':
+            await compileDesktopEntryWithTsx(options);
+            return;
+        case 'auto':
+        case 'esbuild':
+        default:
+            await compileDesktopEntryWithEsbuild(options);
+            return;
+    }
+}
+
+async function compileDesktopEntryWithEsbuild(options: {
+    compiledPath: string;
+    entryPath: string;
+    output: { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' };
+    runtime: DesktopRuntimeName;
+}): Promise<void> {
+    await esbuild({
+        absWorkingDir: dirname(options.entryPath),
+        bundle: true,
+        entryPoints: [options.entryPath],
+        format: options.output.format,
+        logLevel: 'silent',
+        mainFields: options.output.platform === 'node' ? ['module', 'main'] : ['browser', 'module', 'main'],
+        outfile: options.compiledPath,
+        platform: options.output.platform,
+        sourcemap: false,
+        target: options.runtime === 'quickjs' ? ['es2020'] : ['es2022'],
+    });
+}
+
+async function compileDesktopEntryWithTsup(options: {
+    compiledPath: string;
+    entryPath: string;
+    output: { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' };
+    runtime: DesktopRuntimeName;
+}): Promise<void> {
+    const tsup = await loadOptionalDesktopCompiler<TsupModule>('tsup', options.entryPath, 'tsup');
+    const outputBaseName = basename(options.compiledPath, extname(options.compiledPath));
+
+    await tsup.build({
+        bundle: true,
+        clean: false,
+        config: false,
+        dts: false,
+        entry: { [outputBaseName]: options.entryPath },
+        format: [options.output.format],
+        noExternal: [/^elit(?:\/|$)/],
+        outDir: dirname(options.compiledPath),
+        outExtension: () => ({ js: options.output.extension }),
+        platform: options.output.platform,
+        silent: true,
+        skipNodeModulesBundle: false,
+        sourcemap: false,
+        splitting: false,
+        target: options.runtime === 'quickjs' ? 'es2020' : 'es2022',
+        esbuildOptions(esbuildOptions) {
+            esbuildOptions.logLevel = 'silent';
+            esbuildOptions.mainFields = options.output.platform === 'node'
+                ? ['module', 'main']
+                : ['browser', 'module', 'main'];
+        },
+    });
+
+    const actualOutputPath = findTsupOutputPath(options.compiledPath, options.output.extension);
+    if (!actualOutputPath) {
+        throw new Error(`Desktop compiler "tsup" did not produce the expected output: ${options.compiledPath}`);
+    }
+
+    if (actualOutputPath !== options.compiledPath) {
+        renameSync(actualOutputPath, options.compiledPath);
+    }
+}
+
+async function compileDesktopEntryWithTsx(options: {
+    compiledPath: string;
+    entryPath: string;
+    mode: 'run' | 'build';
+    runtime: DesktopRuntimeName;
+}): Promise<void> {
+    if (options.runtime !== 'node') {
+        throw new Error('Desktop compiler "tsx" is only supported with --runtime node.');
+    }
+
+    if (options.mode === 'build') {
+        console.warn('[desktop] compiler "tsx" generates a Node loader stub that keeps reading the original source tree at runtime.');
+    }
+
+    const tsxApiPath = resolveOptionalDesktopCompilerPath('tsx/esm/api', options.entryPath, 'tsx');
+    const entryUrl = pathToFileURL(options.entryPath).href;
+    const bootstrap = [
+        `'use strict';`,
+        `const { register } = require(${JSON.stringify(tsxApiPath)});`,
+        `register();`,
+        `import(${JSON.stringify(entryUrl)}).catch((error) => {`,
+        `    console.error(error);`,
+        `    process.exit(1);`,
+        `});`,
+        '',
+    ].join('\n');
+
+    writeFileSync(options.compiledPath, bootstrap);
+}
+
+async function loadOptionalDesktopCompiler<T>(
+    specifier: string,
+    entryPath: string,
+    compiler: Extract<DesktopCompilerName, 'tsx' | 'tsup'>,
+): Promise<T> {
+    const resolvedPath = resolveOptionalDesktopCompilerPath(specifier, entryPath, compiler);
+    return import(pathToFileURL(resolvedPath).href) as Promise<T>;
+}
+
+function resolveOptionalDesktopCompilerPath(
+    specifier: string,
+    entryPath: string,
+    compiler: Extract<DesktopCompilerName, 'tsx' | 'tsup'>,
+): string {
+    const searchRoots = Array.from(new Set([
+        dirname(resolve(entryPath)),
+        resolve(process.cwd()),
+        PACKAGE_ROOT,
+    ]));
+
+    for (const searchRoot of searchRoots) {
+        try {
+            return createRequire(join(searchRoot, '__elit-desktop__.cjs')).resolve(specifier);
+        } catch {
+            continue;
+        }
+    }
+
+    throw new Error(
+        `Desktop compiler "${compiler}" requires the ${compiler} package to be installed. Try: npm install -D ${compiler}`,
+    );
+}
+
+function findTsupOutputPath(expectedPath: string, expectedExtension: string): string | undefined {
+    const basePath = expectedPath.slice(0, -expectedExtension.length);
+    const candidates = [
+        expectedPath,
+        `${basePath}.js`,
+        `${basePath}.cjs`,
+        `${basePath}.mjs`,
+    ];
+
+    return candidates.find((candidate, index) => candidates.indexOf(candidate) === index && existsSync(candidate));
 }
 
 function compileTarget(runtime: DesktopRuntimeName): { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' } {
