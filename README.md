@@ -163,6 +163,7 @@ Useful flags:
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
 - `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
 - `elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist`
+- `elit mobile doctor --cwd .`
 - `elit mobile sync --cwd . --web-dir dist`
 - `elit mobile open android|ios`
 - `elit mobile run android|ios --cwd . --target <device-id> --prod`
@@ -191,6 +192,7 @@ Mobile mode notes:
 - Android workflow is fully scaffolded: assets are synced to `android/app/src/main/assets/public` and loaded in WebView.
 - Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
 - Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
+- Run `elit mobile doctor` to validate local toolchain and project prerequisites before build or run.
 - iOS workflow currently creates scaffold placeholders for Xcode integration.
 
 WAPK mode notes:

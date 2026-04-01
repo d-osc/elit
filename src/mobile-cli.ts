@@ -41,6 +41,9 @@ export async function runMobileCommand(args: string[]): Promise<void> {
         case 'init':
             initMobileProject(parseInitArgs(args.slice(1), mobileConfig));
             break;
+        case 'doctor':
+            runMobileDoctor(parseCommandOptions(args.slice(1), mobileConfig));
+            break;
         case 'sync':
             syncMobileAssets(parseCommandOptions(args.slice(1), mobileConfig));
             break;
@@ -274,6 +277,70 @@ function openMobileProject(platform: MobilePlatform, options: MobileCommandOptio
     throw new Error('iOS project opening is available only on macOS.');
 }
 
+function runMobileDoctor(options: MobileCommandOptions): void {
+    const checks: Array<{ name: string; ok: boolean; details?: string }> = [];
+    const mobileConfigPath = join(options.cwd, 'elit.mobile.json');
+    const androidRoot = join(options.cwd, 'android');
+    const iosRoot = join(options.cwd, 'ios');
+
+    checks.push({
+        name: 'Project config (elit.mobile.json)',
+        ok: existsSync(mobileConfigPath),
+        details: existsSync(mobileConfigPath) ? mobileConfigPath : 'Run "elit mobile init" to scaffold mobile files.',
+    });
+
+    const hasGradleWrapper = existsSync(join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'));
+    checks.push({
+        name: 'Gradle (gradle or gradlew)',
+        ok: hasGradleWrapper || commandExists('gradle', options.cwd),
+        details: hasGradleWrapper ? 'Using project gradle wrapper.' : 'Install Gradle or generate gradle wrapper in android/.',
+    });
+    checks.push({ name: 'Java JDK (java)', ok: commandExists('java', options.cwd) });
+    checks.push({ name: 'Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT)', ok: Boolean(process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT) });
+    checks.push({ name: 'ADB (adb)', ok: commandExists('adb', options.cwd) });
+    checks.push({
+        name: 'Android scaffold (android/)',
+        ok: existsSync(androidRoot),
+        details: existsSync(androidRoot) ? androidRoot : 'Run "elit mobile init" first.',
+    });
+
+    if (process.platform === 'darwin') {
+        checks.push({ name: 'Xcode tools (xcodebuild)', ok: commandExists('xcodebuild', options.cwd) });
+        checks.push({ name: 'CocoaPods (pod)', ok: commandExists('pod', options.cwd) });
+        checks.push({
+            name: 'iOS scaffold (ios/)',
+            ok: existsSync(iosRoot),
+            details: existsSync(iosRoot) ? iosRoot : 'Run "elit mobile init" first.',
+        });
+    }
+
+    console.log('[mobile doctor] Environment checks:');
+    for (const check of checks) {
+        const status = check.ok ? 'OK' : 'MISSING';
+        console.log(`  [${status}] ${check.name}`);
+        if (!check.ok && check.details) {
+            console.log(`    -> ${check.details}`);
+        }
+    }
+
+    const failed = checks.filter((check) => !check.ok).length;
+    if (failed > 0) {
+        throw new Error(`[mobile doctor] ${failed} check(s) failed.`);
+    }
+
+    console.log('[mobile doctor] All checks passed.');
+}
+
+function commandExists(command: string, cwd: string): boolean {
+    const checker = process.platform === 'win32' ? 'where' : 'which';
+    const result = spawnSync(checker, [command], {
+        cwd,
+        stdio: 'ignore',
+        shell: false,
+    });
+    return result.status === 0;
+}
+
 function runGradle(cwd: string, args: string[]): void {
     const androidRoot = join(cwd, 'android');
     if (!existsSync(androidRoot)) {
@@ -406,14 +473,14 @@ function createAndroidScaffold(directory: string, app: { appId: string; appName:
                 "import android.webkit.WebView\n" +
                 "import androidx.appcompat.app.AppCompatActivity\n\n" +
                 "class MainActivity : AppCompatActivity() {\n" +
-                "  @SuppressLint(\"SetJavaScriptEnabled\")\\n" +
+                "  @SuppressLint(\"SetJavaScriptEnabled\")\n" +
                 "  override fun onCreate(savedInstanceState: Bundle?) {\n" +
                 "    super.onCreate(savedInstanceState)\n" +
                 "    val webView = WebView(this)\n" +
                 "    val settings: WebSettings = webView.settings\n" +
                 "    settings.javaScriptEnabled = true\n" +
                 "    settings.domStorageEnabled = true\n" +
-                "    webView.loadUrl(\"file:///android_asset/public/index.html\")\\n" +
+                "    webView.loadUrl(\"file:///android_asset/public/index.html\")\n" +
                 "    setContentView(webView)\n" +
                 "  }\n" +
                 "}\n",
@@ -491,6 +558,7 @@ Mobile command (native app workflow owned by elit)
 
 Usage:
   elit mobile init [directory] [--app-id id] [--app-name name] [--web-dir dist]
+    elit mobile doctor [--cwd dir]
     elit mobile sync [--cwd dir] [--web-dir dist]
   elit mobile open android|ios
     elit mobile run android|ios [--cwd dir] [--web-dir dist] [--target <id>] [--prod]
@@ -500,6 +568,7 @@ Notes:
     - No external mobile framework is required.
     - Android is fully scaffolded by elit and uses WebView + bundled web assets.
     - iOS scaffold is a placeholder folder for Xcode integration.
+    - Run "elit mobile doctor" to verify local native toolchain readiness.
     - Default values can be set in elit.config.* under mobile.
 `);
 }

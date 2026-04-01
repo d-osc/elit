@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile mode (native shell workflow)** - Added first-class `elit mobile` command group for Android and iOS workflows
   - Added `elit mobile init [directory]` to scaffold `elit.mobile.json` and native project structure
   - Added `elit mobile sync`, `elit mobile open android|ios`, `elit mobile run android|ios`, and `elit mobile build android|ios`
+  - Added `elit mobile doctor` to verify native mobile toolchain readiness and project prerequisites
   - Added `mobile` config support in `elit.config.*` (`cwd`, `appId`, `appName`, `webDir`)
 - **WAPK CLI workflows** - Added first-class WAPK command flows for package lifecycle and runtime execution
   - Added `elit wapk <file.wapk>` and `elit wapk run <file.wapk>` execution paths
