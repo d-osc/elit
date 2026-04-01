@@ -5,6 +5,7 @@ export default defineConfig([
     {
         entry: {
             index: 'src/index.ts',
+            desktop: 'src/desktop.ts',
             dom: 'src/dom.ts',
             el: 'src/el.ts',
             router: 'src/router.ts',

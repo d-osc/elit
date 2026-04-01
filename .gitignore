@@ -7,6 +7,8 @@ coverage
 .env
 .npmrc
 nul
+target
+.elit-desktop-*
 
 # License copied during build
 server/LICENSE

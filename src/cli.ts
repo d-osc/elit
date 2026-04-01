@@ -6,9 +6,10 @@
 import { loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
+import { runDesktopCommand } from './desktop-cli';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -99,6 +100,9 @@ async function main() {
             break;
         case 'test':
             await runTest(args.slice(1));
+            break;
+        case 'desktop':
+            await runDesktop(args.slice(1));
             break;
         case 'version':
             printVersion();
@@ -356,6 +360,15 @@ async function runTest(args: string[]) {
     }
 }
 
+async function runDesktop(args: string[]) {
+    try {
+        await runDesktopCommand(args);
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : error);
+        process.exit(1);
+    }
+}
+
 interface TestOptions {
     files?: string[];
     include?: string[];
@@ -518,6 +531,7 @@ Commands:
   build     Build for production
   preview   Preview production build
   test      Run tests
+  desktop   Run or build a native desktop app
   version   Show version number
   help      Show this help message
 
@@ -535,6 +549,12 @@ Build Options:
   --no-minify            Disable minification
   --sourcemap            Generate sourcemap
   --silent               Disable logging
+
+Desktop Options:
+  elit desktop <entry>                       Run an Elit desktop entry
+  elit desktop build <entry>                Build a standalone desktop executable
+  elit desktop --runtime node src/main.ts   Run with Node.js backend runtime
+  elit desktop build --release src/main.ts  Build a release desktop executable
 
 Note: Build configuration supports both single and multiple builds:
       - Single build: build: { entry: 'src/app.ts', outDir: 'dist' }

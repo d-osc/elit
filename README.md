@@ -1,118 +1,197 @@
 # Elit
 
-⚡ A lightweight TypeScript framework with built-in dev server, HMR, routing, and reactive state management. **Zero production dependencies**, maximum developer experience.
+Elit is a TypeScript toolkit for building browser UIs, dev servers, SSR pages, tests, desktop WebView apps, and small file-backed backends from one package.
 
-[![npm version](https://img.shields.io/npm/v/elit.svg)](https://www.npmjs.com/package/elit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/badge/bundle%20size-lightweight-success)](https://bundlephobia.com/package/elit)
+The package is split by runtime. Browser-facing APIs live in `elit` and the client subpaths, server APIs live in `elit/server`, desktop APIs live in `elit/desktop`, and the CLI is `elit`.
 
-> **Quick Links:** [Installation](#installation) | [Features](#features) | [Quick Start](#quick-start) | [CLI Tools](#cli-tools) | [API](#api) | [Deployment](#deployment)
+## AI Quick Context
 
-## Why Elit?
+If you are generating or editing code for Elit, follow these rules first:
 
-### Frontend Excellence
-- **🎯 Ultra Lightweight**: Modular design - import only what you need (DOM: 11KB, State: 15KB)
-- **⚡ Lightning Fast**: Direct DOM manipulation - no virtual DOM overhead
-- **🔄 Reactive State**: Simple but powerful reactive state management with `createState` and `computed`
-- **🎨 CSS-in-JS**: Type-safe styling with `CreateStyle`
-- **🛣️ Client Router**: Hash and history mode routing with dynamic parameters and guards
-- **📱 Virtual Scrolling**: Handle 100k+ items efficiently
-- **🌲 Tree-Shakeable**: Smart ES modules - only bundle what you use
+- Use `elit` or the client subpaths for browser UI code.
+- Use `elit/server` for HTTP routes, middleware, dev server, preview server, and server-side shared state.
+- Use `elit/desktop` only inside `elit desktop ...` runtime. Those APIs are injected by the native desktop runtime and are not normal browser globals.
+- Use `elit/build` for programmatic bundling.
+- Use `elit/database` for the VM-backed file database helpers.
+- Do not use `elit-server`. Old docs may mention it, but the current package export is `elit/server`.
+- Prefer subpath imports in generated code. They make environment boundaries obvious.
+- `createRouterView(router, options)` returns a function. Render it inside `reactive(router.currentRoute, () => RouterView())`.
+- Browser-facing code may import local `.ts` files during development. Elit rewrites those imports for browser output.
+- Config files can be `elit.config.ts`, `elit.config.js`, `elit.config.mjs`, `elit.config.cjs`, or `elit.config.json`.
+- Environment files are loaded in this order: `.env.{mode}.local`, `.env.{mode}`, `.env.local`, `.env`.
+- Only `VITE_` variables are injected into client bundles.
 
-### Backend Performance
-- **🚀 High Performance**: 10,000+ req/s on Node.js with sub-7ms latency
-- **🌐 ServerRouter**: Full-featured routing with only 2.7% overhead vs raw HTTP
-- **🔌 WebSocket**: Built-in real-time communication support
-- **⚡ Cross-Runtime**: Works on Node.js, Bun, and Deno with runtime-specific optimizations
-- **🔧 Middleware Stack**: CORS, logging, rate limiting, compression, and more
-- **🔐 Zero Dependencies**: No production dependencies for maximum security
+## Install
 
-### Developer Experience
-- **🔷 TypeScript First**: Full type safety and IntelliSense out of the box
-- **📝 TypeScript Imports**: Write `import './file.ts'` - automatically rewritten to `.js` for browsers
-- **🔥 Hot Module Replacement**: Instant development feedback with automatic HMR
-- **🏗️ Build System**: Integrated esbuild for fast production builds
-- **🎯 Zero Config**: Works out of the box with optional `elit.config.ts`
-- **📦 CLI Tools**: `npx elit dev`, `npx elit build`, `npx elit preview`
-- **🌍 Environment Support**: .env files with VITE_ prefix
-
-## Quick Start
-
-The fastest way to get started with Elit is using our scaffolding tool:
+Create a new app with the scaffold:
 
 ```bash
-# With npm
 npm create elit@latest my-app
-
-# With yarn
-yarn create elit my-app
-
-# With pnpm
-pnpm create elit my-app
-
-# With bun
-bun create elit my-app
-
-# With deno
-deno run -A npm:create-elit my-app
-```
-
-Then follow the prompts!
-
-```bash
 cd my-app
 npm install
 npm run dev
 ```
 
-### Available Templates
-
-Choose a template with the `--template` flag:
-
-- **basic** (default) - Full-featured app with styled counter example
-- **full** - Full-stack app with dev server and API routes
-- **minimal** - Minimal setup with just DOM rendering
+Other package managers:
 
 ```bash
-npm create elit@latest my-app --template=full
+yarn create elit my-app
+pnpm create elit my-app
+bun create elit my-app
+deno run -A npm:create-elit my-app
 ```
 
-## Manual Installation
-
-If you prefer to set up manually:
+Manual install:
 
 ```bash
 npm install elit
 ```
 
-## CLI Tools
+If you want desktop mode, install Cargo as well. The native desktop runtime is built with Rust.
 
-Elit includes a powerful CLI for development and production:
+## Module Map
 
-```bash
-# Development server with HMR
-npx elit dev
+Use this table as the import map for generated code.
 
-# Production build
-npx elit build
+| Import | Use it for | Main exports |
+| --- | --- | --- |
+| `elit` | Client-side all-in-one entry | DOM helpers, element factories, state, styles, router, HMR |
+| `elit/dom` | DOM renderer and SSR string rendering | `dom`, `render`, `renderToString`, `mount` |
+| `elit/el` | HTML, SVG, and MathML element factories | `div`, `button`, `html`, `body`, `script`, and many more |
+| `elit/state` | Reactive state and render helpers | `createState`, `computed`, `reactive`, `text`, `bindValue`, `bindChecked`, `createSharedState` |
+| `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
+| `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
+| `elit/server` | HTTP router, dev server, middleware, shared server state | `ServerRouter`, `createDevServer`, `cors`, `logger`, `rateLimit`, `compress`, `security`, `StateManager` |
+| `elit/build` | Programmatic build API | `build` |
+| `elit/desktop` | Native desktop window APIs | `createWindow`, `createWindowServer`, `onMessage`, `windowQuit`, `windowSetTitle`, `windowEval` |
+| `elit/database` | VM-backed file database | `Database`, `create`, `read`, `save`, `update`, `rename`, `remove` |
+| `elit/test` | Test runner module entry | test runtime helpers used by the CLI |
 
-# Preview production build
-npx elit preview
+Advanced subpaths also exist for lower-level adapters and internals: `elit/http`, `elit/https`, `elit/ws`, `elit/wss`, `elit/fs`, `elit/path`, `elit/mime-types`, `elit/chokidar`, `elit/runtime`, `elit/test-runtime`, `elit/test-reporter`, and `elit/types`.
 
-# Mobile app builds (Android & iOS)
-npx elit android init              # Initialize mobile project
-npx elit android sync               # Sync web build to mobile
-npx elit android open --platform android  # Open Android Studio
-npx elit android build --platform android  # Build APK/AAB
+## Fastest Working App
+
+This is the smallest browser app that works with the current CLI.
+
+Project structure:
+
+```text
+my-app/
+  index.html
+  src/
+    main.ts
 ```
 
-### Configuration
+`src/main.ts`
 
-Create `elit.config.ts` (or .js, .mjs, .json) in your project root:
+```ts
+import { div, h1, button } from 'elit/el';
+import { createState, reactive } from 'elit/state';
+import { render } from 'elit/dom';
 
-```typescript
-import { server } from './src/server';
-import { client } from './src/client';
+const count = createState(0);
+
+const app = div(
+  { className: 'app' },
+  h1('Hello Elit'),
+  reactive(count, (value) =>
+    button({ onclick: () => count.value++ }, `Count: ${value}`)
+  )
+);
+
+render('app', app);
+```
+
+`index.html`
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elit App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+```
+
+Run it:
+
+```bash
+npx elit dev
+```
+
+Notes:
+
+- `render('app', app)` and `render('#app', app)` both work.
+- During development you can point the browser to `/src/main.ts` directly.
+- For production builds, your copied HTML should point to the built asset path such as `/main.js`.
+
+## CLI
+
+Main commands:
+
+```bash
+npx elit dev
+npx elit build --entry ./src/main.ts --out-dir dist
+npx elit preview
+npx elit test
+npx elit desktop ./src/main.ts
+npx elit desktop build ./src/main.ts --release
+```
+
+Useful flags:
+
+- `elit dev --port 3000 --host 0.0.0.0 --no-open`
+- `elit build --entry ./src/main.ts --out-dir dist --format esm --sourcemap`
+- `elit preview --root dist --base-path /app`
+- `elit test --watch`
+- `elit test --file ./testing/unit/database.test.ts`
+- `elit test --describe "Database"`
+- `elit test --it "saves records"`
+- `elit test --coverage --coverage-reporter text,html`
+- `elit desktop --runtime quickjs|node|bun|deno`
+- `elit desktop build --platform windows|linux|macos --out-dir dist`
+- `elit desktop build --compiler auto|none|esbuild`
+
+Desktop mode notes:
+
+- Cargo is required the first time the native runtime is built.
+- TypeScript entries are transpiled automatically when needed.
+- Desktop build can prebuild the native runtime even without an entry file.
+- Desktop icon support includes `.ico`, `.png`, and `.svg`.
+- Desktop build auto-detects `icon.*` and `favicon.*` in the entry directory, project directory, and sibling `public/` folders.
+
+## Config File
+
+Elit loads one of these files from the project root:
+
+- `elit.config.ts`
+- `elit.config.js`
+- `elit.config.mjs`
+- `elit.config.cjs`
+- `elit.config.json`
+
+The config shape is:
+
+```ts
+{
+  dev?: DevServerOptions;
+  build?: BuildOptions | BuildOptions[];
+  preview?: PreviewOptions;
+  test?: TestOptions;
+}
+```
+
+Example:
+
+```ts
+import { api } from './src/server';
+import { documentShell } from './src/document';
 
 export default {
   dev: {
@@ -120,1036 +199,383 @@ export default {
     host: '0.0.0.0',
     open: false,
     logging: true,
-    hmr: true,  // Enable/disable Hot Module Replacement
-    clients: [{
-      root: '.',
-      basePath: '',
-      ssr: () => client,  // Server-side rendering
-      api: server         // API routes
-    }]
+    clients: [
+      {
+        root: '.',
+        basePath: '',
+        ssr: () => documentShell,
+        api,
+      },
+    ],
   },
-  build: [{
-    entry: './src/main.ts',
-    outDir: './dist',
-    outFile: 'main.js',
-    format: 'esm',
-    minify: true,
-    sourcemap: true,
-    target: 'es2020',
-    copy: [
-      { from: './public/index.html', to: './index.html' }
-    ]
-  }],
+  build: [
+    {
+      entry: './src/main.ts',
+      outDir: './dist',
+      outFile: 'main.js',
+      format: 'esm',
+      sourcemap: true,
+      copy: [
+        { from: './public/index.html', to: './index.html' },
+      ],
+    },
+  ],
   preview: {
-    port: 3000,
-    host: '0.0.0.0',
-    open: false,
-    logging: true,
     root: './dist',
-    basePath: '',
-    index: './index.html'
+    index: './index.html',
+    port: 4173,
   },
-  mobile: {
-    appId: 'com.example.myapp',
-    appName: 'My App',
-    webDir: 'dist',
-    version: '1.0.0',
-    platforms: ['android', 'ios']
-  }
+  test: {
+    include: ['testing/unit/**/*.test.ts'],
+  },
 };
 ```
 
-**Server setup (src/server.ts):**
+Important details:
 
-```typescript
-import { ServerRouter } from 'elit/server';
+- `build` may be a single object or an array. If it is an array, all builds run sequentially.
+- `dev.clients` is the most flexible setup when you want SSR, API routes, multiple apps, or per-client proxy rules.
+- `preview` supports the same concepts as `dev`: multiple clients, API routes, proxy rules, workers, SSR, and HTTPS.
+- Only `VITE_` variables are exposed to client code during bundling.
 
-export const router = new ServerRouter();
+## Browser Patterns
 
-router.get('/api/hello', async (ctx) => {
-    ctx.res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-    ctx.res.end("Hello from Elit ServerRouter!");
+### Elements and State
+
+```ts
+import { div, input, button, span } from 'elit/el';
+import { createState, computed, reactive, bindValue } from 'elit/state';
+import { render } from 'elit/dom';
+
+const name = createState('Elit');
+const count = createState(0);
+const label = computed([name, count], (currentName, currentCount) => {
+  return `${currentName}: ${currentCount}`;
 });
 
-export const server = router;
-```
-
-**Client SSR template (src/client.ts):**
-
-```typescript
-import { div, html, head, body, title, link, script, meta } from 'elit/el';
-
-export const client = html(
-    head(
-        title('Elit - Full-Stack TypeScript Framework'),
-        link({ rel: 'icon', type: 'image/svg+xml', href: 'favicon.svg' }),
-        meta({ charset: 'UTF-8' }),
-        meta({ name: 'viewport', content: 'width=device-width, initial-scale=1.0' }),
-        meta({ name: 'description', content: 'Full-stack TypeScript framework' })
-    ),
-    body(
-        div({ id: 'root' }),
-        script({ type: 'module', src: '/src/main.js' })
-    )
-);
-```
-
-## Features
-
-### Frontend Framework
-
-- 🎯 **Modular & Lightweight**: DOM (11KB), State (15KB), Router (13KB) - use only what you need
-- ⚡ **Reactive State**: Built-in reactive state management with `createState` and automatic dependency tracking
-- 🔄 **Computed Values**: Automatic dependency tracking with `computed` for derived state
-- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle` and support for pseudo-selectors
-- 🛣️ **Client-Side Router**: Hash and history mode routing with dynamic parameters and navigation guards
-- 📱 **Virtual Scrolling**: Handle 100k+ items efficiently with `createVirtualList`
-- 🖥️ **SSR Support**: Full server-side rendering with `renderToString`
-- 🎭 **100+ Elements**: Complete HTML, SVG, and MathML element support
-- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering, chunked rendering
-- 📦 **Tree-Shakeable**: ES modules with excellent tree-shaking support
-- 🎮 **DOM Utilities**: Query selectors, element creation, fragment support
-
-### Backend & Development
-
-- 🔥 **Hot Module Replacement**: Instant development feedback with automatic state preservation
-- 🏗️ **Build System**: Integrated esbuild with runtime-specific optimizations (Node.js, Bun, Deno)
-- 🌐 **ServerRouter**: High-performance routing (10,128 req/s) with minimal overhead (2.7%)
-- 🔧 **Rich Middleware**: CORS, logging, rate limiting, compression, security headers, and more
-- 🔌 **WebSocket Server**: Built-in WebSocket with automatic state synchronization
-- 📁 **Static File Server**: Efficient serving with proper MIME types and caching
-- 🎯 **Smart Defaults**: Zero-config development with optional `elit.config.mjs`
-- 📦 **Auto TypeScript**: Automatic TypeScript compilation on all runtimes
-- 🌍 **Environment Variables**: .env file support with VITE_ prefix
-- ⚡ **Cross-Runtime**: Optimized for Node.js, Bun, and Deno with specific adaptations
-
-## Manual Setup
-
-If you prefer to set up your project manually:
-
-### 1. Create Your Project
-
-```bash
-# Create a new directory
-mkdir my-elit-app
-cd my-elit-app
-
-# Initialize package.json
-npm init -y
-
-# Install Elit
-npm install elit
-```
-
-### 2. Create Your App
-
-Create `src/main.ts`:
-
-```typescript
-import { div, h1, button, createState, reactive, dom } from 'elit';
-
-const count = createState(0);
-
-const app = div({ className: 'app' },
-  h1('Hello Elit! 🚀'),
-  reactive(count, (value) =>
-    button({
-      onclick: () => count.value++,
-      className: 'btn'
-    }, `Count: ${value}`)
-  )
-);
-
-// Render to DOM
-dom.render('#app', app);
-```
-
-Create `index.html`:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Elit App</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script type="module" src="src/main.ts"></script>
-</body>
-</html>
-```
-
-### 3. Start Development Server
-
-```bash
-npx elit dev
-```
-
-Your app will automatically reload when you make changes with HMR!
-
-### CDN Usage
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>
-</head>
-<body>
-  <div id="app"></div>
-  <script>
-    const { div, h1, button, createState, reactive, dom } = window;
-
-    const count = createState(0);
-    const app = div(
-      h1('Hello from CDN!'),
-      reactive(count, value =>
-        button({ onclick: () => count.value++ }, `Count: ${value}`)
-      )
-    );
-
-    dom.render('#app', app);
-  </script>
-</body>
-</html>
-```
-
-## API
-
-### Element Factories
-
-Create virtual DOM nodes using element factory functions:
-
-```typescript
-import { div, span, a, button, input, form } from 'elit';
-
-const element = div({ className: 'container' },
-  span('Hello'),
-  a({ href: '/about' }, 'About')
-);
-```
-
-### State Management
-
-```typescript
-import { createState, computed, effect } from 'elit';
-
-// Create state
-const name = createState('World');
-const count = createState(0);
-
-// Computed values
-const greeting = computed([name], (n) => `Hello, ${n}!`);
-
-// State with options
-const throttledState = createState(0, { throttle: 100 });
-const deepState = createState({ nested: { value: 1 } }, { deep: true });
-```
-
-### Reactive Rendering
-
-```typescript
-import { reactive, text, bindValue, bindChecked } from 'elit';
-
-const message = createState('Hello');
-const isEnabled = createState(false);
-
-// Reactive element - re-renders when state changes
-const display = reactive(message, (value) =>
-  div({ className: 'message' }, value)
-);
-
-// Reactive text node
-const label = text(message);
-
-// Two-way binding for inputs
-const inputEl = input({ type: 'text', ...bindValue(message) });
-const checkbox = input({ type: 'checkbox', ...bindChecked(isEnabled) });
-```
-
-### Shared State (Real-time Sync)
-
-Shared state automatically syncs between server and client via WebSocket:
-
-**Client-side:**
-
-```typescript
-import { createSharedState, reactive } from 'elit';
-
-// Create shared state (auto-connects to WebSocket server)
-const counter = createSharedState('counter', 0);
-const users = createSharedState('users', []);
-
-// Use with reactive rendering
 const app = div(
-  reactive(counter.state, value =>
-    div(`Counter: ${value}`)
-  ),
-  button({ onclick: () => counter.set(counter.state.value + 1) }, 'Increment')
+  input({ type: 'text', ...bindValue(name) }),
+  reactive(label, (value) => span(value)),
+  button({ onclick: () => count.value++ }, 'Increment')
 );
 
-// Listen to changes
-counter.onChange((newValue) => {
-  console.log('Counter changed to:', newValue);
-});
-
-// Update from any client - automatically syncs to all connected clients
-counter.set(10);
+render('app', app);
 ```
 
-**Server-side:**
+### Router
 
-```typescript
-import { createDevServer, StateManager } from 'elit';
+```ts
+import { div, nav } from 'elit/el';
+import { reactive } from 'elit/state';
+import { createRouter, createRouterView, routerLink } from 'elit/router';
 
-const server = createDevServer({ port: 3000 });
-
-// StateManager is built-in and handles WebSocket connections
-// All clients with matching shared state keys will sync automatically
-```
-
-### Development Server with REST API
-
-Elit includes a built-in development server with HMR, WebSocket support, and REST API routing:
-
-**Server Configuration (server.ts):**
-
-```typescript
-import { createDevServer, ServerRouter, cors, logger, json } from 'elit';
-
-// Create REST API router
-const api = new ServerRouter();
-
-// Add middleware
-api.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
-api.use(logger());
-
-// Define API routes with helper functions
-api.get('/api/users', (ctx) => {
-  json(ctx, { success: true, users: [] });
-});
-
-api.post('/api/users', async (ctx) => {
-  const user = ctx.body;
-  json(ctx, { success: true, user });
-});
-
-// Create development server
-const server = createDevServer({
-  port: 3000,
-  root: './src',
-  open: true,
-  router: api
-});
-```
-
-**Available Middleware:**
-
-```typescript
-import {
-  cors,          // CORS headers
-  logger,        // Request logging
-  errorHandler,  // Error handling
-  rateLimit,     // Rate limiting
-  bodyLimit,     // Request body size limit
-  cacheControl,  // Cache headers
-  compress,      // Gzip compression
-  security       // Security headers
-} from 'elit';
-
-// Example usage
-api.use(cors({ origin: '*' }));
-api.use(logger({ format: 'detailed' }));
-api.use(rateLimit({ max: 100, windowMs: 60000 }));
-api.use(bodyLimit({ limit: 1024 * 1024 })); // 1MB
-api.use(compress());
-api.use(security());
-```
-
-**Helper Functions:**
-
-```typescript
-import { json, sendText, html, status } from 'elit';
-
-api.get('/api/data', (ctx) => {
-  json(ctx, { message: 'Hello' }); // JSON response
-});
-
-api.get('/text', (ctx) => {
-  sendText(ctx, 'Hello World'); // Text response
-});
-
-api.get('/page', (ctx) => {
-  html(ctx, '<h1>Hello</h1>'); // HTML response
-});
-
-api.get('/error', (ctx) => {
-  status(ctx, 404, 'Not Found'); // Custom status
-});
-```
-
-**CLI Usage:**
-
-```bash
-# Start dev server
-npx elit dev
-
-# Custom port
-npx elit dev --port 8080
-
-# Custom root directory
-npx elit dev --root ./public
-
-# Disable auto-open browser
-npx elit dev --no-open
-```
-
-### Server-Side Rendering
-
-```typescript
-import { div, p, renderToString } from 'elit';
-
-const html = renderToString(
-  div({ className: 'app' },
-    p('Server rendered content')
-  ),
-  { pretty: true }
-);
-```
-
-### Routing
-
-```typescript
-import { createRouter, createRouterView, routerLink } from 'elit';
-
-const router = createRouter({
-  mode: 'history', // or 'hash'
+const routerOptions = {
+  mode: 'history' as const,
   routes: [
     { path: '/', component: () => div('Home') },
     { path: '/about', component: () => div('About') },
-    { path: '/user/:id', component: (params) => div(`User ${params.id}`) }
+    { path: '/post/:id', component: (params: Record<string, string>) => div(`Post ${params.id}`) },
   ],
-  notFound: () => div('404 Not Found'),
-  beforeEach: (to, from, next) => {
-    // Navigation guard
-    console.log(`Navigating from ${from} to ${to}`);
-    next();
-  }
-});
-
-// Create navigation links
-const nav = routerLink(router, { to: '/about' }, 'Go to About');
-
-// Programmatic navigation
-router.navigate('/user/123');
-```
-
-### CSS-in-JS with CreateStyle
-
-```typescript
-import { CreateStyle } from 'elit';
-
-const styles = new CreateStyle();
-
-// Define styles
-const buttonClass = styles.class('button', {
-  padding: '10px 20px',
-  backgroundColor: '#007bff',
-  color: 'white',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  '&:hover': {
-    backgroundColor: '#0056b3'
-  }
-});
-
-// Use in elements
-const btn = button({ className: buttonClass }, 'Click me');
-```
-
-### Performance Utilities
-
-```typescript
-import {
-  batchRender,
-  renderChunked,
-  createVirtualList,
-  throttle,
-  debounce,
-  lazy,
-  cleanupUnused
-} from 'elit';
-
-// Batch render multiple elements
-batchRender('#container', elements);
-
-// Chunked rendering for very large lists
-renderChunked('#container', largeArray, 5000, (current, total) => {
-  console.log(`Rendered ${current}/${total}`);
-});
-
-// Virtual scrolling for 100k+ items
-const virtualList = createVirtualList(
-  container,
-  items,
-  (item, index) => div(item.name),
-  50, // item height
-  5   // buffer size
-);
-
-// Lazy loading components
-const LazyComponent = lazy(() => import('./HeavyComponent'));
-
-// Throttle and debounce
-const throttledFn = throttle(handleScroll, 100);
-const debouncedFn = debounce(handleInput, 300);
-
-// Cleanup unused DOM elements
-const cleaned = cleanupUnused(rootElement);
-console.log(`Cleaned ${cleaned} elements`);
-```
-
-### Additional Features
-
-**DOM Utilities:**
-
-```typescript
-import { doc, el, els, createEl, elId, elClass, fragment } from 'elit';
-
-// Query selectors
-const element = el('.my-class');      // querySelector
-const elements = els('.my-class');    // querySelectorAll
-const byId = elId('my-id');          // getElementById
-const byClass = elClass('my-class'); // getElementsByClassName
-
-// Create elements
-const div = createEl('div');         // createElement
-const frag = fragment();             // createDocumentFragment
-
-// Access document
-doc.title = 'New Title';
-```
-
-**Effect System:**
-
-```typescript
-import { createState, effect } from 'elit';
-
-const count = createState(0);
-
-// Run side effects when state changes
-effect(() => {
-  console.log('Count is now:', count.value);
-});
-```
-
-**Reactive As (Advanced):**
-
-```typescript
-import { reactiveAs } from 'elit';
-
-// Use different reactive context
-const display = reactiveAs(customState, customContext, (value) =>
-  div(value)
-);
-```
-
-### JSON Rendering
-
-```typescript
-import { renderJson, renderVNode, renderJsonToString } from 'elit';
-
-// Render from JSON structure (tag, attributes, children)
-renderJson('#app', {
-  tag: 'div',
-  attributes: { class: 'container' },
-  children: [
-    { tag: 'h1', children: 'Title' },
-    { tag: 'p', children: 'Content' }
-  ]
-});
-
-// Render from VNode JSON structure (tagName, props, children)
-renderVNode('#app', {
-  tagName: 'div',
-  props: { className: 'container' },
-  children: [
-    { tagName: 'h1', children: ['Title'] }
-  ]
-});
-```
-
-### Head Management
-
-```typescript
-import { setTitle, addMeta, addLink, addStyle } from 'elit';
-
-setTitle('My App');
-addMeta({ name: 'description', content: 'My awesome app' });
-addLink({ rel: 'stylesheet', href: '/styles.css' });
-addStyle('body { margin: 0; }');
-```
-
-## Available Elements
-
-### HTML Elements (100+)
-All standard HTML elements are available as factory functions:
-
-**Layout**: `div`, `span`, `section`, `article`, `header`, `footer`, `nav`, `main`, `aside`
-
-**Text**: `p`, `h1`-`h6`, `strong`, `em`, `code`, `pre`, `blockquote`, `hr`, `br`
-
-**Forms**: `form`, `input`, `button`, `textarea`, `select`, `option`, `label`, `fieldset`, `legend`
-
-**Lists**: `ul`, `ol`, `li`, `dl`, `dt`, `dd`
-
-**Tables**: `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td`, `caption`, `colgroup`, `col`
-
-**Media**: `img`, `video`, `audio`, `source`, `track`, `picture`, `canvas`, `svg`
-
-**Links**: `a`, `link`, `meta`, `base`
-
-**Semantic**: `time`, `progress`, `meter`, `details`, `summary`, `dialog`, `mark`, `abbr`
-
-And many more...
-
-### SVG Elements
-All SVG elements are prefixed with `svg`:
-
-`svgSvg`, `svgCircle`, `svgRect`, `svgPath`, `svgLine`, `svgPolyline`, `svgPolygon`, `svgEllipse`, `svgG`, `svgText`, `svgDefs`, `svgLinearGradient`, `svgRadialGradient`, `svgStop`, `svgUse`, `svgSymbol`, and more.
-
-### MathML Elements
-All MathML elements are prefixed with `math`:
-
-`mathMath`, `mathMi`, `mathMn`, `mathMo`, `mathMfrac`, `mathMsqrt`, `mathMroot`, `mathMsup`, `mathMsub`, `mathMsubsup`, `mathMover`, `mathMunder`, `mathMunderover`, and more.
-
-## Bundle Size & Performance
-
-Elit is designed to be modular and lightweight with excellent tree-shaking support:
-
-### Bundle Sizes (Minified)
-
-| Component | ESM | CJS | Description |
-|-----------|-----|-----|-------------|
-| **Full Framework** | 79.52 KB | 80.48 KB | All features included |
-| **DOM Only** | 11.06 KB | 11.07 KB | Just DOM utilities |
-| **State** | 15.34 KB | 15.38 KB | Reactive state management |
-| **Router** | 13.22 KB | 13.22 KB | Client-side routing |
-| **Server** | 51.07 KB | 51.18 KB | Server features + Router |
-| **HTTP** | 7.70 KB | 7.85 KB | HTTP utilities |
-| **CLI** | 127.63 KB | - | Full development toolchain |
-
-**Tree-shaking**: Import only what you need! Using modular imports (`elit/dom`, `elit/state`) keeps your bundle minimal.
-
-### Server Performance (Node.js v24.12.0)
-
-| Component | Throughput | Latency (P50) | Latency (Avg) | Description |
-|-----------|-----------|---------------|---------------|-------------|
-| **HTTP Server** | 10,410 req/s | 5.91ms | 6.69ms | Raw HTTP optimized |
-| **ServerRouter** | 10,128 req/s | 6.09ms | 6.94ms | Full routing + middleware |
-
-**Router Overhead**: Only 2.7% slower than raw HTTP while providing:
-- Route matching with dynamic params
-- Query string parsing
-- Request context
-- Middleware chain support
-- Body parsing
-
-### Cross-Runtime Support
-
-Elit works seamlessly on **Node.js, Bun, and Deno** with runtime-specific optimizations:
-
-- **Node.js**: Uses native `http` module
-- **Bun**: Ultra-fast `Bun.serve()` with synchronous response detection
-- **Deno**: `Deno.serve()` integration
-
-### Performance Optimizations
-
-**Frontend**:
-- Direct DOM manipulation (no virtual DOM diffing)
-- Optimized rendering with RAF batching
-- Smart children rendering with automatic fragment usage
-- Efficient attribute updates using charCode checks
-- Minimal function closures and memory allocation
-
-**Backend**:
-- **Zero-copy headers** for Bun/Deno runtimes
-- **Synchronous response detection** eliminates Promise overhead
-- **String-based body buffering** reduces allocations
-- **Inline Response creation** minimizes object overhead
-- **Pre-compiled route patterns** for fast matching
-
-[View detailed benchmarks →](./benchmark)
-
-## Browser Usage
-
-When loaded via script tag, all exports are available on the `window` object:
-
-```html
-<script src="https://unpkg.com/elit@latest/dist/index.global.js"></script>
-<script>
-  const { div, span, createState, dom } = window;
-  // or use DomLib global namespace
-  const app = DomLib.div('Hello');
-</script>
-```
-
-## Examples
-
-### Todo App
-
-```typescript
-import { div, input, button, ul, li, createState, reactive, bindValue } from 'elit';
-
-const todos = createState<string[]>([]);
-const newTodo = createState('');
-
-const TodoApp = div({ className: 'todo-app' },
-  div({ className: 'input-group' },
-    input({ type: 'text', placeholder: 'Add a todo...', ...bindValue(newTodo) }),
-    button({
-      onclick: () => {
-        if (newTodo.value.trim()) {
-          todos.value = [...todos.value, newTodo.value];
-          newTodo.value = '';
-        }
-      }
-    }, 'Add')
+  notFound: () => div('404'),
+};
+
+const router = createRouter(routerOptions);
+const RouterView = createRouterView(router, routerOptions);
+
+const app = div(
+  nav(
+    routerLink(router, { to: '/' }, 'Home'),
+    routerLink(router, { to: '/about' }, 'About')
   ),
-  reactive(todos, (items) =>
-    ul(
-      ...items.map((todo, index) =>
-        li(
-          todo,
-          button({
-            onclick: () => {
-              todos.value = todos.value.filter((_, i) => i !== index);
-            }
-          }, 'Delete')
-        )
-      )
-    )
+  reactive(router.currentRoute, () => RouterView())
+);
+```
+
+### Styling
+
+```ts
+import { CreateStyle } from 'elit/style';
+
+const css = new CreateStyle();
+
+css.addClass('app', {
+  minHeight: '100vh',
+  display: 'grid',
+  placeItems: 'center',
+  fontFamily: 'system-ui, sans-serif',
+});
+
+css.addClass('button', {
+  padding: '12px 18px',
+  borderRadius: '12px',
+  border: '1px solid #222',
+  background: '#111',
+  color: '#fff',
+  cursor: 'pointer',
+});
+
+css.addPseudoClass('hover', {
+  opacity: 0.92,
+}, '.button');
+
+css.inject('app-styles');
+```
+
+You can also use the shared singleton export:
+
+```ts
+import styles from 'elit/style';
+```
+
+## Server Patterns
+
+### Server Router
+
+```ts
+import { ServerRouter, cors, logger } from 'elit/server';
+
+export const api = new ServerRouter();
+
+api.use(cors());
+api.use(logger());
+
+api.get('/api/hello', async (ctx) => {
+  ctx.res.json({ message: 'Hello from Elit' });
+});
+
+api.post('/api/echo', async (ctx) => {
+  ctx.res.json({ body: ctx.body });
+});
+```
+
+`ServerRouter` supports both Elit-style handlers and Express-like handlers:
+
+- `async (ctx) => { ... }`
+- `async (req, res) => { ... }`
+- middleware with `use(middleware)` or `use('/prefix', middleware)`
+
+### Programmatic Dev Server
+
+```ts
+import { createDevServer } from 'elit/server';
+
+const server = createDevServer({
+  port: 3000,
+  root: '.',
+  open: false,
+  logging: true,
+});
+
+console.log(server.url);
+```
+
+### Shared State Between Server and Client
+
+Client:
+
+```ts
+import { createSharedState } from 'elit/state';
+
+const counter = createSharedState('counter', 0);
+counter.value++;
+```
+
+Server:
+
+```ts
+import { createDevServer } from 'elit/server';
+
+const server = createDevServer({ root: '.', open: false });
+const counter = server.state.create('counter', { initial: 0 });
+
+counter.value = 10;
+counter.update((value) => value + 1);
+```
+
+The client `createSharedState()` connects over WebSocket to the current host unless you pass a custom `wsUrl`.
+
+## SSR Document Shell
+
+For SSR-style setups, export a document shell and return it from `dev.clients[].ssr`.
+
+```ts
+import { html, head, body, title, meta, div, script } from 'elit/el';
+
+export const documentShell = html(
+  head(
+    title('My Elit App'),
+    meta({ charset: 'UTF-8' }),
+    meta({ name: 'viewport', content: 'width=device-width, initial-scale=1.0' })
+  ),
+  body(
+    div({ id: 'app' }),
+    script({ type: 'module', src: '/src/main.ts' })
   )
 );
 ```
 
-### Counter with Computed Values
+For production builds, make sure your built HTML points at the production asset path such as `/main.js`.
 
-```typescript
-import { div, button, createState, computed, reactive } from 'elit';
+## Desktop Mode
 
-const count = createState(0);
-const doubled = computed([count], (c) => c * 2);
-const isEven = computed([count], (c) => c % 2 === 0);
+Desktop mode runs an Elit entry file inside a native WebView shell.
 
-const Counter = div(
-  reactive(count, (c) => div(`Count: ${c}`)),
-  reactive(doubled, (d) => div(`Doubled: ${d}`)),
-  reactive(isEven, (even) => div(`Is even: ${even}`)),
-  button({ onclick: () => count.value++ }, 'Increment'),
-  button({ onclick: () => count.value-- }, 'Decrement')
-);
-```
+Example desktop entry:
 
-## TypeScript Support
+```ts
+import { createWindow, onMessage, windowQuit, windowSetTitle } from 'elit/desktop';
 
-Elit is written in TypeScript and provides excellent type safety:
-
-```typescript
-import { VNode, State, Props } from 'elit';
-
-// Type-safe element creation
-const props: Props = {
-  className: 'container',
-  onclick: (e: MouseEvent) => console.log(e)
-};
-
-// Type-safe state
-const count: State<number> = createState(0);
-const users: State<User[]> = createState([]);
-
-// Full IntelliSense support for all 100+ HTML elements
-```
-
-## Deployment
-
-Deploy your Elit application to production:
-
-### Build for Production
-
-```bash
-# Build your app
-npx elit build
-
-# Preview production build
-npx elit preview
-```
-
-### Deploy to Vercel
-
-```bash
-npm i -g vercel
-npm run build
-vercel --prod
-```
-
-### Deploy to Netlify
-
-```bash
-npm i -g netlify-cli
-npm run build
-netlify deploy --prod --dir=dist
-```
-
-### Deploy to GitHub Pages
-
-Create `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      - run: npm install
-      - run: npm run build
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-### Environment Variables
-
-Create `.env.production`:
-
-```env
-VITE_API_URL=https://api.example.com
-VITE_ENV=production
-```
-
-Access in your code:
-
-```typescript
-const apiUrl = import.meta.env.VITE_API_URL;
-const isProd = import.meta.env.PROD;
-```
-
-## Mobile Builds (Android & iOS)
-
-Elit supports building native mobile apps using Capacitor. You can build your web app as a native Android APK/AAB or iOS IPA.
-
-### Quick Start
-
-```bash
-# Initialize mobile project
-npx elit android init --app-id com.myapp --app-name "My App"
-
-# Build your web app
-npx elit build
-
-# Sync to mobile platforms
-npx elit android sync
-
-# Open in Android Studio
-npx elit android open --platform android
-
-# Build release APK/AAB
-npx elit android build --platform android --target release --output aab
-```
-
-### Configuration
-
-Add mobile configuration to `elit.config.ts`:
-
-```typescript
-export default {
-  mobile: {
-    appId: 'com.example.myapp',
-    appName: 'My App',
-    webDir: 'dist',
-    version: '1.0.0',
-    platforms: ['android', 'ios']
+onMessage((message) => {
+  if (message === 'desktop:ready') {
+    windowSetTitle('Elit Desktop');
+    windowQuit();
   }
-}
+});
+
+createWindow({
+  title: 'Elit Desktop',
+  width: 960,
+  height: 640,
+  icon: './public/favicon.svg',
+  html: `<!doctype html>
+<html lang="en">
+  <body>
+    <main>Hello from Elit Desktop</main>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        window.ipc.postMessage('desktop:ready');
+      });
+    </script>
+  </body>
+</html>`,
+});
 ```
 
-### Requirements
+Run it:
 
-**Android:**
-- Node.js 18+
-- Java JDK 17+
-- Android Studio (for Android SDK)
+```bash
+npx elit desktop ./src/main.ts
+```
 
-**iOS:**
-- macOS with Xcode
-- Node.js 18+
-- CocoaPods (`sudo gem install cocoapods`)
+Build a standalone executable:
 
-### Available Commands
+```bash
+npx elit desktop build ./src/main.ts --release
+```
 
-| Command | Description |
-|---------|-------------|
-| `elit android init` | Initialize mobile project |
-| `elit android sync` | Sync web build to mobile |
-| `elit android open --platform <android\|ios>` | Open in native IDE |
-| `elit android build --platform <android\|ios>` | Build native app |
+Desktop notes:
 
-## Comparison with Other Frameworks
+- Runtime choices: `quickjs`, `node`, `bun`, `deno`
+- Transpiler choices: `auto`, `none`, `esbuild`
+- Icon input supports `.ico`, `.png`, and `.svg`
+- EXE icon embedding and runtime window icon loading both support SVG now
+- `createWindowServer(app, opts)` is available when you want to run an HTTP app inside the desktop shell
 
-| Feature | Elit | Vite + React | Next.js | SvelteKit | Express.js |
-|---------|----------|--------------|---------|-----------|------------|
-| **Frontend Size** | 11-15KB (modular) | ~140KB+ | ~200KB+ | ~15KB* | N/A |
-| **Backend Size** | 51KB (Server) | N/A | N/A | N/A | ~200KB+ |
-| **Prod Dependencies** | **0** (Zero!) | Many | Many | Many | Many |
-| **Dev Server** | ✅ Built-in | ✅ Vite | ✅ Built-in | ✅ Built-in | ❌ |
-| **HMR** | ✅ Configurable | ✅ | ✅ | ✅ | ❌ |
-| **Build Tool** | ✅ esbuild | ✅ Vite | ✅ Turbopack | ✅ Vite | ❌ |
-| **Mobile Builds** | ✅ Android/iOS | ➕ Via setup | ✅ | ➕ Via setup | ❌ |
-| **REST API** | ✅ 10K+ req/s | ❌ | ✅ | ✅ | ✅ 8K+ req/s |
-| **Middleware** | ✅ Built-in | ❌ | ✅ | ✅ | ✅ |
-| **WebSocket** | ✅ Built-in | ❌ | ❌ | ❌ | ➕ Via package |
-| **Shared State** | ✅ Auto-sync | ❌ | ❌ | ❌ | ❌ |
-| **Cross-Runtime** | ✅ Node/Bun/Deno | ❌ | ❌ | ❌ | ✅ Node only |
-| **TypeScript** | ✅ Native | ✅ | ✅ | ✅ | ➕ Via setup |
-| **SSR** | ✅ | ❌ | ✅ | ✅ | ➕ Manual |
-| **Tree-Shaking** | ✅ Excellent | ✅ | ✅ | ✅ | ❌ |
-| **Learning Curve** | Easy | Medium | Medium | Easy | Easy |
+## Database
 
-*Svelte requires compilation step
+Elit includes a small VM-backed database helper that stores files under a directory and can execute TypeScript or JavaScript code against them.
 
-### Performance Comparison
+```ts
+import { Database } from 'elit/database';
 
-**Backend (10K requests, 100 concurrent)**:
-- **Elit ServerRouter**: 10,128 req/s (6.94ms avg) on Node.js
-- **Express.js**: ~8,000 req/s (12ms avg) on Node.js
-- **Fastify**: ~12,000 req/s (8ms avg) on Node.js
-- **Elysia (Bun)**: ~100,000 req/s (<1ms avg) on Bun
+const db = new Database({
+  dir: './databases',
+  language: 'ts',
+});
 
-**Frontend Bundle**:
-- **Elit (modular)**: 11KB (DOM) + 15KB (State) = 26KB for typical app
-- **React + React-DOM**: 140KB+ (45KB gzipped)
-- **Vue 3**: 95KB+ (32KB gzipped)
-- **Svelte**: 15KB+ (6KB gzipped) *after compilation*
+db.create('users', `export const users = [];`);
 
-## Documentation
+await db.execute(`
+  import { users } from '@db/users';
+  console.log(users.length);
+`);
+```
 
-- 📚 [Full Documentation](https://d-osc.github.io/elit)
-- ⚡ [Quick Start](https://d-osc.github.io/elit#/docs)
-- 📖 [API Reference](https://d-osc.github.io/elit#/api)
-- 🎮 [Interactive Examples](https://d-osc.github.io/elit#/examples)
+Useful methods:
 
-## Changelog
+- `create(dbName, code)`
+- `read(dbName)`
+- `save(dbName, code)`
+- `update(dbName, fnName, code)`
+- `rename(oldName, newName)`
+- `remove(dbName, fnName?)`
 
-### v2.0.0 - Full-Stack Framework with Performance Optimizations
+## Programmatic Build API
 
-**🚀 Backend Performance Enhancements:**
-- ⚡ **Ultra-Fast HTTP**: 10,410 req/s with sub-7ms latency on Node.js
-- 🎯 **Optimized ServerRouter**: 10,128 req/s with only 2.7% overhead vs raw HTTP
-- 🔄 **Synchronous Response Detection**: Eliminates Promise overhead for Bun runtime
-- 🆓 **Zero-Copy Headers**: Direct headers reference for Bun/Deno runtimes
-- 📦 **String-Based Body Buffering**: Reduced allocations and faster responses
-- ⚡ **Cross-Runtime Optimizations**: Runtime-specific code paths for Node.js, Bun, and Deno
-- 🔧 **Pre-Compiled Routes**: Route patterns compiled once during registration
+If you want to bundle from code instead of the CLI:
 
-**🏗️ Build System & CLI:**
-- 🚀 **Integrated Build System**: Built-in esbuild with runtime-specific transpilation
-- 🔥 **CLI Tools**: `npx elit dev`, `npx elit build`, `npx elit preview`
-- 🏗️ **Zero Config**: Works out of the box with optional `elit.config.mjs`
-- 🎯 **basePath Support**: Configure base paths for subdirectory deployments
-- 🔐 **Environment Variables**: .env file support with VITE_ prefix
-- 📦 **Smart Bundling**: Automatic code splitting and tree-shaking
-- ⚡ **Hot Module Replacement**: Instant development feedback
+```ts
+import { build } from 'elit/build';
 
-**🌐 Server Features:**
-- 🌐 **ServerRouter**: High-performance routing with regex pattern matching
-- 🔧 **Rich Middleware**: CORS, logger, rate limit, compression, security headers
-- 🔌 **WebSocket Server**: Built-in WebSocket with state synchronization
-- 🔄 **Shared State**: Real-time auto-sync between server and all clients
-- 📁 **Static File Server**: Efficient serving with proper MIME types
-- 💾 **Cache Headers**: Smart caching for static assets
-- 📦 **Gzip Compression**: Automatic compression for production
+await build({
+  entry: './src/main.ts',
+  outDir: './dist',
+  outFile: 'main.js',
+  format: 'esm',
+  sourcemap: true,
+  copy: [
+    { from: './public/index.html', to: './index.html' },
+  ],
+});
+```
 
-**🎨 Frontend Library:**
-- 🎯 **Modular Design**: DOM (11KB), State (15KB), Router (13KB) - use only what you need
-- ⚡ **Reactive State**: Automatic dependency tracking with `createState` and `computed`
-- 🎨 **CSS-in-JS**: Type-safe styling with `CreateStyle`
-- 🛣️ **Client Router**: Hash and history mode with navigation guards
-- 📱 **Virtual Scrolling**: Handle 100k+ items with `createVirtualList`
-- 🖥️ **SSR Support**: `renderToString` for server-side rendering
-- 🎭 **100+ Elements**: Complete HTML, SVG, and MathML support
-- 🔧 **Performance Utilities**: Throttle, debounce, batch rendering
-- 📦 **Tree-Shakeable**: Excellent ES module tree-shaking
+## Testing
 
-**📊 Benchmarks:**
-- HTTP Server: 10,410 req/s (Node.js v24.12.0)
-- ServerRouter: 10,128 req/s with full routing + middleware
-- Router Overhead: Only 2.7% vs raw HTTP
-- [View detailed benchmarks →](./benchmark)
+CLI test runner examples:
 
-## Examples
+```bash
+npx elit test
+npx elit test --watch
+npx elit test --file ./testing/unit/database.test.ts
+npx elit test --describe "Database"
+npx elit test --it "should save data"
+npx elit test --coverage --coverage-reporter text,html
+```
 
-Example applications demonstrating Elit features:
+The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-reporter` for advanced use, but most users should stay on the CLI.
 
-- 📖 **[Documentation Site](./docs)** - Full-featured docs site with i18n and blog
-- 🎯 **[Counter App](./examples/counter)** - Simple reactive counter
-- ✅ **[Todo App](./examples/todo)** - Todo list with state management
-- 🎨 **[Styled Components](./examples/styled)** - CSS-in-JS examples
+## Good Defaults For Generated Code
 
-[View all examples →](./examples)
+When writing new Elit code, these defaults are usually correct:
 
-## Links
+- Prefer `elit/el`, `elit/state`, and `elit/dom` in new examples.
+- Keep server code on `elit/server` and browser code on client subpaths.
+- Use `ServerRouter` for APIs instead of inventing another HTTP layer first.
+- Use `createState` plus `reactive` for UI updates before adding abstractions.
+- Use `CreateStyle` or `elit/style` for injected CSS.
+- Use `elit.config.ts` when the project needs SSR, APIs, preview customization, workers, or proxy rules.
+- Use `examples/correct-config` as the reference for a minimal full-stack setup.
 
-- 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 🚀 [npm - create-elit](https://www.npmjs.com/package/create-elit)
-- 🐙 [GitHub Repository](https://github.com/d-osc/elit)
-- 📚 [Documentation](https://d-osc.github.io/elit)
-- 💬 Community & Issues: [GitHub Discussions](https://github.com/d-osc/elit/discussions)
+## Repository Guide
 
-## Contributing
+If you are working in this repository, these locations matter most:
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- `src/index.ts`: root client exports
+- `src/dom.ts`: renderer and SSR string rendering
+- `src/state.ts`: reactive state, bindings, shared state client
+- `src/router.ts`: client router
+- `src/style.ts`: CSS generator
+- `src/server.ts`: dev server, `ServerRouter`, middleware, shared state server
+- `src/build.ts`: bundler API
+- `src/desktop.ts`: desktop runtime bindings exposed to TypeScript
+- `src/desktop-cli.ts`: `elit desktop` implementation
+- `src/database.ts`: database VM and helpers
+- `examples/correct-config`: minimal full-stack reference
+- `examples/full-db`: larger full-stack example with database usage
+- `examples/desktop-example.ts`: desktop smoke test and runtime example
+- `packages/create-elit`: scaffold templates used by `npm create elit@latest`
+- `docs/`: the documentation site built with Elit itself
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Known Boundaries
 
-## License
+- Root `elit` export is client-oriented. Non-client features are on subpaths.
+- Desktop APIs only exist inside the desktop runtime.
+- Client env injection is limited to `VITE_` variables.
+- Production HTML copying is explicit. If you copy `index.html`, make sure it points at the built JS file, not the dev-only `/src/*.ts` path.
 
-MIT License - see [LICENSE](./LICENSE) for details
+## Next Reads
 
----
-
-**Built with ❤️ for modern web development**
-
-*Elit - Lightweight, Reactive, Powerful* 🚀
+- `examples/correct-config` for the cleanest SSR + API setup
+- `examples/desktop-example.ts` for desktop runtime usage
+- `USAGE_EXAMPLES.md` for more import combinations
+- `docs/API.md` for broader API detail

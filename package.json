@@ -21,6 +21,11 @@
       "import": "./dist/dom.mjs",
       "require": "./dist/dom.js"
     },
+    "./desktop": {
+      "types": "./dist/desktop.d.ts",
+      "import": "./dist/desktop.mjs",
+      "require": "./dist/desktop.js"
+    },
     "./el": {
       "types": "./dist/el.d.ts",
       "import": "./dist/el.mjs",
@@ -202,6 +207,8 @@
   "files": [
     "dist",
     "src",
+    "Cargo.toml",
+    "Cargo.lock",
     "README.md",
     "LICENSE"
   ]
