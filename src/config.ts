@@ -73,6 +73,10 @@ export interface MobileConfig {
     appName?: string;
     /** Built web assets directory synced into native projects */
     webDir?: string;
+    /** Mobile app icon image path (recommended: .png or .webp) */
+    icon?: string;
+    /** Android permissions written to AndroidManifest uses-permission tags */
+    permissions?: string[];
 }
 
 export interface DesktopConfig {

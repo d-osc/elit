@@ -1,0 +1,13 @@
+{
+  "mobile": {
+    "cwd": ".",
+    "appId": "com.elit.mobileexample",
+    "appName": "ElitMobileExample",
+    "webDir": "web",
+    "icon": "./icon.png",
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE"
+    ]
+  }
+}

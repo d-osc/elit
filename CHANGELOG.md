@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Mobile mode (native shell workflow)** - Added first-class `elit mobile` command group for Android and iOS workflows
-  - Added `elit mobile init [directory]` to scaffold `elit.mobile.json` and native project structure
+  - Added `elit mobile init [directory]` to scaffold native project structure, with mobile defaults sourced from `elit.config.*`
   - Added `elit mobile sync`, `elit mobile open android|ios`, `elit mobile run android|ios`, and `elit mobile build android|ios`
   - Added `elit mobile doctor` to verify native mobile toolchain readiness and project prerequisites
   - Added `elit mobile doctor --json` for machine-readable CI diagnostics

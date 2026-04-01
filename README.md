@@ -162,13 +162,13 @@ Useful flags:
 - `elit desktop --runtime quickjs|node|bun|deno`
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
 - `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
-- `elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist`
+- `elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist --icon ./icon.png --permission android.permission.CAMERA`
 - `elit mobile doctor --cwd .`
 - `elit mobile doctor --cwd . --json`
-- `elit mobile sync --cwd . --web-dir dist`
+- `elit mobile sync --cwd . --web-dir dist --icon ./icon.png --permission android.permission.CAMERA`
 - `elit mobile open android|ios`
-- `elit mobile run android|ios --cwd . --target <device-id> --prod`
-- `elit mobile build android|ios --cwd . --prod`
+- `elit mobile run android|ios --cwd . --target <device-id> --prod --icon ./icon.png --permission android.permission.CAMERA`
+- `elit mobile build android|ios --cwd . --prod --icon ./icon.png --permission android.permission.CAMERA`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
 - `elit wapk run ./app.wapk --sync-interval 100 --watcher`
 - `elit wapk pack . --include-deps`
@@ -189,8 +189,11 @@ Desktop mode notes:
 Mobile mode notes:
 
 - Mobile mode is implemented by elit directly with native project scaffolding.
-- Run `elit mobile init` once in your project to create `elit.mobile.json` plus native scaffold folders.
+- Run `elit mobile init` once in your project to create native scaffold folders.
+- Set mobile defaults in `elit.config.*` under `mobile` (for example: `cwd`, `appId`, `appName`, `webDir`, `icon`, `permissions`).
 - Android workflow is fully scaffolded: assets are synced to `android/app/src/main/assets/public` and loaded in WebView.
+- Android icon can be set from config or CLI with `.png` / `.webp` and will be applied to launcher resources.
+- Android permissions can be set from config (`mobile.permissions`) or CLI (`--permission`) and are written into `AndroidManifest.xml`.
 - Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
 - Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
 - Run `elit mobile doctor` to validate local toolchain and project prerequisites before build or run.
@@ -230,6 +233,8 @@ The config shape is:
     appId?: string;
     appName?: string;
     webDir?: string;
+    icon?: string;
+    permissions?: string[];
   };
   desktop?: {
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
@@ -303,6 +308,8 @@ export default {
     appId: 'com.elit.app',
     appName: 'Elit App',
     webDir: 'dist',
+    icon: './icon.png',
+    permissions: ['android.permission.INTERNET'],
   },
   desktop: {
     runtime: 'quickjs',

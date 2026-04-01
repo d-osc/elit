@@ -11,7 +11,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { loadConfig, type MobileConfig } from './config';
+import { ELIT_CONFIG_FILES, loadConfig, type MobileConfig } from './config';
 
 type MobilePlatform = 'android' | 'ios';
 
@@ -20,11 +20,17 @@ interface MobileInitOptions {
     appId: string;
     appName: string;
     webDir: string;
+    icon?: string;
+    permissions?: string[];
 }
 
 interface MobileCommandOptions {
     cwd: string;
     webDir: string;
+    appId: string;
+    appName: string;
+    icon?: string;
+    permissions?: string[];
     json: boolean;
 }
 
@@ -46,33 +52,40 @@ export async function runMobileCommand(args: string[]): Promise<void> {
         return;
     }
 
-    const config = await loadConfig();
-    const mobileConfig = config?.mobile;
     const command = args[0];
 
     switch (command) {
-        case 'init':
-            initMobileProject(parseInitArgs(args.slice(1), mobileConfig));
+        case 'init': {
+            const config = await loadConfig();
+            initMobileProject(parseInitArgs(args.slice(1), config?.mobile));
             break;
-        case 'doctor':
-            runMobileDoctor(parseCommandOptions(args.slice(1), mobileConfig));
+        }
+        case 'doctor': {
+            const options = await parseCommandOptions(args.slice(1));
+            runMobileDoctor(options);
             break;
-        case 'sync':
-            syncMobileAssets(parseCommandOptions(args.slice(1), mobileConfig));
+        }
+        case 'sync': {
+            const options = await parseCommandOptions(args.slice(1));
+            syncMobileAssets(options);
             break;
+        }
         case 'open': {
             const platform = parsePlatformArg(args[1]);
-            openMobileProject(platform, parseCommandOptions(args.slice(2), mobileConfig));
+            const options = await parseCommandOptions(args.slice(2));
+            openMobileProject(platform, options);
             break;
         }
         case 'run': {
             const platform = parsePlatformArg(args[1]);
-            runMobilePlatform(platform, args.slice(2), parseCommandOptions(args.slice(2), mobileConfig));
+            const options = await parseCommandOptions(args.slice(2));
+            runMobilePlatform(platform, args.slice(2), options);
             break;
         }
         case 'build': {
             const platform = parsePlatformArg(args[1]);
-            buildMobilePlatform(platform, args.slice(2), parseCommandOptions(args.slice(2), mobileConfig));
+            const options = await parseCommandOptions(args.slice(2));
+            buildMobilePlatform(platform, args.slice(2), options);
             break;
         }
         default:
@@ -86,6 +99,8 @@ function parseInitArgs(args: string[], config?: MobileConfig): MobileInitOptions
         appId: config?.appId ?? 'com.elit.app',
         appName: config?.appName ?? 'Elit App',
         webDir: config?.webDir ?? 'dist',
+        icon: config?.icon,
+        permissions: Array.isArray(config?.permissions) ? [...config.permissions] : undefined,
     };
 
     if (args.length > 0 && !args[0].startsWith('-')) {
@@ -114,16 +129,47 @@ function parseInitArgs(args: string[], config?: MobileConfig): MobileInitOptions
                 options.webDir = value;
                 break;
             }
+            case '--icon': {
+                const value = args[++i];
+                if (!value) throw new Error('Missing value for --icon');
+                options.icon = value;
+                break;
+            }
+            case '--permission': {
+                const value = args[++i];
+                if (!value) throw new Error('Missing value for --permission');
+                if (!options.permissions) options.permissions = [];
+                options.permissions.push(value);
+                break;
+            }
+            case '--permissions': {
+                const value = args[++i];
+                if (!value) throw new Error('Missing value for --permissions');
+                options.permissions = value
+                    .split(',')
+                    .map((permission) => permission.trim())
+                    .filter(Boolean);
+                break;
+            }
         }
     }
 
     return options;
 }
 
-function parseCommandOptions(args: string[], config?: MobileConfig): MobileCommandOptions {
+async function parseCommandOptions(args: string[]): Promise<MobileCommandOptions> {
+    const cwdArg = readArgValue(args, '--cwd');
+    const cwd = cwdArg ? resolve(cwdArg) : process.cwd();
+    const config = await loadConfig(cwd);
+    const mobileConfig = config?.mobile;
+
     const options: MobileCommandOptions = {
-        cwd: config?.cwd ? resolve(config.cwd) : process.cwd(),
-        webDir: config?.webDir ?? 'dist',
+        cwd: mobileConfig?.cwd ? resolve(cwd, mobileConfig.cwd) : cwd,
+        webDir: mobileConfig?.webDir ?? 'dist',
+        appId: mobileConfig?.appId ?? 'com.elit.app',
+        appName: mobileConfig?.appName ?? 'Elit App',
+        icon: mobileConfig?.icon,
+        permissions: Array.isArray(mobileConfig?.permissions) ? [...mobileConfig.permissions] : undefined,
         json: false,
     };
 
@@ -137,6 +183,22 @@ function parseCommandOptions(args: string[], config?: MobileConfig): MobileComma
             const value = args[++i];
             if (!value) throw new Error('Missing value for --web-dir');
             options.webDir = value;
+        } else if (arg === '--icon') {
+            const value = args[++i];
+            if (!value) throw new Error('Missing value for --icon');
+            options.icon = value;
+        } else if (arg === '--permission') {
+            const value = args[++i];
+            if (!value) throw new Error('Missing value for --permission');
+            if (!options.permissions) options.permissions = [];
+            options.permissions.push(value);
+        } else if (arg === '--permissions') {
+            const value = args[++i];
+            if (!value) throw new Error('Missing value for --permissions');
+            options.permissions = value
+                .split(',')
+                .map((permission) => permission.trim())
+                .filter(Boolean);
         } else if (arg === '--json') {
             options.json = true;
         }
@@ -155,26 +217,9 @@ function parsePlatformArg(value: string | undefined): MobilePlatform {
 
 function initMobileProject(options: MobileInitOptions): void {
     const directory = resolve(options.directory);
-    const mobileConfigPath = join(directory, 'elit.mobile.json');
 
     if (!existsSync(directory)) {
         mkdirSync(directory, { recursive: true });
-    }
-
-    if (!existsSync(mobileConfigPath)) {
-        const configContent = JSON.stringify(
-            {
-                appId: options.appId,
-                appName: options.appName,
-                webDir: options.webDir,
-            },
-            null,
-            2,
-        );
-        writeFileSync(mobileConfigPath, `${configContent}\n`);
-        console.log(`[mobile] Created ${mobileConfigPath}`);
-    } else {
-        console.log(`[mobile] Reusing existing ${mobileConfigPath}`);
     }
 
     createAndroidScaffold(directory, {
@@ -182,32 +227,24 @@ function initMobileProject(options: MobileInitOptions): void {
         appName: options.appName,
     });
 
+    applyAndroidPermissions(directory, options.permissions);
+
+    if (options.icon) {
+        applyAndroidIcon(directory, options.icon);
+    }
+
     createIosScaffold(directory);
 
     console.log('[mobile] Native scaffold ready. Next steps:');
+    console.log('  Configure mobile defaults in elit.config.* under { mobile: { ... } }');
     console.log('  elit build --entry ./src/main.ts --out-dir dist');
     console.log('  elit mobile sync --cwd .');
     console.log('  elit mobile build android --cwd .');
     console.log('  elit mobile run android --cwd .');
 }
 
-function readElitMobileConfig(cwd: string): { appId: string; appName: string; webDir: string } {
-    const configPath = join(cwd, 'elit.mobile.json');
-    if (!existsSync(configPath)) {
-        throw new Error(`Missing ${configPath}. Run "elit mobile init" first.`);
-    }
-
-    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
-    const appId = typeof parsed.appId === 'string' ? parsed.appId : 'com.elit.app';
-    const appName = typeof parsed.appName === 'string' ? parsed.appName : 'Elit App';
-    const webDir = typeof parsed.webDir === 'string' ? parsed.webDir : 'dist';
-
-    return { appId, appName, webDir };
-}
-
 function syncMobileAssets(options: MobileCommandOptions): void {
-    const mobileConfig = readElitMobileConfig(options.cwd);
-    const webRoot = resolve(options.cwd, options.webDir || mobileConfig.webDir);
+    const webRoot = resolve(options.cwd, options.webDir);
     if (!existsSync(webRoot)) {
         throw new Error(`Web directory not found: ${webRoot}. Build your app first.`);
     }
@@ -215,6 +252,12 @@ function syncMobileAssets(options: MobileCommandOptions): void {
     const androidPublic = join(options.cwd, 'android', 'app', 'src', 'main', 'assets', 'public');
     copyDirectory(webRoot, androidPublic);
     console.log(`[mobile] Synced web assets to ${androidPublic}`);
+
+    applyAndroidPermissions(options.cwd, options.permissions);
+
+    if (options.icon) {
+        applyAndroidIcon(options.cwd, options.icon);
+    }
 
     const iosPublic = join(options.cwd, 'ios', 'App', 'www');
     if (existsSync(dirname(iosPublic))) {
@@ -243,14 +286,13 @@ function runMobilePlatform(platform: MobilePlatform, args: string[], options: Mo
         const target = readArgValue(args, '--target');
         runGradle(options.cwd, [release ? 'installRelease' : 'installDebug']);
 
-        const mobileConfig = readElitMobileConfig(options.cwd);
         const adbArgs = [
             ...(target ? ['-s', target] : []),
             'shell',
             'am',
             'start',
             '-n',
-            `${mobileConfig.appId}/.MainActivity`,
+            `${options.appId}/.MainActivity`,
         ];
         runCommand('adb', adbArgs, options.cwd);
         return;
@@ -295,14 +337,19 @@ function openMobileProject(platform: MobilePlatform, options: MobileCommandOptio
 
 function runMobileDoctor(options: MobileCommandOptions): void {
     const checks: MobileDoctorCheck[] = [];
-    const mobileConfigPath = join(options.cwd, 'elit.mobile.json');
+    const resolvedConfigPath = ELIT_CONFIG_FILES
+        .map((file) => join(options.cwd, file))
+        .find((filePath) => existsSync(filePath));
     const androidRoot = join(options.cwd, 'android');
     const iosRoot = join(options.cwd, 'ios');
+    const androidSdkPath = detectAndroidSdkPath(options.cwd);
 
     checks.push({
-        name: 'Project config (elit.mobile.json)',
-        ok: existsSync(mobileConfigPath),
-        details: existsSync(mobileConfigPath) ? mobileConfigPath : 'Run "elit mobile init" to scaffold mobile files.',
+        name: 'Project config (elit.config.*)',
+        ok: Boolean(resolvedConfigPath),
+        details: resolvedConfigPath
+            ? resolvedConfigPath
+            : 'Create elit.config.ts|mts|js|mjs|cjs|json and set { mobile: { ... } } defaults.',
     });
 
     const hasGradleWrapper = existsSync(join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'));
@@ -312,7 +359,11 @@ function runMobileDoctor(options: MobileCommandOptions): void {
         details: hasGradleWrapper ? 'Using project gradle wrapper.' : 'Install Gradle or generate gradle wrapper in android/.',
     });
     checks.push({ name: 'Java JDK (java)', ok: commandExists('java', options.cwd) });
-    checks.push({ name: 'Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT)', ok: Boolean(process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT) });
+    checks.push({
+        name: 'Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT)',
+        ok: Boolean(androidSdkPath),
+        details: androidSdkPath ?? 'Set ANDROID_HOME/ANDROID_SDK_ROOT or install Android SDK.',
+    });
     checks.push({ name: 'ADB (adb)', ok: commandExists('adb', options.cwd) });
     checks.push({
         name: 'Android scaffold (android/)',
@@ -371,11 +422,84 @@ function commandExists(command: string, cwd: string): boolean {
     return result.status === 0;
 }
 
+function resolveCommandPath(command: string, cwd: string): string | undefined {
+    const checker = process.platform === 'win32' ? 'where' : 'which';
+    const result = spawnSync(checker, [command], {
+        cwd,
+        encoding: 'utf8',
+        shell: false,
+    });
+
+    if (result.status !== 0) return undefined;
+    const output = String(result.stdout ?? '').trim();
+    if (!output) return undefined;
+
+    const firstLine = output
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean);
+    return firstLine || undefined;
+}
+
+function parseAndroidSdkFromLocalProperties(androidRoot: string): string | undefined {
+    const localPropertiesPath = join(androidRoot, 'local.properties');
+    if (!existsSync(localPropertiesPath)) return undefined;
+
+    try {
+        const content = readFileSync(localPropertiesPath, 'utf8');
+        const sdkLine = content
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .find((line) => line.startsWith('sdk.dir='));
+
+        if (!sdkLine) return undefined;
+
+        const value = sdkLine.slice('sdk.dir='.length).trim();
+        if (!value) return undefined;
+
+        const sdkPath = value.replace(/\\:/g, ':').replace(/\\\\/g, '\\');
+        return existsSync(sdkPath) ? sdkPath : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function detectAndroidSdkPath(cwd: string): string | undefined {
+    const envPath = process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME;
+    if (envPath && existsSync(envPath)) return envPath;
+
+    const androidRoot = join(cwd, 'android');
+    const localPropertiesPath = parseAndroidSdkFromLocalProperties(androidRoot);
+    if (localPropertiesPath) return localPropertiesPath;
+
+    const adbPath = resolveCommandPath('adb', cwd);
+    if (adbPath) {
+        const platformToolsDir = dirname(adbPath);
+        const sdkPath = dirname(platformToolsDir);
+        if (existsSync(join(sdkPath, 'platform-tools'))) {
+            return sdkPath;
+        }
+    }
+
+    const home = process.env.HOME || process.env.USERPROFILE;
+    const candidates = [
+        process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Android', 'Sdk') : undefined,
+        process.env.USERPROFILE ? join(process.env.USERPROFILE, 'AppData', 'Local', 'Android', 'Sdk') : undefined,
+        home ? join(home, 'Library', 'Android', 'sdk') : undefined,
+        home ? join(home, 'Android', 'Sdk') : undefined,
+    ].filter((value): value is string => Boolean(value));
+
+    return candidates.find((candidate) => existsSync(candidate));
+}
+
 function runGradle(cwd: string, args: string[]): void {
     const androidRoot = join(cwd, 'android');
     if (!existsSync(androidRoot)) {
         throw new Error(`Android project not found at ${androidRoot}. Run "elit mobile init" first.`);
     }
+
+    ensureAndroidLocalProperties(cwd);
+    ensureAndroidGradleProperties(cwd);
 
     const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const wrapperPath = join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
@@ -385,7 +509,210 @@ function runGradle(cwd: string, args: string[]): void {
         return;
     }
 
-    runCommand('gradle', args, androidRoot);
+    if (commandExists('gradle', androidRoot)) {
+        runCommand('gradle', args, androidRoot);
+        return;
+    }
+
+    const fallbackGradle = resolveFallbackGradleExecutable();
+    if (!fallbackGradle) {
+        throw new Error(
+            '[mobile] Gradle not found. Install Gradle and add it to PATH, or generate wrapper files in android/ with "gradle wrapper".',
+        );
+    }
+
+    runCommand(fallbackGradle, args, androidRoot);
+}
+
+function resolveFallbackGradleExecutable(): string | undefined {
+    const executable = process.platform === 'win32' ? 'gradle.bat' : 'gradle';
+
+    const gradleHome = process.env.GRADLE_HOME;
+    if (gradleHome) {
+        const gradleFromHome = join(gradleHome, 'bin', executable);
+        if (existsSync(gradleFromHome)) return gradleFromHome;
+    }
+
+    const candidates: string[] = [
+        process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Android Studio', 'gradle') : '',
+        process.env.ProgramFiles ? join(process.env.ProgramFiles, 'Android', 'Android Studio', 'gradle') : '',
+        process.env['ProgramFiles(x86)'] ? join(process.env['ProgramFiles(x86)'], 'Android', 'Android Studio', 'gradle') : '',
+        process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'elit-tools') : '',
+        process.env.USERPROFILE ? join(process.env.USERPROFILE, 'scoop', 'apps', 'gradle', 'current', 'bin') : '',
+        process.platform === 'win32' ? 'C:\\Gradle\\bin' : '',
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const direct = join(candidate, executable);
+        if (existsSync(direct)) return direct;
+
+        if (!existsSync(candidate)) continue;
+
+        try {
+            const versionDirs = readdirSync(candidate)
+                .map((name) => join(candidate, name, 'bin', executable))
+                .filter((path) => existsSync(path))
+                .sort()
+                .reverse();
+
+            if (versionDirs.length > 0) {
+                return versionDirs[0];
+            }
+        } catch {
+            // Ignore unreadable directories while probing for Gradle.
+        }
+    }
+
+    return undefined;
+}
+
+function ensureAndroidLocalProperties(cwd: string): void {
+    const androidRoot = join(cwd, 'android');
+    const sdkPath = detectAndroidSdkPath(cwd);
+    if (!sdkPath) return;
+
+    const localPropertiesPath = join(androidRoot, 'local.properties');
+    const escapedSdkPath = sdkPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:');
+
+    if (!existsSync(localPropertiesPath)) {
+        writeFileSync(localPropertiesPath, `sdk.dir=${escapedSdkPath}\n`, 'utf8');
+        return;
+    }
+
+    const content = readFileSync(localPropertiesPath, 'utf8');
+    const hasSdkLine = /^sdk\.dir=/m.test(content);
+    if (hasSdkLine) {
+        const updated = content.replace(/^sdk\.dir=.*$/m, `sdk.dir=${escapedSdkPath}`);
+        if (updated !== content) {
+            writeFileSync(localPropertiesPath, updated, 'utf8');
+        }
+        return;
+    }
+
+    const separator = content.endsWith('\n') || content.length === 0 ? '' : '\n';
+    writeFileSync(localPropertiesPath, `${content}${separator}sdk.dir=${escapedSdkPath}\n`, 'utf8');
+}
+
+function ensureAndroidGradleProperties(cwd: string): void {
+    const gradlePropertiesPath = join(cwd, 'android', 'gradle.properties');
+    const requiredEntries = [
+        ['android.useAndroidX', 'true'],
+        ['android.enableJetifier', 'true'],
+    ] as const;
+
+    if (!existsSync(gradlePropertiesPath)) {
+        const defaults = [
+            'org.gradle.jvmargs=-Xmx2g -Dkotlin.daemon.jvm.options=-Xmx1g',
+            ...requiredEntries.map(([key, value]) => `${key}=${value}`),
+        ].join('\n');
+        writeFileSync(gradlePropertiesPath, `${defaults}\n`, 'utf8');
+        return;
+    }
+
+    let content = readFileSync(gradlePropertiesPath, 'utf8');
+    let changed = false;
+
+    for (const [key, value] of requiredEntries) {
+        const regex = new RegExp(`^${key}=.*$`, 'm');
+        if (regex.test(content)) {
+            const updated = content.replace(regex, `${key}=${value}`);
+            if (updated !== content) {
+                content = updated;
+                changed = true;
+            }
+            continue;
+        }
+
+        const separator = content.endsWith('\n') || content.length === 0 ? '' : '\n';
+        content = `${content}${separator}${key}=${value}\n`;
+        changed = true;
+    }
+
+    if (changed) {
+        writeFileSync(gradlePropertiesPath, content, 'utf8');
+    }
+}
+
+function applyAndroidIcon(projectRoot: string, iconOption: string): void {
+    const iconPath = resolve(projectRoot, iconOption);
+    if (!existsSync(iconPath)) {
+        throw new Error(`[mobile] Icon file not found: ${iconPath}`);
+    }
+
+    const extension = iconPath.split('.').pop()?.toLowerCase();
+    if (extension !== 'png' && extension !== 'webp') {
+        throw new Error('[mobile] Icon format must be .png or .webp for Android resources.');
+    }
+
+    const resRoot = join(projectRoot, 'android', 'app', 'src', 'main', 'res', 'mipmap');
+    if (!existsSync(resRoot)) {
+        mkdirSync(resRoot, { recursive: true });
+    }
+
+    const launcherIcon = join(resRoot, `ic_launcher.${extension}`);
+    const roundIcon = join(resRoot, `ic_launcher_round.${extension}`);
+    copyFileSync(iconPath, launcherIcon);
+    copyFileSync(iconPath, roundIcon);
+
+    const manifestPath = join(projectRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+    if (!existsSync(manifestPath)) {
+        return;
+    }
+
+    const content = readFileSync(manifestPath, 'utf8');
+    const updated = content.replace(/<application\b[^>]*>/, (tag) => {
+        let next = upsertXmlAttribute(tag, 'android:icon', '@mipmap/ic_launcher');
+        next = upsertXmlAttribute(next, 'android:roundIcon', '@mipmap/ic_launcher_round');
+        return next;
+    });
+
+    if (updated !== content) {
+        writeFileSync(manifestPath, updated, 'utf8');
+    }
+}
+
+function normalizeAndroidPermissions(input?: string[]): string[] {
+    const defaults = ['android.permission.INTERNET'];
+    if (!input || input.length === 0) return defaults;
+
+    const merged = [...input, ...defaults]
+        .map((permission) => permission.trim())
+        .filter(Boolean);
+
+    return Array.from(new Set(merged));
+}
+
+function applyAndroidPermissions(projectRoot: string, permissionsOption?: string[]): void {
+    const manifestPath = join(projectRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+    if (!existsSync(manifestPath)) {
+        return;
+    }
+
+    const permissions = normalizeAndroidPermissions(permissionsOption);
+    const permissionLines = permissions.map((permission) => {
+        return `  <uses-permission android:name='${escapeSingleQuote(permission)}' />`;
+    });
+
+    const content = readFileSync(manifestPath, 'utf8');
+    const withoutPermissionLines = content.replace(/\s*<uses-permission\s+android:name=(?:"[^"]*"|'[^']*')\s*\/\>\s*\r?\n?/g, '\n');
+    const updated = withoutPermissionLines.replace(/<manifest\b[^>]*>\s*/, (tag) => `${tag}${permissionLines.join('\n')}\n`);
+
+    if (updated !== content) {
+        writeFileSync(manifestPath, updated, 'utf8');
+    }
+}
+
+function upsertXmlAttribute(tag: string, name: string, value: string): string {
+    const regex = new RegExp(`${name}=("[^"]*"|'[^']*')`);
+    if (regex.test(tag)) {
+        return tag.replace(regex, `${name}='${value}'`);
+    }
+
+    if (tag.endsWith('/>')) {
+        return `${tag.slice(0, -2)} ${name}='${value}'/>`;
+    }
+
+    return `${tag.slice(0, -1)} ${name}='${value}'>`;
 }
 
 function runCommand(command: string, args: string[], cwd: string): void {
@@ -587,18 +914,20 @@ function printMobileHelp(): void {
 Mobile command (native app workflow owned by elit)
 
 Usage:
-  elit mobile init [directory] [--app-id id] [--app-name name] [--web-dir dist]
+    elit mobile init [directory] [--app-id id] [--app-name name] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA]
     elit mobile doctor [--cwd dir] [--json]
-    elit mobile sync [--cwd dir] [--web-dir dist]
+        elit mobile sync [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA]
   elit mobile open android|ios
-    elit mobile run android|ios [--cwd dir] [--web-dir dist] [--target <id>] [--prod]
-    elit mobile build android|ios [--cwd dir] [--web-dir dist] [--prod]
+        elit mobile run android|ios [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--target <id>] [--prod]
+        elit mobile build android|ios [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--prod]
 
 Notes:
     - No external mobile framework is required.
     - Android is fully scaffolded by elit and uses WebView + bundled web assets.
     - iOS scaffold is a placeholder folder for Xcode integration.
     - Run "elit mobile doctor --json" for CI-friendly machine-readable checks.
-    - Default values can be set in elit.config.* under mobile.
+    - Set default values in elit.config.* under { mobile: { cwd, appId, appName, webDir, icon, permissions } }.
+    - Android permissions can be set by config mobile.permissions or repeated --permission flags.
+    - Android icon expects a .png or .webp file path.
 `);
 }
