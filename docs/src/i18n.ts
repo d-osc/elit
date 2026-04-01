@@ -13,6 +13,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'nav.home': 'Home',
     'nav.examples': 'Examples',
     'nav.docs': 'Docs',
+    'nav.wapk': 'WAPK',
     'nav.api': 'API',
     'nav.blog': 'Blog',
 
@@ -302,6 +303,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'nav.home': 'หน้าแรก',
     'nav.examples': 'ตัวอย่าง',
     'nav.docs': 'เอกสาร',
+    'nav.wapk': 'WAPK',
     'nav.api': 'API',
     'nav.blog': 'บล็อก',
 

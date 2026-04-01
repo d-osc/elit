@@ -5,6 +5,7 @@ Welcome to the Elit documentation! 📚
 ## Getting Started
 
 - **[Quick Start Guide](./QUICK_START.md)** - Get up and running in 5 minutes
+- **[WAPK Guide](./wapk.md)** - Package, inspect, run, and sync `.wapk` archives
 - **[API Reference](./API.md)** - Complete API documentation
 - **[Comparison Guide](./COMPARISON.md)** - Compare Elit with React, Vue, Svelte
 - **[Migration Guide](./MIGRATION.md)** - Migrate from other frameworks

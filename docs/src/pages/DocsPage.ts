@@ -142,7 +142,21 @@ npx elit build --entry ./src/main.ts --out-dir dist
 npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
-npx elit desktop build ./src/main.ts --release`;
+npx elit desktop build ./src/main.ts --release
+npx elit wapk pack .
+npx elit wapk run ./app.wapk
+npx elit desktop wapk run ./app.wapk --runtime bun`;
+
+const wapkCommands = `npx elit wapk pack .
+npx elit wapk pack . --include-deps
+npx elit wapk inspect ./app.wapk
+npx elit wapk extract ./app.wapk
+npx elit wapk ./app.wapk
+npx elit wapk run ./app.wapk
+npx elit wapk run ./app.wapk --runtime node|bun|deno
+npx elit wapk run ./app.wapk --sync-interval 100
+npx elit wapk run ./app.wapk --watcher
+npx elit desktop wapk run ./app.wapk --runtime bun`;
 
 const desktopEntry = `import { createWindow, onMessage, windowQuit, windowSetTitle } from 'elit/desktop';
 
@@ -176,6 +190,15 @@ const configShape = `{
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  wapk?: {
+    name?: string;
+    version?: string;
+    runtime?: 'node' | 'bun' | 'deno';
+    entry?: string;
+    include?: string[];
+    exclude?: string[];
+    desktop?: Record<string, unknown>;
+  };
 }`;
 
 const configExample = `import { api } from './src/server';
@@ -215,6 +238,14 @@ export default {
   },
   test: {
     include: ['testing/unit/**/*.test.ts'],
+  },
+  wapk: {
+    name: '@acme/sample-app',
+    version: '1.0.0',
+    runtime: 'bun',
+    entry: 'src/server.ts',
+    include: ['public/**'],
+    exclude: ['**/*.log'],
   },
 };`;
 
@@ -323,6 +354,7 @@ const Docs = () =>
               scrollLink('browser-app', text('Browser App', 'แอปเบราว์เซอร์')),
               scrollLink('cli', 'CLI'),
               scrollLink('desktop', text('Desktop Mode', 'Desktop Mode')),
+              scrollLink('wapk', 'WAPK'),
               scrollLink('config', text('Config File', 'Config File')),
               scrollLink('server', text('Server Patterns', 'รูปแบบฝั่ง Server')),
               scrollLink('styling', text('Styling', 'Styling')),
@@ -403,7 +435,10 @@ const Docs = () =>
               li(code('elit test --coverage --coverage-reporter text,html')),
               li(code('elit desktop --runtime quickjs|node|bun|deno')),
               li(code('elit desktop build --platform windows|linux|macos --out-dir dist')),
-              li(code('elit desktop build --compiler auto|none|esbuild|tsx|tsup'))
+              li(code('elit desktop build --compiler auto|none|esbuild|tsx|tsup')),
+              li(code('elit wapk pack [directory] --include-deps')),
+              li(code('elit wapk run <file.wapk> --runtime node|bun|deno')),
+              li(code('elit wapk run <file.wapk> --sync-interval 100 --watcher'))
             ),
 
             h2({ id: 'desktop' }, text('Desktop Mode', 'Desktop Mode')),
@@ -424,10 +459,23 @@ npx elit desktop build ./src/main.ts --release`),
               li(text('Use createWindowServer(app, opts) when you want to run an HTTP app inside the desktop shell.', 'ใช้ createWindowServer(app, opts) เมื่อต้องการรัน HTTP app ภายใน desktop shell.'))
             ),
 
+            h2({ id: 'wapk' }, 'WAPK'),
+            p(text(
+              'WAPK packages an app directory into one archive file and supports live sync back to the same archive while running.',
+              'WAPK ใช้แพ็กแอปเป็นไฟล์ archive เดียว และรองรับ live sync กลับเข้า archive เดิมระหว่างรัน.'
+            )),
+            codeExample(wapkCommands),
+            ul(
+              li(text('Use pack to create archives and include-deps when node_modules is required at runtime.', 'ใช้ pack เพื่อสร้าง archive และใช้ include-deps เมื่อต้องมี node_modules ตอนรัน.')),
+              li(text('Use inspect and extract for debugging archive content and metadata.', 'ใช้ inspect และ extract เพื่อดูโครงสร้างไฟล์และ metadata ใน archive.')),
+              li(text('Run mode supports runtime override (node, bun, deno) and sync tuning via sync-interval.', 'โหมด run รองรับ runtime override (node, bun, deno) และปรับการ sync ผ่าน sync-interval.')),
+              li(text('Use watcher mode for event-driven sync when files change frequently.', 'ใช้ watcher mode เพื่อ sync แบบ event-driven เมื่อไฟล์เปลี่ยนบ่อย.'))
+            ),
+
             h2({ id: 'config' }, text('Config File', 'Config File')),
             p(text(
-              'Elit loads one of these files from the project root: elit.config.ts, elit.config.js, elit.config.mjs, elit.config.cjs, or elit.config.json.',
-              'Elit จะโหลดไฟล์ใดไฟล์หนึ่งจาก project root: elit.config.ts, elit.config.js, elit.config.mjs, elit.config.cjs หรือ elit.config.json.'
+              'Elit loads one of these files from the project root: elit.config.ts, elit.config.mts, elit.config.js, elit.config.mjs, elit.config.cjs, or elit.config.json.',
+              'Elit จะโหลดไฟล์ใดไฟล์หนึ่งจาก project root: elit.config.ts, elit.config.mts, elit.config.js, elit.config.mjs, elit.config.cjs หรือ elit.config.json.'
             )),
             h3(text('Config Shape', 'โครงสร้าง config')),
             codeExample(configShape),
@@ -437,7 +485,8 @@ npx elit desktop build ./src/main.ts --release`),
               li(text('build can be a single object or an array. Arrays run sequentially.', 'build อาจเป็น object เดียวหรือ array ก็ได้ และถ้าเป็น array จะรันทีละตัวตามลำดับ.')),
               li(text('Only VITE_ variables are injected into client bundles.', 'มีเพียงตัวแปรที่ขึ้นต้นด้วย VITE_ เท่านั้นที่ถูก inject เข้า client bundle.')),
               li(text('Environment files load in this order: .env.{mode}.local, .env.{mode}, .env.local, .env.', 'ไฟล์ env จะถูกโหลดตามลำดับ: .env.{mode}.local, .env.{mode}, .env.local, .env.')),
-              li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.'))
+              li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.')),
+              li(text('Configure WAPK packaging in config.wapk instead of a legacy wapk.config.json file.', 'ตั้งค่า WAPK ที่ config.wapk แทนไฟล์ legacy wapk.config.json.'))
             ),
 
             h2({ id: 'server' }, text('Server Patterns', 'รูปแบบฝั่ง Server')),

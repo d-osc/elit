@@ -66,6 +66,52 @@ npx elit-dev
 
 Your app will open at `http://localhost:3000` with hot module replacement! 🎉
 
+## WAPK Quick Start
+
+Package an app directory into a single `.wapk` file:
+
+```bash
+npx elit wapk pack .
+```
+
+Inspect archive metadata and files:
+
+```bash
+npx elit wapk inspect ./app.wapk
+```
+
+Run the archive:
+
+```bash
+npx elit wapk ./app.wapk
+# or
+npx elit wapk run ./app.wapk
+```
+
+Runtime override:
+
+```bash
+npx elit wapk run ./app.wapk --runtime node
+npx elit wapk run ./app.wapk --runtime bun
+npx elit wapk run ./app.wapk --runtime deno
+```
+
+Desktop from archive:
+
+```bash
+npx elit desktop wapk ./app.wapk
+npx elit desktop wapk run ./app.wapk --runtime bun
+```
+
+Tune sync mode while running:
+
+```bash
+npx elit wapk run ./app.wapk --sync-interval 100
+npx elit wapk run ./app.wapk --watcher
+```
+
+For full details and config examples, see [WAPK Guide](./wapk.md).
+
 ## Next Steps
 
 ### 1. Add Some Styling

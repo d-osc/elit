@@ -56,8 +56,46 @@ export interface ElitConfig {
     preview?: PreviewOptions;
     /** Test configuration */
     test?: TestOptions;
+    /** Desktop command configuration */
+    desktop?: DesktopConfig;
     /** WAPK packaging configuration */
     wapk?: WapkConfig;
+}
+
+export interface DesktopConfig {
+    /** Native desktop runtime: quickjs, bun, node, deno */
+    runtime?: 'quickjs' | 'bun' | 'node' | 'deno';
+    /** Desktop entry compiler: auto, none, esbuild, tsx, tsup */
+    compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
+    /** Build or run with release desktop runtime */
+    release?: boolean;
+    /** Desktop build output directory */
+    outDir?: string;
+    /** Desktop build target platform */
+    platform?:
+        | 'windows'
+        | 'win'
+        | 'windows-arm'
+        | 'win-arm'
+        | 'linux'
+        | 'linux-musl'
+        | 'linux-arm'
+        | 'macos'
+        | 'mac'
+        | 'darwin'
+        | 'macos-arm'
+        | 'mac-arm';
+    /** Desktop WAPK mode defaults */
+    wapk?: {
+        /** Packaged runtime to execute inside desktop mode */
+        runtime?: 'node' | 'bun' | 'deno';
+        /** Polling interval for WAPK live sync */
+        syncInterval?: number;
+        /** Use event-driven file watcher for WAPK live sync */
+        useWatcher?: boolean;
+        /** Use release desktop runtime binary */
+        release?: boolean;
+    };
 }
 
 export interface WapkConfig {

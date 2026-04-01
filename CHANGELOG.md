@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.5] - 2026-04-02
+
+### Added
+- **WAPK CLI workflows** - Added first-class WAPK command flows for package lifecycle and runtime execution
+  - Added `elit wapk <file.wapk>` and `elit wapk run <file.wapk>` execution paths
+  - Added `elit wapk pack [directory]`, `elit wapk inspect <file.wapk>`, and `elit wapk extract <file.wapk>`
+  - Added runtime override support via `--runtime node|bun|deno` for WAPK run commands
+  - Added desktop integration commands: `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>`
+- **WAPK sync controls** - Added runtime sync tuning options for edit-heavy workflows
+  - Added `--sync-interval <ms>` to configure archive sync frequency
+  - Added `--watcher` / `--use-watcher` mode for event-driven file sync
+- **Desktop config defaults** - Added `desktop` config support in `elit.config.*` for `elit desktop` commands
+  - `elit desktop` and `elit desktop build` now read defaults from `desktop` config
+  - `elit desktop wapk` now reads defaults from `desktop.wapk` config
+
+### Changed
+- **WAPK config source** - WAPK packaging now reads `wapk` options from `elit.config.*`
+  - Supports `elit.config.ts`, `elit.config.mts`, `elit.config.js`, `elit.config.mjs`, `elit.config.cjs`, and `elit.config.json`
+  - Removed metadata fallback behavior from legacy `wapk.config.json`
+- **WAPK run architecture** - Reworked run flow from cache-based extraction to live archive sync
+  - `.wapk` is loaded and prepared in a temporary working directory for runtime execution
+  - File changes are synced back into the source `.wapk` archive directly during runtime
+  - Desktop WAPK run now uses the same live sync model and lifecycle cleanup
+
+### Fixed
+- **Archive ignore behavior** - Packaging now excludes legacy and temporary config artifacts from WAPK contents
+  - Prevents accidental inclusion of `.elit-config-*` temporary files
+  - Prevents accidental inclusion of `wapk.config.json` in generated archives
+- **Desktop/WAPK compatibility after run refactor** - Updated desktop command paths to use `workDir` after cache removal
+
+### Tests
+- Added and expanded WAPK unit/smoke coverage for:
+  - `elit.config.json` and `elit.config.mts` metadata loading
+  - Ignoring legacy `wapk.config.json` metadata and file inclusion
+  - Configurable sync interval and watcher-enabled live sync behavior
+  - Real-world example flow (`pack -> inspect -> run -> extract`) in `examples/wapk-example`
+
 ## [3.4.4] - 2026-04-01
 
 ### Added

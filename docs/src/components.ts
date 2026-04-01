@@ -50,6 +50,12 @@ export const Header = (router: Router) => {
         ),
         reactive(navState, (state) =>
           routerLink(router, {
+            to: '/docs',
+            className: isActive('/docs', state.currentPath) ? 'active' : ''
+          }, t('nav.wapk'))
+        ),
+        reactive(navState, (state) =>
+          routerLink(router, {
             to: '/api',
             className: isActive('/api', state.currentPath) ? 'active' : ''
           }, t('nav.api'))
@@ -592,7 +598,7 @@ export const Stats = () =>
           span({ className: 'stat-label' }, t('stats.deps'))
         ),
         div({ className: 'stat' },
-          span({ className: 'stat-number' }, 'v3.4.4'),
+          span({ className: 'stat-number' }, 'v3.4.5'),
           span({ className: 'stat-label' }, t('stats.version'))
         ),
         div({ className: 'stat' },
@@ -1042,7 +1048,7 @@ export const Footer = () =>
         p(
           t('footer.license'), ' | ',
           a({ href: 'https://github.com/d-osc/elit' }, 'GitHub'),
-          ' | ', t('footer.builtWith'), ' v3.4.4 | ',
+          ' | ', t('footer.builtWith'), ' v3.4.5 | ',
           'Created by ', a({ href: 'https://github.com/n-devs', target: '_blank' }, 'n-devs')
         )
       )

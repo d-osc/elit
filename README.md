@@ -17,7 +17,7 @@ If you are generating or editing code for Elit, follow these rules first:
 - Prefer subpath imports in generated code. They make environment boundaries obvious.
 - `createRouterView(router, options)` returns a function. Render it inside `reactive(router.currentRoute, () => RouterView())`.
 - Browser-facing code may import local `.ts` files during development. Elit rewrites those imports for browser output.
-- Config files can be `elit.config.ts`, `elit.config.js`, `elit.config.mjs`, `elit.config.cjs`, or `elit.config.json`.
+- Config files can be `elit.config.ts`, `elit.config.mts`, `elit.config.js`, `elit.config.mjs`, `elit.config.cjs`, or `elit.config.json`.
 - Environment files are loaded in this order: `.env.{mode}.local`, `.env.{mode}`, `.env.local`, `.env`.
 - Only `VITE_` variables are injected into client bundles.
 
@@ -142,6 +142,9 @@ npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
 npx elit desktop build ./src/main.ts --release
+npx elit wapk pack .
+npx elit wapk run ./app.wapk
+npx elit desktop wapk run ./app.wapk
 ```
 
 Useful flags:
@@ -157,6 +160,12 @@ Useful flags:
 - `elit desktop --runtime quickjs|node|bun|deno`
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
 - `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
+- `elit wapk ./app.wapk --runtime node|bun|deno`
+- `elit wapk run ./app.wapk --sync-interval 100 --watcher`
+- `elit wapk pack . --include-deps`
+- `elit wapk inspect ./app.wapk`
+- `elit wapk extract ./app.wapk`
+- `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
 
 Desktop mode notes:
 
@@ -168,11 +177,21 @@ Desktop mode notes:
 - Desktop icon support includes `.ico`, `.png`, and `.svg`.
 - Desktop build auto-detects `icon.*` and `favicon.*` in the entry directory, project directory, and sibling `public/` folders.
 
+WAPK mode notes:
+
+- `elit wapk <file.wapk>` and `elit wapk run <file.wapk>` run packaged apps.
+- `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>` run packaged apps in desktop mode.
+- During run, the archive is expanded into a temporary work directory and changes are synced back to the same `.wapk` file.
+- Use `--sync-interval <ms>` for polling mode, or `--watcher` / `--use-watcher` for event-driven sync.
+- Configure package metadata in `elit.config.*` under `wapk`.
+- See the full example app at `examples/wapk-example`.
+
 ## Config File
 
 Elit loads one of these files from the project root:
 
 - `elit.config.ts`
+- `elit.config.mts`
 - `elit.config.js`
 - `elit.config.mjs`
 - `elit.config.cjs`
@@ -186,6 +205,29 @@ The config shape is:
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  desktop?: {
+    runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
+    compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
+    release?: boolean;
+    outDir?: string;
+    platform?: 'windows' | 'linux' | 'macos';
+    wapk?: {
+      runtime?: 'node' | 'bun' | 'deno';
+      syncInterval?: number;
+      useWatcher?: boolean;
+      release?: boolean;
+    };
+  };
+  wapk?: {
+    name?: string;
+    version?: string;
+    runtime?: 'node' | 'bun' | 'deno';
+    entry?: string;
+    scripts?: Record<string, string>;
+    port?: number;
+    env?: Record<string, string | number | boolean>;
+    desktop?: Record<string, unknown>;
+  };
 }
 ```
 
@@ -230,6 +272,29 @@ export default {
   test: {
     include: ['testing/unit/**/*.test.ts'],
   },
+  desktop: {
+    runtime: 'quickjs',
+    compiler: 'auto',
+    release: false,
+    outDir: 'dist',
+    platform: 'windows',
+    wapk: {
+      runtime: 'bun',
+      syncInterval: 150,
+      useWatcher: true,
+      release: true,
+    },
+  },
+  wapk: {
+    name: 'my-app',
+    version: '1.0.0',
+    runtime: 'bun',
+    entry: './src/server.ts',
+    port: 3000,
+    env: {
+      NODE_ENV: 'production',
+    },
+  },
 };
 ```
 
@@ -239,6 +304,9 @@ Important details:
 - `dev.clients` is the most flexible setup when you want SSR, API routes, multiple apps, or per-client proxy rules.
 - `preview` supports the same concepts as `dev`: multiple clients, API routes, proxy rules, workers, SSR, and HTTPS.
 - Only `VITE_` variables are exposed to client code during bundling.
+- `desktop` config provides defaults for `elit desktop`, `elit desktop build`, and `elit desktop wapk`.
+- `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
+- `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
 
 ## Browser Patterns
 

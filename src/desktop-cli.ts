@@ -6,6 +6,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { build as esbuild } from 'esbuild';
+import { loadConfig, type DesktopConfig } from './config';
 
 import {
     WAPK_RUNTIMES,
@@ -95,24 +96,27 @@ export async function runDesktopCommand(args: string[]): Promise<void> {
         return;
     }
 
+    const config = await loadConfig();
+    const desktopConfig = config?.desktop;
+
     if (args[0] === 'wapk') {
-        await runDesktopWapkCommand(args.slice(1));
+        await runDesktopWapkCommand(args.slice(1), desktopConfig);
         return;
     }
 
     if (args[0] === 'build') {
-        await buildDesktopBundle(parseDesktopBuildArgs(args.slice(1)));
+        await buildDesktopBundle(parseDesktopBuildArgs(args.slice(1), desktopConfig));
         return;
     }
 
-    await runDesktopRuntime(parseDesktopRunArgs(args));
+    await runDesktopRuntime(parseDesktopRunArgs(args, desktopConfig));
 }
 
-function parseDesktopRunArgs(args: string[]): DesktopRunOptions {
+function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRunOptions {
     const options: DesktopRunOptions = {
-        runtime: 'quickjs',
-        compiler: 'auto',
-        release: false,
+        runtime: config?.runtime ?? 'quickjs',
+        compiler: config?.compiler ?? 'auto',
+        release: config?.release ?? false,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -155,12 +159,13 @@ function parseDesktopRunArgs(args: string[]): DesktopRunOptions {
     return options;
 }
 
-function parseDesktopBuildArgs(args: string[]): DesktopBuildOptions {
+function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopBuildOptions {
     const options: DesktopBuildOptions = {
-        runtime: 'quickjs',
-        compiler: 'auto',
-        release: false,
-        outDir: 'dist',
+        runtime: config?.runtime ?? 'quickjs',
+        compiler: config?.compiler ?? 'auto',
+        release: config?.release ?? false,
+        outDir: config?.outDir ?? 'dist',
+        platform: config?.platform as DesktopPlatform | undefined,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -267,13 +272,13 @@ function printDesktopHelp(): void {
     ].join('\n'));
 }
 
-async function runDesktopWapkCommand(args: string[]): Promise<void> {
+async function runDesktopWapkCommand(args: string[], config?: DesktopConfig): Promise<void> {
     if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
         printDesktopHelp();
         return;
     }
 
-    const options = parseDesktopWapkRunArgs(args);
+    const options = parseDesktopWapkRunArgs(args, config?.wapk);
     const preparedApp = prepareWapkApp(options.file, {
         runtime: options.runtime,
         syncInterval: options.syncInterval,
@@ -300,11 +305,14 @@ async function runDesktopWapkCommand(args: string[]): Promise<void> {
     }
 }
 
-function parseDesktopWapkRunArgs(args: string[]): DesktopWapkRunOptions {
+function parseDesktopWapkRunArgs(args: string[], config?: DesktopConfig['wapk']): DesktopWapkRunOptions {
     const normalizedArgs = args[0] === 'run' ? args.slice(1) : args;
     const options: DesktopWapkRunOptions = {
-        release: false,
+        runtime: config?.runtime,
+        release: config?.release ?? false,
         file: '',
+        syncInterval: config?.syncInterval,
+        useWatcher: config?.useWatcher,
     };
 
     for (let i = 0; i < normalizedArgs.length; i++) {
