@@ -25,6 +25,19 @@ interface MobileInitOptions {
 interface MobileCommandOptions {
     cwd: string;
     webDir: string;
+    json: boolean;
+}
+
+interface MobileDoctorCheck {
+    name: string;
+    ok: boolean;
+    details?: string;
+}
+
+interface MobileDoctorReport {
+    ok: boolean;
+    failed: number;
+    checks: MobileDoctorCheck[];
 }
 
 export async function runMobileCommand(args: string[]): Promise<void> {
@@ -111,6 +124,7 @@ function parseCommandOptions(args: string[], config?: MobileConfig): MobileComma
     const options: MobileCommandOptions = {
         cwd: config?.cwd ? resolve(config.cwd) : process.cwd(),
         webDir: config?.webDir ?? 'dist',
+        json: false,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -123,6 +137,8 @@ function parseCommandOptions(args: string[], config?: MobileConfig): MobileComma
             const value = args[++i];
             if (!value) throw new Error('Missing value for --web-dir');
             options.webDir = value;
+        } else if (arg === '--json') {
+            options.json = true;
         }
     }
 
@@ -278,7 +294,7 @@ function openMobileProject(platform: MobilePlatform, options: MobileCommandOptio
 }
 
 function runMobileDoctor(options: MobileCommandOptions): void {
-    const checks: Array<{ name: string; ok: boolean; details?: string }> = [];
+    const checks: MobileDoctorCheck[] = [];
     const mobileConfigPath = join(options.cwd, 'elit.mobile.json');
     const androidRoot = join(options.cwd, 'android');
     const iosRoot = join(options.cwd, 'ios');
@@ -314,6 +330,21 @@ function runMobileDoctor(options: MobileCommandOptions): void {
         });
     }
 
+    const failed = checks.filter((check) => !check.ok).length;
+    const report: MobileDoctorReport = {
+        ok: failed === 0,
+        failed,
+        checks,
+    };
+
+    if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+        if (!report.ok) {
+            process.exitCode = 1;
+        }
+        return;
+    }
+
     console.log('[mobile doctor] Environment checks:');
     for (const check of checks) {
         const status = check.ok ? 'OK' : 'MISSING';
@@ -323,8 +354,7 @@ function runMobileDoctor(options: MobileCommandOptions): void {
         }
     }
 
-    const failed = checks.filter((check) => !check.ok).length;
-    if (failed > 0) {
+    if (!report.ok) {
         throw new Error(`[mobile doctor] ${failed} check(s) failed.`);
     }
 
@@ -558,7 +588,7 @@ Mobile command (native app workflow owned by elit)
 
 Usage:
   elit mobile init [directory] [--app-id id] [--app-name name] [--web-dir dist]
-    elit mobile doctor [--cwd dir]
+    elit mobile doctor [--cwd dir] [--json]
     elit mobile sync [--cwd dir] [--web-dir dist]
   elit mobile open android|ios
     elit mobile run android|ios [--cwd dir] [--web-dir dist] [--target <id>] [--prod]
@@ -568,7 +598,7 @@ Notes:
     - No external mobile framework is required.
     - Android is fully scaffolded by elit and uses WebView + bundled web assets.
     - iOS scaffold is a placeholder folder for Xcode integration.
-    - Run "elit mobile doctor" to verify local native toolchain readiness.
+    - Run "elit mobile doctor --json" for CI-friendly machine-readable checks.
     - Default values can be set in elit.config.* under mobile.
 `);
 }

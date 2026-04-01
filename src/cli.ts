@@ -586,7 +586,7 @@ Desktop Options:
 
 Mobile Options:
   elit mobile init [dir]                    Initialize native mobile config files
-  elit mobile doctor                        Validate native mobile toolchain and project setup
+  elit mobile doctor [--json]               Validate native mobile toolchain and project setup
   elit mobile sync                          Sync web assets to native mobile projects
   elit mobile open android|ios              Open platform project in native IDE
   elit mobile run android|ios               Run app on device or emulator
