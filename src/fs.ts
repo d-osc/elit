@@ -75,7 +75,7 @@ async function processDenoEntriesAsync(iterator: any, withFileTypes?: boolean): 
 
 // Pre-load fs module for Node.js
 let fs: any, fsPromises: any;
-if (isNode) {
+if (isNode || isBun) {
   fs = require('fs');
   fsPromises = require('fs/promises');
 }
@@ -174,13 +174,8 @@ export interface Dirent {
 export async function readFile(path: string, options?: ReadFileOptions | BufferEncoding): Promise<string | Buffer> {
   const opts = parseOptions<ReadFileOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.readFile(path, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    const file = Bun.file(path);
-    const content = await file.arrayBuffer();
-    return decodeContent(content, opts.encoding);
   } else if (isDeno) {
     // @ts-ignore
     const content = await Deno.readFile(path);
@@ -196,13 +191,8 @@ export async function readFile(path: string, options?: ReadFileOptions | BufferE
 export function readFileSync(path: string, options?: ReadFileOptions | BufferEncoding): string | Buffer {
   const opts = parseOptions<ReadFileOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     return fs.readFileSync(path, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    const file = Bun.file(path);
-    const content = file.arrayBuffer();
-    return decodeContent(content as ArrayBuffer, opts.encoding);
   } else if (isDeno) {
     // @ts-ignore
     const content = Deno.readFileSync(path);
@@ -316,20 +306,8 @@ export function existsSync(path: string): boolean {
  * Get file stats (async)
  */
 export async function stat(path: string): Promise<Stats> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.stat(path);
-  } else if (isBun) {
-    // @ts-ignore
-    const file = Bun.file(path);
-    const size = file.size;
-    const exists = await file.exists();
-
-    if (!exists) {
-      throw new Error(`ENOENT: no such file or directory, stat '${path}'`);
-    }
-
-    // Create a Stats-like object
-    return createStatsObject(path, size, false);
   } else if (isDeno) {
     // @ts-ignore
     const info = await Deno.stat(path);
@@ -343,21 +321,8 @@ export async function stat(path: string): Promise<Stats> {
  * Get file stats (sync)
  */
 export function statSync(path: string): Stats {
-  if (isNode) {
+  if (isNode || isBun) {
     return fs.statSync(path);
-  } else if (isBun) {
-    // @ts-ignore
-    const file = Bun.file(path);
-    const size = file.size;
-
-    // Bun doesn't have sync exists check, so we try to read
-    try {
-      file.arrayBuffer();
-    } catch {
-      throw new Error(`ENOENT: no such file or directory, stat '${path}'`);
-    }
-
-    return createStatsObject(path, size, false);
   } else if (isDeno) {
     // @ts-ignore
     const info = Deno.statSync(path);
@@ -585,40 +550,6 @@ export function realpathSync(path: string, options?: { encoding?: BufferEncoding
     return Deno.realPathSync(path);
   }
   return path;
-}
-
-/**
- * Helper: Create Stats object
- */
-function createStatsObject(_path: string, size: number, isDir: boolean): Stats {
-  const now = Date.now();
-  return {
-    isFile: () => !isDir,
-    isDirectory: () => isDir,
-    isBlockDevice: () => false,
-    isCharacterDevice: () => false,
-    isSymbolicLink: () => false,
-    isFIFO: () => false,
-    isSocket: () => false,
-    dev: 0,
-    ino: 0,
-    mode: isDir ? 16877 : 33188,
-    nlink: 1,
-    uid: 0,
-    gid: 0,
-    rdev: 0,
-    size,
-    blksize: 4096,
-    blocks: Math.ceil(size / 512),
-    atimeMs: now,
-    mtimeMs: now,
-    ctimeMs: now,
-    birthtimeMs: now,
-    atime: new Date(now),
-    mtime: new Date(now),
-    ctime: new Date(now),
-    birthtime: new Date(now),
-  };
 }
 
 /**

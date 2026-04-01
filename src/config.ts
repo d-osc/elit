@@ -1,5 +1,5 @@
 /**
- * Config loader for elit.config.{ts,js,json}
+ * Config loader for elit.config.{ts,mts,js,mjs,cjs,json}
  */
 
 import { existsSync, readFileSync } from './fs';
@@ -56,6 +56,20 @@ export interface ElitConfig {
     preview?: PreviewOptions;
     /** Test configuration */
     test?: TestOptions;
+    /** WAPK packaging configuration */
+    wapk?: WapkConfig;
+}
+
+export interface WapkConfig {
+    name?: string;
+    version?: string;
+    runtime?: string;
+    engine?: string;
+    entry?: string;
+    scripts?: Record<string, string>;
+    port?: number;
+    env?: Record<string, string | number | boolean>;
+    desktop?: Record<string, unknown>;
 }
 
 /**
@@ -65,13 +79,14 @@ export function defineConfig(config: ElitConfig): ElitConfig {
     return config;
 }
 
-const CONFIG_FILES = [
+export const ELIT_CONFIG_FILES = [
     'elit.config.ts',
+    'elit.config.mts',
     'elit.config.js',
     'elit.config.mjs',
     'elit.config.cjs',
     'elit.config.json'
-];
+] as const;
 
 /**
  * Load environment variables from .env files
@@ -118,7 +133,7 @@ export function loadEnv(mode: string = 'development', cwd: string = process.cwd(
  * Load elit config from current directory
  */
 export async function loadConfig(cwd: string = process.cwd()): Promise<ElitConfig | null> {
-    for (const configFile of CONFIG_FILES) {
+    for (const configFile of ELIT_CONFIG_FILES) {
         const configPath = resolve(cwd, configFile);
 
         if (existsSync(configPath)) {
@@ -142,7 +157,7 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
         // Load JSON config
         const content = readFileAsString(configPath);
         return JSON.parse(content);
-    } else if (ext === 'ts') {
+    } else if (ext === 'ts' || ext === 'mts') {
         // Load TypeScript config by transpiling it with esbuild
         try {
             const { build } = await import('esbuild');

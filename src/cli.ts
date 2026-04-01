@@ -3,13 +3,14 @@
  * Main CLI for Elit
  */
 
-import { loadConfig, mergeConfig, loadEnv } from './config';
+import { ELIT_CONFIG_FILES, loadConfig, mergeConfig, loadEnv } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
 import { runDesktopCommand } from './desktop-cli';
+import { runWapkCommand } from './wapk-cli';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -104,6 +105,9 @@ async function main() {
         case 'desktop':
             await runDesktop(args.slice(1));
             break;
+        case 'wapk':
+          await runWapk(args.slice(1));
+          break;
         case 'version':
             printVersion();
             break;
@@ -117,7 +121,6 @@ async function main() {
 async function runDev(args: string[]) {
     const cliOptions = parseDevArgs(args);
     const cwd = process.cwd();
-    const CONFIG_FILES = ['elit.config.ts', 'elit.config.js', 'elit.config.mjs', 'elit.config.json'];
 
     let devServer: Awaited<ReturnType<typeof createDevServer>> | null = null;
     let restarting = false;
@@ -157,7 +160,7 @@ async function runDev(args: string[]) {
     const { watch } = await import('fs');
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const configWatcher = watch(cwd, (_, filename) => {
-        if (filename && CONFIG_FILES.includes(filename)) {
+      if (filename && ELIT_CONFIG_FILES.includes(filename as typeof ELIT_CONFIG_FILES[number])) {
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(restart, 300);
         }
@@ -369,6 +372,15 @@ async function runDesktop(args: string[]) {
     }
 }
 
+  async function runWapk(args: string[]) {
+    try {
+      await runWapkCommand(args);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
+
 interface TestOptions {
     files?: string[];
     include?: string[];
@@ -532,6 +544,7 @@ Commands:
   preview   Preview production build
   test      Run tests
   desktop   Run or build a native desktop app
+  wapk      Pack, inspect, extract, or run a .wapk app
   version   Show version number
   help      Show this help message
 
@@ -553,8 +566,17 @@ Build Options:
 Desktop Options:
   elit desktop <entry>                       Run an Elit desktop entry
   elit desktop build <entry>                Build a standalone desktop executable
+  elit desktop wapk <file.wapk>             Run a packaged app in the desktop shell
   elit desktop --runtime node src/main.ts   Run with Node.js backend runtime
   elit desktop build --release src/main.ts  Build a release desktop executable
+
+WAPK Options:
+  elit wapk <file.wapk>                     Run a packaged app
+  elit wapk run <file.wapk>                 Run a packaged app
+  elit wapk pack [directory]                Pack a directory into a .wapk archive
+  elit wapk inspect <file.wapk>             Inspect a .wapk archive
+  elit wapk extract <file.wapk>             Extract a .wapk archive
+  elit wapk --runtime node|bun|deno <file>  Override the packaged runtime
 
 Note: Build configuration supports both single and multiple builds:
       - Single build: build: { entry: 'src/app.ts', outDir: 'dist' }
@@ -594,7 +616,7 @@ Note: Test command behaviors:
       - elit test --coverage          Run with coverage report
 
 Config File:
-  Create elit.config.ts, elit.config.js, or elit.config.json in project root
+  Create elit.config.ts, elit.config.mts, elit.config.js, elit.config.mjs, elit.config.cjs, or elit.config.json in project root
 
 Proxy Configuration:
   Configure proxy in the config file to forward requests to backend servers.

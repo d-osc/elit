@@ -7,6 +7,16 @@ import { pathToFileURL } from 'node:url';
 
 import { build as esbuild } from 'esbuild';
 
+import {
+    WAPK_RUNTIMES,
+    createWapkLiveSync,
+    getWapkRuntimeArgs,
+    prepareWapkApp,
+    resolveWapkRuntimeExecutable,
+    type PreparedWapkApp,
+    type WapkRuntimeName,
+} from './wapk-cli';
+
 type DesktopRuntimeName = 'quickjs' | 'bun' | 'node' | 'deno';
 type DesktopCompilerName = 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
 type DesktopFormat = 'iife' | 'cjs' | 'esm';
@@ -37,6 +47,12 @@ interface PreparedEntry {
     appName: string;
     entryPath: string;
     cleanupPath?: string;
+}
+
+interface DesktopWapkRunOptions {
+    runtime?: WapkRuntimeName;
+    release: boolean;
+    file: string;
 }
 
 const PACKAGE_ROOT = resolve(__dirname, '..');
@@ -74,6 +90,11 @@ const TS_LIKE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.jsx']);
 export async function runDesktopCommand(args: string[]): Promise<void> {
     if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
         printDesktopHelp();
+        return;
+    }
+
+    if (args[0] === 'wapk') {
+        await runDesktopWapkCommand(args.slice(1));
         return;
     }
 
@@ -201,6 +222,8 @@ function printDesktopHelp(): void {
         '',
         'Usage:',
         '  elit desktop [options] <entry>',
+        '  elit desktop wapk [options] <file.wapk>',
+        '  elit desktop wapk run [options] <file.wapk>',
         '  elit desktop build [options] <entry>',
         '  elit desktop build [options]',
         '',
@@ -216,9 +239,15 @@ function printDesktopHelp(): void {
         '  -o, --out-dir <dir>      Output directory (default: dist)',
         '  --release                Build the desktop runtime in release mode',
         '',
+        'Desktop WAPK options:',
+        '  -r, --runtime <name>     Packaged app runtime: node, bun, deno',
+        '  --release                Use the release desktop runtime binary',
+        '',
         'Examples:',
         '  elit desktop src/main.ts',
         '  elit desktop --runtime node app.ts',
+        '  elit desktop wapk app.wapk',
+        '  elit desktop wapk run app.wapk --runtime bun',
         '  elit desktop build src/main.ts',
         '  elit desktop build --runtime bun --release src/main.ts',
         '',
@@ -228,7 +257,247 @@ function printDesktopHelp(): void {
         '  - The tsx compiler is Node-only and keeps loading the original source tree.',
         '  - The tsx and tsup compilers require those packages to be installed.',
         '  - The build subcommand can be used without an entry to prebuild the native runtime.',
+        '  - Desktop WAPK mode expects the packaged entry to start an HTTP app.',
     ].join('\n'));
+}
+
+async function runDesktopWapkCommand(args: string[]): Promise<void> {
+    if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+        printDesktopHelp();
+        return;
+    }
+
+    const options = parseDesktopWapkRunArgs(args);
+    const preparedApp = prepareWapkApp(options.file, { runtime: options.runtime });
+    const preparedEntry = await createDesktopWapkEntry(preparedApp);
+    const liveSync = createWapkLiveSync(preparedApp);
+
+    try {
+        const binary = ensureDesktopBinary({
+            runtime: preparedApp.runtime,
+            release: options.release,
+            entryPath: preparedApp.entryPath,
+        });
+
+        const exitCode = await spawnDesktopProcess(binary, ['--runtime', preparedApp.runtime, preparedEntry.entryPath]);
+        if (exitCode !== 0) {
+            process.exit(exitCode);
+        }
+    } finally {
+        liveSync.stop();
+        rmSync(preparedApp.workDir, { recursive: true, force: true });
+        cleanupPreparedEntry(preparedEntry);
+    }
+}
+
+function parseDesktopWapkRunArgs(args: string[]): DesktopWapkRunOptions {
+    const normalizedArgs = args[0] === 'run' ? args.slice(1) : args;
+    const options: DesktopWapkRunOptions = {
+        release: false,
+        file: '',
+    };
+
+    for (let i = 0; i < normalizedArgs.length; i++) {
+        const arg = normalizedArgs[i];
+
+        switch (arg) {
+            case '--runtime':
+            case '-r': {
+                const runtime = normalizedArgs[++i] as WapkRuntimeName | undefined;
+                if (!runtime || !WAPK_RUNTIMES.includes(runtime)) {
+                    throw new Error(`Unknown desktop WAPK runtime: ${runtime}`);
+                }
+                options.runtime = runtime;
+                break;
+            }
+            case '--release':
+                options.release = true;
+                break;
+            default:
+                if (arg.startsWith('-')) {
+                    throw new Error(`Unknown desktop WAPK option: ${arg}`);
+                }
+                if (options.file) {
+                    throw new Error('Desktop WAPK mode accepts exactly one package file.');
+                }
+                options.file = arg;
+                break;
+        }
+    }
+
+    if (!options.file) {
+        throw new Error('Usage: elit desktop wapk <file.wapk>');
+    }
+
+    return options;
+}
+
+async function createDesktopWapkEntry(preparedApp: PreparedWapkApp): Promise<PreparedEntry> {
+    const port = await resolveDesktopWapkPort(preparedApp.header.port);
+    const appName = sanitizeDesktopWapkName(preparedApp.header.name);
+    const entryPath = join(preparedApp.workDir, `.elit-desktop-wapk-${appName}-${randomUUID()}.mjs`);
+    const desktopOptions = buildDesktopWapkWindowOptions(preparedApp);
+    const runtimeExecutable = resolveWapkRuntimeExecutable(preparedApp.runtime);
+    const runtimeArgs = getWapkRuntimeArgs(preparedApp.runtime, preparedApp.entryPath);
+    const env = {
+        ...process.env,
+        ...preparedApp.header.env,
+        PORT: String(port),
+    };
+
+    writeFileSync(
+        entryPath,
+        [
+            `import { spawn } from 'node:child_process';`,
+            `import http from 'node:http';`,
+            '',
+            `const runtimeExecutable = ${JSON.stringify(runtimeExecutable)};`,
+            `const runtimeArgs = ${JSON.stringify(runtimeArgs)};`,
+            `const workDir = ${JSON.stringify(preparedApp.workDir)};`,
+            `const runtimeEnv = ${JSON.stringify(env)};`,
+            `const windowOptions = ${JSON.stringify(desktopOptions)};`,
+            `const appUrl = ${JSON.stringify(`http://127.0.0.1:${port}`)};`,
+            '',
+            'function waitForServer(url, timeoutMs = 15000) {',
+            '    return new Promise((resolvePromise, rejectPromise) => {',
+            '        const startTime = Date.now();',
+            '        const poll = () => {',
+            '            const request = http.get(url, (response) => {',
+            '                response.resume();',
+            '                resolvePromise();',
+            '            });',
+            '            request.on(\'error\', () => {',
+            '                if (Date.now() - startTime > timeoutMs) {',
+            '                    rejectPromise(new Error(`Server did not start in ${timeoutMs}ms.`));',
+            '                } else {',
+            '                    setTimeout(poll, 200);',
+            '                }',
+            '            });',
+            '            request.setTimeout(1000, () => {',
+            '                request.destroy();',
+            '            });',
+            '        };',
+            '        poll();',
+            '    });',
+            '}',
+            '',
+            'const child = spawn(runtimeExecutable, runtimeArgs, {',
+            '    cwd: workDir,',
+            '    env: runtimeEnv,',
+            '    stdio: \"inherit\",',
+            '    windowsHide: true,',
+            '});',
+            '',
+            'const stopChild = () => {',
+            '    try {',
+            '        if (!child.killed) child.kill();',
+            '    } catch {}',
+            '};',
+            '',
+            'process.on(\'exit\', stopChild);',
+            'process.on(\'SIGINT\', () => { stopChild(); process.exit(130); });',
+            'process.on(\'SIGTERM\', () => { stopChild(); process.exit(143); });',
+            '',
+            'child.once(\'error\', (error) => {',
+            '    console.error(error);',
+            '    process.exit(1);',
+            '});',
+            '',
+            'child.once(\'exit\', (code) => {',
+            '    if (code && code !== 0) {',
+            '        process.exit(code);',
+            '        return;',
+            '    }',
+            '    if (typeof globalThis.windowQuit === \"function\") {',
+            '        globalThis.windowQuit();',
+            '    }',
+            '});',
+            '',
+            '(async () => {',
+            '    await waitForServer(appUrl);',
+            '    if (typeof globalThis.createWindow !== \"function\") {',
+            '        throw new Error(\'Desktop runtime did not expose createWindow().\');',
+            '    }',
+            '    globalThis.createWindow({ ...windowOptions, url: appUrl });',
+            '})().catch((error) => {',
+            '    console.error(error);',
+            '    stopChild();',
+            '    process.exit(1);',
+            '});',
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+
+    return {
+        appName,
+        entryPath,
+        cleanupPath: entryPath,
+    };
+}
+
+function sanitizeDesktopWapkName(name: string): string {
+    return name.replace(/[^a-zA-Z0-9._-]+/g, '-');
+}
+
+function buildDesktopWapkWindowOptions(preparedApp: PreparedWapkApp): Record<string, unknown> {
+    const desktopOptions = preparedApp.header.desktop ? { ...preparedApp.header.desktop } : {};
+    const icon = typeof desktopOptions.icon === 'string' ? desktopOptions.icon : undefined;
+
+    if (icon && !/^(?:[a-z]+:)?[/\\]/i.test(icon)) {
+        desktopOptions.icon = join(preparedApp.workDir, icon);
+    }
+
+    if (desktopOptions.title === undefined) {
+        desktopOptions.title = preparedApp.header.name;
+    }
+
+    if (desktopOptions.width === undefined) {
+        desktopOptions.width = 1280;
+    }
+
+    if (desktopOptions.height === undefined) {
+        desktopOptions.height = 800;
+    }
+
+    if (desktopOptions.center === undefined) {
+        desktopOptions.center = true;
+    }
+
+    delete desktopOptions.url;
+    delete desktopOptions.proxy_port;
+    delete desktopOptions.proxy_pipe;
+    delete desktopOptions.proxy_secret;
+
+    return desktopOptions;
+}
+
+async function resolveDesktopWapkPort(preferredPort?: number): Promise<number> {
+    if (preferredPort) {
+        return preferredPort;
+    }
+
+    const { createServer } = await import('node:net');
+    return await new Promise<number>((resolvePromise, rejectPromise) => {
+        const server = createServer();
+        server.once('error', rejectPromise);
+        server.listen(0, '127.0.0.1', () => {
+            const address = server.address();
+            server.close((closeError) => {
+                if (closeError) {
+                    rejectPromise(closeError);
+                    return;
+                }
+
+                if (!address || typeof address === 'string') {
+                    rejectPromise(new Error('Failed to allocate a desktop WAPK port.'));
+                    return;
+                }
+
+                resolvePromise(address.port);
+            });
+        });
+    });
 }
 
 async function runDesktopRuntime(options: DesktopRunOptions): Promise<void> {
