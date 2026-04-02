@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[android-native-test] init"
+bun ../../src/cli.ts mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web
+
+echo "[android-native-test] sync"
+bun ../../src/cli.ts mobile sync --cwd . --web-dir web
+
+echo "[android-native-test] doctor --json (informational)"
+bun ../../src/cli.ts mobile doctor --cwd . --json || true
+
+GENERATED_SCREEN_PATH="android/app/src/main/java/com/elit/androidnativeexample/ElitGeneratedScreen.kt"
+if [[ ! -f "$GENERATED_SCREEN_PATH" ]]; then
+  echo "[android-native-test] FAILED: generated screen missing at $GENERATED_SCREEN_PATH"
+  exit 1
+fi
+
+TEXT_FIELD_COUNT=$(grep -o 'OutlinedTextField(' "$GENERATED_SCREEN_PATH" | wc -l | tr -d ' ')
+if [[ "$TEXT_FIELD_COUNT" -lt 2 ]]; then
+  echo "[android-native-test] FAILED: generated Compose output should contain two OutlinedTextField blocks"
+  exit 1
+fi
+
+if ! grep -Fq 'Checkbox(' "$GENERATED_SCREEN_PATH"; then
+  echo "[android-native-test] FAILED: generated Compose output is missing Checkbox("
+  exit 1
+fi
+
+CHECKBOX_COUNT=$(grep -o 'Checkbox(' "$GENERATED_SCREEN_PATH" | wc -l | tr -d ' ')
+if [[ "$CHECKBOX_COUNT" -lt 2 ]]; then
+  echo "[android-native-test] FAILED: generated Compose output should contain two Checkbox blocks"
+  exit 1
+fi
+
+if ! grep -Fq 'openUri("https://github.com/d-osc/elit")' "$GENERATED_SCREEN_PATH"; then
+  echo "[android-native-test] FAILED: generated Compose output is missing openUri(...) for the external link"
+  exit 1
+fi
+
+if ! grep -Fq 'ElitImagePlaceholder(' "$GENERATED_SCREEN_PATH"; then
+  echo "[android-native-test] FAILED: generated Compose output is missing ElitImagePlaceholder("
+  exit 1
+fi
+
+ASSET_PATH="android/app/src/main/assets/public/index.html"
+if [[ ! -f "$ASSET_PATH" ]]; then
+  echo "[android-native-test] FAILED: synced web asset missing at $ASSET_PATH"
+  exit 1
+fi
+
+echo "[android-native-test] build android"
+bun ../../src/cli.ts mobile build android --cwd .
+
+echo "[android-native-test] PASS: scaffold, generation, and Android build completed"

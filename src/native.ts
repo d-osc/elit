@@ -644,7 +644,8 @@ function buildAndroidComposeHelpers(context: AndroidComposeContext): string[] {
         helpers.push('');
         helpers.push('@Composable');
         helpers.push('private fun ElitImagePlaceholder(source: String, contentDescription: String?, modifier: Modifier = Modifier) {');
-        helpers.push('    Text(text = "Image: ${source}", modifier = modifier)');
+        helpers.push('    val label = contentDescription?.takeIf { it.isNotBlank() }?.let { "Image: ${source} (${it})" } ?: "Image: ${source}"');
+        helpers.push('    Text(text = label, modifier = modifier)');
         helpers.push('}');
     }
 

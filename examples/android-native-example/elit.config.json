@@ -1,0 +1,19 @@
+{
+  "mobile": {
+    "cwd": ".",
+    "appId": "com.elit.androidnativeexample",
+    "appName": "ElitAndroidNativeExample",
+    "webDir": "web",
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE"
+    ],
+    "native": {
+      "entry": "./src/native-screen.ts",
+      "exportName": "screen",
+      "ios": {
+        "enabled": false
+      }
+    }
+  }
+}

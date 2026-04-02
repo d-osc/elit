@@ -503,6 +503,7 @@ function runMobileDoctor(options: MobileCommandOptions): void {
         .find((filePath) => existsSync(filePath));
     const androidRoot = join(options.cwd, 'android');
     const androidSdkPath = detectAndroidSdkPath(options.cwd);
+    const gradleCommand = resolveGradleCommand(options.cwd);
 
     checks.push({
         name: 'Project config (elit.config.*)',
@@ -512,11 +513,10 @@ function runMobileDoctor(options: MobileCommandOptions): void {
             : 'Create elit.config.ts|mts|js|mjs|cjs|json and set { mobile: { ... } } defaults.',
     });
 
-    const hasGradleWrapper = existsSync(join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'));
     checks.push({
         name: 'Gradle (gradle or gradlew)',
-        ok: hasGradleWrapper || commandExists('gradle', options.cwd),
-        details: hasGradleWrapper ? 'Using project gradle wrapper.' : 'Install Gradle or generate gradle wrapper in android/.',
+        ok: Boolean(gradleCommand),
+        details: gradleCommand?.details ?? 'Install Gradle or generate gradle wrapper in android/.',
     });
     checks.push({ name: 'Java JDK (java)', ok: commandExists('java', options.cwd) });
     checks.push({
@@ -733,27 +733,44 @@ function runGradle(cwd: string, args: string[]): void {
     ensureAndroidLocalProperties(cwd);
     ensureAndroidGradleProperties(cwd);
 
-    const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-    const wrapperPath = join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
-
-    if (existsSync(wrapperPath)) {
-        runCommand(wrapper, args, androidRoot);
-        return;
-    }
-
-    if (commandExists('gradle', androidRoot)) {
-        runCommand('gradle', args, androidRoot);
-        return;
-    }
-
-    const fallbackGradle = resolveFallbackGradleExecutable();
-    if (!fallbackGradle) {
+    const gradleCommand = resolveGradleCommand(cwd);
+    if (!gradleCommand) {
         throw new Error(
             '[mobile] Gradle not found. Install Gradle and add it to PATH, or generate wrapper files in android/ with "gradle wrapper".',
         );
     }
 
-    runCommand(fallbackGradle, args, androidRoot);
+    runCommand(gradleCommand.command, args, androidRoot);
+}
+
+function resolveGradleCommand(cwd: string): { command: string; details: string } | undefined {
+    const androidRoot = join(cwd, 'android');
+    const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+    const wrapperPath = join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+
+    if (existsSync(wrapperPath)) {
+        return {
+            command: wrapper,
+            details: 'Using project gradle wrapper.',
+        };
+    }
+
+    if (commandExists('gradle', androidRoot)) {
+        return {
+            command: 'gradle',
+            details: 'Using Gradle from PATH.',
+        };
+    }
+
+    const fallbackGradle = resolveFallbackGradleExecutable();
+    if (!fallbackGradle) {
+        return undefined;
+    }
+
+    return {
+        command: fallbackGradle,
+        details: `Using fallback Gradle at ${fallbackGradle}.`,
+    };
 }
 
 function resolveFallbackGradleExecutable(): string | undefined {
