@@ -5,6 +5,7 @@ export * from './state';
 export * from './style';
 export * from './el';
 export * from './native';
+export * from './universal';
 
 // Client-side Router
 export { createRouter, createRouterView, routerLink } from './router';

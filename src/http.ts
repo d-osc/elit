@@ -395,11 +395,20 @@ export class ServerResponse extends EventEmitter {
 export class Server extends EventEmitter {
   private nativeServer?: any;
   private requestListener?: RequestListener;
+  private _bunWebSocketServers: Set<any> = new Set();
   public _listening: boolean = false;
 
   constructor(requestListener?: RequestListener) {
     super();
     this.requestListener = requestListener;
+  }
+
+  registerWebSocketServer(wsServer: any): void {
+    this._bunWebSocketServers.add(wsServer);
+  }
+
+  unregisterWebSocketServer(wsServer: any): void {
+    this._bunWebSocketServers.delete(wsServer);
   }
 
   listen(port?: number, hostname?: string, backlog?: number, listeningListener?: () => void): this;
@@ -465,10 +474,55 @@ export class Server extends EventEmitter {
       this.nativeServer = Bun.serve({
         port,
         hostname,
+        websocket: {
+          open: (ws: any) => {
+            ws.data?.wsServer?._handleBunOpen(ws, ws.data?.request);
+          },
+          message: (ws: any, message: any) => {
+            ws.data?.wsServer?._handleBunMessage(ws, message);
+          },
+          close: (ws: any, code: number, reason: any) => {
+            ws.data?.wsServer?._handleBunClose(ws, code, reason);
+          },
+        },
         fetch: (req: Request) => {
           // Fast path: Create minimal context object to avoid wrapper classes
           const urlObj = new URL(req.url);
           const pathname = urlObj.pathname + urlObj.search;
+
+          const upgradeHeader = req.headers.get('upgrade');
+          if (upgradeHeader && upgradeHeader.toLowerCase() === 'websocket') {
+            const matchingWebSocketServer = Array.from(this._bunWebSocketServers).find((wsServer: any) => {
+              return !wsServer.path || wsServer.path === '/' || wsServer.path === pathname;
+            });
+
+            if (!matchingWebSocketServer) {
+              return new Response('WebSocket path not found', { status: 404 });
+            }
+
+            const requestHeaders: Record<string, string> = {};
+            req.headers.forEach((value, key) => {
+              requestHeaders[key] = value;
+            });
+
+            const upgraded = this.nativeServer.upgrade(req, {
+              data: {
+                wsServer: matchingWebSocketServer,
+                request: {
+                  method: req.method,
+                  url: pathname,
+                  headers: requestHeaders,
+                  socket: { remoteAddress: undefined },
+                },
+              },
+            });
+
+            if (upgraded) {
+              return undefined as any;
+            }
+
+            return new Response('WebSocket upgrade failed', { status: 400 });
+          }
 
           // Ultra-lightweight response builder (no class instantiation)
           let statusCode = 200;

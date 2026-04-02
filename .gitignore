@@ -9,6 +9,7 @@ coverage
 nul
 target
 .elit-desktop-*
+.elit-config-*.mjs
 
 # License copied during build
 server/LICENSE

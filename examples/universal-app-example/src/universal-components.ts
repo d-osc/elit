@@ -1,0 +1,209 @@
+import { a, article, button, div, h1, h2, img, input, li, main, p, section, span, textarea, ul } from '../../../src/el';
+import { createUniversalBridgeProps, createUniversalLinkProps, mergeUniversalProps, type UniversalBridgeOptions } from 'elit/universal';
+import type { Child, Props, VNode } from '../../../src/types';
+
+import { APP_NAME, APP_TAGLINE, PLATFORM_SURFACES, SHARED_CHECKLIST, VALIDATION_STEPS } from './shared';
+import './web-styles';
+
+const surfacePalette = {
+    ink: '#261914',
+    bodyCopy: '#5d4335',
+    line: 'rgba(38, 25, 20, 0.12)',
+} as const;
+
+const sharedStyles = {
+    heroTitle: {
+        color: surfacePalette.ink,
+        fontSize: '38px',
+        fontWeight: '700',
+    },
+    bodyCopy: {
+        color: surfacePalette.bodyCopy,
+    },
+    inputField: {
+        width: '100%',
+        background: '#fff',
+        borderRadius: '16px',
+        border: `1px solid ${surfacePalette.line}`,
+        color: surfacePalette.ink,
+    },
+} as const;
+
+export interface UniversalAction extends UniversalBridgeOptions {
+    label: string;
+    className?: string;
+    href?: string;
+    target?: string;
+    rel?: string;
+    onClick?: (event: Event) => void;
+}
+
+export interface UniversalFormOptions {
+    title?: string;
+    questionLabel: string;
+    questionValue: string;
+    questionPlaceholder?: string;
+    onQuestionInput?: (event: Event) => void;
+    noteLabel: string;
+    noteValue: string;
+    notePlaceholder?: string;
+    onNoteInput?: (event: Event) => void;
+    toggleLabel: string;
+    nativeEnabled: boolean;
+    onToggleInput?: (event: Event) => void;
+    statusItems?: Child[];
+}
+
+export interface UniversalShellOptions {
+    iconSrc?: string;
+    iconAlt?: string;
+    heroActions: UniversalAction[];
+    form: UniversalFormOptions;
+    surfaceTitle?: string;
+    checklistTitle?: string;
+    checklistItems?: readonly string[];
+}
+
+export function createStatusCard(content: Child): VNode {
+    return div({ className: 'status' }, content);
+}
+
+function renderAction(action: UniversalAction): VNode {
+    const bridgeOptions: UniversalBridgeOptions = {
+        action: action.action,
+        route: action.route,
+        payload: action.payload,
+        desktopMessage: action.desktopMessage,
+    };
+    const props: Props = mergeUniversalProps(
+        action.href
+            ? createUniversalLinkProps(action.href, bridgeOptions)
+            : createUniversalBridgeProps(bridgeOptions),
+        {
+            className: action.className ?? 'btn btn-secondary',
+        },
+    );
+
+    if (action.onClick) {
+        props.onClick = action.onClick;
+    }
+
+    if (action.href) {
+        props.href = action.href;
+        if (action.target) props.target = action.target;
+        if (action.rel) props.rel = action.rel;
+        return a(props, action.label);
+    }
+
+    props.type = 'button';
+    return button(props, action.label);
+}
+
+function createHero(options: UniversalShellOptions): VNode {
+    const heroMedia: Child[] = [];
+    if (options.iconSrc) {
+        heroMedia.push(img({ className: 'hero-mark', src: options.iconSrc, alt: options.iconAlt ?? `${APP_NAME} icon` }));
+    }
+
+    return section(
+        { className: 'hero' },
+        div(
+            { className: 'hero-layout' },
+            ...heroMedia,
+            div(
+                { className: 'hero-copy' },
+                h1({ style: sharedStyles.heroTitle }, APP_NAME),
+                p({ className: 'lede' }, APP_TAGLINE),
+                div(
+                    { className: 'button-row' },
+                    ...options.heroActions.map(renderAction),
+                ),
+            ),
+        ),
+    );
+}
+
+function createSurfacePanel(title: string): VNode {
+    return section(
+        { className: 'panel' },
+        h2(title),
+        div(
+            { className: 'surface-grid' },
+            ...PLATFORM_SURFACES.map((surface) => article(
+                { className: 'surface-card' },
+                span({ className: 'surface-id' }, surface.id),
+                h2(surface.title),
+                p({ style: sharedStyles.bodyCopy }, surface.description),
+            )),
+        ),
+    );
+}
+
+function createFormPanel(options: UniversalFormOptions): VNode {
+    return section(
+        { className: 'panel' },
+        h2(options.title ?? 'Shared validation form'),
+        div(
+            { className: 'form-grid' },
+            div(
+                { className: 'field-label' },
+                span(options.questionLabel),
+                input({
+                    style: sharedStyles.inputField,
+                    value: options.questionValue,
+                    placeholder: options.questionPlaceholder ?? options.questionLabel,
+                    onInput: options.onQuestionInput,
+                }),
+            ),
+            div(
+                { className: 'field-label' },
+                span(options.noteLabel),
+                textarea({
+                    style: sharedStyles.inputField,
+                    value: options.noteValue,
+                    placeholder: options.notePlaceholder ?? options.noteLabel,
+                    onInput: options.onNoteInput,
+                }),
+            ),
+            div(
+                { className: 'toggle-row' },
+                input({
+                    type: 'checkbox',
+                    checked: options.nativeEnabled,
+                    onInput: options.onToggleInput,
+                }),
+                span({ style: sharedStyles.bodyCopy }, options.toggleLabel),
+            ),
+            ...(options.statusItems ?? []),
+        ),
+    );
+}
+
+function createChecklistPanel(title: string, items: readonly string[]): VNode {
+    return section(
+        { className: 'panel' },
+        h2(title),
+        ul(
+            { className: 'meta-list' },
+            ...items.map((item) => li({ className: 'meta-item' }, item)),
+        ),
+    );
+}
+
+export function createUniversalShell(options: UniversalShellOptions): VNode {
+    const checklistItems = options.checklistItems ?? [...VALIDATION_STEPS, ...SHARED_CHECKLIST];
+
+    return main(
+        { className: 'page' },
+        div(
+            { className: 'shell' },
+            createHero(options),
+            createSurfacePanel(options.surfaceTitle ?? 'Platform surfaces'),
+            div(
+                { className: 'panel-grid' },
+                createFormPanel(options.form),
+                createChecklistPanel(options.checklistTitle ?? 'Repo smoke checklist', checklistItems),
+            ),
+        ),
+    );
+}

@@ -1,3 +1,4 @@
+import styles from './style';
 import type { Child, Props, VNode } from './types';
 
 export type NativePlatform = 'generic' | 'android' | 'ios';
@@ -50,7 +51,14 @@ export interface SwiftUIOptions {
     includePreview?: boolean;
 }
 
-type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler';
+type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler' | 'bridge';
+type NativeResolvedStyleMap = WeakMap<NativeElementNode, Record<string, NativePropValue>>;
+
+interface NativeStyleScope {
+    tagName: string;
+    classNames: string[];
+    attributes: Record<string, string>;
+}
 
 interface StateLike<T = unknown> {
     value: T;
@@ -62,6 +70,7 @@ interface AndroidComposeContext {
     toggleIndex: number;
     stateDeclarations: string[];
     helperFlags: Set<NativeHelperFlag>;
+    resolvedStyles: NativeResolvedStyleMap;
 }
 
 interface SwiftUIContext {
@@ -69,6 +78,34 @@ interface SwiftUIContext {
     toggleIndex: number;
     stateDeclarations: string[];
     helperFlags: Set<NativeHelperFlag>;
+    resolvedStyles: NativeResolvedStyleMap;
+}
+
+interface NativeColorValue {
+    red: number;
+    green: number;
+    blue: number;
+    alpha: number;
+}
+
+type NativeGradientDirection =
+    | 'topToBottom'
+    | 'bottomToTop'
+    | 'leadingToTrailing'
+    | 'trailingToLeading'
+    | 'topLeadingToBottomTrailing'
+    | 'bottomTrailingToTopLeading';
+
+interface NativeGradientValue {
+    colors: NativeColorValue[];
+    direction: NativeGradientDirection;
+}
+
+interface NativeShadowValue {
+    offsetX: number;
+    offsetY: number;
+    blur: number;
+    color: NativeColorValue;
 }
 
 const DEFAULT_COMPONENT_MAP: Record<string, string> = {
@@ -161,6 +198,15 @@ const EVENT_NAME_MAP: Record<string, string> = {
     onInput: 'input',
     onSubmit: 'submit',
 };
+
+const INHERITED_TEXT_STYLE_KEYS = [
+    'color',
+    'fontSize',
+    'fontWeight',
+    'letterSpacing',
+    'textAlign',
+    'textTransform',
+] as const;
 
 function isStateLike(value: unknown): value is StateLike {
     return Boolean(
@@ -298,6 +344,51 @@ function toNativeBoolean(value: NativePropValue | undefined): boolean {
         return normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes';
     }
     return false;
+}
+
+function serializeNativePayload(value: NativePropValue | undefined): string | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === 'string') return value;
+    return JSON.stringify(value);
+}
+
+function resolveNativeAction(node: NativeElementNode): string | undefined {
+    return typeof node.props.nativeAction === 'string' && node.props.nativeAction.trim()
+        ? node.props.nativeAction
+        : undefined;
+}
+
+function resolveNativeRoute(node: NativeElementNode): string | undefined {
+    if (typeof node.props.nativeRoute === 'string' && node.props.nativeRoute.trim()) {
+        return node.props.nativeRoute;
+    }
+
+    const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
+    if (destination && !isExternalDestination(destination)) {
+        return destination;
+    }
+
+    return undefined;
+}
+
+function buildComposeBridgeInvocation(action?: string, route?: string, payloadJson?: string): string | undefined {
+    const args: string[] = [];
+
+    if (action) args.push(`action = ${quoteKotlinString(action)}`);
+    if (route) args.push(`route = ${quoteKotlinString(route)}`);
+    if (payloadJson) args.push(`payloadJson = ${quoteKotlinString(payloadJson)}`);
+
+    return args.length > 0 ? `ElitNativeBridge.dispatch(${args.join(', ')})` : undefined;
+}
+
+function buildSwiftBridgeInvocation(action?: string, route?: string, payloadJson?: string): string | undefined {
+    const args: string[] = [];
+
+    if (action) args.push(`action: ${quoteSwiftString(action)}`);
+    if (route) args.push(`route: ${quoteSwiftString(route)}`);
+    if (payloadJson) args.push(`payloadJson: ${quoteSwiftString(payloadJson)}`);
+
+    return args.length > 0 ? `ElitNativeBridge.dispatch(${args.join(', ')})` : undefined;
 }
 
 function wrapTextNodeIfNeeded(node: NativeNode, parentComponent: string, options: Required<Omit<NativeTransformOptions, 'tagMap'>>): NativeNode {
@@ -479,28 +570,748 @@ function toPointLiteral(value: NativePropValue | undefined): string | undefined 
     return undefined;
 }
 
-function buildComposeModifier(node: NativeElementNode): string {
+function toSpLiteral(value: NativePropValue | undefined): string | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return `${value}.sp`;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const match = trimmed.match(/^(-?\d+(?:\.\d+)?)(px|dp|pt|sp)?$/i);
+        if (match) {
+            return `${match[1]}.sp`;
+        }
+    }
+
+    return undefined;
+}
+
+function getClassList(node: NativeElementNode): string[] {
+    const classList = node.props.classList;
+    if (!Array.isArray(classList)) {
+        return [];
+    }
+
+    return classList
+        .map((item) => String(item).trim())
+        .filter(Boolean);
+}
+
+function getSelectorAttributes(node: NativeElementNode): Record<string, string> {
+    const attributes: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(node.props)) {
+        if (
+            value == null ||
+            value === false ||
+            key === 'classList' ||
+            key === 'style' ||
+            key === 'innerHTML' ||
+            key === 'nativeAction' ||
+            key === 'nativeRoute' ||
+            key === 'nativePayload'
+        ) {
+            continue;
+        }
+
+        if (key === 'source') {
+            attributes.src = String(value);
+            continue;
+        }
+
+        if (key === 'destination') {
+            attributes.href = String(value);
+            continue;
+        }
+
+        if (typeof value === 'boolean') {
+            if (value) {
+                attributes[key] = 'true';
+            }
+            continue;
+        }
+
+        if (typeof value === 'string' || typeof value === 'number') {
+            attributes[key] = String(value);
+        }
+    }
+
+    if (node.sourceTag === 'input' && node.component === 'Toggle' && !attributes.type) {
+        attributes.type = 'checkbox';
+    }
+
+    return attributes;
+}
+
+function pickInheritedTextStyles(style: Record<string, NativePropValue> | undefined): Record<string, NativePropValue> | undefined {
+    if (!style) {
+        return undefined;
+    }
+
+    const inheritedEntries = INHERITED_TEXT_STYLE_KEYS
+        .map((key) => [key, style[key]] as const)
+        .filter(([, value]) => value !== undefined);
+
+    return inheritedEntries.length > 0
+        ? Object.fromEntries(inheritedEntries) as Record<string, NativePropValue>
+        : undefined;
+}
+
+function getInlineStyleObject(node: NativeElementNode): Record<string, NativePropValue> | undefined {
+    const inlineStyle = node.props.style;
+    if (inlineStyle && typeof inlineStyle === 'object' && !Array.isArray(inlineStyle)) {
+        return inlineStyle as Record<string, NativePropValue>;
+    }
+
+    return undefined;
+}
+
+function buildResolvedStyleMap(
+    nodes: NativeNode[],
+    ancestors: NativeStyleScope[] = [],
+    resolvedStyles: NativeResolvedStyleMap = new WeakMap(),
+    inheritedTextStyles: Record<string, NativePropValue> = {},
+): NativeResolvedStyleMap {
+    for (const node of nodes) {
+        if (node.kind !== 'element') {
+            continue;
+        }
+
+        const scope: NativeStyleScope = {
+            tagName: node.sourceTag,
+            classNames: getClassList(node),
+            attributes: getSelectorAttributes(node),
+        };
+        const classStyles = styles.resolveNativeStyles(scope, ancestors) as Record<string, NativePropValue>;
+        const inlineStyle = getInlineStyleObject(node);
+        const hasClassStyles = Object.keys(classStyles).length > 0;
+
+        const ownStyle = inlineStyle
+            ? hasClassStyles
+                ? { ...classStyles, ...inlineStyle }
+                : inlineStyle
+            : hasClassStyles
+                ? classStyles
+                : undefined;
+        const resolvedStyle = ownStyle
+            ? { ...inheritedTextStyles, ...ownStyle }
+            : Object.keys(inheritedTextStyles).length > 0
+                ? { ...inheritedTextStyles }
+                : undefined;
+
+        if (resolvedStyle) {
+            resolvedStyles.set(node, resolvedStyle);
+        }
+
+        buildResolvedStyleMap(
+            node.children,
+            [...ancestors, scope],
+            resolvedStyles,
+            pickInheritedTextStyles(resolvedStyle) ?? inheritedTextStyles,
+        );
+    }
+
+    return resolvedStyles;
+}
+
+function getStyleObject(
+    node: NativeElementNode,
+    resolvedStyles?: NativeResolvedStyleMap,
+): Record<string, NativePropValue> | undefined {
+    const mappedStyle = resolvedStyles?.get(node);
+    if (mappedStyle) {
+        return mappedStyle;
+    }
+
+    const classStyles = styles.resolveNativeStyles({
+        tagName: node.sourceTag,
+        classNames: getClassList(node),
+        attributes: getSelectorAttributes(node),
+    }) as Record<string, NativePropValue>;
+    const inlineStyle = getInlineStyleObject(node);
+    const hasClassStyles = Object.keys(classStyles).length > 0;
+
+    if (inlineStyle) {
+        return hasClassStyles
+            ? { ...classStyles, ...inlineStyle }
+            : inlineStyle;
+    }
+
+    return hasClassStyles ? classStyles : undefined;
+}
+
+function parseSpacingShorthand(
+    value: NativePropValue | undefined,
+    unitParser: (value: NativePropValue | undefined) => string | undefined,
+): { top?: string; right?: string; bottom?: string; left?: string } | undefined {
+    if (value === undefined) return undefined;
+
+    const rawValues = typeof value === 'string'
+        ? value.trim().split(/\s+/).filter(Boolean)
+        : [value];
+
+    if (rawValues.length === 0 || rawValues.length > 4) {
+        return undefined;
+    }
+
+    const parsed = rawValues.map((item) => unitParser(item));
+    if (parsed.some((item) => !item)) {
+        return undefined;
+    }
+
+    const [first, second = first, third = first, fourth = second] = parsed as string[];
+
+    switch (parsed.length) {
+        case 1:
+            return { top: first, right: first, bottom: first, left: first };
+        case 2:
+            return { top: first, right: second, bottom: first, left: second };
+        case 3:
+            return { top: first, right: second, bottom: third, left: second };
+        case 4:
+            return { top: first, right: second, bottom: third, left: fourth };
+        default:
+            return undefined;
+    }
+}
+
+function resolveDirectionalSpacing(
+    style: Record<string, NativePropValue>,
+    prefix: 'padding' | 'margin',
+    unitParser: (value: NativePropValue | undefined) => string | undefined,
+): { top?: string; right?: string; bottom?: string; left?: string } {
+    const shorthand = parseSpacingShorthand(style[prefix], unitParser);
+
+    return {
+        top: shorthand?.top ?? unitParser(style[`${prefix}Top`]),
+        right: shorthand?.right ?? unitParser(style[`${prefix}Right`] ?? style[`${prefix}End`]),
+        bottom: shorthand?.bottom ?? unitParser(style[`${prefix}Bottom`]),
+        left: shorthand?.left ?? unitParser(style[`${prefix}Left`] ?? style[`${prefix}Start`]),
+    };
+}
+
+function isFillValue(value: NativePropValue | undefined): boolean {
+    return typeof value === 'string' && value.trim() === '100%';
+}
+
+function extractColorToken(value: string): string | undefined {
+    const trimmed = value.trim();
+    const directMatch = trimmed.match(/^(rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8})$/);
+    if (directMatch) {
+        return directMatch[1];
+    }
+
+    const embeddedMatch = trimmed.match(/(rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8})/);
+    return embeddedMatch?.[1];
+}
+
+function parseCssColor(value: NativePropValue | undefined): NativeColorValue | undefined {
+    if (typeof value !== 'string') return undefined;
+
+    const token = extractColorToken(value);
+    if (!token) return undefined;
+
+    const hexMatch = token.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+    if (hexMatch) {
+        const hex = hexMatch[1];
+        if (hex.length === 3 || hex.length === 4) {
+            const [r, g, b, a = 'f'] = hex.split('');
+            return {
+                red: parseInt(`${r}${r}`, 16),
+                green: parseInt(`${g}${g}`, 16),
+                blue: parseInt(`${b}${b}`, 16),
+                alpha: parseInt(`${a}${a}`, 16) / 255,
+            };
+        }
+
+        const red = parseInt(hex.slice(0, 2), 16);
+        const green = parseInt(hex.slice(2, 4), 16);
+        const blue = parseInt(hex.slice(4, 6), 16);
+        const alpha = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+        return { red, green, blue, alpha };
+    }
+
+    const rgbMatch = token.match(/^rgba?\(([^\)]+)\)$/i);
+    if (!rgbMatch) return undefined;
+
+    const parts = rgbMatch[1].split(',').map((part) => part.trim());
+    if (parts.length < 3) return undefined;
+
+    const red = Number(parts[0]);
+    const green = Number(parts[1]);
+    const blue = Number(parts[2]);
+    const alpha = parts[3] !== undefined ? Number(parts[3]) : 1;
+
+    if ([red, green, blue, alpha].some((item) => Number.isNaN(item))) {
+        return undefined;
+    }
+
+    return { red, green, blue, alpha };
+}
+
+function formatFloat(value: number): string {
+    return Number(value.toFixed(3)).toString();
+}
+
+function toComposeColorLiteral(color: NativeColorValue): string {
+    return `Color(red = ${formatFloat(color.red / 255)}f, green = ${formatFloat(color.green / 255)}f, blue = ${formatFloat(color.blue / 255)}f, alpha = ${formatFloat(color.alpha)}f)`;
+}
+
+function toSwiftColorLiteral(color: NativeColorValue): string {
+    return `Color(red: ${formatFloat(color.red / 255)}, green: ${formatFloat(color.green / 255)}, blue: ${formatFloat(color.blue / 255)}, opacity: ${formatFloat(color.alpha)})`;
+}
+
+function normalizeAngle(angle: number): number {
+    const normalized = angle % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function resolveGradientDirection(angle: number | undefined): NativeGradientDirection {
+    if (angle === undefined || Number.isNaN(angle)) {
+        return 'topLeadingToBottomTrailing';
+    }
+
+    const normalized = normalizeAngle(angle);
+    if (normalized >= 67.5 && normalized < 112.5) {
+        return 'leadingToTrailing';
+    }
+
+    if (normalized >= 157.5 && normalized < 202.5) {
+        return 'topToBottom';
+    }
+
+    if (normalized >= 247.5 && normalized < 292.5) {
+        return 'trailingToLeading';
+    }
+
+    if (normalized >= 337.5 || normalized < 22.5) {
+        return 'bottomToTop';
+    }
+
+    return normalized >= 112.5 && normalized < 247.5
+        ? 'topLeadingToBottomTrailing'
+        : 'bottomTrailingToTopLeading';
+}
+
+function parseLinearGradient(value: NativePropValue | undefined): NativeGradientValue | undefined {
+    if (typeof value !== 'string') return undefined;
+
+    const trimmed = value.trim();
+    if (!/^linear-gradient\(/i.test(trimmed)) {
+        return undefined;
+    }
+
+    const colorTokens = trimmed.match(/rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8}/g);
+    if (!colorTokens || colorTokens.length < 2) {
+        return undefined;
+    }
+
+    const colors = colorTokens
+        .map((token) => parseCssColor(token))
+        .filter((color): color is NativeColorValue => Boolean(color));
+    if (colors.length < 2) {
+        return undefined;
+    }
+
+    const angleMatch = trimmed.match(/linear-gradient\(\s*(-?\d+(?:\.\d+)?)deg/i);
+    const angle = angleMatch ? Number(angleMatch[1]) : undefined;
+
+    return {
+        colors,
+        direction: resolveGradientDirection(angle),
+    };
+}
+
+function formatComposeGradientColors(colors: NativeColorValue[], reverse = false): string {
+    const orderedColors = reverse ? [...colors].reverse() : colors;
+    return orderedColors.map((color) => toComposeColorLiteral(color)).join(', ');
+}
+
+function toComposeBrushLiteral(gradient: NativeGradientValue): string {
+    switch (gradient.direction) {
+        case 'topToBottom':
+            return `Brush.verticalGradient(colors = listOf(${formatComposeGradientColors(gradient.colors)}))`;
+        case 'bottomToTop':
+            return `Brush.verticalGradient(colors = listOf(${formatComposeGradientColors(gradient.colors, true)}))`;
+        case 'leadingToTrailing':
+            return `Brush.horizontalGradient(colors = listOf(${formatComposeGradientColors(gradient.colors)}))`;
+        case 'trailingToLeading':
+            return `Brush.horizontalGradient(colors = listOf(${formatComposeGradientColors(gradient.colors, true)}))`;
+        case 'bottomTrailingToTopLeading':
+            return `Brush.linearGradient(colors = listOf(${formatComposeGradientColors(gradient.colors, true)}))`;
+        default:
+            return `Brush.linearGradient(colors = listOf(${formatComposeGradientColors(gradient.colors)}))`;
+    }
+}
+
+function toSwiftGradientLiteral(gradient: NativeGradientValue): string {
+    const colors = gradient.colors.map((color) => toSwiftColorLiteral(color)).join(', ');
+    const startPoint = gradient.direction === 'topToBottom'
+        ? '.top'
+        : gradient.direction === 'bottomToTop'
+            ? '.bottom'
+            : gradient.direction === 'leadingToTrailing'
+                ? '.leading'
+                : gradient.direction === 'trailingToLeading'
+                    ? '.trailing'
+                    : gradient.direction === 'bottomTrailingToTopLeading'
+                        ? '.bottomTrailing'
+                        : '.topLeading';
+    const endPoint = gradient.direction === 'topToBottom'
+        ? '.bottom'
+        : gradient.direction === 'bottomToTop'
+            ? '.top'
+            : gradient.direction === 'leadingToTrailing'
+                ? '.trailing'
+                : gradient.direction === 'trailingToLeading'
+                    ? '.leading'
+                    : gradient.direction === 'bottomTrailingToTopLeading'
+                        ? '.topLeading'
+                        : '.bottomTrailing';
+
+    return `LinearGradient(colors: [${colors}], startPoint: ${startPoint}, endPoint: ${endPoint})`;
+}
+
+function parseBoxShadow(value: NativePropValue | undefined): NativeShadowValue | undefined {
+    if (typeof value !== 'string') return undefined;
+
+    const colorToken = extractColorToken(value);
+    const color = parseCssColor(colorToken ?? value);
+    if (!color) {
+        return undefined;
+    }
+
+    const dimensionSource = colorToken ? value.replace(colorToken, ' ').trim() : value.trim();
+    const lengths = dimensionSource.match(/-?\d+(?:\.\d+)?(?:px|dp|pt)?/g) ?? [];
+    if (lengths.length < 2) {
+        return undefined;
+    }
+
+    const offsetX = Number.parseFloat(lengths[0]!);
+    const offsetY = Number.parseFloat(lengths[1]!);
+    const blur = lengths[2] ? Number.parseFloat(lengths[2]) : Math.max(Math.abs(offsetX), Math.abs(offsetY));
+
+    if ([offsetX, offsetY, blur].some((entry) => Number.isNaN(entry))) {
+        return undefined;
+    }
+
+    return { offsetX, offsetY, blur, color };
+}
+
+function toComposeShadowElevation(shadow: NativeShadowValue): string {
+    const elevation = Math.max(1, Math.abs(shadow.offsetY), shadow.blur / 4);
+    return `${formatFloat(elevation)}.dp`;
+}
+
+function toSwiftShadowRadius(shadow: NativeShadowValue): string {
+    const radius = Math.max(1, shadow.blur / 2);
+    return formatFloat(radius);
+}
+
+function resolveBackgroundColor(style: Record<string, NativePropValue>): NativeColorValue | undefined {
+    const background = typeof style.background === 'string' && /^linear-gradient\(/i.test(style.background.trim())
+        ? undefined
+        : parseCssColor(style.background);
+    return parseCssColor(style.backgroundColor) ?? background;
+}
+
+function resolveBackgroundGradient(style: Record<string, NativePropValue>): NativeGradientValue | undefined {
+    return parseLinearGradient(style.background);
+}
+
+function parseBorderValue(
+    value: NativePropValue | undefined,
+    unitParser: (value: NativePropValue | undefined) => string | undefined,
+): { width?: string; color?: NativeColorValue } | undefined {
+    if (typeof value !== 'string') return undefined;
+
+    const widthMatch = value.match(/-?\d+(?:\.\d+)?(?:px|dp|pt)?/i);
+    const width = widthMatch ? unitParser(widthMatch[0]) : undefined;
+    const color = parseCssColor(value);
+
+    if (!width && !color) {
+        return undefined;
+    }
+
+    return { width, color };
+}
+
+function resolveTextTransform(value: NativePropValue | undefined): 'uppercase' | 'lowercase' | 'capitalize' | undefined {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'uppercase' || normalized === 'lowercase' || normalized === 'capitalize') {
+        return normalized;
+    }
+
+    return undefined;
+}
+
+function applyTextTransform(text: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | undefined): string {
+    if (!transform) return text;
+    if (transform === 'uppercase') return text.toUpperCase();
+    if (transform === 'lowercase') return text.toLowerCase();
+    return text.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
+}
+
+function resolveComposeFontWeight(value: NativePropValue | undefined): string | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return `FontWeight.W${Math.min(900, Math.max(100, Math.round(value / 100) * 100))}`;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        if (/^\d+$/.test(trimmed)) {
+            return `FontWeight.W${Math.min(900, Math.max(100, Math.round(Number(trimmed) / 100) * 100))}`;
+        }
+        if (trimmed === 'bold') return 'FontWeight.Bold';
+        if (trimmed === 'semibold') return 'FontWeight.SemiBold';
+        if (trimmed === 'medium') return 'FontWeight.Medium';
+        if (trimmed === 'normal') return 'FontWeight.Normal';
+    }
+
+    return undefined;
+}
+
+function resolveSwiftFontWeight(value: NativePropValue | undefined): string | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        if (value >= 700) return '.bold';
+        if (value >= 600) return '.semibold';
+        if (value >= 500) return '.medium';
+        return '.regular';
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        if (/^\d+$/.test(trimmed)) {
+            return resolveSwiftFontWeight(Number(trimmed));
+        }
+        if (trimmed === 'bold') return '.bold';
+        if (trimmed === 'semibold') return '.semibold';
+        if (trimmed === 'medium') return '.medium';
+        if (trimmed === 'normal') return '.regular';
+    }
+
+    return undefined;
+}
+
+function resolveComposeTextAlign(value: NativePropValue | undefined): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    switch (value.trim().toLowerCase()) {
+        case 'center':
+            return 'TextAlign.Center';
+        case 'right':
+        case 'end':
+            return 'TextAlign.End';
+        case 'left':
+        case 'start':
+            return 'TextAlign.Start';
+        default:
+            return undefined;
+    }
+}
+
+function resolveSwiftTextAlign(value: NativePropValue | undefined): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    switch (value.trim().toLowerCase()) {
+        case 'center':
+            return '.center';
+        case 'right':
+        case 'end':
+            return '.trailing';
+        case 'left':
+        case 'start':
+            return '.leading';
+        default:
+            return undefined;
+    }
+}
+
+function resolveLayoutDirection(style: Record<string, NativePropValue> | undefined): 'Row' | 'Column' | undefined {
+    if (!style) return undefined;
+
+    if (typeof style.flexDirection === 'string') {
+        return style.flexDirection.trim().toLowerCase() === 'row' ? 'Row' : 'Column';
+    }
+
+    if (typeof style.display === 'string') {
+        const display = style.display.trim().toLowerCase();
+        if (display === 'flex' || display === 'inline-flex') {
+            return 'Row';
+        }
+        if (display === 'grid' || display === 'inline-grid') {
+            return 'Column';
+        }
+    }
+
+    return undefined;
+}
+
+function buildComposeArrangement(layout: 'Row' | 'Column', style: Record<string, NativePropValue> | undefined): string | undefined {
+    if (!style) return undefined;
+
+    const justify = typeof style.justifyContent === 'string' ? style.justifyContent.trim().toLowerCase() : undefined;
+    const gap = toDpLiteral(style.gap ?? (layout === 'Row' ? style.columnGap : style.rowGap) ?? style.gap);
+
+    if (layout === 'Row') {
+        switch (justify) {
+            case 'center': return 'Arrangement.Center';
+            case 'flex-end':
+            case 'end':
+            case 'right':
+                return 'Arrangement.End';
+            case 'space-between': return 'Arrangement.SpaceBetween';
+            case 'space-around': return 'Arrangement.SpaceAround';
+            case 'space-evenly': return 'Arrangement.SpaceEvenly';
+            default:
+                return gap ? `Arrangement.spacedBy(${gap})` : undefined;
+        }
+    }
+
+    switch (justify) {
+        case 'center': return 'Arrangement.Center';
+        case 'flex-end':
+        case 'end':
+        case 'bottom':
+            return 'Arrangement.Bottom';
+        case 'space-between': return 'Arrangement.SpaceBetween';
+        case 'space-around': return 'Arrangement.SpaceAround';
+        case 'space-evenly': return 'Arrangement.SpaceEvenly';
+        default:
+            return gap ? `Arrangement.spacedBy(${gap})` : undefined;
+    }
+}
+
+function buildComposeCrossAlignment(layout: 'Row' | 'Column', style: Record<string, NativePropValue> | undefined): string | undefined {
+    if (!style || typeof style.alignItems !== 'string') return undefined;
+
+    const align = style.alignItems.trim().toLowerCase();
+    if (layout === 'Row') {
+        switch (align) {
+            case 'center': return 'Alignment.CenterVertically';
+            case 'flex-end':
+            case 'end':
+            case 'bottom':
+                return 'Alignment.Bottom';
+            default:
+                return 'Alignment.Top';
+        }
+    }
+
+    switch (align) {
+        case 'center': return 'Alignment.CenterHorizontally';
+        case 'flex-end':
+        case 'end':
+        case 'right':
+            return 'Alignment.End';
+        default:
+            return 'Alignment.Start';
+    }
+}
+
+function buildComposeTextStyleArgs(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): string[] {
+    const style = getStyleObject(node, resolvedStyles);
+    if (!style) return [];
+
+    const args: string[] = [];
+    const color = parseCssColor(style.color);
+    const fontSize = toSpLiteral(style.fontSize);
+    const fontWeight = resolveComposeFontWeight(style.fontWeight);
+    const letterSpacing = toSpLiteral(style.letterSpacing);
+    const textAlign = resolveComposeTextAlign(style.textAlign);
+
+    if (color) args.push(`color = ${toComposeColorLiteral(color)}`);
+    if (fontSize) args.push(`fontSize = ${fontSize}`);
+    if (fontWeight) args.push(`fontWeight = ${fontWeight}`);
+    if (letterSpacing) args.push(`letterSpacing = ${letterSpacing}`);
+    if (textAlign) args.push(`textAlign = ${textAlign}`);
+
+    return args;
+}
+
+function buildComposeLabelText(node: NativeElementNode, label: string, resolvedStyles?: NativeResolvedStyleMap): string {
+    const style = getStyleObject(node, resolvedStyles);
+    const transformedLabel = applyTextTransform(label, resolveTextTransform(style?.textTransform));
+    const args = [`text = ${quoteKotlinString(transformedLabel)}`, ...buildComposeTextStyleArgs(node, resolvedStyles)];
+    return `Text(${args.join(', ')})`;
+}
+
+function buildComposeButtonArgs(
+    node: NativeElementNode,
+    modifier: string,
+    variant: 'filled' | 'text',
+    resolvedStyles?: NativeResolvedStyleMap,
+): string[] {
+    const args = [`modifier = ${modifier}`];
+    const style = getStyleObject(node, resolvedStyles);
+    if (!style) {
+        return args;
+    }
+
+    const radius = toDpLiteral(style.borderRadius);
+    const backgroundColor = resolveBackgroundColor(style);
+    const backgroundGradient = resolveBackgroundGradient(style);
+    const border = parseBorderValue(style.border, toDpLiteral);
+    const contentColor = parseCssColor(style.color);
+    const hasCustomContainer = Boolean(backgroundColor || backgroundGradient || border?.color || border?.width);
+
+    if (radius) {
+        args.push(`shape = RoundedCornerShape(${radius})`);
+    }
+
+    const colorArgs: string[] = [];
+    if (hasCustomContainer) {
+        colorArgs.push('containerColor = Color.Transparent');
+    }
+    if (contentColor) {
+        colorArgs.push(`contentColor = ${toComposeColorLiteral(contentColor)}`);
+    }
+    if (colorArgs.length > 0) {
+        const builder = variant === 'filled' ? 'ButtonDefaults.buttonColors' : 'ButtonDefaults.textButtonColors';
+        args.push(`colors = ${builder}(${colorArgs.join(', ')})`);
+    }
+
+    return args;
+}
+
+function buildComposeModifier(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): string {
     const parts = ['Modifier'];
     if (node.component === 'Screen') {
         parts.push('fillMaxSize()');
     }
 
-    const style = node.props.style;
-    if (style && typeof style === 'object' && !Array.isArray(style)) {
+    const style = getStyleObject(node, resolvedStyles);
+    if (style) {
         const padding = toDpLiteral(style.padding);
         const paddingHorizontal = toDpLiteral(style.paddingHorizontal);
         const paddingVertical = toDpLiteral(style.paddingVertical);
         const width = toDpLiteral(style.width);
         const height = toDpLiteral(style.height);
+        const minWidth = toDpLiteral(style.minWidth);
+        const maxWidth = toDpLiteral(style.maxWidth);
+        const minHeight = toDpLiteral(style.minHeight);
+        const maxHeight = toDpLiteral(style.maxHeight);
+        const radius = toDpLiteral(style.borderRadius);
+        const backgroundGradient = resolveBackgroundGradient(style);
+        const backgroundColor = resolveBackgroundColor(style);
+        const border = parseBorderValue(style.border, toDpLiteral);
+        const shadow = parseBoxShadow(style.boxShadow);
+        const flexValue = typeof style.flex === 'number'
+            ? style.flex
+            : typeof style.flex === 'string' && /^-?\d+(?:\.\d+)?$/.test(style.flex.trim())
+                ? Number(style.flex)
+                : typeof style.flexGrow === 'number'
+                    ? style.flexGrow
+                    : undefined;
 
         if (padding) {
             parts.push(`padding(${padding})`);
         } else {
             const paddingArgs: string[] = [];
-            const top = toDpLiteral(style.paddingTop);
-            const right = toDpLiteral(style.paddingRight ?? style.paddingEnd);
-            const bottom = toDpLiteral(style.paddingBottom);
-            const left = toDpLiteral(style.paddingLeft ?? style.paddingStart);
+            const spacing = resolveDirectionalSpacing(style, 'padding', toDpLiteral);
+            const top = spacing.top;
+            const right = spacing.right;
+            const bottom = spacing.bottom;
+            const left = spacing.left;
 
             if (paddingHorizontal) paddingArgs.push(`horizontal = ${paddingHorizontal}`);
             if (paddingVertical) paddingArgs.push(`vertical = ${paddingVertical}`);
@@ -514,8 +1325,61 @@ function buildComposeModifier(node: NativeElementNode): string {
             }
         }
 
-        if (width) parts.push(`width(${width})`);
-        if (height) parts.push(`height(${height})`);
+        if (isFillValue(style.width)) {
+            parts.push('fillMaxWidth()');
+        } else if (width) {
+            parts.push(`width(${width})`);
+        }
+
+        if (isFillValue(style.height)) {
+            parts.push('fillMaxHeight()');
+        } else if (height) {
+            parts.push(`height(${height})`);
+        }
+
+        const widthInArgs: string[] = [];
+        if (minWidth) widthInArgs.push(`min = ${minWidth}`);
+        if (maxWidth) widthInArgs.push(`max = ${maxWidth}`);
+        if (widthInArgs.length > 0) {
+            parts.push(`widthIn(${widthInArgs.join(', ')})`);
+        }
+
+        const heightInArgs: string[] = [];
+        if (minHeight) heightInArgs.push(`min = ${minHeight}`);
+        if (maxHeight) heightInArgs.push(`max = ${maxHeight}`);
+        if (heightInArgs.length > 0) {
+            parts.push(`heightIn(${heightInArgs.join(', ')})`);
+        }
+
+        if (shadow) {
+            parts.push(`shadow(elevation = ${toComposeShadowElevation(shadow)}, shape = RoundedCornerShape(${radius ?? '0.dp'}))`);
+        }
+
+        if (backgroundGradient) {
+            if (radius) {
+                parts.push(`background(brush = ${toComposeBrushLiteral(backgroundGradient)}, shape = RoundedCornerShape(${radius}))`);
+            } else {
+                parts.push(`background(brush = ${toComposeBrushLiteral(backgroundGradient)})`);
+            }
+        } else if (backgroundColor) {
+            if (radius) {
+                parts.push(`background(color = ${toComposeColorLiteral(backgroundColor)}, shape = RoundedCornerShape(${radius}))`);
+            } else {
+                parts.push(`background(${toComposeColorLiteral(backgroundColor)})`);
+            }
+        }
+
+        if (border?.width && border.color) {
+            if (radius) {
+                parts.push(`border(${border.width}, ${toComposeColorLiteral(border.color)}, RoundedCornerShape(${radius}))`);
+            } else {
+                parts.push(`border(${border.width}, ${toComposeColorLiteral(border.color)})`);
+            }
+        }
+
+        if (flexValue !== undefined && Number.isFinite(flexValue) && flexValue > 0) {
+            parts.push(`weight(${flexValue}f)`);
+        }
     }
 
     return parts.join('.');
@@ -529,6 +1393,35 @@ function renderComposeChildren(nodes: NativeNode[], level: number, context: Andr
     return lines;
 }
 
+function resolveComposeLayout(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): 'Row' | 'Column' {
+    const style = getStyleObject(node, resolvedStyles);
+    const styleLayout = resolveLayoutDirection(style);
+    if (styleLayout) return styleLayout;
+    return node.component === 'Row' || node.component === 'ListItem' ? 'Row' : 'Column';
+}
+
+function buildComposeLayoutArguments(
+    node: NativeElementNode,
+    layout: 'Row' | 'Column',
+    modifier: string,
+    resolvedStyles?: NativeResolvedStyleMap,
+): string {
+    const args = [`modifier = ${modifier}`];
+    const style = getStyleObject(node, resolvedStyles);
+    const arrangement = buildComposeArrangement(layout, style);
+    const alignment = buildComposeCrossAlignment(layout, style);
+
+    if (layout === 'Row') {
+        if (arrangement) args.push(`horizontalArrangement = ${arrangement}`);
+        if (alignment) args.push(`verticalAlignment = ${alignment}`);
+    } else {
+        if (arrangement) args.push(`verticalArrangement = ${arrangement}`);
+        if (alignment) args.push(`horizontalAlignment = ${alignment}`);
+    }
+
+    return args.join(', ');
+}
+
 function renderTextComposable(text: string, level: number): string[] {
     return [`${indent(level)}Text(text = ${quoteKotlinString(text)})`];
 }
@@ -538,7 +1431,7 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
         return renderTextComposable(node.value, level);
     }
 
-    const modifier = buildComposeModifier(node);
+    const modifier = buildComposeModifier(node, context.resolvedStyles);
     const classComment = Array.isArray(node.props.classList) && node.props.classList.length > 0
         ? `${indent(level)}// classList: ${(node.props.classList as NativePropValue[]).map((item) => String(item)).join(' ')}`
         : undefined;
@@ -546,8 +1439,12 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
     if (classComment) lines.push(classComment);
 
     if (node.component === 'Text') {
-        const text = flattenTextContent(node.children);
-        return [...lines, `${indent(level)}Text(text = ${quoteKotlinString(text)})`];
+        const style = getStyleObject(node, context.resolvedStyles);
+        const text = applyTextTransform(flattenTextContent(node.children), resolveTextTransform(style?.textTransform));
+        const args = [`text = ${quoteKotlinString(text)}`];
+        if (modifier !== 'Modifier') args.push(`modifier = ${modifier}`);
+        args.push(...buildComposeTextStyleArgs(node, context.resolvedStyles));
+        return [...lines, `${indent(level)}Text(${args.join(', ')})`];
     }
 
     if (node.component === 'Toggle') {
@@ -584,11 +1481,23 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
 
     if (node.component === 'Button') {
         const label = flattenTextContent(node.children) || 'Button';
-        const actionComment = node.events.length > 0
-            ? ` /* TODO: wire elit event(s): ${node.events.join(', ')} */ `
-            : ' ';
-        lines.push(`${indent(level)}Button(onClick = {${actionComment}}, modifier = ${modifier}) {`);
-        lines.push(`${indent(level + 1)}Text(text = ${quoteKotlinString(label)})`);
+        const bridgeInvocation = buildComposeBridgeInvocation(
+            resolveNativeAction(node),
+            resolveNativeRoute(node),
+            serializeNativePayload(node.props.nativePayload),
+        );
+        const args = buildComposeButtonArgs(node, modifier, 'filled', context.resolvedStyles);
+
+        if (bridgeInvocation) {
+            context.helperFlags.add('bridge');
+            lines.push(`${indent(level)}Button(onClick = { ${bridgeInvocation} }, ${args.join(', ')}) {`);
+        } else {
+            const actionComment = node.events.length > 0
+                ? ` /* TODO: wire elit event(s): ${node.events.join(', ')} */ `
+                : ' ';
+            lines.push(`${indent(level)}Button(onClick = {${actionComment}}, ${args.join(', ')}) {`);
+        }
+        lines.push(`${indent(level + 1)}${buildComposeLabelText(node, label, context.resolvedStyles)}`);
         lines.push(`${indent(level)}}`);
         return lines;
     }
@@ -596,14 +1505,26 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
     if (node.component === 'Link') {
         const label = flattenTextContent(node.children) || String(node.props.destination ?? 'Link');
         const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
+        const args = buildComposeButtonArgs(node, modifier, 'text', context.resolvedStyles);
         if (destination && isExternalDestination(destination)) {
             context.helperFlags.add('uriHandler');
-            lines.push(`${indent(level)}TextButton(onClick = { uriHandler.openUri(${quoteKotlinString(destination)}) }, modifier = ${modifier}) {`);
+            lines.push(`${indent(level)}TextButton(onClick = { uriHandler.openUri(${quoteKotlinString(destination)}) }, ${args.join(', ')}) {`);
         } else {
-            const actionComment = destination ? ` /* TODO: navigate to ${escapeKotlinString(destination)} */ ` : ' ';
-            lines.push(`${indent(level)}TextButton(onClick = {${actionComment}}, modifier = ${modifier}) {`);
+            const bridgeInvocation = buildComposeBridgeInvocation(
+                resolveNativeAction(node),
+                resolveNativeRoute(node),
+                serializeNativePayload(node.props.nativePayload),
+            );
+
+            if (bridgeInvocation) {
+                context.helperFlags.add('bridge');
+                lines.push(`${indent(level)}TextButton(onClick = { ${bridgeInvocation} }, ${args.join(', ')}) {`);
+            } else {
+                const actionComment = destination ? ` /* TODO: navigate to ${escapeKotlinString(destination)} */ ` : ' ';
+                lines.push(`${indent(level)}TextButton(onClick = {${actionComment}}, ${args.join(', ')}) {`);
+            }
         }
-        lines.push(`${indent(level + 1)}Text(text = ${quoteKotlinString(label)})`);
+        lines.push(`${indent(level + 1)}${buildComposeLabelText(node, label, context.resolvedStyles)}`);
         lines.push(`${indent(level)}}`);
         return lines;
     }
@@ -630,8 +1551,8 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
         return lines;
     }
 
-    const layout = node.component === 'Row' || node.component === 'ListItem' ? 'Row' : 'Column';
-    lines.push(`${indent(level)}${layout}(modifier = ${modifier}) {`);
+    const layout = resolveComposeLayout(node, context.resolvedStyles);
+    lines.push(`${indent(level)}${layout}(${buildComposeLayoutArguments(node, layout, modifier, context.resolvedStyles)}) {`);
     lines.push(...renderComposeChildren(node.children, level + 1, context));
     lines.push(`${indent(level)}}`);
     return lines;
@@ -639,6 +1560,23 @@ function renderComposeNode(node: NativeNode, level: number, context: AndroidComp
 
 function buildAndroidComposeHelpers(context: AndroidComposeContext): string[] {
     const helpers: string[] = [];
+
+    if (context.helperFlags.has('bridge')) {
+        helpers.push('');
+        helpers.push('object ElitNativeBridge {');
+        helpers.push('    var onAction: ((String, String?, String?) -> Unit)? = null');
+        helpers.push('    var onNavigate: ((String) -> Unit)? = null');
+        helpers.push('');
+        helpers.push('    fun dispatch(action: String? = null, route: String? = null, payloadJson: String? = null) {');
+        helpers.push('        if (route != null) {');
+        helpers.push('            onNavigate?.invoke(route)');
+        helpers.push('        }');
+        helpers.push('        if (action != null) {');
+        helpers.push('            onAction?.invoke(action, route, payloadJson)');
+        helpers.push('        }');
+        helpers.push('    }');
+        helpers.push('}');
+    }
 
     if (context.helperFlags.has('imagePlaceholder')) {
         helpers.push('');
@@ -660,28 +1598,50 @@ function buildAndroidComposeHelpers(context: AndroidComposeContext): string[] {
     return helpers;
 }
 
-function buildSwiftUIModifiers(node: NativeElementNode): string[] {
+function buildSwiftUIModifiers(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): string[] {
     const modifiers: string[] = [];
 
     if (node.component === 'Screen') {
         modifiers.push('.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)');
     }
 
-    const style = node.props.style;
-    if (style && typeof style === 'object' && !Array.isArray(style)) {
+    const style = getStyleObject(node, resolvedStyles);
+    if (style) {
         const padding = toPointLiteral(style.padding);
         const paddingHorizontal = toPointLiteral(style.paddingHorizontal);
         const paddingVertical = toPointLiteral(style.paddingVertical);
         const width = toPointLiteral(style.width);
         const height = toPointLiteral(style.height);
+        const minWidth = toPointLiteral(style.minWidth);
+        const maxWidth = toPointLiteral(style.maxWidth);
+        const minHeight = toPointLiteral(style.minHeight);
+        const maxHeight = toPointLiteral(style.maxHeight);
+        const radius = toPointLiteral(style.borderRadius);
+        const backgroundGradient = resolveBackgroundGradient(style);
+        const backgroundColor = resolveBackgroundColor(style);
+        const border = parseBorderValue(style.border, toPointLiteral);
+        const shadow = parseBoxShadow(style.boxShadow);
+        const color = parseCssColor(style.color);
+        const fontSize = toPointLiteral(style.fontSize);
+        const fontWeight = resolveSwiftFontWeight(style.fontWeight);
+        const letterSpacing = toPointLiteral(style.letterSpacing);
+        const textAlign = resolveSwiftTextAlign(style.textAlign);
+        const flexValue = typeof style.flex === 'number'
+            ? style.flex
+            : typeof style.flex === 'string' && /^-?\d+(?:\.\d+)?$/.test(style.flex.trim())
+                ? Number(style.flex)
+                : typeof style.flexGrow === 'number'
+                    ? style.flexGrow
+                    : undefined;
 
         if (padding) {
             modifiers.push(`.padding(${padding})`);
         } else {
-            const top = toPointLiteral(style.paddingTop);
-            const right = toPointLiteral(style.paddingRight ?? style.paddingEnd);
-            const bottom = toPointLiteral(style.paddingBottom);
-            const left = toPointLiteral(style.paddingLeft ?? style.paddingStart);
+            const spacing = resolveDirectionalSpacing(style, 'padding', toPointLiteral);
+            const top = spacing.top;
+            const right = spacing.right;
+            const bottom = spacing.bottom;
+            const left = spacing.left;
 
             if (paddingHorizontal) modifiers.push(`.padding(.horizontal, ${paddingHorizontal})`);
             if (paddingVertical) modifiers.push(`.padding(.vertical, ${paddingVertical})`);
@@ -692,14 +1652,92 @@ function buildSwiftUIModifiers(node: NativeElementNode): string[] {
         }
 
         const frameArgs: string[] = [];
-        if (width) frameArgs.push(`width: ${width}`);
-        if (height) frameArgs.push(`height: ${height}`);
+        if (isFillValue(style.width)) {
+            frameArgs.push('maxWidth: .infinity');
+        } else if (width) {
+            frameArgs.push(`width: ${width}`);
+        }
+        if (isFillValue(style.height)) {
+            frameArgs.push('maxHeight: .infinity');
+        } else if (height) {
+            frameArgs.push(`height: ${height}`);
+        }
+        if (minWidth) frameArgs.push(`minWidth: ${minWidth}`);
+        if (maxWidth) frameArgs.push(`maxWidth: ${maxWidth}`);
+        if (minHeight) frameArgs.push(`minHeight: ${minHeight}`);
+        if (maxHeight) frameArgs.push(`maxHeight: ${maxHeight}`);
         if (frameArgs.length > 0) {
             modifiers.push(`.frame(${frameArgs.join(', ')})`);
+        }
+
+        if (backgroundGradient) {
+            modifiers.push(`.background(${toSwiftGradientLiteral(backgroundGradient)})`);
+        } else if (backgroundColor) {
+            modifiers.push(`.background(${toSwiftColorLiteral(backgroundColor)})`);
+        }
+
+        if (radius) {
+            modifiers.push(`.clipShape(RoundedRectangle(cornerRadius: ${radius}))`);
+        }
+
+        if (border?.width && border.color) {
+            const radiusValue = radius ?? '0';
+            modifiers.push(`.overlay(RoundedRectangle(cornerRadius: ${radiusValue}).stroke(${toSwiftColorLiteral(border.color)}, lineWidth: ${border.width}))`);
+        }
+
+        if (shadow) {
+            modifiers.push(`.shadow(color: ${toSwiftColorLiteral(shadow.color)}, radius: ${toSwiftShadowRadius(shadow)}, x: ${formatFloat(shadow.offsetX)}, y: ${formatFloat(shadow.offsetY)})`);
+        }
+
+        if (color) modifiers.push(`.foregroundStyle(${toSwiftColorLiteral(color)})`);
+        if (fontSize || fontWeight) {
+            const args = [`size: ${fontSize ?? '17'}`];
+            if (fontWeight) args.push(`weight: ${fontWeight}`);
+            modifiers.push(`.font(.system(${args.join(', ')}))`);
+        }
+        if (letterSpacing) modifiers.push(`.kerning(${letterSpacing})`);
+        if (textAlign) modifiers.push(`.multilineTextAlignment(${textAlign})`);
+        if (flexValue !== undefined && Number.isFinite(flexValue) && flexValue > 0) {
+            modifiers.push('.frame(maxWidth: .infinity, alignment: .leading)');
         }
     }
 
     return modifiers;
+}
+
+function buildSwiftUIButtonModifiers(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): string[] {
+    const style = getStyleObject(node, resolvedStyles);
+    const modifiers = buildSwiftUIModifiers(node, resolvedStyles);
+    return style ? ['.buttonStyle(.plain)', ...modifiers] : modifiers;
+}
+
+function resolveSwiftUILayout(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): 'HStack' | 'VStack' {
+    const style = getStyleObject(node, resolvedStyles);
+    const styleLayout = resolveLayoutDirection(style);
+    if (styleLayout === 'Row') return 'HStack';
+    return node.component === 'Row' || node.component === 'ListItem' ? 'HStack' : 'VStack';
+}
+
+function buildSwiftUILayout(node: NativeElementNode, layout: 'HStack' | 'VStack', resolvedStyles?: NativeResolvedStyleMap): string {
+    const style = getStyleObject(node, resolvedStyles);
+    const spacing = toPointLiteral(style?.gap ?? (layout === 'HStack' ? style?.columnGap : style?.rowGap) ?? style?.gap) ?? '12';
+    const align = typeof style?.alignItems === 'string' ? style.alignItems.trim().toLowerCase() : undefined;
+
+    if (layout === 'HStack') {
+        const alignment = align === 'center'
+            ? '.center'
+            : align === 'flex-end' || align === 'end' || align === 'bottom'
+                ? '.bottom'
+                : '.top';
+        return `HStack(alignment: ${alignment}, spacing: ${spacing})`;
+    }
+
+    const alignment = align === 'center'
+        ? '.center'
+        : align === 'flex-end' || align === 'end' || align === 'right'
+            ? '.trailing'
+            : '.leading';
+    return `VStack(alignment: ${alignment}, spacing: ${spacing})`;
 }
 
 function appendSwiftUIModifiers(lines: string[], modifiers: string[], level: number): string[] {
@@ -733,10 +1771,11 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
     if (classComment) baseLines.push(classComment);
 
     if (node.component === 'Text') {
-        const text = flattenTextContent(node.children);
+        const style = getStyleObject(node, context.resolvedStyles);
+        const text = applyTextTransform(flattenTextContent(node.children), resolveTextTransform(style?.textTransform));
         return appendSwiftUIModifiers(
             [...baseLines, `${indent(level)}Text(${quoteSwiftString(text)})`],
-            buildSwiftUIModifiers(node),
+            buildSwiftUIModifiers(node, context.resolvedStyles),
             level
         );
     }
@@ -750,7 +1789,7 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
                 ...baseLines,
                 `${indent(level)}Toggle("", isOn: $${stateName})`,
             ],
-            ['.labelsHidden()', ...buildSwiftUIModifiers(node)],
+            ['.labelsHidden()', ...buildSwiftUIModifiers(node, context.resolvedStyles)],
             level
         );
     }
@@ -768,27 +1807,51 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
                 ...baseLines,
                 `${indent(level)}TextField(${quoteSwiftString(placeholder)}, text: $${stateName})`,
             ],
-            ['.textFieldStyle(.roundedBorder)', ...buildSwiftUIModifiers(node)],
+            ['.textFieldStyle(.roundedBorder)', ...buildSwiftUIModifiers(node, context.resolvedStyles)],
             level
         );
     }
 
     if (node.component === 'Button') {
         const label = flattenTextContent(node.children) || 'Button';
-        const lines = [
-            ...baseLines,
-            `${indent(level)}Button(action: {`,
-            `${indent(level + 1)}// TODO: wire elit event(s): ${node.events.join(', ') || 'press'}`,
-            `${indent(level)}}) {`,
-            `${indent(level + 1)}Text(${quoteSwiftString(label)})`,
-            `${indent(level)}}`,
-        ];
-        return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node), level);
+        const transformedLabel = applyTextTransform(label, resolveTextTransform(getStyleObject(node, context.resolvedStyles)?.textTransform));
+        const bridgeInvocation = buildSwiftBridgeInvocation(
+            resolveNativeAction(node),
+            resolveNativeRoute(node),
+            serializeNativePayload(node.props.nativePayload),
+        );
+        const lines = bridgeInvocation
+            ? [
+                ...baseLines,
+                `${indent(level)}Button(action: {`,
+                `${indent(level + 1)}${bridgeInvocation}`,
+                `${indent(level)}}) {`,
+                `${indent(level + 1)}Text(${quoteSwiftString(transformedLabel)})`,
+                `${indent(level)}}`,
+            ]
+            : [
+                ...baseLines,
+                `${indent(level)}Button(action: {`,
+                `${indent(level + 1)}// TODO: wire elit event(s): ${node.events.join(', ') || 'press'}`,
+                `${indent(level)}}) {`,
+                `${indent(level + 1)}Text(${quoteSwiftString(transformedLabel)})`,
+                `${indent(level)}}`,
+            ];
+        if (bridgeInvocation) {
+            context.helperFlags.add('bridge');
+        }
+        return appendSwiftUIModifiers(lines, buildSwiftUIButtonModifiers(node, context.resolvedStyles), level);
     }
 
     if (node.component === 'Link') {
         const label = flattenTextContent(node.children) || String(node.props.destination ?? 'Link');
+        const transformedLabel = applyTextTransform(label, resolveTextTransform(getStyleObject(node, context.resolvedStyles)?.textTransform));
         const destination = typeof node.props.destination === 'string' ? node.props.destination : 'destination';
+        const bridgeInvocation = buildSwiftBridgeInvocation(
+            resolveNativeAction(node),
+            resolveNativeRoute(node),
+            serializeNativePayload(node.props.nativePayload),
+        );
         const lines = isExternalDestination(destination)
             ? [
                 ...baseLines,
@@ -797,21 +1860,32 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
                 `${indent(level + 2)}openURL(destination)`,
                 `${indent(level + 1)}}`,
                 `${indent(level)}}) {`,
-                `${indent(level + 1)}Text(${quoteSwiftString(label)})`,
+                `${indent(level + 1)}Text(${quoteSwiftString(transformedLabel)})`,
                 `${indent(level)}}`,
             ]
+            : bridgeInvocation
+                ? [
+                    ...baseLines,
+                    `${indent(level)}Button(action: {`,
+                    `${indent(level + 1)}${bridgeInvocation}`,
+                    `${indent(level)}}) {`,
+                    `${indent(level + 1)}Text(${quoteSwiftString(transformedLabel)})`,
+                    `${indent(level)}}`,
+                ]
             : [
                 ...baseLines,
                 `${indent(level)}Button(action: {`,
                 `${indent(level + 1)}// TODO: navigate to ${escapeSwiftString(destination)}`,
                 `${indent(level)}}) {`,
-                `${indent(level + 1)}Text(${quoteSwiftString(label)})`,
+                `${indent(level + 1)}Text(${quoteSwiftString(transformedLabel)})`,
                 `${indent(level)}}`,
             ];
         if (isExternalDestination(destination)) {
             context.helperFlags.add('openUrlHandler');
+        } else if (bridgeInvocation) {
+            context.helperFlags.add('bridge');
         }
-        return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node), level);
+        return appendSwiftUIModifiers(lines, buildSwiftUIButtonModifiers(node, context.resolvedStyles), level);
     }
 
     if (node.component === 'Image') {
@@ -823,7 +1897,7 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
                 ...baseLines,
                 `${indent(level)}elitImagePlaceholder(source: ${quoteSwiftString(source)}, alt: ${alt ? quoteSwiftString(alt) : 'nil'})`,
             ],
-            buildSwiftUIModifiers(node),
+            buildSwiftUIModifiers(node, context.resolvedStyles),
             level
         );
     }
@@ -840,20 +1914,35 @@ function renderSwiftUINode(node: NativeNode, level: number, context: SwiftUICont
         );
     }
 
-    const layout = node.component === 'Row' || node.component === 'ListItem'
-        ? 'HStack(alignment: .top, spacing: 12)'
-        : 'VStack(alignment: .leading, spacing: 12)';
+    const layout = buildSwiftUILayout(node, resolveSwiftUILayout(node, context.resolvedStyles), context.resolvedStyles);
     const lines = [
         ...baseLines,
         `${indent(level)}${layout} {`,
         ...renderSwiftUIChildren(node.children, level + 1, context),
         `${indent(level)}}`,
     ];
-    return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node), level);
+    return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node, context.resolvedStyles), level);
 }
 
 function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
     const helpers: string[] = [];
+
+    if (context.helperFlags.has('bridge')) {
+        helpers.push('');
+        helpers.push('enum ElitNativeBridge {');
+        helpers.push('    static var onAction: ((String, String?, String?) -> Void)?');
+        helpers.push('    static var onNavigate: ((String) -> Void)?');
+        helpers.push('');
+        helpers.push('    static func dispatch(action: String? = nil, route: String? = nil, payloadJson: String? = nil) {');
+        helpers.push('        if let route {');
+        helpers.push('            onNavigate?(route)');
+        helpers.push('        }');
+        helpers.push('        if let action {');
+        helpers.push('            onAction?(action, route, payloadJson)');
+        helpers.push('        }');
+        helpers.push('    }');
+        helpers.push('}');
+    }
 
     if (context.helperFlags.has('imagePlaceholder')) {
         helpers.push('');
@@ -893,6 +1982,7 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
         toggleIndex: 0,
         stateDeclarations: [],
         helperFlags: new Set(),
+        resolvedStyles: buildResolvedStyleMap(tree.roots),
     };
 
     const bodyLines = tree.roots.length === 1
@@ -912,14 +2002,24 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
 
     if (resolvedOptions.includeImports) {
         lines.push('import androidx.compose.foundation.layout.*');
+        lines.push('import androidx.compose.foundation.background');
+        lines.push('import androidx.compose.foundation.border');
+        lines.push('import androidx.compose.ui.draw.shadow');
         lines.push('import androidx.compose.material3.*');
         lines.push('import androidx.compose.runtime.*');
+        lines.push('import androidx.compose.foundation.shape.RoundedCornerShape');
+        lines.push('import androidx.compose.ui.Alignment');
         lines.push('import androidx.compose.ui.Modifier');
+        lines.push('import androidx.compose.ui.graphics.Brush');
+        lines.push('import androidx.compose.ui.graphics.Color');
         if (context.helperFlags.has('uriHandler')) {
             lines.push('import androidx.compose.ui.platform.LocalUriHandler');
         }
+        lines.push('import androidx.compose.ui.text.font.FontWeight');
+        lines.push('import androidx.compose.ui.text.style.TextAlign');
         lines.push('import androidx.compose.ui.tooling.preview.Preview');
         lines.push('import androidx.compose.ui.unit.dp');
+        lines.push('import androidx.compose.ui.unit.sp');
         lines.push('');
     }
 
@@ -969,6 +2069,7 @@ export function renderSwiftUI(input: Child | NativeTree, options: SwiftUIOptions
         toggleIndex: 0,
         stateDeclarations: [],
         helperFlags: new Set(),
+        resolvedStyles: buildResolvedStyleMap(tree.roots),
     };
 
     const bodyLines = tree.roots.length === 1

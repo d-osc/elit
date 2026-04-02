@@ -231,6 +231,7 @@ export class WebSocketServer extends EventEmitter {
   public path: string;
 
   private _httpServer: any;
+  private _ownsHttpServer: boolean = false;
 
   constructor(options?: ServerOptions, callback?: () => void) {
     super();
@@ -248,12 +249,19 @@ export class WebSocketServer extends EventEmitter {
         // Create new HTTP server
         const http = require('http');
         this._httpServer = http.createServer();
+        this._ownsHttpServer = true;
         this._setupUpgradeHandler();
 
         if (options?.port) {
           this._httpServer.listen(options.port, options.host, callback);
         }
       }
+    } else if (runtime === 'bun') {
+      if (options?.server?.registerWebSocketServer) {
+        this._httpServer = options.server;
+        options.server.registerWebSocketServer(this);
+      }
+      queueCallback(callback as any);
     } else {
       // Bun/Deno - WebSocket server setup
       queueCallback(callback as any);
@@ -401,6 +409,100 @@ export class WebSocketServer extends EventEmitter {
     return client;
   }
 
+  private _createClientFromBunSocket(socket: any): WebSocket {
+    const client = Object.create(WebSocket.prototype);
+    EventEmitter.call(client);
+
+    client.readyState = ReadyState.OPEN;
+    client.url = 'ws://localhost';
+    client.protocol = '';
+    client.extensions = '';
+    client.binaryType = 'nodebuffer';
+    client._socket = socket;
+
+    client.send = (data: Data, _options?: any, callback?: (err?: Error) => void) => {
+      if (client.readyState !== ReadyState.OPEN) {
+        queueCallback(callback, new Error('WebSocket is not open'));
+        return;
+      }
+
+      try {
+        socket.send(data);
+        queueCallback(callback);
+      } catch (error) {
+        queueCallback(callback, error as Error);
+      }
+    };
+
+    client.close = (code?: number, reason?: string) => {
+      if (client.readyState === ReadyState.CLOSED) {
+        return;
+      }
+
+      client.readyState = ReadyState.CLOSING;
+      socket.close(code ?? CLOSE_CODES.NORMAL, reason);
+    };
+
+    client.terminate = () => {
+      socket.close();
+      client.readyState = ReadyState.CLOSED;
+    };
+
+    return client;
+  }
+
+  _handleBunOpen(socket: any, request: Partial<IncomingMessage> = {}): void {
+    const client = this._createClientFromBunSocket(socket);
+
+    if (socket.data) {
+      socket.data.client = client;
+    }
+
+    if (this.options.clientTracking !== false) {
+      this.clients.add(client);
+      client.on('close', () => {
+        this.clients.delete(client);
+      });
+    }
+
+    const incomingRequest = {
+      url: request.url || this.path,
+      headers: request.headers || {},
+      socket: request.socket || { remoteAddress: undefined },
+    } as IncomingMessage;
+
+    this.emit('connection', client, incomingRequest);
+  }
+
+  _handleBunMessage(socket: any, message: any): void {
+    const client = socket.data?.client;
+    if (!client) {
+      return;
+    }
+
+    const isBinary = typeof message !== 'string';
+    const payload = typeof message === 'string'
+      ? message
+      : message instanceof ArrayBuffer
+        ? Buffer.from(message)
+        : ArrayBuffer.isView(message)
+          ? Buffer.from(message.buffer, message.byteOffset, message.byteLength)
+          : Buffer.from(String(message));
+
+    client.emit('message', payload, isBinary);
+  }
+
+  _handleBunClose(socket: any, code: number, reason: any): void {
+    const client = socket.data?.client;
+    if (!client) {
+      return;
+    }
+
+    client.readyState = ReadyState.CLOSED;
+    client.emit('close', code, typeof reason === 'string' ? reason : reason?.toString() || '');
+    this.clients.delete(client);
+  }
+
   private _parseFrame(data: Buffer): string | null {
     // Minimal WebSocket frame parsing
     if (data.length < 2) return null;
@@ -480,9 +582,12 @@ export class WebSocketServer extends EventEmitter {
     this.clients.forEach(client => client.close());
     this.clients.clear();
 
-    if (this._httpServer) {
+    if (this._httpServer && this._ownsHttpServer) {
       this._httpServer.close(callback);
     } else {
+      if (runtime === 'bun' && this._httpServer?.unregisterWebSocketServer) {
+        this._httpServer.unregisterWebSocketServer(this);
+      }
       this.emit('close');
       queueCallback(callback);
     }

@@ -56,6 +56,27 @@ export interface LayerRule {
     rules: CSSRule[];
 }
 
+export interface StyleSelectorTarget {
+    tagName?: string;
+    classNames?: string[];
+    attributes?: Record<string, string | number | boolean>;
+}
+
+type ParsedSelectorCombinator = 'descendant' | 'child';
+
+interface ParsedAttributeSelector {
+    name: string;
+    operator?: '=' | '~=' | '^=' | '$=' | '*=';
+    value?: string;
+}
+
+interface ParsedSimpleSelector {
+    tagName?: string;
+    classNames: string[];
+    attributes: ParsedAttributeSelector[];
+    combinator?: ParsedSelectorCombinator;
+}
+
 export class CreateStyle {
     private variables: CSSVariable[] = [];
     private rules: CSSRule[] = [];
@@ -299,6 +320,292 @@ export class CreateStyle {
         return `${value} !important`;
     }
 
+    getVariables(): Record<string, string> {
+        return Object.fromEntries(this.variables.map((variable) => [variable.name, variable.value]));
+    }
+
+    private resolveVariableReferences(value: string, variables: Record<string, string>): string {
+        let resolved = value;
+
+        for (let index = 0; index < 8; index++) {
+            let replaced = false;
+            resolved = resolved.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^\)]+))?\)/g, (match, name: string, fallback?: string) => {
+                const variableValue = variables[name];
+                if (variableValue !== undefined) {
+                    replaced = true;
+                    return variableValue;
+                }
+
+                if (fallback !== undefined) {
+                    replaced = true;
+                    return fallback.trim();
+                }
+
+                return match;
+            });
+
+            if (!replaced) {
+                break;
+            }
+        }
+
+        return resolved.replace(/\s*!important\s*$/i, '').trim();
+    }
+
+    private normalizeTarget(target: StyleSelectorTarget): StyleSelectorTarget {
+        return {
+            tagName: typeof target.tagName === 'string' && target.tagName.trim()
+                ? target.tagName.trim().toLowerCase()
+                : undefined,
+            classNames: Array.isArray(target.classNames)
+                ? target.classNames.map((className) => className.trim()).filter(Boolean)
+                : [],
+            attributes: target.attributes
+                ? Object.fromEntries(
+                    Object.entries(target.attributes)
+                        .filter(([, value]) => value !== undefined && value !== null && value !== false)
+                        .map(([name, value]) => [name.toLowerCase(), String(value)])
+                )
+                : {},
+        };
+    }
+
+    private parseSimpleSelectorToken(token: string): ParsedSimpleSelector | undefined {
+        const trimmed = token.trim();
+        if (!trimmed || /[#:+~*&]/.test(trimmed)) {
+            return undefined;
+        }
+        let cursor = 0;
+        let tagName: string | undefined;
+        const classNames: string[] = [];
+        const attributes: ParsedAttributeSelector[] = [];
+
+        const tagMatch = trimmed.slice(cursor).match(/^([_a-zA-Z][-_a-zA-Z0-9]*)/);
+        if (tagMatch) {
+            tagName = tagMatch[1].toLowerCase();
+            cursor += tagMatch[0].length;
+        }
+
+        while (cursor < trimmed.length) {
+            const char = trimmed[cursor];
+            if (char === '.') {
+                const classMatch = trimmed.slice(cursor).match(/^\.([_a-zA-Z][-_a-zA-Z0-9]*)/);
+                if (!classMatch) {
+                    return undefined;
+                }
+                classNames.push(classMatch[1]);
+                cursor += classMatch[0].length;
+                continue;
+            }
+
+            if (char === '[') {
+                const endIndex = trimmed.indexOf(']', cursor + 1);
+                if (endIndex === -1) {
+                    return undefined;
+                }
+
+                const rawAttribute = trimmed.slice(cursor + 1, endIndex).trim();
+                const attrMatch = rawAttribute.match(/^([_a-zA-Z][-_a-zA-Z0-9]*)(?:\s*(=|~=|\^=|\$=|\*=)\s*(?:"([^"]*)"|'([^']*)'|([^\s"']+)))?$/);
+                if (!attrMatch) {
+                    return undefined;
+                }
+
+                attributes.push({
+                    name: attrMatch[1].toLowerCase(),
+                    operator: attrMatch[2] as ParsedAttributeSelector['operator'] | undefined,
+                    value: attrMatch[3] ?? attrMatch[4] ?? attrMatch[5],
+                });
+                cursor = endIndex + 1;
+                continue;
+            }
+
+            return undefined;
+        }
+
+        if (!tagName && classNames.length === 0 && attributes.length === 0) {
+            return undefined;
+        }
+
+        return { tagName, classNames, attributes };
+    }
+
+    private extractSupportedSelectorChains(selector: string): ParsedSimpleSelector[][] {
+        return selector
+            .split(',')
+            .map((segment) => segment.trim())
+            .map((segment) => {
+                const chain: ParsedSimpleSelector[] = [];
+                let token = '';
+                let combinator: ParsedSelectorCombinator = 'descendant';
+                let invalid = false;
+
+                const flushToken = (): void => {
+                    const trimmedToken = token.trim();
+                    token = '';
+                    if (!trimmedToken || invalid) {
+                        return;
+                    }
+
+                    const parsed = this.parseSimpleSelectorToken(trimmedToken);
+                    if (!parsed) {
+                        invalid = true;
+                        return;
+                    }
+
+                    if (chain.length > 0) {
+                        parsed.combinator = combinator;
+                    }
+                    chain.push(parsed);
+                    combinator = 'descendant';
+                };
+
+                for (let index = 0; index < segment.length; index++) {
+                    const char = segment[index];
+                    if (char === '>') {
+                        flushToken();
+                        if (invalid) break;
+                        combinator = 'child';
+                        continue;
+                    }
+
+                    if (/\s/.test(char)) {
+                        flushToken();
+                        if (invalid) break;
+                        if (combinator !== 'child') {
+                            combinator = 'descendant';
+                        }
+                        continue;
+                    }
+
+                    token += char;
+                }
+                flushToken();
+
+                if (invalid || chain.length === 0) {
+                    return undefined;
+                }
+
+                return chain.some((part) => part.classNames.length > 0 || part.attributes.length > 0)
+                    ? chain
+                    : undefined;
+            })
+            .filter((segment): segment is ParsedSimpleSelector[] => Array.isArray(segment) && segment.length > 0);
+    }
+
+    private matchesAttributeSelector(targetValue: string | undefined, selector: ParsedAttributeSelector): boolean {
+        if (selector.operator === undefined) {
+            return targetValue !== undefined;
+        }
+
+        if (targetValue === undefined || selector.value === undefined) {
+            return false;
+        }
+
+        switch (selector.operator) {
+            case '=':
+                return targetValue === selector.value;
+            case '~=':
+                return targetValue.split(/\s+/).includes(selector.value);
+            case '^=':
+                return targetValue.startsWith(selector.value);
+            case '$=':
+                return targetValue.endsWith(selector.value);
+            case '*=':
+                return targetValue.includes(selector.value);
+            default:
+                return false;
+        }
+    }
+
+    private matchesSelectorPart(target: StyleSelectorTarget, selector: ParsedSimpleSelector): boolean {
+        if (selector.tagName && target.tagName !== selector.tagName) {
+            return false;
+        }
+
+        const classSet = new Set(target.classNames ?? []);
+        if (!selector.classNames.every((className) => classSet.has(className))) {
+            return false;
+        }
+
+        const attributes = target.attributes as Record<string, string> | undefined;
+        return selector.attributes.every((attribute) => this.matchesAttributeSelector(attributes?.[attribute.name], attribute));
+    }
+
+    private matchesSelectorChain(
+        target: StyleSelectorTarget,
+        ancestors: StyleSelectorTarget[],
+        chain: ParsedSimpleSelector[],
+    ): boolean {
+        if (!this.matchesSelectorPart(target, chain[chain.length - 1])) {
+            return false;
+        }
+
+        let ancestorIndex = ancestors.length - 1;
+        for (let chainIndex = chain.length - 1; chainIndex > 0; chainIndex--) {
+            const selector = chain[chainIndex - 1];
+            const combinator = chain[chainIndex].combinator ?? 'descendant';
+
+            if (combinator === 'child') {
+                if (ancestorIndex < 0 || !this.matchesSelectorPart(ancestors[ancestorIndex], selector)) {
+                    return false;
+                }
+                ancestorIndex -= 1;
+                continue;
+            }
+
+            let matchedIndex = -1;
+            for (let index = ancestorIndex; index >= 0; index--) {
+                if (this.matchesSelectorPart(ancestors[index], selector)) {
+                    matchedIndex = index;
+                    break;
+                }
+            }
+
+            if (matchedIndex < 0) {
+                return false;
+            }
+
+            ancestorIndex = matchedIndex - 1;
+        }
+
+        return true;
+    }
+
+    resolveNativeStyles(target: StyleSelectorTarget, ancestors: StyleSelectorTarget[] = []): Record<string, string | number> {
+        const normalizedTarget = this.normalizeTarget(target);
+        if (!normalizedTarget.tagName && (!normalizedTarget.classNames || normalizedTarget.classNames.length === 0)) {
+            return {};
+        }
+
+        const normalizedAncestors = ancestors.map((ancestor) => this.normalizeTarget(ancestor));
+        const variables = this.getVariables();
+        const resolved: Record<string, string | number> = {};
+
+        for (const rule of this.rules) {
+            const selectorChains = this.extractSupportedSelectorChains(rule.selector);
+            if (selectorChains.length === 0) {
+                continue;
+            }
+
+            const matches = selectorChains.some((selectorChain) => this.matchesSelectorChain(normalizedTarget, normalizedAncestors, selectorChain));
+            if (!matches) {
+                continue;
+            }
+
+            for (const [property, value] of Object.entries(rule.styles)) {
+                resolved[property] = typeof value === 'string'
+                    ? this.resolveVariableReferences(value, variables)
+                    : value;
+            }
+        }
+
+        return resolved;
+    }
+
+    resolveClassStyles(classNames: string[]): Record<string, string | number> {
+        return this.resolveNativeStyles({ classNames });
+    }
+
     // Utility Methods
     private toKebabCase(str: string): string {
         return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
@@ -518,6 +825,8 @@ export const {
     supports: supportsStyle,
     layerOrder, layer,
     add: addStyle, important,
+    getVariables: getStyleVariables,
+    resolveClassStyles,
     render: renderStyle, inject: injectStyle, clear: clearStyle
 } = styles;
 

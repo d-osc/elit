@@ -1,0 +1,6 @@
+android/
+ios/
+dist/
+desktop-dist/
+.elit-desktop-*
+.elit-config-*.mjs

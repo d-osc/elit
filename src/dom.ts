@@ -118,7 +118,7 @@ export class DomNode {
                 (el as HTMLElement).innerHTML = value.__html;
             }
             // ref (r=114)
-            else if (c === 114 && key.length === 3) {
+            else if (c === 114 && key === 'ref') {
                 setTimeout(() => {
                     typeof value === 'function' ? value(el as HTMLElement) : (value.current = el as HTMLElement);
                 }, 0);

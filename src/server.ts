@@ -370,13 +370,28 @@ const send404 = (res: ServerResponse, msg = 'Not Found'): void => sendError(res,
 const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res, 403, msg);
 const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
 
+async function resolveElitImportBasePath(rootDir: string, basePath: string, mode: 'dev' | 'preview'): Promise<string> {
+  const resolvedRootDir = await realpath(resolve(rootDir));
+
+  try {
+    const packageJsonBuffer = await readFile(join(resolvedRootDir, 'package.json'));
+    const packageJson = JSON.parse(packageJsonBuffer.toString()) as { name?: string };
+
+    if (packageJson.name === 'elit') {
+      const workspaceDir = mode === 'dev' ? 'src' : 'dist';
+      return basePath ? `${basePath}/${workspaceDir}` : `/${workspaceDir}`;
+    }
+  } catch {
+    // Fall back to node_modules imports when the root is not the Elit package workspace.
+  }
+
+  const packageDir = mode === 'dev' ? 'src' : 'dist';
+  return basePath ? `${basePath}/node_modules/elit/${packageDir}` : `/node_modules/elit/${packageDir}`;
+}
+
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
 const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
-  // In dev mode, use built files from node_modules/elit/dist
-  // In preview mode, use built files from dist
-  const srcPath = mode === 'dev'
-    ? (basePath ? `${basePath}/node_modules/elit/src` : '/node_modules/elit/src')
-    : (basePath ? `${basePath}/node_modules/elit/dist` : '/node_modules/elit/dist');
+  const srcPath = await resolveElitImportBasePath(rootDir, basePath, mode);
 
   const fileExt = mode === 'dev' ? '.ts' : '.mjs';
 
@@ -388,6 +403,7 @@ const createElitImportMap = async (rootDir: string, basePath: string = '', mode:
     "elit/state": `${srcPath}/state${fileExt}`,
     "elit/style": `${srcPath}/style${fileExt}`,
     "elit/el": `${srcPath}/el${fileExt}`,
+    "elit/universal": `${srcPath}/universal${fileExt}`,
     "elit/router": `${srcPath}/router${fileExt}`,
     "elit/hmr": `${srcPath}/hmr${fileExt}`,
     "elit/types": `${srcPath}/types${fileExt}`
@@ -417,6 +433,14 @@ const rewriteRelativePaths = (html: string, basePath: string): string => {
 
 // Helper function to normalize basePath (reused in serveFile and serveSSR)
 const normalizeBasePath = (basePath?: string): string => basePath && basePath !== '/' ? basePath : '';
+
+const requestAcceptsGzip = (acceptEncoding: string | string[] | undefined): boolean => {
+  if (Array.isArray(acceptEncoding)) {
+    return acceptEncoding.some(value => /\bgzip\b/i.test(value));
+  }
+
+  return typeof acceptEncoding === 'string' && /\bgzip\b/i.test(acceptEncoding);
+};
 
 // Helper function to find dist or node_modules directory by walking up the directory tree
 async function findSpecialDir(startDir: string, targetDir: string): Promise<string | null> {
@@ -838,8 +862,7 @@ export function cacheControl(options: { maxAge?: number; public?: boolean } = {}
 
 export function compress(): Middleware {
   return async (ctx, next) => {
-    const acceptEncoding = ctx.req.headers['accept-encoding'] || '';
-    if (!acceptEncoding.includes('gzip')) {
+    if (isBun || !requestAcceptsGzip(ctx.req.headers['accept-encoding'])) {
       await next();
       return;
     }
@@ -1701,8 +1724,13 @@ export default css;
 
       // Apply gzip compression for text-based files
       const compressible = /^(text\/|application\/(javascript|json|xml))/.test(mimeType);
+      const acceptsGzip = requestAcceptsGzip(req.headers['accept-encoding']);
 
-      if (compressible && content.length > 1024) {
+      if (compressible) {
+        headers['Vary'] = 'Accept-Encoding';
+      }
+
+      if (!isBun && acceptsGzip && compressible && content.length > 1024) {
         const { gzipSync } = require('zlib');
         const compressed = gzipSync(content);
         headers['Content-Encoding'] = 'gzip';

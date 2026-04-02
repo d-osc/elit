@@ -90,6 +90,57 @@ const PLATFORMS = {
 } as const;
 const TS_LIKE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.jsx']);
 
+function findWorkspacePackageRoot(startDir: string, packageName: string): string | undefined {
+    let currentDir = resolve(startDir);
+
+    while (true) {
+        const packageJsonPath = join(currentDir, 'package.json');
+        if (existsSync(packageJsonPath)) {
+            try {
+                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
+                if (packageJson.name === packageName) {
+                    return currentDir;
+                }
+            } catch {
+                // Ignore invalid package metadata while walking upward.
+            }
+        }
+
+        const parentDir = dirname(currentDir);
+        if (parentDir === currentDir) {
+            return undefined;
+        }
+        currentDir = parentDir;
+    }
+}
+
+function resolveWorkspacePackageImport(specifier: string, startDir: string): string | undefined {
+    if (specifier !== 'elit' && !specifier.startsWith('elit/')) {
+        return undefined;
+    }
+
+    const packageRoot = findWorkspacePackageRoot(startDir, 'elit');
+    if (!packageRoot) {
+        return undefined;
+    }
+
+    const subpath = specifier === 'elit' ? 'index' : specifier.slice('elit/'.length);
+    const candidate = resolve(packageRoot, 'src', `${subpath}.ts`);
+    return existsSync(candidate) ? candidate : undefined;
+}
+
+function createWorkspacePackagePlugin(entryDir: string) {
+    return {
+        name: 'workspace-package-self-reference',
+        setup(build: any) {
+            build.onResolve({ filter: /^elit(?:\/.*)?$/ }, (args: { path: string; resolveDir?: string }) => {
+                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || entryDir);
+                return resolved ? { path: resolved } : undefined;
+            });
+        },
+    };
+}
+
 export async function runDesktopCommand(args: string[]): Promise<void> {
     if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
         printDesktopHelp();
@@ -802,6 +853,8 @@ async function compileDesktopEntryWithEsbuild(options: {
     output: { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' };
     runtime: DesktopRuntimeName;
 }): Promise<void> {
+    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath));
+
     await esbuild({
         absWorkingDir: dirname(options.entryPath),
         bundle: true,
@@ -811,6 +864,7 @@ async function compileDesktopEntryWithEsbuild(options: {
         mainFields: options.output.platform === 'node' ? ['module', 'main'] : ['browser', 'module', 'main'],
         outfile: options.compiledPath,
         platform: options.output.platform,
+        plugins: [workspacePackagePlugin],
         sourcemap: false,
         target: options.runtime === 'quickjs' ? ['es2020'] : ['es2022'],
     });
@@ -824,6 +878,7 @@ async function compileDesktopEntryWithTsup(options: {
 }): Promise<void> {
     const tsup = await loadOptionalDesktopCompiler<TsupModule>('tsup', options.entryPath, 'tsup');
     const outputBaseName = basename(options.compiledPath, extname(options.compiledPath));
+    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath));
 
     await tsup.build({
         bundle: true,
@@ -846,6 +901,7 @@ async function compileDesktopEntryWithTsup(options: {
             esbuildOptions.mainFields = options.output.platform === 'node'
                 ? ['module', 'main']
                 : ['browser', 'module', 'main'];
+            esbuildOptions.plugins = [...(esbuildOptions.plugins ?? []), workspacePackagePlugin];
         },
     });
 

@@ -36,6 +36,11 @@
       "import": "./dist/native.mjs",
       "require": "./dist/native.js"
     },
+    "./universal": {
+      "types": "./dist/universal.d.ts",
+      "import": "./dist/universal.mjs",
+      "require": "./dist/universal.js"
+    },
     "./router": {
       "types": "./dist/router.d.ts",
       "import": "./dist/router.mjs",

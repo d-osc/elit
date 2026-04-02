@@ -9,11 +9,6 @@
 import { runtime, isNode, isBun, isDeno } from './runtime';
 
 /**
- * Helper: Check if runtime is Bun or Deno (eliminates duplication in Deno API calls)
- */
-const isBunOrDeno = isBun || isDeno;
-
-/**
  * Helper: Parse options from string or object (eliminates duplication in options parsing)
  */
 function parseOptions<T>(options: T | string | undefined, defaultValue: T): T {
@@ -208,11 +203,8 @@ export function readFileSync(path: string, options?: ReadFileOptions | BufferEnc
 export async function writeFile(path: string, data: string | Buffer | Uint8Array, options?: WriteFileOptions | BufferEncoding): Promise<void> {
   const opts = parseOptions<WriteFileOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.writeFile(path, data, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    await Bun.write(path, data);
   } else if (isDeno) {
     // @ts-ignore
     await Deno.writeFile(path, dataToUint8Array(data));
@@ -225,11 +217,8 @@ export async function writeFile(path: string, data: string | Buffer | Uint8Array
 export function writeFileSync(path: string, data: string | Buffer | Uint8Array, options?: WriteFileOptions | BufferEncoding): void {
   const opts = parseOptions<WriteFileOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     fs.writeFileSync(path, data, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    Bun.write(path, data);
   } else if (isDeno) {
     // @ts-ignore
     Deno.writeFileSync(path, dataToUint8Array(data));
@@ -338,11 +327,8 @@ export function statSync(path: string): Stats {
 export async function mkdir(path: string, options?: MkdirOptions | number): Promise<void> {
   const opts = typeof options === 'number' ? { mode: options } as MkdirOptions : options || {};
 
-  if (isNode) {
+  if (isNode || isBun) {
     await fsPromises.mkdir(path, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    await Deno.mkdir(path, { recursive: opts.recursive });
   } else if (isDeno) {
     // @ts-ignore
     await Deno.mkdir(path, { recursive: opts.recursive });
@@ -355,11 +341,8 @@ export async function mkdir(path: string, options?: MkdirOptions | number): Prom
 export function mkdirSync(path: string, options?: MkdirOptions | number): void {
   const opts = typeof options === 'number' ? { mode: options } as MkdirOptions : options || {};
 
-  if (isNode) {
+  if (isNode || isBun) {
     fs.mkdirSync(path, opts);
-  } else if (isBun) {
-    // @ts-ignore
-    Deno.mkdirSync(path, { recursive: opts.recursive });
   } else if (isDeno) {
     // @ts-ignore
     Deno.mkdirSync(path, { recursive: opts.recursive });
@@ -372,9 +355,9 @@ export function mkdirSync(path: string, options?: MkdirOptions | number): void {
 export async function readdir(path: string, options?: ReaddirOptions | BufferEncoding): Promise<string[] | Dirent[]> {
   const opts = parseOptions<ReaddirOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.readdir(path, opts);
-  } else if (isBunOrDeno) {
+  } else if (isDeno) {
     // @ts-ignore
     return processDenoEntriesAsync(Deno.readDir(path), opts.withFileTypes);
   }
@@ -388,9 +371,9 @@ export async function readdir(path: string, options?: ReaddirOptions | BufferEnc
 export function readdirSync(path: string, options?: ReaddirOptions | BufferEncoding): string[] | Dirent[] {
   const opts = parseOptions<ReaddirOptions>(options, {});
 
-  if (isNode) {
+  if (isNode || isBun) {
     return fs.readdirSync(path, opts);
-  } else if (isBunOrDeno) {
+  } else if (isDeno) {
     // @ts-ignore
     return processDenoEntries(Deno.readDirSync(path), opts.withFileTypes);
   }
@@ -402,11 +385,8 @@ export function readdirSync(path: string, options?: ReaddirOptions | BufferEncod
  * Remove file (async)
  */
 export async function unlink(path: string): Promise<void> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.unlink(path);
-  } else if (isBun) {
-    // @ts-ignore
-    await Deno.remove(path);
   } else if (isDeno) {
     // @ts-ignore
     await Deno.remove(path);
@@ -417,11 +397,8 @@ export async function unlink(path: string): Promise<void> {
  * Remove file (sync)
  */
 export function unlinkSync(path: string): void {
-  if (isNode) {
+  if (isNode || isBun) {
     fs.unlinkSync(path);
-  } else if (isBun) {
-    // @ts-ignore
-    Deno.removeSync(path);
   } else if (isDeno) {
     // @ts-ignore
     Deno.removeSync(path);
@@ -432,11 +409,8 @@ export function unlinkSync(path: string): void {
  * Remove directory (async)
  */
 export async function rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.rmdir(path, options);
-  } else if (isBun) {
-    // @ts-ignore
-    await Deno.remove(path, { recursive: options?.recursive });
   } else if (isDeno) {
     // @ts-ignore
     await Deno.remove(path, { recursive: options?.recursive });
@@ -447,11 +421,8 @@ export async function rmdir(path: string, options?: { recursive?: boolean }): Pr
  * Remove directory (sync)
  */
 export function rmdirSync(path: string, options?: { recursive?: boolean }): void {
-  if (isNode) {
+  if (isNode || isBun) {
     fs.rmdirSync(path, options);
-  } else if (isBun) {
-    // @ts-ignore
-    Deno.removeSync(path, { recursive: options?.recursive });
   } else if (isDeno) {
     // @ts-ignore
     Deno.removeSync(path, { recursive: options?.recursive });
@@ -462,11 +433,8 @@ export function rmdirSync(path: string, options?: { recursive?: boolean }): void
  * Rename/move file (async)
  */
 export async function rename(oldPath: string, newPath: string): Promise<void> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.rename(oldPath, newPath);
-  } else if (isBun) {
-    // @ts-ignore
-    await Deno.rename(oldPath, newPath);
   } else if (isDeno) {
     // @ts-ignore
     await Deno.rename(oldPath, newPath);
@@ -477,11 +445,8 @@ export async function rename(oldPath: string, newPath: string): Promise<void> {
  * Rename/move file (sync)
  */
 export function renameSync(oldPath: string, newPath: string): void {
-  if (isNode) {
+  if (isNode || isBun) {
     fs.renameSync(oldPath, newPath);
-  } else if (isBun) {
-    // @ts-ignore
-    Deno.renameSync(oldPath, newPath);
   } else if (isDeno) {
     // @ts-ignore
     Deno.renameSync(oldPath, newPath);
@@ -492,11 +457,8 @@ export function renameSync(oldPath: string, newPath: string): void {
  * Copy file (async)
  */
 export async function copyFile(src: string, dest: string, flags?: number): Promise<void> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.copyFile(src, dest, flags);
-  } else if (isBun) {
-    // @ts-ignore
-    await Deno.copyFile(src, dest);
   } else if (isDeno) {
     // @ts-ignore
     await Deno.copyFile(src, dest);
@@ -507,11 +469,8 @@ export async function copyFile(src: string, dest: string, flags?: number): Promi
  * Copy file (sync)
  */
 export function copyFileSync(src: string, dest: string, flags?: number): void {
-  if (isNode) {
+  if (isNode || isBun) {
     fs.copyFileSync(src, dest, flags);
-  } else if (isBun) {
-    // @ts-ignore
-    Deno.copyFileSync(src, dest);
   } else if (isDeno) {
     // @ts-ignore
     Deno.copyFileSync(src, dest);
@@ -522,12 +481,8 @@ export function copyFileSync(src: string, dest: string, flags?: number): void {
  * Resolve pathname to absolute path (async)
  */
 export async function realpath(path: string, options?: { encoding?: BufferEncoding }): Promise<string> {
-  if (isNode) {
+  if (isNode || isBun) {
     return fsPromises.realpath(path, options);
-  } else if (isBun) {
-    // Bun supports fs.promises.realpath
-    const fs = require('fs/promises');
-    return fs.realpath(path, options);
   } else if (isDeno) {
     // @ts-ignore
     return await Deno.realPath(path);
@@ -539,11 +494,7 @@ export async function realpath(path: string, options?: { encoding?: BufferEncodi
  * Resolve pathname to absolute path (sync)
  */
 export function realpathSync(path: string, options?: { encoding?: BufferEncoding }): string {
-  if (isNode) {
-    return fs.realpathSync(path, options);
-  } else if (isBun) {
-    // Bun supports fs.realpathSync
-    const fs = require('fs');
+  if (isNode || isBun) {
     return fs.realpathSync(path, options);
   } else if (isDeno) {
     // @ts-ignore

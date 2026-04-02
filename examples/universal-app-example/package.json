@@ -1,0 +1,25 @@
+{
+  "name": "example-universal-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single-repo Elit example covering web, desktop, and mobile",
+  "scripts": {
+    "web:dev": "bun ../../src/cli.ts dev",
+    "web:build": "bun ../../src/cli.ts build",
+    "web:preview": "bun ../../src/cli.ts preview",
+    "desktop:run": "bun ../../src/cli.ts desktop ./src/desktop.ts",
+    "desktop:smoke": "bun ../../src/cli.ts desktop ./src/desktop-smoke.ts",
+    "desktop:build": "bun ../../src/cli.ts desktop build ./src/desktop.ts --out-dir ./desktop-dist",
+    "mobile:init": "bun ../../src/cli.ts mobile init . --app-id com.elit.universalexample --app-name ElitUniversalExample --web-dir dist",
+    "mobile:sync": "bun ../../src/cli.ts mobile sync --cwd . --web-dir dist",
+    "mobile:doctor": "bun ../../src/cli.ts mobile doctor --cwd . --json",
+    "mobile:devices:android": "bun ../../src/cli.ts mobile devices android --cwd . --json",
+    "mobile:build:android": "bun ../../src/cli.ts mobile build android --cwd .",
+    "mobile:run:android:auto": "bun ./scripts/run-android-auto.ts",
+    "test:win": "powershell -ExecutionPolicy Bypass -File ./test-universal.ps1",
+    "test:sh": "bash ./test-universal.sh"
+  },
+  "devDependencies": {
+    "elit": "file:../.."
+  }
+}

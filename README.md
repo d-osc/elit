@@ -268,6 +268,7 @@ Mobile mode notes:
 - Android permissions can be set from config (`mobile.permissions`) or CLI (`--permission`) and are written into `AndroidManifest.xml`.
 - Set `mobile.android.target` or `mobile.ios.target` when you want a default device/simulator without repeating `--target` on every command.
 - Use `examples/android-native-example` when you want an Android-first native mobile smoke test that scaffolds, generates Compose, and builds through Gradle.
+- Use `examples/universal-app-example` when you want one repo that validates web, desktop, and Android mobile workflows together.
 - Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
 - If `mobile.native.entry` is configured, sync can still proceed even when the web build output is missing.
 - Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
@@ -768,6 +769,7 @@ If you are working in this repository, these locations matter most:
 - `src/database.ts`: database VM and helpers
 - `examples/correct-config`: minimal full-stack reference
 - `examples/full-db`: larger full-stack example with database usage
+- `examples/universal-app-example`: one repo covering web, desktop, and Android mobile smoke flows
 - `examples/android-native-example`: Android-first native mobile validation flow
 - `examples/desktop-example.ts`: desktop smoke test and runtime example
 - `packages/create-elit`: scaffold templates used by `npm create elit@latest`
@@ -783,6 +785,7 @@ If you are working in this repository, these locations matter most:
 ## Next Reads
 
 - `examples/correct-config` for the cleanest SSR + API setup
+- `examples/universal-app-example` for a single repo exercising web, desktop, and Android mobile together
 - `examples/android-native-example` for Android-native mobile validation
 - `examples/desktop-example.ts` for desktop runtime usage
 - `USAGE_EXAMPLES.md` for more import combinations

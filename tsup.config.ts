@@ -9,6 +9,7 @@ export default defineConfig([
             dom: 'src/dom.ts',
             el: 'src/el.ts',
             native: 'src/native.ts',
+            universal: 'src/universal.ts',
             router: 'src/router.ts',
             state: 'src/state.ts',
             style: 'src/style.ts',
