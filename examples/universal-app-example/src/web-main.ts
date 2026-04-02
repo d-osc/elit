@@ -1,27 +1,30 @@
 import { a, article, button, div, h1, h2, input, label, li, p, section, span, textarea, ul } from '../../../src/el';
 import { render } from '../../../src/dom';
-import { createState, reactive } from '../../../src/state';
+import { bindChecked, bindValue } from '../../../src/state';
 
-import { APP_LINK } from './shared';
-import { createStatusCard, createUniversalShell } from './universal-components';
+import {
+    APP_LINK,
+    createUniversalExampleState,
+    createUniversalStatusMessages,
+    UNIVERSAL_FORM_COPY,
+    UNIVERSAL_PRIMARY_ACTION_LABEL,
+} from './shared';
+import { createHeroBadge, createStatusCard, createUniversalShell } from './universal-components';
 import './web-styles';
 
-const launchCount = createState(3);
-const validationTarget = createState('web + desktop + mobile');
-const notes = createState('Desktop and mobile are driven from the same repo.');
-const nativeEnabled = createState(true);
+const state = createUniversalExampleState();
 
 const app = createUniversalShell(
     {
-        iconSrc: '/examples/universal-app-example/public/favicon.svg',
+        iconChild: createHeroBadge(),
         heroActions: [
             {
-                label: 'Record another validation pass',
+                label: UNIVERSAL_PRIMARY_ACTION_LABEL,
                 className: 'btn btn-primary',
                 action: 'validation.record',
                 payload: { surface: 'web' },
                 onClick: () => {
-                    launchCount.value++;
+                    state.launchCount.value++;
                 },
             },
             {
@@ -33,31 +36,16 @@ const app = createUniversalShell(
             },
         ],
         form: {
-            title: 'Web state and shared content',
-            questionLabel: 'What are you validating?',
-            questionValue: validationTarget.value,
-            questionPlaceholder: 'web + desktop + mobile',
-            onQuestionInput: (event: Event) => {
-                validationTarget.value = String((event.target as HTMLInputElement).value);
-            },
-            noteLabel: 'Repo note',
-            noteValue: notes.value,
-            notePlaceholder: 'Explain what changed in the shared component tree',
-            onNoteInput: (event: Event) => {
-                notes.value = String((event.target as HTMLTextAreaElement).value);
-            },
-            toggleLabel: 'Keep native mobile generation enabled for Android checks',
-            nativeEnabled: nativeEnabled.value,
-            onToggleInput: (event: Event) => {
-                nativeEnabled.value = Boolean((event.target as HTMLInputElement).checked);
-            },
-            statusItems: [
-                createStatusCard(reactive(launchCount, (value) => `Validation counter: ${value}`)),
-                createStatusCard(reactive(validationTarget, (value) => `Current validation target: ${value}`)),
-                createStatusCard(reactive(notes, (value) => `Latest note: ${value}`)),
-                createStatusCard(reactive(nativeEnabled, (value) => `Native mobile generation: ${value ? 'enabled' : 'disabled'}`)),
-                createStatusCard('The primary CTA now carries shared bridge metadata through elit/universal while the web handler still updates local state.'),
-            ],
+            title: UNIVERSAL_FORM_COPY.title,
+            questionLabel: UNIVERSAL_FORM_COPY.questionLabel,
+            questionPlaceholder: UNIVERSAL_FORM_COPY.questionPlaceholder,
+            questionInputProps: bindValue(state.validationTarget),
+            noteLabel: UNIVERSAL_FORM_COPY.noteLabel,
+            notePlaceholder: UNIVERSAL_FORM_COPY.notePlaceholder,
+            noteInputProps: bindValue(state.notes),
+            toggleLabel: UNIVERSAL_FORM_COPY.toggleLabel,
+            toggleInputProps: bindChecked(state.nativeEnabled),
+            statusItems: createUniversalStatusMessages(state).map((message) => createStatusCard(message)),
         },
     },
 );

@@ -4,6 +4,7 @@
     "appId": "com.elit.androidnativeexample",
     "appName": "ElitAndroidNativeExample",
     "webDir": "web",
+    "mode": "native",
     "permissions": [
       "android.permission.INTERNET",
       "android.permission.ACCESS_NETWORK_STATE"

@@ -1,7 +1,8 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
-import { a, button, div, frag, h1, h2, img, input, li, span, ul } from '../../src/el';
+import { a, button, div, frag, h1, h2, img, input, li, main, p, span, textarea, ul } from '../../src/el';
 import { renderAndroidCompose, renderNativeJson, renderNativeTree, renderSwiftUI } from '../../src/native';
+import { bindChecked, bindValue, createState } from '../../src/state';
 import styles from '../../src/style';
 import { createUniversalBridgeProps, createUniversalLinkProps, mergeUniversalProps } from '../../src/universal';
 
@@ -125,10 +126,12 @@ describe('native target foundation', () => {
         expect(compose).toContain('val uriHandler = LocalUriHandler.current');
         expect(compose).toContain('Column(modifier = Modifier.padding(16.dp))');
         expect(compose).toContain('Text(text = "Hello Native")');
-        expect(compose).toContain('OutlinedTextField(');
+        expect(compose).toContain('BasicTextField(');
         expect(compose).toContain('Checkbox(');
         expect(compose).toContain('uriHandler.openUri("https://elit.dev/docs")');
-        expect(compose).toContain('Button(onClick = { /* TODO: wire elit event(s): press */ }, modifier = Modifier)');
+        expect(compose).toContain('Box(modifier = Modifier.clickable { uriHandler.openUri("https://elit.dev/docs") }, contentAlignment = Alignment.Center)');
+        expect(compose).toContain('// TODO: wire elit event(s): press');
+        expect(compose).toContain('Box(modifier = Modifier, contentAlignment = Alignment.Center)');
         expect(compose).toContain('ElitImagePlaceholder(');
         expect(compose).toContain('@Preview(showBackground = true)');
     });
@@ -158,8 +161,26 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('Toggle("", isOn: $toggleValue0)');
         expect(swiftui).toContain('if let destination = URL(string: "https://elit.dev/docs") {');
         expect(swiftui).toContain('Button(action: {');
-        expect(swiftui).toContain('elitImagePlaceholder(source: "./logo.png", alt: "Logo")');
+        expect(swiftui).toContain('elitImagePlaceholder(label: "LO", source: "./logo.png", alt: "Logo")');
         expect(swiftui).toContain('#Preview {');
+    });
+
+    it('renders screen roots as scrollable containers and uses refined image fallback labels', () => {
+        const compose = renderAndroidCompose(
+            main(img({ src: './public/favicon.svg', alt: 'Elit Universal Example icon' })),
+            { functionName: 'ScrollableScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            main(img({ src: './public/favicon.svg', alt: 'Elit Universal Example icon' })),
+            { structName: 'ScrollableScreen' },
+        );
+
+        expect(compose).toContain('Modifier.fillMaxSize().verticalScroll(rememberScrollState())');
+        expect(compose).toContain('label = "EU"');
+
+        expect(swiftui).toContain('ScrollView {');
+        expect(swiftui).toContain('elitImagePlaceholder(label: "EU", source: "./public/favicon.svg", alt: "Elit Universal Example icon")');
     });
 
     it('renders Compose bridge helpers for universal action metadata', () => {
@@ -248,7 +269,7 @@ describe('native target foundation', () => {
         expect(compose).toContain('RoundedCornerShape(24.dp)');
         expect(compose).toContain('border(1.dp, Color(');
         expect(compose).toContain('verticalArrangement = Arrangement.spacedBy(12.dp)');
-        expect(compose).toContain('Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically)');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically)');
         expect(compose).toContain('Text(text = "MOBILE", color = Color(');
         expect(compose).toContain('fontSize = 12.sp');
         expect(compose).toContain('fontWeight = FontWeight.W700');
@@ -341,8 +362,9 @@ describe('native target foundation', () => {
         expect(compose).toContain('background(color = Color(');
         expect(compose).toContain('border(1.dp, Color(');
         expect(compose).toContain('verticalArrangement = Arrangement.spacedBy(14.dp)');
-        expect(compose).toContain('Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically)');
-        expect(compose).toContain('background(brush = Brush.linearGradient(colors = listOf(');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically)');
+        expect(compose).toContain('Box(modifier = Modifier.shadow(elevation = 10.dp, shape = RoundedCornerShape(999.dp)).background(brush = Brush.linearGradient(colors = listOf(');
+        expect(compose).toContain('.padding(top = 12.dp, end = 18.dp, bottom = 12.dp, start = 18.dp), contentAlignment = Alignment.Center)');
         expect(compose).toContain('Text(text = "Launch now", color = Color(');
 
         expect(swiftui).toContain('.background(Color(');
@@ -450,7 +472,7 @@ describe('native target foundation', () => {
             { structName: 'InheritedToggleScreen' },
         );
 
-        expect(compose).toContain('Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically)');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically)');
         expect(compose).toContain('modifier = Modifier.width(20.dp).height(20.dp).widthIn(min = 20.dp)');
         expect(compose).toContain('Text(text = "NATIVE TOGGLE", color = Color(');
         expect(compose).toContain('fontWeight = FontWeight.W700');
@@ -462,6 +484,627 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('Text("NATIVE TOGGLE")');
         expect(swiftui).toContain('.foregroundStyle(Color(');
         expect(swiftui).toContain('.font(.system(size: 17, weight: .bold))');
+    });
+
+    it('reuses shared state bindings across native text, inputs, and toggles', () => {
+        const query = createState('Search term');
+        const enabled = createState(true);
+
+        const compose = renderAndroidCompose(
+            div(
+                span(query),
+                input({ ...bindValue(query), placeholder: 'Search' }),
+                input({ type: 'checkbox', ...bindChecked(enabled) }),
+                span(enabled),
+            ),
+            { functionName: 'BoundStateScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                span(query),
+                input({ ...bindValue(query), placeholder: 'Search' }),
+                input({ type: 'checkbox', ...bindChecked(enabled) }),
+                span(enabled),
+            ),
+            { structName: 'BoundStateScreen' },
+        );
+
+        expect(compose).toContain('var nativeState0 by remember { mutableStateOf("Search term") }');
+        expect(compose).toContain('var nativeState1 by remember { mutableStateOf(true) }');
+        expect(compose).toContain('Text(text = nativeState0)');
+        expect(compose).toContain('value = nativeState0');
+        expect(compose).toContain('checked = nativeState1');
+        expect(compose).not.toContain('textFieldValue0');
+        expect(compose).not.toContain('toggleValue0');
+
+        expect(swiftui).toContain('@State private var nativeState0 = "Search term"');
+        expect(swiftui).toContain('@State private var nativeState1 = true');
+        expect(swiftui).toContain('Text(nativeState0)');
+        expect(swiftui).toContain('TextField("Search", text: $nativeState0)');
+        expect(swiftui).toContain('Toggle("", isOn: $nativeState1)');
+    });
+
+    it('applies media queries and supported pseudo-class selectors in native style resolution', () => {
+        styles.addClass('card', {
+            padding: '32px',
+            maxWidth: '420px',
+        });
+        styles.addClass('field', {
+            border: '1px solid rgba(38, 25, 20, 0.12)',
+        });
+        styles.addClass('field:focus', {
+            border: '2px solid #d56e43',
+        });
+        styles.mediaMaxWidth('800px', {
+            '.card': {
+                padding: '12px',
+                maxWidth: '280px',
+            },
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'card' },
+                input({ className: 'field', value: 'abc', placeholder: 'Search' }),
+            ),
+            { functionName: 'ResponsiveNativeScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'card' },
+                input({ className: 'field', value: 'abc', placeholder: 'Search' }),
+            ),
+            { structName: 'ResponsiveNativeScreen' },
+        );
+
+        expect(compose).toContain('Column(modifier = Modifier.widthIn(max = 280.dp).padding(12.dp))');
+        expect(compose).toContain('modifier = Modifier.border(2.dp, Color(');
+
+        expect(swiftui).toContain('.padding(12)');
+        expect(swiftui).toContain('.frame(maxWidth: 280)');
+        expect(swiftui).toContain('.overlay(RoundedRectangle(cornerRadius: 0).stroke(Color(');
+    });
+
+    it('keeps native parity overrides aligned with hybrid-style mobile layouts', () => {
+        styles.addClass('page', {
+            padding: '40px 24px 80px',
+        });
+        styles.addClass('hero', {
+            width: '100%',
+            padding: '32px',
+        });
+        styles.addClass('hero-layout', {
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '20px',
+        });
+        styles.addClass('hero-badge', {
+            width: '84px',
+            height: '84px',
+        });
+        styles.addClass('hero-badge-mark', {
+            fontSize: '28px',
+        });
+        styles.addClass('hero-layout-native', {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '20px',
+        });
+        styles.addClass('panel-grid', {
+            width: '100%',
+            display: 'grid',
+            gridTemplateColumns: '1.2fr 0.8fr',
+            gap: '20px',
+        });
+        styles.mediaMaxWidth('800px', {
+            '.page': {
+                padding: '20px 16px 48px',
+            },
+            '.hero': {
+                padding: '24px',
+            },
+            '.hero-badge': {
+                width: '72px',
+                height: '72px',
+            },
+            '.hero-badge-mark': {
+                fontSize: '24px',
+            },
+            '.panel-grid': {
+                gridTemplateColumns: '1fr',
+            },
+            '.hero-layout-native .hero-badge': {
+                width: '84px',
+                height: '84px',
+            },
+            '.hero-layout-native .hero-badge-mark': {
+                fontSize: '28px',
+            },
+            '.page-native': {
+                padding: '40px 24px 80px',
+            },
+            '.hero-native': {
+                padding: '32px',
+            },
+            '.panel-grid-native': {
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+            },
+        });
+
+        const compose = renderAndroidCompose(
+            main(
+                { className: 'page page-native' },
+                div(
+                    { className: 'hero hero-native' },
+                    div(
+                        { className: 'hero-layout hero-layout-native' },
+                        div(
+                            { className: 'hero-badge' },
+                            span({ className: 'hero-badge-mark' }, 'EU'),
+                        ),
+                        div('Hero copy'),
+                    ),
+                ),
+                div(
+                    { className: 'panel-grid panel-grid-native' },
+                    div('Left panel'),
+                    div('Right panel'),
+                ),
+            ),
+            { functionName: 'NativeParityScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            main(
+                { className: 'page page-native' },
+                div(
+                    { className: 'hero hero-native' },
+                    div(
+                        { className: 'hero-layout hero-layout-native' },
+                        div(
+                            { className: 'hero-badge' },
+                            span({ className: 'hero-badge-mark' }, 'EU'),
+                        ),
+                        div('Hero copy'),
+                    ),
+                ),
+                div(
+                    { className: 'panel-grid panel-grid-native' },
+                    div('Left panel'),
+                    div('Right panel'),
+                ),
+            ),
+            { structName: 'NativeParityScreen' },
+        );
+
+        expect(compose).toContain('Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 40.dp, end = 24.dp, bottom = 80.dp, start = 24.dp)');
+        expect(compose).toContain('// classList: hero hero-native');
+        expect(compose).toContain('Column(modifier = Modifier.fillMaxWidth().padding(32.dp))');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically)');
+        expect(compose).toContain('// classList: hero-badge');
+        expect(compose).toContain('Column(modifier = Modifier.width(84.dp).height(84.dp))');
+        expect(compose).toContain('fontSize = 28.sp');
+        expect(compose).toContain('// classList: panel-grid panel-grid-native');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.weight(1f).fillMaxWidth())');
+        expect(compose).toContain('Box(modifier = Modifier.weight(1f).fillMaxWidth())');
+
+        expect(swiftui).toContain('.padding(.top, 40)');
+        expect(swiftui).toContain('.padding(.trailing, 24)');
+        expect(swiftui).toContain('.padding(.bottom, 80)');
+        expect(swiftui).toContain('.padding(.leading, 24)');
+        expect(swiftui).toContain('.frame(width: 84, height: 84)');
+        expect(swiftui).toContain('.font(.system(size: 28))');
+        expect(swiftui).toContain('HStack(alignment: .top, spacing: 16) {');
+        expect(swiftui).toContain('.layoutPriority(1)');
+        expect(swiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('fills decorated child containers across native block layouts without explicit width', () => {
+        styles.addClass('stack', {
+            gap: '12px',
+        });
+        styles.addClass('card', {
+            padding: '20px',
+            borderRadius: '16px',
+            background: '#fff',
+            border: '1px solid rgba(38, 25, 20, 0.12)',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'stack' },
+                div({ className: 'card' }, span('Card content')),
+                div('Body copy'),
+            ),
+            { functionName: 'AutoFillCardScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'stack' },
+                div({ className: 'card' }, span('Card content')),
+                div('Body copy'),
+            ),
+            { structName: 'AutoFillCardScreen' },
+        );
+
+        expect(compose).toContain('// classList: card');
+        expect(compose).toContain('Column(modifier = Modifier.fillMaxWidth().background(color = Color(red = 1f, green = 1f, blue = 1f, alpha = 1f), shape = RoundedCornerShape(16.dp)).border(1.dp, Color(red = 0.149f, green = 0.098f, blue = 0.078f, alpha = 0.12f), RoundedCornerShape(16.dp)).padding(20.dp))');
+
+        expect(swiftui).toContain('// classList: card');
+        expect(swiftui).toContain('.padding(20)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .leading)');
+    });
+
+    it('maps rem and em text units, font families, and line-height into native text output', () => {
+        styles.addClass('eyebrow', {
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '0.78rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+        });
+        styles.addClass('lede', {
+            fontSize: '1.05rem',
+            lineHeight: 1.7,
+            color: '#5d4335',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                span({ className: 'eyebrow' }, 'mobile'),
+                span({ className: 'lede' }, 'One repo validating browser, desktop, and Android mobile workflows.'),
+            ),
+            { functionName: 'TypographyScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                span({ className: 'eyebrow' }, 'mobile'),
+                span({ className: 'lede' }, 'One repo validating browser, desktop, and Android mobile workflows.'),
+            ),
+            { structName: 'TypographyScreen' },
+        );
+
+        expect(compose).toContain('Text(text = "MOBILE", fontSize = 12.48.sp');
+        expect(compose).toContain('fontFamily = FontFamily.Serif');
+        expect(compose).toContain('letterSpacing = 1.28.sp');
+        expect(compose).toContain('lineHeight = 28.56.sp');
+
+        expect(swiftui).toContain('Text("MOBILE")');
+        expect(swiftui).toContain('.font(.system(size: 12.48, design: .serif))');
+        expect(swiftui).toContain('.kerning(1.28)');
+        expect(swiftui).toContain('.lineSpacing(11.76)');
+    });
+
+    it('inherits body typography and clamps viewport-based font sizes in native output', () => {
+        styles.addTag('body', {
+            color: '#5d4335',
+            fontFamily: 'Georgia, "Times New Roman", serif',
+        });
+        styles.addTag('h1', {
+            fontSize: 'clamp(2.4rem, 5vw, 4.4rem)',
+        });
+
+        const compose = renderAndroidCompose(
+            div(h1('Hybrid parity headline')),
+            { functionName: 'ViewportTypographyScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(h1('Hybrid parity headline')),
+            { structName: 'ViewportTypographyScreen' },
+        );
+
+        expect(compose).toContain('Text(text = "Hybrid parity headline", color = Color(');
+        expect(compose).toContain('fontSize = 38.4.sp');
+        expect(compose).toContain('fontFamily = FontFamily.Serif');
+
+        expect(swiftui).toContain('Text("Hybrid parity headline")');
+        expect(swiftui).toContain('.foregroundStyle(Color(');
+        expect(swiftui).toContain('.font(.system(size: 38.4, design: .serif))');
+    });
+
+    it('keeps sans-serif body inheritance distinct from serif font families', () => {
+        styles.addTag('body', {
+            color: '#261914',
+            fontFamily: '"Avenir Next", "Trebuchet MS", sans-serif',
+        });
+        styles.addTag('p', {
+            lineHeight: 1.7,
+        });
+        styles.addClass('btn', {
+            color: '#fff6ee',
+            fontWeight: 700,
+            lineHeight: 1.2,
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                p('Body copy'),
+                button({ className: 'btn' }, 'CTA'),
+                span('Plain span'),
+            ),
+            { functionName: 'SansTypographyScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                p('Body copy'),
+                button({ className: 'btn' }, 'CTA'),
+                span('Plain span'),
+            ),
+            { structName: 'SansTypographyScreen' },
+        );
+
+        expect(compose).toContain('Text(text = "Body copy", color = Color(');
+        expect(compose).toContain('fontFamily = FontFamily.SansSerif, lineHeight = 27.2.sp');
+        expect(compose).toContain('Text(text = "CTA", color = Color(');
+        expect(compose).toContain('fontWeight = FontWeight.W700, fontFamily = FontFamily.SansSerif, lineHeight = 19.2.sp');
+
+        expect(swiftui).toContain('Text("Body copy")');
+        expect(swiftui).not.toContain('design: .serif');
+    });
+
+    it('approximates frosted backdrop surfaces in native output', () => {
+        styles.addClass('glass', {
+            padding: '24px',
+            borderRadius: '28px',
+            background: 'rgba(255, 252, 247, 0.82)',
+            backdropFilter: 'blur(18px)',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'glass' },
+                span('Glass surface'),
+            ),
+            { functionName: 'GlassScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'glass' },
+                span('Glass surface'),
+            ),
+            { structName: 'GlassScreen' },
+        );
+
+        expect(compose).toContain('Modifier.background(color = Color(red = 1f, green = 0.988f, blue = 0.969f, alpha = 0.932f), shape = RoundedCornerShape(28.dp)).shadow(elevation = 12.dp, shape = RoundedCornerShape(28.dp)).padding(24.dp)');
+        expect(swiftui).toContain('.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28))');
+        expect(swiftui).toContain('.background(Color(red: 1, green: 0.988, blue: 0.969, opacity: 0.932))');
+    });
+
+    it('maps viewport units and numeric CSS functions into native layout sizing', () => {
+        styles.addClass('hero-shell', {
+            minHeight: '100vh',
+            maxWidth: 'min(92vw, 640px)',
+            padding: 'calc(1vw + 4px)',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'hero-shell' },
+                span('Viewport shell'),
+            ),
+            { functionName: 'ViewportSizingScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'hero-shell' },
+                span('Viewport shell'),
+            ),
+            { structName: 'ViewportSizingScreen' },
+        );
+
+        expect(compose).toContain('Modifier.widthIn(max = 358.8.dp).heightIn(min = 844.dp).padding(7.9.dp)');
+        expect(swiftui).toContain('.padding(7.9)');
+        expect(swiftui).toContain('.frame(maxWidth: 358.8, minHeight: 844)');
+    });
+
+    it('maps explicit grid columns into weighted native rows', () => {
+        styles.addClass('grid', {
+            display: 'grid',
+            gridTemplateColumns: '1.2fr 0.8fr',
+            gap: '20px',
+        });
+        styles.addClass('cell', {
+            padding: '12px',
+            borderRadius: '16px',
+            background: '#fff',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'grid' },
+                div({ className: 'cell' }, span('Alpha panel')),
+                div({ className: 'cell' }, span('Beta panel')),
+            ),
+            { functionName: 'GridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'grid' },
+                div({ className: 'cell' }, span('Alpha panel')),
+                div({ className: 'cell' }, span('Beta panel')),
+            ),
+            { structName: 'GridScreen' },
+        );
+
+        expect(compose).toContain('Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(20.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.weight(1.2f).fillMaxWidth())');
+        expect(compose).toContain('Box(modifier = Modifier.weight(0.8f).fillMaxWidth())');
+        expect(compose).toContain('modifier = Modifier.fillMaxWidth().background(color = Color(red = 1f, green = 1f, blue = 1f, alpha = 1f), shape = RoundedCornerShape(16.dp)).padding(12.dp)');
+
+        expect(swiftui).toContain('HStack(alignment: .top, spacing: 20) {');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .leading)');
+        expect(swiftui).toContain('.layoutPriority(1.2)');
+        expect(swiftui).toContain('.layoutPriority(0.8)');
+    });
+
+    it('wraps flex rows into stacked native rows when content exceeds the mobile viewport', () => {
+        styles.addClass('button-row', {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'button-row' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { functionName: 'WrappedButtonsScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'button-row' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { structName: 'WrappedButtonsScreen' },
+        );
+
+        expect(compose).toContain('Column(modifier = Modifier, verticalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(compose).toContain('Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+
+        expect(swiftui).toContain('VStack(alignment: .leading, spacing: 12) {');
+        expect(swiftui).toContain('HStack(alignment: .top, spacing: 12) {');
+    });
+
+    it('translates safe text margins into native spacing', () => {
+        styles.addTag('h2', {
+            marginBottom: '14px',
+            color: '#261914',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                h2('Section title'),
+                span('Body copy'),
+            ),
+            { functionName: 'MarginScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                h2('Section title'),
+                span('Body copy'),
+            ),
+            { structName: 'MarginScreen' },
+        );
+
+        expect(compose).toContain('Text(text = "Section title", modifier = Modifier.padding(bottom = 14.dp), color = Color(');
+        expect(swiftui).toContain('Text("Section title")');
+        expect(swiftui).toContain('.padding(.bottom, 14)');
+    });
+
+    it('centers max-width containers with horizontal auto margins', () => {
+        styles.addClass('shell', {
+            maxWidth: '480px',
+            margin: '0 auto',
+            gap: '16px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'shell' },
+                span('Centered shell'),
+            ),
+            { functionName: 'CenteredShellScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'shell' },
+                span('Centered shell'),
+            ),
+            { structName: 'CenteredShellScreen' },
+        );
+
+        expect(compose).toContain('Modifier.fillMaxWidth().widthIn(max = 480.dp).wrapContentWidth(Alignment.CenterHorizontally)');
+        expect(swiftui).toContain('.frame(maxWidth: 480)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .center)');
+    });
+
+    it('keeps decorated element margins as outer native spacing', () => {
+        styles.addClass('pill', {
+            display: 'inline-block',
+            padding: '6px 10px',
+            borderRadius: '999px',
+            background: 'rgba(213, 110, 67, 0.12)',
+            color: '#d56e43',
+            marginBottom: '10px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                span({ className: 'pill' }, 'Web'),
+                span('Body copy'),
+            ),
+            { functionName: 'DecoratedMarginScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                span({ className: 'pill' }, 'Web'),
+                span('Body copy'),
+            ),
+            { structName: 'DecoratedMarginScreen' },
+        );
+
+        expect(compose).toContain('Modifier.padding(bottom = 10.dp).background(color = Color(');
+        expect(compose).toContain('RoundedCornerShape(999.dp)).padding(top = 6.dp, end = 10.dp, bottom = 6.dp, start = 10.dp)');
+        expect(swiftui).toContain('.background(Color(');
+        expect(swiftui).toContain('.padding(.bottom, 10)');
+    });
+
+    it('neutralizes native text field chrome and adds multiline textarea hints', () => {
+        styles.addClass('field', {
+            padding: '14px 16px',
+            borderRadius: '16px',
+            border: '1px solid rgba(38, 25, 20, 0.12)',
+            background: '#fff',
+            color: '#261914',
+            fontWeight: 700,
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                input({ className: 'field', value: 'abc', placeholder: 'Search' }),
+                textarea({ className: 'field', value: 'Notes', placeholder: 'Repo note' }),
+            ),
+            { functionName: 'FieldChromeScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                input({ className: 'field', value: 'abc', placeholder: 'Search' }),
+                textarea({ className: 'field', value: 'Notes', placeholder: 'Repo note' }),
+            ),
+            { structName: 'FieldChromeScreen' },
+        );
+
+        expect(compose).toContain('BasicTextField(');
+        expect(compose).toContain('textStyle = androidx.compose.ui.text.TextStyle(');
+        expect(compose).toContain('cursorBrush = SolidColor(Color(');
+        expect(compose).toContain('modifier = Modifier.background(color = Color(red = 1f, green = 1f, blue = 1f, alpha = 1f), shape = RoundedCornerShape(16.dp)).border(1.dp, Color(red = 0.149f, green = 0.098f, blue = 0.078f, alpha = 0.12f), RoundedCornerShape(16.dp)).padding(top = 14.dp, end = 16.dp, bottom = 14.dp, start = 16.dp)');
+        expect(compose).toContain('singleLine = true,');
+        expect(compose).toContain('decorationBox = { innerTextField ->');
+        expect(compose).toContain('minLines = 4,');
+        expect(compose).toContain('contentAlignment = Alignment.TopStart');
+
+        expect(swiftui).toContain('.textFieldStyle(.plain)');
+        expect(swiftui).toContain('TextField("Repo note", text: $textFieldValue1, axis: .vertical)');
+        expect(swiftui).toContain('.lineLimit(4, reservesSpace: true)');
     });
 
     it('maps gradients, shadows, and button theme into Compose output', () => {
@@ -493,9 +1136,8 @@ describe('native target foundation', () => {
 
         expect(compose).toContain('background(brush = Brush.verticalGradient(colors = listOf(');
         expect(compose).toContain('shadow(elevation = 24.dp, shape = RoundedCornerShape(28.dp))');
-        expect(compose).toContain('Button(onClick = { }, modifier = Modifier.shadow(elevation = 10.dp, shape = RoundedCornerShape(999.dp)).background(brush = Brush.linearGradient(colors = listOf(');
-        expect(compose).toContain('shape = RoundedCornerShape(999.dp)');
-        expect(compose).toContain('colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color(');
+        expect(compose).toContain('Box(modifier = Modifier.shadow(elevation = 10.dp, shape = RoundedCornerShape(999.dp)).background(brush = Brush.linearGradient(colors = listOf(');
+        expect(compose).toContain('contentAlignment = Alignment.Center');
         expect(compose).toContain('Text(text = "Launch now", color = Color(');
         expect(compose).toContain('fontWeight = FontWeight.W700');
     });

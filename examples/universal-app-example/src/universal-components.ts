@@ -41,31 +41,60 @@ export interface UniversalAction extends UniversalBridgeOptions {
 export interface UniversalFormOptions {
     title?: string;
     questionLabel: string;
-    questionValue: string;
+    questionValue?: string;
     questionPlaceholder?: string;
     onQuestionInput?: (event: Event) => void;
+    questionInputProps?: Props;
     noteLabel: string;
-    noteValue: string;
+    noteValue?: string;
     notePlaceholder?: string;
     onNoteInput?: (event: Event) => void;
+    noteInputProps?: Props;
     toggleLabel: string;
-    nativeEnabled: boolean;
+    nativeEnabled?: boolean;
     onToggleInput?: (event: Event) => void;
+    toggleInputProps?: Props;
     statusItems?: Child[];
 }
 
 export interface UniversalShellOptions {
     iconSrc?: string;
     iconAlt?: string;
+    iconChild?: Child;
+    pageClassName?: string;
+    heroClassName?: string;
+    heroLayoutProps?: Props;
     heroActions: UniversalAction[];
     form: UniversalFormOptions;
+    panelGridClassName?: string;
     surfaceTitle?: string;
     checklistTitle?: string;
     checklistItems?: readonly string[];
 }
 
+function mergeClassName(baseClassName: string, extraClassName?: string): string {
+    const normalizedExtraClassName = typeof extraClassName === 'string'
+        ? extraClassName.trim()
+        : '';
+
+    return normalizedExtraClassName
+        ? `${baseClassName} ${normalizedExtraClassName}`
+        : baseClassName;
+}
+
+export function createHeroBadge(): VNode {
+    return div(
+        {
+            className: 'hero-badge',
+            role: 'img',
+            'aria-label': `${APP_NAME} icon`,
+        },
+        span({ className: 'hero-badge-mark' }, 'EU'),
+    );
+}
+
 export function createStatusCard(content: Child): VNode {
-    return div({ className: 'status' }, content);
+    return div({ className: 'status' }, span(content));
 }
 
 function renderAction(action: UniversalAction): VNode {
@@ -101,14 +130,26 @@ function renderAction(action: UniversalAction): VNode {
 
 function createHero(options: UniversalShellOptions): VNode {
     const heroMedia: Child[] = [];
-    if (options.iconSrc) {
+    if (options.iconChild !== undefined) {
+        heroMedia.push(options.iconChild);
+    } else if (options.iconSrc) {
         heroMedia.push(img({ className: 'hero-mark', src: options.iconSrc, alt: options.iconAlt ?? `${APP_NAME} icon` }));
     }
 
+    const heroLayoutProps: Props = {
+        ...(options.heroLayoutProps ?? {}),
+    };
+    const existingHeroLayoutClassName = typeof heroLayoutProps.className === 'string'
+        ? heroLayoutProps.className.trim()
+        : '';
+    heroLayoutProps.className = existingHeroLayoutClassName
+        ? `hero-layout ${existingHeroLayoutClassName}`
+        : 'hero-layout';
+
     return section(
-        { className: 'hero' },
+        { className: mergeClassName('hero', options.heroClassName) },
         div(
-            { className: 'hero-layout' },
+            heroLayoutProps,
             ...heroMedia,
             div(
                 { className: 'hero-copy' },
@@ -140,6 +181,29 @@ function createSurfacePanel(title: string): VNode {
 }
 
 function createFormPanel(options: UniversalFormOptions): VNode {
+    const questionInputProps: Props = {
+        style: sharedStyles.inputField,
+        value: options.questionValue,
+        placeholder: options.questionPlaceholder ?? options.questionLabel,
+        onInput: options.onQuestionInput,
+        ...options.questionInputProps,
+    };
+
+    const noteInputProps: Props = {
+        style: sharedStyles.inputField,
+        value: options.noteValue,
+        placeholder: options.notePlaceholder ?? options.noteLabel,
+        onInput: options.onNoteInput,
+        ...options.noteInputProps,
+    };
+
+    const toggleInputProps: Props = {
+        type: 'checkbox',
+        checked: options.nativeEnabled,
+        onInput: options.onToggleInput,
+        ...options.toggleInputProps,
+    };
+
     return section(
         { className: 'panel' },
         h2(options.title ?? 'Shared validation form'),
@@ -148,30 +212,16 @@ function createFormPanel(options: UniversalFormOptions): VNode {
             div(
                 { className: 'field-label' },
                 span(options.questionLabel),
-                input({
-                    style: sharedStyles.inputField,
-                    value: options.questionValue,
-                    placeholder: options.questionPlaceholder ?? options.questionLabel,
-                    onInput: options.onQuestionInput,
-                }),
+                input(questionInputProps),
             ),
             div(
                 { className: 'field-label' },
                 span(options.noteLabel),
-                textarea({
-                    style: sharedStyles.inputField,
-                    value: options.noteValue,
-                    placeholder: options.notePlaceholder ?? options.noteLabel,
-                    onInput: options.onNoteInput,
-                }),
+                textarea(noteInputProps),
             ),
             div(
                 { className: 'toggle-row' },
-                input({
-                    type: 'checkbox',
-                    checked: options.nativeEnabled,
-                    onInput: options.onToggleInput,
-                }),
+                input(toggleInputProps),
                 span({ style: sharedStyles.bodyCopy }, options.toggleLabel),
             ),
             ...(options.statusItems ?? []),
@@ -194,13 +244,13 @@ export function createUniversalShell(options: UniversalShellOptions): VNode {
     const checklistItems = options.checklistItems ?? [...VALIDATION_STEPS, ...SHARED_CHECKLIST];
 
     return main(
-        { className: 'page' },
+        { className: mergeClassName('page', options.pageClassName) },
         div(
             { className: 'shell' },
             createHero(options),
             createSurfacePanel(options.surfaceTitle ?? 'Platform surfaces'),
             div(
-                { className: 'panel-grid' },
+                { className: mergeClassName('panel-grid', options.panelGridClassName) },
                 createFormPanel(options.form),
                 createChecklistPanel(options.checklistTitle ?? 'Repo smoke checklist', checklistItems),
             ),

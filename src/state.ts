@@ -5,6 +5,15 @@
 import type { State, StateOptions, VNode, VirtualListController, Child, Props } from './types';
 import { dom } from './dom';
 
+export type NativeBindingKind = 'value' | 'checked';
+
+export interface NativeBindingMetadata<T = unknown> {
+    kind: NativeBindingKind;
+    state: State<T>;
+}
+
+export const ELIT_NATIVE_BINDING = Symbol('elit.native.binding');
+
 // State management helpers
 export const createState = <T>(initial: T, options?: StateOptions): State<T> =>
     dom.createState(initial, options);
@@ -62,6 +71,54 @@ export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: numbe
         timer = setTimeout(() => fn(...args), delay);
     };
 };
+
+export function bindValue<T extends string | number>(state: State<T>): Props {
+    const props = {
+        value: state.value,
+        onInput: (event: Event) => {
+            const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+            if (!target) {
+                return;
+            }
+
+            const nextValue = typeof state.value === 'number'
+                ? Number(target.value)
+                : target.value;
+
+            state.value = (typeof state.value === 'number' && Number.isNaN(nextValue))
+                ? state.value
+                : nextValue as T;
+        },
+    } as Props & { [ELIT_NATIVE_BINDING]: NativeBindingMetadata<T> };
+
+    props[ELIT_NATIVE_BINDING] = {
+        kind: 'value',
+        state,
+    };
+
+    return props;
+}
+
+export function bindChecked(state: State<boolean>): Props {
+    const props = {
+        checked: state.value,
+        onInput: (event: Event) => {
+            const target = event.target as HTMLInputElement | null;
+            if (!target) {
+                return;
+            }
+
+            state.value = Boolean(target.checked);
+        },
+    } as Props & { [ELIT_NATIVE_BINDING]: NativeBindingMetadata<boolean> };
+
+    props[ELIT_NATIVE_BINDING] = {
+        kind: 'checked',
+        state,
+    };
+
+    return props;
+}
 
 // ===== Shared State - syncs with elit-server =====
 
@@ -468,13 +525,3 @@ export const text = (state: State<any> | any): VNode | string =>
     (state && state.value !== undefined)
         ? reactive(state, v => ({ tagName: 'span', props: {}, children: [String(v)] }))
         : String(state);
-
-export const bindValue = <T extends string | number>(state: State<T>): Props => ({
-    value: state.value,
-    oninput: (e: Event) => { state.value = (e.target as HTMLInputElement).value as T; }
-});
-
-export const bindChecked = (state: State<boolean>): Props => ({
-    checked: state.value,
-    onchange: (e: Event) => { state.value = (e.target as HTMLInputElement).checked; }
-});

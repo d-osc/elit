@@ -7,6 +7,7 @@ This example is a real project for validating the native mobile workflow in elit
 - `elit mobile init` creates native scaffold files
 - `elit mobile sync` copies web assets into Android/iOS asset folders
 - `elit mobile sync` also generates Android Compose / iOS SwiftUI when `mobile.native.entry` is configured
+- `mobile.mode` can switch runtime behavior between `native` and `hybrid` without removing the native entry
 - generated native output now maps checkbox inputs to native toggle controls and absolute links to native URL-open actions
 - `elit mobile doctor --json` reports environment status for CI
 - `mobile.icon` applies launcher icon during sync/run/build on Android
@@ -60,3 +61,4 @@ When `mobile.native.entry` is present, sync writes generated files to:
 - Scaffold + sync should still pass and produce web asset plus native UI files.
 - On macOS, `mobile devices ios --json` lists simulators, `mobile build ios` uses `xcodebuild`, and `mobile run ios` picks the booted simulator first or the best available iPhone fallback when no `--target` is passed.
 - If you do not want to repeat `--target`, set `mobile.android.target` or `mobile.ios.target` in `elit.config.json`.
+- Use `mobile.mode: "hybrid"` or pass `--mode hybrid` when you want to keep the WebView shell active while still generating native files.

@@ -60,6 +60,15 @@ export interface StyleSelectorTarget {
     tagName?: string;
     classNames?: string[];
     attributes?: Record<string, string | number | boolean>;
+    pseudoStates?: string[];
+}
+
+export interface NativeStyleResolveOptions {
+    viewportWidth?: number;
+    viewportHeight?: number;
+    colorScheme?: 'light' | 'dark';
+    reducedMotion?: boolean;
+    mediaType?: 'screen' | 'print' | 'all';
 }
 
 type ParsedSelectorCombinator = 'descendant' | 'child';
@@ -74,7 +83,47 @@ interface ParsedSimpleSelector {
     tagName?: string;
     classNames: string[];
     attributes: ParsedAttributeSelector[];
+    pseudoClasses: string[];
     combinator?: ParsedSelectorCombinator;
+}
+
+interface CreateStyleStore {
+    variables: CSSVariable[];
+    rules: CSSRule[];
+    mediaRules: MediaRule[];
+    keyframes: Keyframes[];
+    fontFaces: FontFace[];
+    imports: string[];
+    containerRules: ContainerRule[];
+    supportsRules: SupportsRule[];
+    layerRules: LayerRule[];
+    layerOrder: string[];
+}
+
+const ELIT_SHARED_STYLE_STORE_KEY = '__elitSharedStyleStore__';
+
+function createStyleStore(): CreateStyleStore {
+    return {
+        variables: [],
+        rules: [],
+        mediaRules: [],
+        keyframes: [],
+        fontFaces: [],
+        imports: [],
+        containerRules: [],
+        supportsRules: [],
+        layerRules: [],
+        layerOrder: [],
+    };
+}
+
+function getSharedStyleStore(): CreateStyleStore {
+    const globalScope = globalThis as typeof globalThis & { [ELIT_SHARED_STYLE_STORE_KEY]?: CreateStyleStore };
+    if (!globalScope[ELIT_SHARED_STYLE_STORE_KEY]) {
+        globalScope[ELIT_SHARED_STYLE_STORE_KEY] = createStyleStore();
+    }
+
+    return globalScope[ELIT_SHARED_STYLE_STORE_KEY]!;
 }
 
 export class CreateStyle {
@@ -88,6 +137,23 @@ export class CreateStyle {
     private supportsRules: SupportsRule[] = [];
     private layerRules: LayerRule[] = [];
     private _layerOrder: string[] = [];
+
+    constructor(store?: CreateStyleStore) {
+        if (!store) {
+            return;
+        }
+
+        this.variables = store.variables;
+        this.rules = store.rules;
+        this.mediaRules = store.mediaRules;
+        this.keyframes = store.keyframes;
+        this.fontFaces = store.fontFaces;
+        this.imports = store.imports;
+        this.containerRules = store.containerRules;
+        this.supportsRules = store.supportsRules;
+        this.layerRules = store.layerRules;
+        this._layerOrder = store.layerOrder;
+    }
 
     // CSS Variables
     addVar(name: string, value: string): CSSVariable {
@@ -367,18 +433,22 @@ export class CreateStyle {
                         .map(([name, value]) => [name.toLowerCase(), String(value)])
                 )
                 : {},
+            pseudoStates: Array.isArray(target.pseudoStates)
+                ? [...new Set(target.pseudoStates.map((pseudoState) => pseudoState.trim().toLowerCase()).filter(Boolean))]
+                : [],
         };
     }
 
     private parseSimpleSelectorToken(token: string): ParsedSimpleSelector | undefined {
         const trimmed = token.trim();
-        if (!trimmed || /[#:+~*&]/.test(trimmed)) {
+        if (!trimmed || /[#~*&]/.test(trimmed)) {
             return undefined;
         }
         let cursor = 0;
         let tagName: string | undefined;
         const classNames: string[] = [];
         const attributes: ParsedAttributeSelector[] = [];
+        const pseudoClasses: string[] = [];
 
         const tagMatch = trimmed.slice(cursor).match(/^([_a-zA-Z][-_a-zA-Z0-9]*)/);
         if (tagMatch) {
@@ -419,14 +489,29 @@ export class CreateStyle {
                 continue;
             }
 
+            if (char === ':') {
+                if (trimmed[cursor + 1] === ':') {
+                    return undefined;
+                }
+
+                const pseudoMatch = trimmed.slice(cursor).match(/^:([_a-zA-Z][-_a-zA-Z0-9]*)/);
+                if (!pseudoMatch) {
+                    return undefined;
+                }
+
+                pseudoClasses.push(pseudoMatch[1].toLowerCase());
+                cursor += pseudoMatch[0].length;
+                continue;
+            }
+
             return undefined;
         }
 
-        if (!tagName && classNames.length === 0 && attributes.length === 0) {
+        if (!tagName && classNames.length === 0 && attributes.length === 0 && pseudoClasses.length === 0) {
             return undefined;
         }
 
-        return { tagName, classNames, attributes };
+        return { tagName, classNames, attributes, pseudoClasses };
     }
 
     private extractSupportedSelectorChains(selector: string): ParsedSimpleSelector[][] {
@@ -485,7 +570,7 @@ export class CreateStyle {
                     return undefined;
                 }
 
-                return chain.some((part) => part.classNames.length > 0 || part.attributes.length > 0)
+                return chain.some((part) => Boolean(part.tagName) || part.classNames.length > 0 || part.attributes.length > 0 || part.pseudoClasses.length > 0)
                     ? chain
                     : undefined;
             })
@@ -528,7 +613,31 @@ export class CreateStyle {
         }
 
         const attributes = target.attributes as Record<string, string> | undefined;
-        return selector.attributes.every((attribute) => this.matchesAttributeSelector(attributes?.[attribute.name], attribute));
+        if (!selector.attributes.every((attribute) => this.matchesAttributeSelector(attributes?.[attribute.name], attribute))) {
+            return false;
+        }
+
+        return selector.pseudoClasses.every((pseudoClass) => this.matchesPseudoClass(target, pseudoClass));
+    }
+
+    private matchesPseudoClass(target: StyleSelectorTarget, pseudoClass: string): boolean {
+        const normalized = pseudoClass.trim().toLowerCase();
+        const pseudoStates = new Set(target.pseudoStates ?? []);
+        if (pseudoStates.has(normalized)) {
+            return true;
+        }
+
+        const attributes = target.attributes as Record<string, string> | undefined;
+        switch (normalized) {
+            case 'checked':
+                return attributes?.checked !== undefined && attributes.checked !== 'false';
+            case 'disabled':
+                return attributes?.disabled !== undefined && attributes.disabled !== 'false';
+            case 'selected':
+                return (attributes?.selected !== undefined && attributes.selected !== 'false') || attributes?.['aria-current'] !== undefined;
+            default:
+                return false;
+        }
     }
 
     private matchesSelectorChain(
@@ -571,7 +680,74 @@ export class CreateStyle {
         return true;
     }
 
-    resolveNativeStyles(target: StyleSelectorTarget, ancestors: StyleSelectorTarget[] = []): Record<string, string | number> {
+    private parseMediaLength(value: string): number | undefined {
+        const match = value.trim().match(/^(-?\d+(?:\.\d+)?)(px|rem|em)?$/i);
+        if (!match) {
+            return undefined;
+        }
+
+        const numericValue = Number(match[1]);
+        const unit = (match[2] ?? 'px').toLowerCase();
+        if (unit === 'rem' || unit === 'em') {
+            return numericValue * 16;
+        }
+
+        return numericValue;
+    }
+
+    private matchesMediaCondition(condition: string, options: NativeStyleResolveOptions): boolean {
+        const normalized = condition.trim().replace(/^\(+|\)+$/g, '').trim().toLowerCase();
+        if (!normalized) {
+            return true;
+        }
+
+        if (normalized.startsWith('min-width:')) {
+            const minWidth = this.parseMediaLength(normalized.slice('min-width:'.length));
+            return minWidth !== undefined && options.viewportWidth !== undefined && options.viewportWidth >= minWidth;
+        }
+
+        if (normalized.startsWith('max-width:')) {
+            const maxWidth = this.parseMediaLength(normalized.slice('max-width:'.length));
+            return maxWidth !== undefined && options.viewportWidth !== undefined && options.viewportWidth <= maxWidth;
+        }
+
+        if (normalized === 'prefers-color-scheme: dark') {
+            return options.colorScheme === 'dark';
+        }
+
+        if (normalized === 'prefers-color-scheme: light') {
+            return (options.colorScheme ?? 'light') === 'light';
+        }
+
+        if (normalized === 'prefers-reduced-motion: reduce') {
+            return options.reducedMotion === true;
+        }
+
+        return false;
+    }
+
+    private matchesMediaRule(rule: MediaRule, options: NativeStyleResolveOptions): boolean {
+        const mediaType = options.mediaType ?? 'screen';
+        if (rule.type && rule.type !== mediaType && rule.type !== 'all') {
+            return false;
+        }
+
+        if (!rule.condition.trim()) {
+            return true;
+        }
+
+        return rule.condition
+            .split(/\band\b/i)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .every((part) => this.matchesMediaCondition(part, options));
+    }
+
+    resolveNativeStyles(
+        target: StyleSelectorTarget,
+        ancestors: StyleSelectorTarget[] = [],
+        options: NativeStyleResolveOptions = {},
+    ): Record<string, string | number> {
         const normalizedTarget = this.normalizeTarget(target);
         if (!normalizedTarget.tagName && (!normalizedTarget.classNames || normalizedTarget.classNames.length === 0)) {
             return {};
@@ -581,21 +757,31 @@ export class CreateStyle {
         const variables = this.getVariables();
         const resolved: Record<string, string | number> = {};
 
-        for (const rule of this.rules) {
-            const selectorChains = this.extractSupportedSelectorChains(rule.selector);
-            if (selectorChains.length === 0) {
-                continue;
-            }
+        const applyRules = (rules: CSSRule[]): void => {
+            for (const rule of rules) {
+                const selectorChains = this.extractSupportedSelectorChains(rule.selector);
+                if (selectorChains.length === 0) {
+                    continue;
+                }
 
-            const matches = selectorChains.some((selectorChain) => this.matchesSelectorChain(normalizedTarget, normalizedAncestors, selectorChain));
-            if (!matches) {
-                continue;
-            }
+                const matches = selectorChains.some((selectorChain) => this.matchesSelectorChain(normalizedTarget, normalizedAncestors, selectorChain));
+                if (!matches) {
+                    continue;
+                }
 
-            for (const [property, value] of Object.entries(rule.styles)) {
-                resolved[property] = typeof value === 'string'
-                    ? this.resolveVariableReferences(value, variables)
-                    : value;
+                for (const [property, value] of Object.entries(rule.styles)) {
+                    resolved[property] = typeof value === 'string'
+                        ? this.resolveVariableReferences(value, variables)
+                        : value;
+                }
+            }
+        };
+
+        applyRules(this.rules);
+
+        for (const mediaRule of this.mediaRules) {
+            if (this.matchesMediaRule(mediaRule, options)) {
+                applyRules(mediaRule.rules);
             }
         }
 
@@ -794,20 +980,20 @@ export class CreateStyle {
     }
 
     clear(): void {
-        this.variables = [];
-        this.rules = [];
-        this.mediaRules = [];
-        this.keyframes = [];
-        this.fontFaces = [];
-        this.imports = [];
-        this.containerRules = [];
-        this.supportsRules = [];
-        this.layerRules = [];
-        this._layerOrder = [];
+        this.variables.length = 0;
+        this.rules.length = 0;
+        this.mediaRules.length = 0;
+        this.keyframes.length = 0;
+        this.fontFaces.length = 0;
+        this.imports.length = 0;
+        this.containerRules.length = 0;
+        this.supportsRules.length = 0;
+        this.layerRules.length = 0;
+        this._layerOrder.length = 0;
     }
 }
 
-export const styles = new CreateStyle();
+export const styles = new CreateStyle(getSharedStyleStore());
 
 
 export const {

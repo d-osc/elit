@@ -2,6 +2,7 @@
 
 import { a, div } from '../../src/el';
 import { render } from '../../src/dom';
+import { createState } from '../../src/state';
 
 class FakeTextNode {
     constructor(public textContent: string) {}
@@ -102,5 +103,19 @@ describe('dom renderer props', () => {
 
         expect(ref.current).toBeDefined();
         expect(ref.current?.tagName).toBe('a');
+    });
+
+    it('renders State children as live text nodes', () => {
+        const root = new FakeElement('root');
+        const label = createState('initial');
+
+        render(root as any, div(label));
+
+        const wrapper = root.children[0] as FakeElement;
+        const textNode = wrapper.children[0] as FakeTextNode;
+        expect(textNode.textContent).toBe('initial');
+
+        label.value = 'updated';
+        expect(textNode.textContent).toBe('updated');
     });
 });

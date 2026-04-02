@@ -1,11 +1,12 @@
 import { dom } from '../../../src/dom';
 
 import { APP_LINK, APP_NAME } from './shared';
-import { createStatusCard, createUniversalShell } from './universal-components';
+import { createHeroBadge, createStatusCard, createUniversalShell } from './universal-components';
 import { universalAppCss } from './web-styles';
 
 export function renderDesktopHtml(options: { autoClose?: boolean } = {}): string {
     const appMarkup = dom.renderToString(createUniversalShell({
+    iconChild: createHeroBadge(),
         heroActions: [
             {
                 label: 'Ping native shell',

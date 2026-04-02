@@ -11,7 +11,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { ELIT_CONFIG_FILES, loadConfig, type MobileConfig, type MobileNativeConfig } from './config';
+import { ELIT_CONFIG_FILES, loadConfig, type MobileConfig, type MobileMode, type MobileNativeConfig } from './config';
 import { generateNativeEntryOutput } from './native-cli';
 
 type MobilePlatform = 'android' | 'ios';
@@ -47,6 +47,7 @@ interface MobileInitOptions {
 interface MobileCommandOptions {
     cwd: string;
     webDir: string;
+    mode: MobileMode;
     appId: string;
     appName: string;
     androidTarget?: string;
@@ -209,6 +210,7 @@ async function parseCommandOptions(args: string[]): Promise<MobileCommandOptions
     const options: MobileCommandOptions = {
         cwd: mobileConfig?.cwd ? resolve(cwd, mobileConfig.cwd) : cwd,
         webDir: mobileConfig?.webDir ?? 'dist',
+        mode: getDefaultMobileMode(mobileConfig),
         appId: mobileConfig?.appId ?? 'com.elit.app',
         appName: mobileConfig?.appName ?? 'Elit App',
         androidTarget: mobileConfig?.android?.target,
@@ -225,6 +227,10 @@ async function parseCommandOptions(args: string[]): Promise<MobileCommandOptions
             const value = args[++i];
             if (!value) throw new Error('Missing value for --cwd');
             options.cwd = resolve(value);
+        } else if (arg === '--mode') {
+            const value = args[++i];
+            if (!value) throw new Error('Missing value for --mode');
+            options.mode = parseMobileMode(value, '--mode');
         } else if (arg === '--web-dir') {
             const value = args[++i];
             if (!value) throw new Error('Missing value for --web-dir');
@@ -295,10 +301,18 @@ function initMobileProject(options: MobileInitOptions): void {
 }
 
 async function syncMobileAssets(options: MobileCommandOptions): Promise<void> {
+    if (options.mode === 'native' && !options.native) {
+        throw new Error('mobile.mode="native" requires mobile.native.entry. Use mobile.mode="hybrid" for the WebView shell.');
+    }
+
     const webRoot = resolve(options.cwd, options.webDir);
     const hasWebAssets = existsSync(webRoot);
-    if (!hasWebAssets && !options.native) {
-        throw new Error(`Web directory not found: ${webRoot}. Build your app first.`);
+    const requiresWebAssets = options.mode === 'hybrid' || !options.native;
+    if (!hasWebAssets && requiresWebAssets) {
+        const hint = options.native
+            ? ' Build your app first or switch mobile.mode to "native".'
+            : ' Build your app first.';
+        throw new Error(`Web directory not found: ${webRoot}.${hint}`);
     }
 
     if (hasWebAssets) {
@@ -306,7 +320,7 @@ async function syncMobileAssets(options: MobileCommandOptions): Promise<void> {
         copyDirectory(webRoot, androidPublic);
         console.log(`[mobile] Synced web assets to ${androidPublic}`);
     } else {
-        console.log(`[mobile] Skipped web asset sync because ${webRoot} was not found and a native entry is configured.`);
+        console.log(`[mobile] Skipped web asset sync because ${webRoot} was not found and mobile.mode is "native".`);
     }
 
     applyAndroidPermissions(options.cwd, options.permissions);
@@ -511,6 +525,17 @@ function runMobileDoctor(options: MobileCommandOptions): void {
         details: resolvedConfigPath
             ? resolvedConfigPath
             : 'Create elit.config.ts|mts|js|mjs|cjs|json and set { mobile: { ... } } defaults.',
+    });
+    checks.push({
+        name: 'Mobile runtime mode',
+        ok: options.mode !== 'native' || Boolean(options.native),
+        details: options.mode === 'native'
+            ? options.native
+                ? 'native (generated UI is the primary runtime)'
+                : 'mobile.mode="native" requires mobile.native.entry'
+            : options.native
+                ? 'hybrid (WebView runtime with generated native files kept in sync)'
+                : 'hybrid (WebView runtime)',
     });
 
     checks.push({
@@ -1014,6 +1039,26 @@ function readArgValue(args: string[], key: string): string | undefined {
     return args[index + 1];
 }
 
+function parseMobileMode(value: string, source: string): MobileMode {
+    if (value === 'native' || value === 'hybrid') {
+        return value;
+    }
+
+    throw new Error(`Invalid ${source}: ${value}. Expected "native" or "hybrid".`);
+}
+
+function getDefaultMobileMode(config?: MobileConfig): MobileMode {
+    if (config?.mode) {
+        return parseMobileMode(config.mode, 'mobile.mode');
+    }
+
+    return config?.native?.entry ? 'native' : 'hybrid';
+}
+
+function resolvePlatformMobileMode(mode: MobileMode, nativeEnabled: boolean): MobileMode {
+    return mode === 'native' && nativeEnabled ? 'native' : 'hybrid';
+}
+
 function resolveMobileNativeOptions(projectRoot: string, appId: string, nativeConfig?: MobileNativeConfig): MobileResolvedNativeOptions | undefined {
     if (!nativeConfig?.entry) {
         return undefined;
@@ -1201,6 +1246,8 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
         '// ELIT-MOBILE-MAIN-ACTIVITY',
         'import android.annotation.SuppressLint',
         'import android.os.Bundle',
+        'import android.webkit.WebResourceRequest',
+        'import android.webkit.WebResourceResponse',
         'import android.webkit.WebSettings',
         'import android.webkit.WebView',
         'import androidx.activity.ComponentActivity',
@@ -1209,6 +1256,8 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
         'import androidx.compose.runtime.Composable',
         'import androidx.compose.ui.Modifier',
         'import androidx.compose.ui.viewinterop.AndroidView',
+        'import androidx.webkit.WebViewAssetLoader',
+        'import androidx.webkit.WebViewClientCompat',
         importLines.trimEnd(),
         'class MainActivity : ComponentActivity() {',
         '  override fun onCreate(savedInstanceState: Bundle?) {',
@@ -1235,11 +1284,20 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
         '  AndroidView(',
         '    modifier = modifier,',
         '    factory = { context ->',
+        '      val assetLoader = WebViewAssetLoader.Builder()',
+        '        .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))',
+        '        .build()',
+        '',
         '      WebView(context).apply {',
         '        val webSettings: WebSettings = settings',
         '        webSettings.javaScriptEnabled = true',
         '        webSettings.domStorageEnabled = true',
-        '        loadUrl("file:///android_asset/public/index.html")',
+        '        webViewClient = object : WebViewClientCompat() {',
+        '          override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {',
+        '            return assetLoader.shouldInterceptRequest(request.url)',
+        '          }',
+        '        }',
+        '        loadUrl("https://appassets.androidplatform.net/assets/public/index.html")',
         '      }',
         '    },',
         '  )',
@@ -1249,10 +1307,12 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
 }
 
 export function renderAndroidRuntimeConfigSource(packageName: string, nativeEnabled: boolean): string {
+    const runtimeMode = nativeEnabled ? 'native' : 'hybrid';
     return [
         `package ${packageName}`,
         '',
         '// ELIT-MOBILE-RUNTIME-CONFIG',
+        `const val ELIT_MOBILE_MODE = "${runtimeMode}"`,
         `const val ELIT_USE_NATIVE_UI = ${nativeEnabled ? 'true' : 'false'}`,
         '',
     ].join('\n');
@@ -1346,8 +1406,10 @@ export function renderIosWebViewSource(): string {
 }
 
 export function renderIosRuntimeConfigSource(nativeEnabled: boolean): string {
+    const runtimeMode = nativeEnabled ? 'native' : 'hybrid';
     return [
         '// ELIT-MOBILE-RUNTIME-CONFIG',
+        `let ELIT_MOBILE_MODE = "${runtimeMode}"`,
         `let ELIT_USE_NATIVE_UI = ${nativeEnabled ? 'true' : 'false'}`,
         '',
     ].join('\n');
@@ -1702,6 +1764,7 @@ function ensureAndroidComposeBuildSupport(projectRoot: string): void {
         "implementation 'androidx.compose.ui:ui:1.7.2'",
         "implementation 'androidx.compose.ui:ui-tooling-preview:1.7.2'",
         "implementation 'androidx.compose.material3:material3:1.3.0'",
+        "implementation 'androidx.webkit:webkit:1.11.0'",
         "debugImplementation 'androidx.compose.ui:ui-tooling:1.7.2'",
     ];
 
@@ -1737,7 +1800,7 @@ function ensureManagedAndroidMainActivity(projectRoot: string, appId: string, na
         return true;
     }
 
-    if (current.includes('// ELIT-MOBILE-MAIN-ACTIVITY') || current.includes('file:///android_asset/public/index.html')) {
+    if (current.includes('// ELIT-MOBILE-MAIN-ACTIVITY') || current.includes('file:///android_asset/public/index.html') || current.includes('appassets.androidplatform.net')) {
         writeFileSync(mainActivityPath, nextContent, 'utf8');
         return true;
     }
@@ -1767,6 +1830,7 @@ async function syncNativeMobileTargets(options: MobileCommandOptions): Promise<v
     const androidRoot = join(options.cwd, 'android');
     if (existsSync(androidRoot)) {
         ensureAndroidComposeBuildSupport(options.cwd);
+        const androidRuntimeMode = resolvePlatformMobileMode(options.mode, options.native.android.enabled);
 
         const mainActivityManaged = ensureManagedAndroidMainActivity(
             options.cwd,
@@ -1798,13 +1862,16 @@ async function syncNativeMobileTargets(options: MobileCommandOptions): Promise<v
                 runtimeConfigPath,
                 options.native.android.outputPath,
                 options.native.android.packageName,
-                true,
+                androidRuntimeMode === 'native',
                 composeSource,
             );
             console.log(`[mobile] Synced native Android UI to ${options.native.android.outputPath}`);
+            if (androidRuntimeMode === 'hybrid') {
+                console.log('[mobile] Android runtime mode is hybrid; keeping WebView fallback active.');
+            }
 
             if (!mainActivityManaged) {
-                console.warn('[mobile] MainActivity.kt no longer matches the managed scaffold. Import ELIT_USE_NATIVE_UI and ElitGeneratedScreen manually to enable native UI in your custom activity.');
+                console.warn('[mobile] MainActivity.kt no longer matches the managed scaffold. Import ELIT_USE_NATIVE_UI and ElitGeneratedScreen manually to preserve mode switching in your custom activity.');
             }
         } else {
             const runtimeConfigPath = join(
@@ -1834,6 +1901,7 @@ async function syncNativeMobileTargets(options: MobileCommandOptions): Promise<v
                 appId: options.appId,
                 appName: options.appName,
             });
+            const iosRuntimeMode = resolvePlatformMobileMode(options.mode, options.native.ios.enabled);
 
             const swiftSource = await generateNativeEntryOutput({
                 entryPath: options.native.entryPath,
@@ -1845,12 +1913,15 @@ async function syncNativeMobileTargets(options: MobileCommandOptions): Promise<v
 
             const defaultGeneratedScreenPath = join(getIosAppPath(options.cwd), `${IOS_GENERATED_SCREEN_NAME}.swift`);
             const runtimeConfigPath = join(getIosAppPath(options.cwd), `${IOS_RUNTIME_CONFIG_NAME}.swift`);
-            writeIosRuntimeSupportFiles(runtimeConfigPath, defaultGeneratedScreenPath, true, swiftSource);
+            writeIosRuntimeSupportFiles(runtimeConfigPath, defaultGeneratedScreenPath, iosRuntimeMode === 'native', swiftSource);
             if (options.native.ios.outputPath !== defaultGeneratedScreenPath) {
                 mkdirSync(dirname(options.native.ios.outputPath), { recursive: true });
                 writeFileSync(options.native.ios.outputPath, swiftSource, 'utf8');
             }
             console.log(`[mobile] Synced native iOS UI to ${options.native.ios.outputPath}`);
+            if (iosRuntimeMode === 'hybrid') {
+                console.log('[mobile] iOS runtime mode is hybrid; keeping WebView fallback active.');
+            }
         }
     } else {
         const iosRoot = getIosAppPath(options.cwd);
@@ -1933,6 +2004,7 @@ function createAndroidScaffold(directory: string, app: { appId: string; appName:
                 "  implementation 'androidx.compose.ui:ui:1.7.2'\n" +
                 "  implementation 'androidx.compose.ui:ui-tooling-preview:1.7.2'\n" +
                 "  implementation 'androidx.compose.material3:material3:1.3.0'\n" +
+                "  implementation 'androidx.webkit:webkit:1.11.0'\n" +
                 "  implementation 'androidx.core:core-ktx:1.13.1'\n" +
                 "  implementation 'androidx.appcompat:appcompat:1.7.0'\n" +
                 "  debugImplementation 'androidx.compose.ui:ui-tooling:1.7.2'\n" +
@@ -2106,25 +2178,26 @@ Mobile command (native app workflow owned by elit)
 
 Usage:
     elit mobile init [directory] [--app-id id] [--app-name name] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA]
-    elit mobile doctor [--cwd dir] [--json]
+    elit mobile doctor [--cwd dir] [--mode native|hybrid] [--json]
     elit mobile devices android|ios [--cwd dir] [--json]
-    elit mobile sync [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA]
+    elit mobile sync [--cwd dir] [--mode native|hybrid] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA]
     elit mobile open android|ios
-    elit mobile run android|ios [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--target <id|name|booted>] [--prod]
-    elit mobile build android|ios [--cwd dir] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--target <id|name|booted>] [--prod]
+    elit mobile run android|ios [--cwd dir] [--mode native|hybrid] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--target <id|name|booted>] [--prod]
+    elit mobile build android|ios [--cwd dir] [--mode native|hybrid] [--web-dir dist] [--icon ./icon.png] [--permission android.permission.CAMERA] [--target <id|name|booted>] [--prod]
 
 Notes:
     - No external mobile framework is required.
     - Android scaffold can run either WebView assets or generated Compose UI.
     - Set mobile.native.entry in elit.config.* to auto-generate Android Compose and iOS SwiftUI during sync/build/run.
-    - If mobile.native.entry is set and the web build is missing, sync will still continue with native UI generation.
+    - Set mobile.mode to native or hybrid. When omitted, projects with mobile.native.entry default to native; otherwise they default to hybrid.
+    - If mobile.mode is native and mobile.native.entry is set, sync can still continue when the web build is missing.
     - iOS scaffold now creates ${IOS_PROJECT_NAME}.xcodeproj and SwiftUI/WebView source files under ios/App.
     - iOS build automation uses xcodebuild on macOS.
     - iOS run automation uses xcrun simctl on macOS and accepts --target booted, a simulator name, or a simulator UDID.
     - Without --target, iOS run prefers a booted simulator and otherwise falls back to the best available iPhone simulator.
     - Use "elit mobile devices ios --json" to inspect available iOS simulators and the preferred fallback choice.
     - Run "elit mobile doctor --json" for CI-friendly machine-readable checks.
-     - Set default values in elit.config.* under { mobile: { cwd, appId, appName, webDir, icon, permissions, android, ios, native } }.
+    - Set default values in elit.config.* under { mobile: { cwd, appId, appName, webDir, mode, icon, permissions, android, ios, native } }.
      - Use mobile.android.target or mobile.ios.target when you want a default device or simulator without repeating --target.
     - Android permissions can be set by config mobile.permissions or repeated --permission flags.
     - Android icon expects a .png or .webp file path.

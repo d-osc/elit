@@ -260,17 +260,18 @@ Mobile mode notes:
 
 - Mobile mode is implemented by elit directly with native project scaffolding.
 - Run `elit mobile init` once in your project to create native scaffold folders.
-- Set mobile defaults in `elit.config.*` under `mobile` (for example: `cwd`, `appId`, `appName`, `webDir`, `icon`, `permissions`).
+- Set mobile defaults in `elit.config.*` under `mobile` (for example: `cwd`, `appId`, `appName`, `webDir`, `mode`, `icon`, `permissions`).
 - Android workflow is fully scaffolded: assets are synced to `android/app/src/main/assets/public` and loaded in WebView.
 - Set `mobile.native.entry` to also generate `ElitGeneratedScreen.kt` and `ElitGeneratedScreen.swift` from the same Elit UI source during `sync`, `run`, and `build`.
-- Android scaffold now includes a Compose host that switches between generated native UI and the WebView fallback via generated runtime config.
+- Set `mobile.mode` to `native` or `hybrid`. Projects with `mobile.native.entry` default to `native`; projects without it default to `hybrid`.
+- Android scaffold now includes a Compose host that switches between generated native UI and the WebView fallback via generated runtime config and `mobile.mode`.
 - Android icon can be set from config or CLI with `.png` / `.webp` and will be applied to launcher resources.
 - Android permissions can be set from config (`mobile.permissions`) or CLI (`--permission`) and are written into `AndroidManifest.xml`.
 - Set `mobile.android.target` or `mobile.ios.target` when you want a default device/simulator without repeating `--target` on every command.
 - Use `examples/android-native-example` when you want an Android-first native mobile smoke test that scaffolds, generates Compose, and builds through Gradle.
 - Use `examples/universal-app-example` when you want one repo that validates web, desktop, and Android mobile workflows together.
 - Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
-- If `mobile.native.entry` is configured, sync can still proceed even when the web build output is missing.
+- If `mobile.mode` is `native` and `mobile.native.entry` is configured, sync can still proceed even when the web build output is missing.
 - Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
 - Use `elit mobile devices android|ios --json` to inspect connected Android devices or available iOS simulators.
 - Run `elit mobile doctor` to validate local toolchain and project prerequisites before build or run.
@@ -404,6 +405,7 @@ export default {
     appId: 'com.elit.app',
     appName: 'Elit App',
     webDir: 'dist',
+    mode: 'hybrid',
     icon: './icon.png',
     permissions: ['android.permission.INTERNET'],
   },

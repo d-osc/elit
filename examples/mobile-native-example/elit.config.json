@@ -4,6 +4,7 @@
     "appId": "com.elit.mobileexample",
     "appName": "ElitMobileExample",
     "webDir": "web",
+    "mode": "native",
     "icon": "./icon.png",
     "native": {
       "entry": "./src/native-screen.ts",

@@ -53,6 +53,15 @@ export class DomNode {
             return;
         }
 
+        if (this.isState(vNode)) {
+            const textNode = document.createTextNode(String(vNode.value ?? ''));
+            parent.appendChild(textNode);
+            vNode.subscribe((newValue) => {
+                textNode.textContent = String(newValue ?? '');
+            });
+            return;
+        }
+
         // Handle arrays (Child[])
         if (Array.isArray(vNode)) {
             for (const child of vNode) {

@@ -42,6 +42,7 @@ export default defineConfig({
         appId: 'com.elit.universalexample',
         appName: 'ElitUniversalExample',
         webDir: 'dist',
+        mode: 'native',
         permissions: [
             'android.permission.INTERNET',
             'android.permission.ACCESS_NETWORK_STATE',

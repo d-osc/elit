@@ -23,15 +23,21 @@ describe('mobile native templates', () => {
         expect(source).toContain('package com.example.app');
         expect(source).toContain('import com.example.generated.ELIT_USE_NATIVE_UI');
         expect(source).toContain('import com.example.generated.ElitGeneratedScreen');
+        expect(source).toContain('import androidx.webkit.WebViewAssetLoader');
         expect(source).toContain('AndroidView(');
-        expect(source).toContain('file:///android_asset/public/index.html');
+        expect(source).toContain('appassets.androidplatform.net/assets/public/index.html');
+        expect(source).toContain('assetLoader.shouldInterceptRequest(request.url)');
     });
 
     it('renders Android runtime config and placeholder screen sources', () => {
         const runtimeConfig = renderAndroidRuntimeConfigSource('com.example.generated', true);
+        const hybridRuntimeConfig = renderAndroidRuntimeConfigSource('com.example.generated', false);
         const placeholder = renderAndroidGeneratedPlaceholderSource('com.example.generated');
 
+        expect(runtimeConfig).toContain('const val ELIT_MOBILE_MODE = "native"');
         expect(runtimeConfig).toContain('const val ELIT_USE_NATIVE_UI = true');
+        expect(hybridRuntimeConfig).toContain('const val ELIT_MOBILE_MODE = "hybrid"');
+        expect(hybridRuntimeConfig).toContain('const val ELIT_USE_NATIVE_UI = false');
         expect(placeholder).toContain('fun ElitGeneratedScreen()');
         expect(placeholder).toContain('Elit native screen is not generated yet.');
     });
@@ -41,6 +47,7 @@ describe('mobile native templates', () => {
         const rootSource = renderIosAppRootSource();
         const webViewSource = renderIosWebViewSource();
         const runtimeConfig = renderIosRuntimeConfigSource(true);
+        const hybridRuntimeConfig = renderIosRuntimeConfigSource(false);
         const placeholder = renderIosGeneratedPlaceholderSource();
 
         expect(appSource).toContain('@main');
@@ -50,7 +57,10 @@ describe('mobile native templates', () => {
         expect(rootSource).toContain('Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "www")');
         expect(webViewSource).toContain('struct ElitWebView: UIViewRepresentable');
         expect(webViewSource).toContain('WKWebView');
+        expect(runtimeConfig).toContain('let ELIT_MOBILE_MODE = "native"');
         expect(runtimeConfig).toContain('let ELIT_USE_NATIVE_UI = true');
+        expect(hybridRuntimeConfig).toContain('let ELIT_MOBILE_MODE = "hybrid"');
+        expect(hybridRuntimeConfig).toContain('let ELIT_USE_NATIVE_UI = false');
         expect(placeholder).toContain('struct ElitGeneratedScreen: View');
     });
 

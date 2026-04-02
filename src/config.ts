@@ -64,6 +64,8 @@ export interface ElitConfig {
     wapk?: WapkConfig;
 }
 
+export type MobileMode = 'native' | 'hybrid';
+
 export interface MobileConfig {
     /** Project directory for native mobile artifacts */
     cwd?: string;
@@ -73,6 +75,8 @@ export interface MobileConfig {
     appName?: string;
     /** Built web assets directory synced into native projects */
     webDir?: string;
+    /** Mobile runtime mode: native uses generated UI, hybrid keeps the WebView shell active */
+    mode?: MobileMode;
     /** Mobile app icon image path (recommended: .png or .webp) */
     icon?: string;
     /** Android permissions written to AndroidManifest uses-permission tags */
