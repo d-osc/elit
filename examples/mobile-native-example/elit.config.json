@@ -5,6 +5,10 @@
     "appName": "ElitMobileExample",
     "webDir": "web",
     "icon": "./icon.png",
+    "native": {
+      "entry": "./src/native-screen.ts",
+      "exportName": "screen"
+    },
     "permissions": [
       "android.permission.INTERNET",
       "android.permission.ACCESS_NETWORK_STATE"

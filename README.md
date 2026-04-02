@@ -58,6 +58,7 @@ Use this table as the import map for generated code.
 | `elit` | Client-side all-in-one entry | DOM helpers, element factories, state, styles, router, HMR |
 | `elit/dom` | DOM renderer and SSR string rendering | `dom`, `render`, `renderToString`, `mount` |
 | `elit/el` | HTML, SVG, and MathML element factories | `div`, `button`, `html`, `body`, `script`, and many more |
+| `elit/native` | Native target proof of concept using the same Elit syntax | `renderNativeTree`, `renderNativeJson`, `renderAndroidCompose`, `renderSwiftUI` |
 | `elit/state` | Reactive state and render helpers | `createState`, `computed`, `reactive`, `text`, `bindValue`, `bindChecked`, `createSharedState` |
 | `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
 | `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
@@ -68,6 +69,71 @@ Use this table as the import map for generated code.
 | `elit/test` | Test runner module entry | test runtime helpers used by the CLI |
 
 Advanced subpaths also exist for lower-level adapters and internals: `elit/http`, `elit/https`, `elit/ws`, `elit/wss`, `elit/fs`, `elit/path`, `elit/mime-types`, `elit/chokidar`, `elit/runtime`, `elit/test-runtime`, `elit/test-reporter`, and `elit/types`.
+
+## Native Target POC
+
+Elit now includes an early native-target foundation that keeps the existing element syntax and converts it into a serializable native tree. This is not a full Android/iOS renderer yet, but it is the first reusable layer for compiling one UI definition into multiple targets.
+
+```ts
+import { a, button, div, h1, img, input } from 'elit/el';
+import { renderNativeTree } from 'elit/native';
+
+const screen = div(
+  { className: 'screen' },
+  h1('Hello Native'),
+  input({ value: 'search', placeholder: 'Search' }),
+  input({ type: 'checkbox', checked: true }),
+  a({ href: 'https://elit.dev/docs' }, 'Open docs'),
+  button({ onClick: () => {} }, 'Tap'),
+  img({ src: './logo.png', alt: 'Logo' })
+);
+
+const nativeTree = renderNativeTree(screen, { platform: 'android' });
+```
+
+You can also emit Jetpack Compose code from the same syntax:
+
+```ts
+import { renderAndroidCompose } from 'elit/native';
+
+const composeFile = renderAndroidCompose(screen, {
+  packageName: 'com.example.generated',
+  functionName: 'HomeScreen',
+  includePreview: true,
+});
+```
+
+And the same source tree can emit SwiftUI code too:
+
+```ts
+import { renderSwiftUI } from 'elit/native';
+
+const swiftFile = renderSwiftUI(screen, {
+  structName: 'HomeScreen',
+  includePreview: true,
+});
+```
+
+You can generate these files directly from the CLI too:
+
+```bash
+npx elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app
+npx elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift
+npx elit native generate ir ./src/native-screen.ts --platform android --export screen
+```
+
+The entry module should export a VNode tree or a zero-argument function that returns one. By default the CLI auto-detects `default`, `screen`, `app`, `view`, and `root` exports.
+
+Current scope:
+
+- Reuses existing Elit element syntax and VNode output.
+- Maps common tags into generic native components such as `View`, `Text`, `Button`, `Image`, and `TextInput`.
+- Maps checkbox inputs into native toggle controls and turns absolute `href` links into native URL-opening actions.
+- Produces serializable IR suitable for future Android/iOS code generators.
+- Can generate first-pass Jetpack Compose code for a practical subset of tags.
+- Can generate first-pass SwiftUI code for the same practical subset.
+- Can be wired into `elit mobile sync|build|run` through `mobile.native.entry` so generated files land in the mobile scaffold automatically.
+- Keeps source tag information so platform backends can apply custom rules later.
 
 ## Fastest Working App
 
@@ -144,6 +210,7 @@ npx elit desktop ./src/main.ts
 npx elit desktop build ./src/main.ts --release
 npx elit mobile init
 npx elit mobile run android
+npx elit native generate android ./src/native-screen.ts --name HomeScreen
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk
@@ -169,6 +236,9 @@ Useful flags:
 - `elit mobile open android|ios`
 - `elit mobile run android|ios --cwd . --target <device-id> --prod --icon ./icon.png --permission android.permission.CAMERA`
 - `elit mobile build android|ios --cwd . --prod --icon ./icon.png --permission android.permission.CAMERA`
+- `elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app`
+- `elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview`
+- `elit native generate ir ./src/native-screen.ts --platform android --export screen`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
 - `elit wapk run ./app.wapk --sync-interval 100 --watcher`
 - `elit wapk pack . --include-deps`
@@ -192,13 +262,20 @@ Mobile mode notes:
 - Run `elit mobile init` once in your project to create native scaffold folders.
 - Set mobile defaults in `elit.config.*` under `mobile` (for example: `cwd`, `appId`, `appName`, `webDir`, `icon`, `permissions`).
 - Android workflow is fully scaffolded: assets are synced to `android/app/src/main/assets/public` and loaded in WebView.
+- Set `mobile.native.entry` to also generate `ElitGeneratedScreen.kt` and `ElitGeneratedScreen.swift` from the same Elit UI source during `sync`, `run`, and `build`.
+- Android scaffold now includes a Compose host that switches between generated native UI and the WebView fallback via generated runtime config.
 - Android icon can be set from config or CLI with `.png` / `.webp` and will be applied to launcher resources.
 - Android permissions can be set from config (`mobile.permissions`) or CLI (`--permission`) and are written into `AndroidManifest.xml`.
+- Set `mobile.android.target` or `mobile.ios.target` when you want a default device/simulator without repeating `--target` on every command.
 - Build your web app first, then run `elit mobile sync` before `open`, `run`, or `build`.
+- If `mobile.native.entry` is configured, sync can still proceed even when the web build output is missing.
 - Android commands require native tools in your machine (`gradle` or `gradlew`, plus `adb` for `run`).
+- Use `elit mobile devices android|ios --json` to inspect connected Android devices or available iOS simulators.
 - Run `elit mobile doctor` to validate local toolchain and project prerequisites before build or run.
 - Use `elit mobile doctor --json` when you need machine-readable output for CI checks.
-- iOS workflow currently creates scaffold placeholders for Xcode integration.
+- iOS scaffold now creates `ios/ElitMobileApp.xcodeproj` plus SwiftUI/WebView fallback sources under `ios/App`.
+- iOS build automation uses `xcodebuild` on macOS.
+- iOS run automation uses `xcrun simctl` on macOS and accepts `--target booted`, a simulator name, or a simulator UDID. Without `--target`, it prefers a booted simulator and otherwise falls back to the best available iPhone simulator.
 
 WAPK mode notes:
 
@@ -235,6 +312,23 @@ The config shape is:
     webDir?: string;
     icon?: string;
     permissions?: string[];
+    android?: {
+      target?: string;
+    };
+    ios?: {
+      target?: string;
+    };
+    native?: {
+      entry?: string;
+      exportName?: string;
+      android?: {
+        packageName?: string;
+        functionName?: string;
+      };
+      ios?: {
+        structName?: string;
+      };
+    };
   };
   desktop?: {
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';

@@ -77,6 +77,49 @@ export interface MobileConfig {
     icon?: string;
     /** Android permissions written to AndroidManifest uses-permission tags */
     permissions?: string[];
+    /** Platform-specific Android CLI defaults */
+    android?: MobileAndroidConfig;
+    /** Platform-specific iOS CLI defaults */
+    ios?: MobileIosConfig;
+    /** Optional native UI generation targets using the same Elit syntax */
+    native?: MobileNativeConfig;
+}
+
+export interface MobileAndroidConfig {
+    /** Default Android device/emulator id used when --target is omitted */
+    target?: string;
+}
+
+export interface MobileIosConfig {
+    /** Default iOS simulator name, UDID, booted alias, or full xcodebuild destination */
+    target?: string;
+}
+
+export interface MobileNativeConfig {
+    /** Elit entry file that exports a VNode tree or zero-argument factory */
+    entry?: string;
+    /** Explicit export name to read from the native entry module */
+    exportName?: string;
+    /** Android-specific native generation options */
+    android?: MobileNativeAndroidConfig;
+    /** iOS-specific native generation options */
+    ios?: MobileNativeIosConfig;
+}
+
+export interface MobileNativeAndroidConfig {
+    /** Disable Android native code generation while keeping iOS enabled */
+    enabled?: boolean;
+    /** Kotlin package name for generated native screen files */
+    packageName?: string;
+    /** Output file path for generated Compose screen, relative to mobile.cwd */
+    output?: string;
+}
+
+export interface MobileNativeIosConfig {
+    /** Disable iOS native code generation while keeping Android enabled */
+    enabled?: boolean;
+    /** Output file path for generated SwiftUI file, relative to mobile.cwd */
+    output?: string;
 }
 
 export interface DesktopConfig {

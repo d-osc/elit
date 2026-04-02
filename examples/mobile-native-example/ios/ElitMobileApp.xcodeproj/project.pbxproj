@@ -1,0 +1,249 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+
+/* Begin PBXBuildFile section */
+        A0000000000000000000000C /* ElitMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* ElitMobileApp.swift */; };
+        A0000000000000000000000D /* ElitAppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* ElitAppRoot.swift */; };
+        A0000000000000000000000E /* ElitWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* ElitWebView.swift */; };
+        A0000000000000000000000F /* ElitRuntimeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* ElitRuntimeConfig.swift */; };
+        A00000000000000000000010 /* ElitGeneratedScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000008 /* ElitGeneratedScreen.swift */; };
+        A00000000000000000000011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000009 /* Assets.xcassets */; };
+        A00000000000000000000012 /* www in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000A /* www */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+        A00000000000000000000004 /* ElitMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElitMobileApp.swift; sourceTree = "<group>"; };
+        A00000000000000000000005 /* ElitAppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElitAppRoot.swift; sourceTree = "<group>"; };
+        A00000000000000000000006 /* ElitWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElitWebView.swift; sourceTree = "<group>"; };
+        A00000000000000000000007 /* ElitRuntimeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElitRuntimeConfig.swift; sourceTree = "<group>"; };
+        A00000000000000000000008 /* ElitGeneratedScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElitGeneratedScreen.swift; sourceTree = "<group>"; };
+        A00000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+        A0000000000000000000000A /* www */ = {isa = PBXFileReference; lastKnownFileType = folder; path = www; sourceTree = "<group>"; };
+        A0000000000000000000000B /* ElitMobileApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ElitMobileApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+        A00000000000000000000013 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = ();
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+        A00000000000000000000001 = {
+            isa = PBXGroup;
+            children = (
+                A00000000000000000000002 /* App */,
+                A00000000000000000000003 /* Products */,
+            );
+            sourceTree = "<group>";
+        };
+        A00000000000000000000002 /* App */ = {
+            isa = PBXGroup;
+            children = (
+                A00000000000000000000004 /* ElitMobileApp.swift */,
+                A00000000000000000000005 /* ElitAppRoot.swift */,
+                A00000000000000000000006 /* ElitWebView.swift */,
+                A00000000000000000000007 /* ElitRuntimeConfig.swift */,
+                A00000000000000000000008 /* ElitGeneratedScreen.swift */,
+                A00000000000000000000009 /* Assets.xcassets */,
+                A0000000000000000000000A /* www */,
+            );
+            path = App;
+            sourceTree = "<group>";
+        };
+        A00000000000000000000003 /* Products */ = {
+            isa = PBXGroup;
+            children = (
+                A0000000000000000000000B /* ElitMobileApp.app */,
+            );
+            name = Products;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        A00000000000000000000016 /* ElitMobileApp */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A00000000000000000000019 /* Build configuration list for PBXNativeTarget "ElitMobileApp" */;
+            buildPhases = (
+                A00000000000000000000015 /* Sources */,
+                A00000000000000000000013 /* Frameworks */,
+                A00000000000000000000014 /* Resources */,
+            );
+            buildRules = ();
+            dependencies = ();
+            name = ElitMobileApp;
+            productName = ElitMobileApp;
+            productReference = A0000000000000000000000B /* ElitMobileApp.app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        A00000000000000000000017 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 1600;
+                LastUpgradeCheck = 1600;
+                TargetAttributes = {
+                    A00000000000000000000016 = {
+                        CreatedOnToolsVersion = 16.0;
+                    };
+                };
+            };
+            buildConfigurationList = A00000000000000000000018 /* Build configuration list for PBXProject "ElitMobileApp" */;
+            compatibilityVersion = "Xcode 15.0";
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                Base,
+            );
+            mainGroup = A00000000000000000000001;
+            productRefGroup = A00000000000000000000003 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                A00000000000000000000016 /* ElitMobileApp */,
+            );
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        A00000000000000000000014 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                A00000000000000000000011 /* Assets.xcassets in Resources */,
+                A00000000000000000000012 /* www in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        A00000000000000000000015 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                A0000000000000000000000C /* ElitMobileApp.swift in Sources */,
+                A0000000000000000000000D /* ElitAppRoot.swift in Sources */,
+                A0000000000000000000000E /* ElitWebView.swift in Sources */,
+                A0000000000000000000000F /* ElitRuntimeConfig.swift in Sources */,
+                A00000000000000000000010 /* ElitGeneratedScreen.swift in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        A0000000000000000000001A /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+            };
+            name = Debug;
+        };
+        A0000000000000000000001B /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+            };
+            name = Release;
+        };
+        A0000000000000000000001C /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = "";
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "ElitMobileExample";
+                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                );
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.elit.mobileexample;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        A0000000000000000000001D /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = "";
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "ElitMobileExample";
+                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                );
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.elit.mobileexample;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        A00000000000000000000018 /* Build configuration list for PBXProject "ElitMobileApp" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                A0000000000000000000001A /* Debug */,
+                A0000000000000000000001B /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A00000000000000000000019 /* Build configuration list for PBXNativeTarget "ElitMobileApp" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                A0000000000000000000001C /* Debug */,
+                A0000000000000000000001D /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+    };
+    rootObject = A00000000000000000000017 /* Project object */;
+}

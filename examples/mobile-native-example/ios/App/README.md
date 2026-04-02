@@ -1,1 +1,4 @@
-Elit iOS scaffold placeholder. Open this folder in Xcode and create a WebView app that loads ./www/index.html.
+Elit iOS scaffold.
+
+Open ../ElitMobileApp.xcodeproj in Xcode to build or run the app.
+The app switches between ./ElitGeneratedScreen.swift and ./www/index.html using ./ElitRuntimeConfig.swift.

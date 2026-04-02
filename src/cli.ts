@@ -8,10 +8,11 @@ import { createDevServer } from './server';
 import { build } from './build';
 import { runDesktopCommand } from './desktop-cli';
 import { runMobileCommand } from './mobile-cli';
+import { runNativeCommand } from './native-cli';
 import { runWapkCommand } from './wapk-cli';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'wapk', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'native', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -109,6 +110,9 @@ async function main() {
         case 'mobile':
           await runMobile(args.slice(1));
           break;
+        case 'native':
+            await runNative(args.slice(1));
+            break;
         case 'wapk':
           await runWapk(args.slice(1));
           break;
@@ -385,6 +389,15 @@ async function runMobile(args: string[]) {
   }
 }
 
+async function runNative(args: string[]) {
+    try {
+        await runNativeCommand(args);
+    } catch (error) {
+        console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+    }
+}
+
   async function runWapk(args: string[]) {
     try {
       await runWapkCommand(args);
@@ -558,6 +571,7 @@ Commands:
   test      Run tests
   desktop   Run or build a native desktop app
   mobile    Run native mobile workflow commands
+  native    Generate native target code from an Elit entry
   wapk      Pack, inspect, extract, or run a .wapk app
   version   Show version number
   help      Show this help message
@@ -591,6 +605,15 @@ Mobile Options:
   elit mobile open android|ios              Open platform project in native IDE
   elit mobile run android|ios               Run app on device or emulator
   elit mobile build android|ios             Build native app artifacts
+
+Native Options:
+  elit native generate android <entry>      Emit Jetpack Compose from an Elit entry
+  elit native generate ios <entry>          Emit SwiftUI from an Elit entry
+  elit native generate ir <entry>           Emit native IR JSON from an Elit entry
+  elit native generate ... --out <file>     Write output to a file
+  elit native generate ... --name <name>    Set Compose function or SwiftUI struct name
+  elit native generate android ... --package <name>  Set Kotlin package name
+  elit native generate ... --export <name>  Select a specific module export
 
 WAPK Options:
   elit wapk <file.wapk>                     Run a packaged app
@@ -692,6 +715,7 @@ Examples:
   elit build --entry src/app.ts
   elit preview
   elit preview --port 5000
+  elit native generate android src/native-screen.ts --name HomeScreen
 
 Config file example (elit.config.ts):
   export default {
