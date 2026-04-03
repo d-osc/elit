@@ -124,6 +124,8 @@ npx elit native generate ir ./src/native-screen.ts --platform android --export s
 
 The entry module should export a VNode tree or a zero-argument function that returns one. By default the CLI auto-detects `default`, `screen`, `app`, `view`, and `root` exports.
 
+For the current native CSS subset, supported style mapping, and parity backlog, see [docs/native-css-support.md](docs/native-css-support.md).
+
 Current scope:
 
 - Reuses existing Elit element syntax and VNode output.

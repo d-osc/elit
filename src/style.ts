@@ -61,6 +61,17 @@ export interface StyleSelectorTarget {
     classNames?: string[];
     attributes?: Record<string, string | number | boolean>;
     pseudoStates?: string[];
+    previousSiblings?: StyleSelectorTarget[];
+    nextSiblings?: StyleSelectorTarget[];
+    children?: StyleSelectorTarget[];
+    childIndex?: number;
+    siblingCount?: number;
+    sameTypeIndex?: number;
+    sameTypeCount?: number;
+    containerNames?: string[];
+    containerWidth?: number;
+    isContainer?: boolean;
+    isScopeReference?: boolean;
 }
 
 export interface NativeStyleResolveOptions {
@@ -71,7 +82,7 @@ export interface NativeStyleResolveOptions {
     mediaType?: 'screen' | 'print' | 'all';
 }
 
-type ParsedSelectorCombinator = 'descendant' | 'child';
+type ParsedSelectorCombinator = 'descendant' | 'child' | 'adjacent-sibling' | 'general-sibling';
 
 interface ParsedAttributeSelector {
     name: string;
@@ -81,10 +92,17 @@ interface ParsedAttributeSelector {
 
 interface ParsedSimpleSelector {
     tagName?: string;
+    idName?: string;
     classNames: string[];
     attributes: ParsedAttributeSelector[];
     pseudoClasses: string[];
     combinator?: ParsedSelectorCombinator;
+}
+
+interface ParsedSelectorCursor {
+    target: StyleSelectorTarget;
+    ancestorIndex: number;
+    previousSiblings: StyleSelectorTarget[];
 }
 
 interface CreateStyleStore {
@@ -418,7 +436,7 @@ export class CreateStyle {
         return resolved.replace(/\s*!important\s*$/i, '').trim();
     }
 
-    private normalizeTarget(target: StyleSelectorTarget): StyleSelectorTarget {
+    private normalizeTargetIdentity(target: StyleSelectorTarget): StyleSelectorTarget {
         return {
             tagName: typeof target.tagName === 'string' && target.tagName.trim()
                 ? target.tagName.trim().toLowerCase()
@@ -436,16 +454,393 @@ export class CreateStyle {
             pseudoStates: Array.isArray(target.pseudoStates)
                 ? [...new Set(target.pseudoStates.map((pseudoState) => pseudoState.trim().toLowerCase()).filter(Boolean))]
                 : [],
+            childIndex: typeof target.childIndex === 'number' && Number.isFinite(target.childIndex)
+                ? target.childIndex
+                : undefined,
+            siblingCount: typeof target.siblingCount === 'number' && Number.isFinite(target.siblingCount)
+                ? target.siblingCount
+                : undefined,
+            sameTypeIndex: typeof target.sameTypeIndex === 'number' && Number.isFinite(target.sameTypeIndex)
+                ? target.sameTypeIndex
+                : undefined,
+            sameTypeCount: typeof target.sameTypeCount === 'number' && Number.isFinite(target.sameTypeCount)
+                ? target.sameTypeCount
+                : undefined,
+            containerNames: Array.isArray(target.containerNames)
+                ? [...new Set(target.containerNames.map((containerName) => containerName.trim().toLowerCase()).filter(Boolean))]
+                : [],
+            containerWidth: typeof target.containerWidth === 'number' && Number.isFinite(target.containerWidth)
+                ? target.containerWidth
+                : undefined,
+            isContainer: target.isContainer === true,
+            isScopeReference: target.isScopeReference === true,
         };
+    }
+
+    private normalizeTarget(target: StyleSelectorTarget): StyleSelectorTarget {
+        return {
+            ...this.normalizeTargetIdentity(target),
+            previousSiblings: Array.isArray(target.previousSiblings)
+                ? target.previousSiblings.map((sibling) => this.normalizeTarget(sibling))
+                : [],
+            nextSiblings: Array.isArray(target.nextSiblings)
+                ? target.nextSiblings.map((sibling) => this.normalizeTarget(sibling))
+                : [],
+            children: Array.isArray(target.children)
+                ? target.children.map((child) => this.normalizeTarget(child))
+                : [],
+        };
+    }
+
+    private splitConditionalClauses(value: string, operator: 'and' | 'or'): string[] {
+        const clauses: string[] = [];
+        let token = '';
+        let depth = 0;
+
+        for (let index = 0; index < value.length; index++) {
+            const char = value[index];
+            if (char === '(') {
+                depth += 1;
+            } else if (char === ')' && depth > 0) {
+                depth -= 1;
+            }
+
+            const operatorToken = ` ${operator} `;
+            if (depth === 0 && value.slice(index, index + operatorToken.length).toLowerCase() === operatorToken) {
+                const trimmed = token.trim();
+                if (trimmed) {
+                    clauses.push(trimmed);
+                }
+                token = '';
+                index += operatorToken.length - 1;
+                continue;
+            }
+
+            token += char;
+        }
+
+        const trailing = token.trim();
+        if (trailing) {
+            clauses.push(trailing);
+        }
+
+        return clauses;
+    }
+
+    private splitSelectorList(value: string): string[] {
+        const selectors: string[] = [];
+        let token = '';
+        let attributeDepth = 0;
+        let parenthesisDepth = 0;
+        let quoted: '"' | '\'' | undefined;
+
+        for (let index = 0; index < value.length; index++) {
+            const char = value[index];
+
+            if (quoted) {
+                token += char;
+                if (char === quoted && value[index - 1] !== '\\') {
+                    quoted = undefined;
+                }
+                continue;
+            }
+
+            if (char === '"' || char === '\'') {
+                quoted = char;
+                token += char;
+                continue;
+            }
+
+            if (char === '[') {
+                attributeDepth += 1;
+                token += char;
+                continue;
+            }
+
+            if (char === ']' && attributeDepth > 0) {
+                attributeDepth -= 1;
+                token += char;
+                continue;
+            }
+
+            if (attributeDepth === 0 && char === '(') {
+                parenthesisDepth += 1;
+                token += char;
+                continue;
+            }
+
+            if (attributeDepth === 0 && char === ')' && parenthesisDepth > 0) {
+                parenthesisDepth -= 1;
+                token += char;
+                continue;
+            }
+
+            if (attributeDepth === 0 && parenthesisDepth === 0 && char === ',') {
+                const trimmed = token.trim();
+                if (trimmed) {
+                    selectors.push(trimmed);
+                }
+                token = '';
+                continue;
+            }
+
+            token += char;
+        }
+
+        const trailing = token.trim();
+        if (trailing) {
+            selectors.push(trailing);
+        }
+
+        return selectors;
+    }
+
+    private parsePseudoSelectorToken(token: string, startIndex: number): { value: string; nextIndex: number } | undefined {
+        if (token[startIndex] !== ':' || token[startIndex + 1] === ':') {
+            return undefined;
+        }
+
+        let cursor = startIndex + 1;
+        const nameMatch = token.slice(cursor).match(/^([_a-zA-Z][-_a-zA-Z0-9]*)/);
+        if (!nameMatch) {
+            return undefined;
+        }
+
+        const pseudoName = nameMatch[1].toLowerCase();
+        cursor += nameMatch[0].length;
+
+        if (token[cursor] !== '(') {
+            return { value: pseudoName, nextIndex: cursor };
+        }
+
+        const argumentStart = cursor + 1;
+        let attributeDepth = 0;
+        let parenthesisDepth = 1;
+        let quoted: '"' | '\'' | undefined;
+        cursor += 1;
+
+        while (cursor < token.length) {
+            const char = token[cursor];
+
+            if (quoted) {
+                if (char === quoted && token[cursor - 1] !== '\\') {
+                    quoted = undefined;
+                }
+                cursor += 1;
+                continue;
+            }
+
+            if (char === '"' || char === '\'') {
+                quoted = char;
+                cursor += 1;
+                continue;
+            }
+
+            if (char === '[') {
+                attributeDepth += 1;
+                cursor += 1;
+                continue;
+            }
+
+            if (char === ']' && attributeDepth > 0) {
+                attributeDepth -= 1;
+                cursor += 1;
+                continue;
+            }
+
+            if (attributeDepth === 0 && char === '(') {
+                parenthesisDepth += 1;
+                cursor += 1;
+                continue;
+            }
+
+            if (attributeDepth === 0 && char === ')') {
+                parenthesisDepth -= 1;
+                if (parenthesisDepth === 0) {
+                    const pseudoArgument = token.slice(argumentStart, cursor).trim();
+                    return {
+                        value: pseudoArgument.length > 0
+                            ? `${pseudoName}(${pseudoArgument})`
+                            : `${pseudoName}()`,
+                        nextIndex: cursor + 1,
+                    };
+                }
+
+                cursor += 1;
+                continue;
+            }
+
+            cursor += 1;
+        }
+
+        return undefined;
+    }
+
+    private matchesSupportsDeclaration(property: string, value: string): boolean {
+        const normalizedProperty = property.trim().toLowerCase();
+        const normalizedValue = value.trim().toLowerCase();
+        const supportedProperties = new Set([
+            'align-items',
+            'background',
+            'background-color',
+            'backdrop-filter',
+            'border',
+            'border-radius',
+            'box-shadow',
+            'color',
+            'column-gap',
+            'container-name',
+            'container-type',
+            'display',
+            'flex',
+            'flex-direction',
+            'flex-grow',
+            'flex-wrap',
+            'font-family',
+            'font-size',
+            'font-weight',
+            'gap',
+            'grid-template-columns',
+            'height',
+            'justify-content',
+            'letter-spacing',
+            'line-height',
+            'margin',
+            'margin-bottom',
+            'margin-left',
+            'margin-right',
+            'margin-top',
+            'max-height',
+            'max-width',
+            'min-height',
+            'min-width',
+            'padding',
+            'padding-bottom',
+            'padding-end',
+            'padding-horizontal',
+            'padding-left',
+            'padding-right',
+            'padding-start',
+            'padding-top',
+            'padding-vertical',
+            'row-gap',
+            'text-align',
+            'text-decoration',
+            'text-transform',
+            'width',
+        ]);
+
+        if (!supportedProperties.has(normalizedProperty)) {
+            return false;
+        }
+
+        if (normalizedProperty === 'display') {
+            return new Set(['block', 'flex', 'grid', 'inline', 'inline-block', 'inline-flex', 'inline-grid']).has(normalizedValue);
+        }
+
+        if (normalizedProperty === 'backdrop-filter') {
+            return /blur\(/.test(normalizedValue);
+        }
+
+        if (normalizedProperty === 'container-type') {
+            return new Set(['inline-size', 'size']).has(normalizedValue);
+        }
+
+        return true;
+    }
+
+    private matchesSupportsCondition(condition: string): boolean {
+        const normalized = condition.trim().replace(/^\(+|\)+$/g, '').trim();
+        if (!normalized) {
+            return true;
+        }
+
+        if (normalized.toLowerCase().startsWith('not ')) {
+            return !this.matchesSupportsCondition(normalized.slice(4));
+        }
+
+        const orClauses = this.splitConditionalClauses(normalized, 'or');
+        if (orClauses.length > 1) {
+            return orClauses.some((clause) => this.matchesSupportsCondition(clause));
+        }
+
+        const andClauses = this.splitConditionalClauses(normalized, 'and');
+        if (andClauses.length > 1) {
+            return andClauses.every((clause) => this.matchesSupportsCondition(clause));
+        }
+
+        const declarationMatch = normalized.match(/^([a-z-]+)\s*:\s*(.+)$/i);
+        if (!declarationMatch) {
+            return false;
+        }
+
+        return this.matchesSupportsDeclaration(declarationMatch[1], declarationMatch[2]);
+    }
+
+    private findMatchingContainerTarget(ancestors: StyleSelectorTarget[], name?: string): StyleSelectorTarget | undefined {
+        const normalizedName = typeof name === 'string' && name.trim()
+            ? name.trim().toLowerCase()
+            : undefined;
+
+        for (let index = ancestors.length - 1; index >= 0; index--) {
+            const ancestor = ancestors[index];
+            if (!ancestor?.isContainer || ancestor.containerWidth === undefined) {
+                continue;
+            }
+
+            if (!normalizedName) {
+                return ancestor;
+            }
+
+            if ((ancestor.containerNames ?? []).includes(normalizedName)) {
+                return ancestor;
+            }
+        }
+
+        return undefined;
+    }
+
+    private matchesContainerCondition(condition: string, containerWidth: number): boolean {
+        const normalized = condition.trim().replace(/^\(+|\)+$/g, '').trim().toLowerCase();
+        if (!normalized) {
+            return true;
+        }
+
+        if (normalized.startsWith('not ')) {
+            return !this.matchesContainerCondition(normalized.slice(4), containerWidth);
+        }
+
+        const orClauses = this.splitConditionalClauses(normalized, 'or');
+        if (orClauses.length > 1) {
+            return orClauses.some((clause) => this.matchesContainerCondition(clause, containerWidth));
+        }
+
+        const andClauses = this.splitConditionalClauses(normalized, 'and');
+        if (andClauses.length > 1) {
+            return andClauses.every((clause) => this.matchesContainerCondition(clause, containerWidth));
+        }
+
+        if (normalized.startsWith('min-width:')) {
+            const minWidth = this.parseMediaLength(normalized.slice('min-width:'.length));
+            return minWidth !== undefined && containerWidth >= minWidth;
+        }
+
+        if (normalized.startsWith('max-width:')) {
+            const maxWidth = this.parseMediaLength(normalized.slice('max-width:'.length));
+            return maxWidth !== undefined && containerWidth <= maxWidth;
+        }
+
+        return false;
     }
 
     private parseSimpleSelectorToken(token: string): ParsedSimpleSelector | undefined {
         const trimmed = token.trim();
-        if (!trimmed || /[#~*&]/.test(trimmed)) {
+        if (!trimmed || /[*&]/.test(trimmed)) {
             return undefined;
         }
         let cursor = 0;
         let tagName: string | undefined;
+        let idName: string | undefined;
         const classNames: string[] = [];
         const attributes: ParsedAttributeSelector[] = [];
         const pseudoClasses: string[] = [];
@@ -465,6 +860,16 @@ export class CreateStyle {
                 }
                 classNames.push(classMatch[1]);
                 cursor += classMatch[0].length;
+                continue;
+            }
+
+            if (char === '#') {
+                const idMatch = trimmed.slice(cursor).match(/^#([_a-zA-Z][-_a-zA-Z0-9]*)/);
+                if (!idMatch || idName) {
+                    return undefined;
+                }
+                idName = idMatch[1];
+                cursor += idMatch[0].length;
                 continue;
             }
 
@@ -490,39 +895,37 @@ export class CreateStyle {
             }
 
             if (char === ':') {
-                if (trimmed[cursor + 1] === ':') {
+                const pseudoToken = this.parsePseudoSelectorToken(trimmed, cursor);
+                if (!pseudoToken) {
                     return undefined;
                 }
 
-                const pseudoMatch = trimmed.slice(cursor).match(/^:([_a-zA-Z][-_a-zA-Z0-9]*)/);
-                if (!pseudoMatch) {
-                    return undefined;
-                }
-
-                pseudoClasses.push(pseudoMatch[1].toLowerCase());
-                cursor += pseudoMatch[0].length;
+                pseudoClasses.push(pseudoToken.value);
+                cursor = pseudoToken.nextIndex;
                 continue;
             }
 
             return undefined;
         }
 
-        if (!tagName && classNames.length === 0 && attributes.length === 0 && pseudoClasses.length === 0) {
+        if (!tagName && !idName && classNames.length === 0 && attributes.length === 0 && pseudoClasses.length === 0) {
             return undefined;
         }
 
-        return { tagName, classNames, attributes, pseudoClasses };
+        return { tagName, idName, classNames, attributes, pseudoClasses };
     }
 
     private extractSupportedSelectorChains(selector: string): ParsedSimpleSelector[][] {
-        return selector
-            .split(',')
+        return this.splitSelectorList(selector)
             .map((segment) => segment.trim())
             .map((segment) => {
                 const chain: ParsedSimpleSelector[] = [];
                 let token = '';
                 let combinator: ParsedSelectorCombinator = 'descendant';
                 let invalid = false;
+                let attributeDepth = 0;
+                let parenthesisDepth = 0;
+                let quoted: '"' | '\'' | undefined;
 
                 const flushToken = (): void => {
                     const trimmedToken = token.trim();
@@ -546,19 +949,60 @@ export class CreateStyle {
 
                 for (let index = 0; index < segment.length; index++) {
                     const char = segment[index];
-                    if (char === '>') {
-                        flushToken();
-                        if (invalid) break;
-                        combinator = 'child';
+                    if (quoted) {
+                        token += char;
+                        if (char === quoted && segment[index - 1] !== '\\') {
+                            quoted = undefined;
+                        }
                         continue;
                     }
 
-                    if (/\s/.test(char)) {
+                    if (char === '"' || char === '\'') {
+                        quoted = char;
+                        token += char;
+                        continue;
+                    }
+
+                    if (char === '[') {
+                        attributeDepth += 1;
+                        token += char;
+                        continue;
+                    }
+
+                    if (char === ']') {
+                        if (attributeDepth > 0) {
+                            attributeDepth -= 1;
+                        }
+                        token += char;
+                        continue;
+                    }
+
+                    if (attributeDepth === 0 && char === '(') {
+                        parenthesisDepth += 1;
+                        token += char;
+                        continue;
+                    }
+
+                    if (attributeDepth === 0 && char === ')' && parenthesisDepth > 0) {
+                        parenthesisDepth -= 1;
+                        token += char;
+                        continue;
+                    }
+
+                    if (attributeDepth === 0 && parenthesisDepth === 0 && (char === '>' || char === '+' || char === '~')) {
                         flushToken();
                         if (invalid) break;
-                        if (combinator !== 'child') {
-                            combinator = 'descendant';
-                        }
+                        combinator = char === '>'
+                            ? 'child'
+                            : char === '+'
+                                ? 'adjacent-sibling'
+                                : 'general-sibling';
+                        continue;
+                    }
+
+                    if (attributeDepth === 0 && parenthesisDepth === 0 && /\s/.test(char)) {
+                        flushToken();
+                        if (invalid) break;
                         continue;
                     }
 
@@ -570,7 +1014,7 @@ export class CreateStyle {
                     return undefined;
                 }
 
-                return chain.some((part) => Boolean(part.tagName) || part.classNames.length > 0 || part.attributes.length > 0 || part.pseudoClasses.length > 0)
+                return chain.some((part) => Boolean(part.tagName) || Boolean(part.idName) || part.classNames.length > 0 || part.attributes.length > 0 || part.pseudoClasses.length > 0)
                     ? chain
                     : undefined;
             })
@@ -607,12 +1051,16 @@ export class CreateStyle {
             return false;
         }
 
+        const attributes = target.attributes as Record<string, string> | undefined;
+        if (selector.idName && attributes?.id !== selector.idName) {
+            return false;
+        }
+
         const classSet = new Set(target.classNames ?? []);
         if (!selector.classNames.every((className) => classSet.has(className))) {
             return false;
         }
 
-        const attributes = target.attributes as Record<string, string> | undefined;
         if (!selector.attributes.every((attribute) => this.matchesAttributeSelector(attributes?.[attribute.name], attribute))) {
             return false;
         }
@@ -621,23 +1069,221 @@ export class CreateStyle {
     }
 
     private matchesPseudoClass(target: StyleSelectorTarget, pseudoClass: string): boolean {
-        const normalized = pseudoClass.trim().toLowerCase();
-        const pseudoStates = new Set(target.pseudoStates ?? []);
+        const rawPseudoClass = pseudoClass.trim();
+        const normalized = rawPseudoClass.toLowerCase();
+        const pseudoStates = new Set((target.pseudoStates ?? []).map((state) => state.trim().toLowerCase()));
         if (pseudoStates.has(normalized)) {
             return true;
         }
 
+        const functionalMatch = rawPseudoClass.match(/^([_a-zA-Z][-_a-zA-Z0-9]*)(?:\((.*)\))?$/);
+        const pseudoName = functionalMatch?.[1] ?? normalized;
+        const pseudoArgument = functionalMatch?.[2]?.trim();
         const attributes = target.attributes as Record<string, string> | undefined;
-        switch (normalized) {
+        switch (pseudoName) {
+            case 'scope':
+                return target.isScopeReference === true;
             case 'checked':
                 return attributes?.checked !== undefined && attributes.checked !== 'false';
             case 'disabled':
                 return attributes?.disabled !== undefined && attributes.disabled !== 'false';
             case 'selected':
                 return (attributes?.selected !== undefined && attributes.selected !== 'false') || attributes?.['aria-current'] !== undefined;
+            case 'first-child':
+                return target.childIndex === 1;
+            case 'last-child':
+                return target.childIndex !== undefined
+                    && target.siblingCount !== undefined
+                    && target.childIndex === target.siblingCount;
+            case 'only-child':
+                return target.childIndex !== undefined
+                    && target.siblingCount !== undefined
+                    && target.siblingCount === 1;
+            case 'first-of-type':
+                return target.sameTypeIndex === 1;
+            case 'last-of-type':
+                return target.sameTypeIndex !== undefined
+                    && target.sameTypeCount !== undefined
+                    && target.sameTypeIndex === target.sameTypeCount;
+            case 'only-of-type':
+                return target.sameTypeIndex !== undefined
+                    && target.sameTypeCount !== undefined
+                    && target.sameTypeCount === 1;
+            case 'nth-child':
+                return target.childIndex !== undefined
+                    && typeof pseudoArgument === 'string'
+                    && this.matchesNthChildExpression(pseudoArgument, target.childIndex);
+            case 'nth-last-child':
+                return target.childIndex !== undefined
+                    && target.siblingCount !== undefined
+                    && typeof pseudoArgument === 'string'
+                    && this.matchesNthChildExpression(pseudoArgument, target.siblingCount - target.childIndex + 1);
+            case 'nth-of-type':
+                return target.sameTypeIndex !== undefined
+                    && typeof pseudoArgument === 'string'
+                    && this.matchesNthChildExpression(pseudoArgument, target.sameTypeIndex);
+            case 'nth-last-of-type':
+                return target.sameTypeIndex !== undefined
+                    && target.sameTypeCount !== undefined
+                    && typeof pseudoArgument === 'string'
+                    && this.matchesNthChildExpression(pseudoArgument, target.sameTypeCount - target.sameTypeIndex + 1);
+            case 'has':
+                return typeof pseudoArgument === 'string'
+                    && this.matchesHasPseudoClass(target, pseudoArgument);
+            case 'not': {
+                if (!pseudoArgument) {
+                    return false;
+                }
+
+                const selectorArguments = this.splitSelectorList(pseudoArgument);
+                if (selectorArguments.length === 0) {
+                    return false;
+                }
+
+                const parsedSelectors: ParsedSimpleSelector[] = [];
+                for (const selectorArgument of selectorArguments) {
+                    const parsedSelector = this.parseSimpleSelectorToken(selectorArgument);
+                    if (!parsedSelector) {
+                        return false;
+                    }
+
+                    parsedSelectors.push(parsedSelector);
+                }
+
+                return parsedSelectors.every((selectorPart) => !this.matchesSelectorPart(target, selectorPart));
+            }
             default:
                 return false;
         }
+    }
+
+    private matchesNthChildExpression(expression: string, childIndex: number): boolean {
+        const normalized = expression.trim().toLowerCase().replace(/\s+/g, '');
+        if (!normalized) {
+            return false;
+        }
+
+        if (normalized === 'odd') {
+            return childIndex % 2 === 1;
+        }
+
+        if (normalized === 'even') {
+            return childIndex % 2 === 0;
+        }
+
+        if (/^[+-]?\d+$/.test(normalized)) {
+            return childIndex === Number(normalized);
+        }
+
+        const patternMatch = normalized.match(/^([+-]?\d*)n(?:([+-]?\d+))?$/);
+        if (!patternMatch) {
+            return false;
+        }
+
+        const coefficientToken = patternMatch[1];
+        const offsetToken = patternMatch[2];
+        const coefficient = coefficientToken === '' || coefficientToken === '+'
+            ? 1
+            : coefficientToken === '-'
+                ? -1
+                : Number(coefficientToken);
+        const offset = offsetToken !== undefined ? Number(offsetToken) : 0;
+
+        if (!Number.isFinite(coefficient) || !Number.isFinite(offset)) {
+            return false;
+        }
+
+        if (coefficient === 0) {
+            return childIndex === offset;
+        }
+
+        const delta = childIndex - offset;
+        const step = Math.abs(coefficient);
+        if (delta % step !== 0) {
+            return false;
+        }
+
+        const n = delta / coefficient;
+        return Number.isInteger(n) && n >= 0;
+    }
+
+    private matchesHasPseudoClass(target: StyleSelectorTarget, pseudoArgument: string): boolean {
+        const selectorArguments = this.splitSelectorList(pseudoArgument);
+        if (selectorArguments.length === 0) {
+            return false;
+        }
+
+        return selectorArguments.some((selectorArgument) => this.matchesRelativeHasSelector(target, selectorArgument));
+    }
+
+    private matchesRelativeHasSelector(target: StyleSelectorTarget, selectorArgument: string): boolean {
+        const trimmedSelector = selectorArgument.trim();
+        if (!trimmedSelector) {
+            return false;
+        }
+
+        const scopeRelativeSelector = this.toHasScopeRelativeSelector(trimmedSelector);
+        if (!scopeRelativeSelector) {
+            return false;
+        }
+
+        const selectorChains = this.extractSupportedSelectorChains(scopeRelativeSelector);
+        if (selectorChains.length === 0) {
+            return false;
+        }
+
+        const scopeTarget = this.normalizeTarget({ ...target, isScopeReference: true });
+        if (trimmedSelector.startsWith('+') || trimmedSelector.startsWith('~')) {
+            const scopedSiblings = this.buildScopedFollowingSiblingTargets(scopeTarget, target.nextSiblings ?? []);
+            return selectorChains.some((selectorChain) =>
+                scopedSiblings.some((sibling) => this.matchesSelectorChainInSubtree(sibling, [], selectorChain))
+            );
+        }
+
+        return selectorChains.some((selectorChain) =>
+            (target.children ?? []).some((child) => this.matchesSelectorChainInSubtree(child, [scopeTarget], selectorChain))
+        );
+    }
+
+    private toHasScopeRelativeSelector(selectorArgument: string): string | undefined {
+        const trimmedSelector = selectorArgument.trim();
+        if (!trimmedSelector) {
+            return undefined;
+        }
+
+        return trimmedSelector.startsWith('>') || trimmedSelector.startsWith('+') || trimmedSelector.startsWith('~')
+            ? `:scope${trimmedSelector}`
+            : `:scope ${trimmedSelector}`;
+    }
+
+    private buildScopedFollowingSiblingTargets(
+        scopeTarget: StyleSelectorTarget,
+        nextSiblings: StyleSelectorTarget[],
+    ): StyleSelectorTarget[] {
+        const scopedSiblings: StyleSelectorTarget[] = [];
+
+        for (const sibling of nextSiblings) {
+            const scopedSibling = this.normalizeTarget({
+                ...sibling,
+                previousSiblings: [scopeTarget, ...scopedSiblings],
+            });
+            scopedSiblings.push(scopedSibling);
+        }
+
+        return scopedSiblings;
+    }
+
+    private matchesSelectorChainInSubtree(
+        target: StyleSelectorTarget,
+        ancestors: StyleSelectorTarget[],
+        chain: ParsedSimpleSelector[],
+    ): boolean {
+        if (this.matchesSelectorChain(target, ancestors, chain)) {
+            return true;
+        }
+
+        const nextAncestors = [...ancestors, target];
+        return (target.children ?? []).some((child) => this.matchesSelectorChainInSubtree(child, nextAncestors, chain));
     }
 
     private matchesSelectorChain(
@@ -645,39 +1291,87 @@ export class CreateStyle {
         ancestors: StyleSelectorTarget[],
         chain: ParsedSimpleSelector[],
     ): boolean {
-        if (!this.matchesSelectorPart(target, chain[chain.length - 1])) {
+        const initialCursor: ParsedSelectorCursor = {
+            target,
+            ancestorIndex: ancestors.length - 1,
+            previousSiblings: Array.isArray(target.previousSiblings) ? target.previousSiblings : [],
+        };
+
+        return this.matchesSelectorChainFromCursor(chain, chain.length - 1, ancestors, initialCursor);
+    }
+
+    private getAncestorCursor(ancestors: StyleSelectorTarget[], ancestorIndex: number): ParsedSelectorCursor | undefined {
+        if (ancestorIndex < 0 || ancestorIndex >= ancestors.length) {
+            return undefined;
+        }
+
+        const ancestor = ancestors[ancestorIndex];
+        return {
+            target: ancestor,
+            ancestorIndex: ancestorIndex - 1,
+            previousSiblings: Array.isArray(ancestor.previousSiblings) ? ancestor.previousSiblings : [],
+        };
+    }
+
+    private matchesSelectorChainFromCursor(
+        chain: ParsedSimpleSelector[],
+        chainIndex: number,
+        ancestors: StyleSelectorTarget[],
+        cursor: ParsedSelectorCursor,
+    ): boolean {
+        if (!this.matchesSelectorPart(cursor.target, chain[chainIndex])) {
             return false;
         }
 
-        let ancestorIndex = ancestors.length - 1;
-        for (let chainIndex = chain.length - 1; chainIndex > 0; chainIndex--) {
-            const selector = chain[chainIndex - 1];
-            const combinator = chain[chainIndex].combinator ?? 'descendant';
-
-            if (combinator === 'child') {
-                if (ancestorIndex < 0 || !this.matchesSelectorPart(ancestors[ancestorIndex], selector)) {
-                    return false;
-                }
-                ancestorIndex -= 1;
-                continue;
-            }
-
-            let matchedIndex = -1;
-            for (let index = ancestorIndex; index >= 0; index--) {
-                if (this.matchesSelectorPart(ancestors[index], selector)) {
-                    matchedIndex = index;
-                    break;
-                }
-            }
-
-            if (matchedIndex < 0) {
-                return false;
-            }
-
-            ancestorIndex = matchedIndex - 1;
+        if (chainIndex === 0) {
+            return true;
         }
 
-        return true;
+        const combinator = chain[chainIndex].combinator ?? 'descendant';
+        switch (combinator) {
+            case 'child': {
+                const parentCursor = this.getAncestorCursor(ancestors, cursor.ancestorIndex);
+                return parentCursor
+                    ? this.matchesSelectorChainFromCursor(chain, chainIndex - 1, ancestors, parentCursor)
+                    : false;
+            }
+            case 'adjacent-sibling': {
+                const siblingIndex = cursor.previousSiblings.length - 1;
+                if (siblingIndex < 0) {
+                    return false;
+                }
+
+                return this.matchesSelectorChainFromCursor(chain, chainIndex - 1, ancestors, {
+                    target: cursor.previousSiblings[siblingIndex],
+                    ancestorIndex: cursor.ancestorIndex,
+                    previousSiblings: cursor.previousSiblings.slice(0, siblingIndex),
+                });
+            }
+            case 'general-sibling': {
+                for (let siblingIndex = cursor.previousSiblings.length - 1; siblingIndex >= 0; siblingIndex--) {
+                    if (this.matchesSelectorChainFromCursor(chain, chainIndex - 1, ancestors, {
+                        target: cursor.previousSiblings[siblingIndex],
+                        ancestorIndex: cursor.ancestorIndex,
+                        previousSiblings: cursor.previousSiblings.slice(0, siblingIndex),
+                    })) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            case 'descendant':
+            default: {
+                for (let ancestorIndex = cursor.ancestorIndex; ancestorIndex >= 0; ancestorIndex--) {
+                    const ancestorCursor = this.getAncestorCursor(ancestors, ancestorIndex);
+                    if (ancestorCursor && this.matchesSelectorChainFromCursor(chain, chainIndex - 1, ancestors, ancestorCursor)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 
     private parseMediaLength(value: string): number | undefined {
@@ -743,6 +1437,26 @@ export class CreateStyle {
             .every((part) => this.matchesMediaCondition(part, options));
     }
 
+    private getOrderedLayerNames(): string[] {
+        const orderedLayerNames: string[] = [];
+
+        for (const layerName of this._layerOrder) {
+            const normalizedName = layerName.trim();
+            if (normalizedName && !orderedLayerNames.includes(normalizedName)) {
+                orderedLayerNames.push(normalizedName);
+            }
+        }
+
+        for (const layerRule of this.layerRules) {
+            const normalizedName = layerRule.name.trim();
+            if (normalizedName && !orderedLayerNames.includes(normalizedName)) {
+                orderedLayerNames.push(normalizedName);
+            }
+        }
+
+        return orderedLayerNames;
+    }
+
     resolveNativeStyles(
         target: StyleSelectorTarget,
         ancestors: StyleSelectorTarget[] = [],
@@ -777,7 +1491,28 @@ export class CreateStyle {
             }
         };
 
+        for (const layerName of this.getOrderedLayerNames()) {
+            for (const layerRule of this.layerRules) {
+                if (layerRule.name.trim() === layerName) {
+                    applyRules(layerRule.rules);
+                }
+            }
+        }
+
         applyRules(this.rules);
+
+        for (const supportsRule of this.supportsRules) {
+            if (this.matchesSupportsCondition(supportsRule.condition)) {
+                applyRules(supportsRule.rules);
+            }
+        }
+
+        for (const containerRule of this.containerRules) {
+            const matchingContainer = this.findMatchingContainerTarget(normalizedAncestors, containerRule.name);
+            if (matchingContainer && this.matchesContainerCondition(containerRule.condition, matchingContainer.containerWidth!)) {
+                applyRules(containerRule.rules);
+            }
+        }
 
         for (const mediaRule of this.mediaRules) {
             if (this.matchesMediaRule(mediaRule, options)) {

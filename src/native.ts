@@ -71,15 +71,268 @@ const IMAGE_FALLBACK_STOP_WORDS = new Set([
     'webp',
 ]);
 
+const CSS_NAMED_COLORS: Record<string, NativeColorValue> = {
+    transparent: { red: 0, green: 0, blue: 0, alpha: 0 },
+    black: { red: 0, green: 0, blue: 0, alpha: 1 },
+    silver: { red: 192, green: 192, blue: 192, alpha: 1 },
+    gray: { red: 128, green: 128, blue: 128, alpha: 1 },
+    grey: { red: 128, green: 128, blue: 128, alpha: 1 },
+    white: { red: 255, green: 255, blue: 255, alpha: 1 },
+    maroon: { red: 128, green: 0, blue: 0, alpha: 1 },
+    red: { red: 255, green: 0, blue: 0, alpha: 1 },
+    purple: { red: 128, green: 0, blue: 128, alpha: 1 },
+    fuchsia: { red: 255, green: 0, blue: 255, alpha: 1 },
+    green: { red: 0, green: 128, blue: 0, alpha: 1 },
+    lime: { red: 0, green: 255, blue: 0, alpha: 1 },
+    olive: { red: 128, green: 128, blue: 0, alpha: 1 },
+    yellow: { red: 255, green: 255, blue: 0, alpha: 1 },
+    navy: { red: 0, green: 0, blue: 128, alpha: 1 },
+    blue: { red: 0, green: 0, blue: 255, alpha: 1 },
+    teal: { red: 0, green: 128, blue: 128, alpha: 1 },
+    aqua: { red: 0, green: 255, blue: 255, alpha: 1 },
+    orange: { red: 255, green: 165, blue: 0, alpha: 1 },
+    pink: { red: 255, green: 192, blue: 203, alpha: 1 },
+    brown: { red: 165, green: 42, blue: 42, alpha: 1 },
+    cyan: { red: 0, green: 255, blue: 255, alpha: 1 },
+    magenta: { red: 255, green: 0, blue: 255, alpha: 1 },
+    rebeccapurple: { red: 102, green: 51, blue: 153, alpha: 1 },
+};
+
+Object.assign(CSS_NAMED_COLORS, createNativeNamedColorMap({
+    aliceblue: '#f0f8ff',
+    antiquewhite: '#faebd7',
+    aqua: '#00ffff',
+    aquamarine: '#7fffd4',
+    azure: '#f0ffff',
+    beige: '#f5f5dc',
+    bisque: '#ffe4c4',
+    black: '#000000',
+    blanchedalmond: '#ffebcd',
+    blue: '#0000ff',
+    blueviolet: '#8a2be2',
+    brown: '#a52a2a',
+    burlywood: '#deb887',
+    cadetblue: '#5f9ea0',
+    chartreuse: '#7fff00',
+    chocolate: '#d2691e',
+    coral: '#ff7f50',
+    cornflowerblue: '#6495ed',
+    cornsilk: '#fff8dc',
+    crimson: '#dc143c',
+    cyan: '#00ffff',
+    darkblue: '#00008b',
+    darkcyan: '#008b8b',
+    darkgoldenrod: '#b8860b',
+    darkgray: '#a9a9a9',
+    darkgreen: '#006400',
+    darkgrey: '#a9a9a9',
+    darkkhaki: '#bdb76b',
+    darkmagenta: '#8b008b',
+    darkolivegreen: '#556b2f',
+    darkorange: '#ff8c00',
+    darkorchid: '#9932cc',
+    darkred: '#8b0000',
+    darksalmon: '#e9967a',
+    darkseagreen: '#8fbc8f',
+    darkslateblue: '#483d8b',
+    darkslategray: '#2f4f4f',
+    darkslategrey: '#2f4f4f',
+    darkturquoise: '#00ced1',
+    darkviolet: '#9400d3',
+    deeppink: '#ff1493',
+    deepskyblue: '#00bfff',
+    dimgray: '#696969',
+    dimgrey: '#696969',
+    dodgerblue: '#1e90ff',
+    firebrick: '#b22222',
+    floralwhite: '#fffaf0',
+    forestgreen: '#228b22',
+    fuchsia: '#ff00ff',
+    gainsboro: '#dcdcdc',
+    ghostwhite: '#f8f8ff',
+    gold: '#ffd700',
+    goldenrod: '#daa520',
+    gray: '#808080',
+    green: '#008000',
+    greenyellow: '#adff2f',
+    grey: '#808080',
+    honeydew: '#f0fff0',
+    hotpink: '#ff69b4',
+    indianred: '#cd5c5c',
+    indigo: '#4b0082',
+    ivory: '#fffff0',
+    khaki: '#f0e68c',
+    lavender: '#e6e6fa',
+    lavenderblush: '#fff0f5',
+    lawngreen: '#7cfc00',
+    lemonchiffon: '#fffacd',
+    lightblue: '#add8e6',
+    lightcoral: '#f08080',
+    lightcyan: '#e0ffff',
+    lightgoldenrodyellow: '#fafad2',
+    lightgray: '#d3d3d3',
+    lightgreen: '#90ee90',
+    lightgrey: '#d3d3d3',
+    lightpink: '#ffb6c1',
+    lightsalmon: '#ffa07a',
+    lightseagreen: '#20b2aa',
+    lightskyblue: '#87cefa',
+    lightslategray: '#778899',
+    lightslategrey: '#778899',
+    lightsteelblue: '#b0c4de',
+    lightyellow: '#ffffe0',
+    lime: '#00ff00',
+    limegreen: '#32cd32',
+    linen: '#faf0e6',
+    magenta: '#ff00ff',
+    maroon: '#800000',
+    mediumaquamarine: '#66cdaa',
+    mediumblue: '#0000cd',
+    mediumorchid: '#ba55d3',
+    mediumpurple: '#9370db',
+    mediumseagreen: '#3cb371',
+    mediumslateblue: '#7b68ee',
+    mediumspringgreen: '#00fa9a',
+    mediumturquoise: '#48d1cc',
+    mediumvioletred: '#c71585',
+    midnightblue: '#191970',
+    mintcream: '#f5fffa',
+    mistyrose: '#ffe4e1',
+    moccasin: '#ffe4b5',
+    navajowhite: '#ffdead',
+    navy: '#000080',
+    oldlace: '#fdf5e6',
+    olive: '#808000',
+    olivedrab: '#6b8e23',
+    orange: '#ffa500',
+    orangered: '#ff4500',
+    orchid: '#da70d6',
+    palegoldenrod: '#eee8aa',
+    palegreen: '#98fb98',
+    paleturquoise: '#afeeee',
+    palevioletred: '#db7093',
+    papayawhip: '#ffefd5',
+    peachpuff: '#ffdab9',
+    peru: '#cd853f',
+    pink: '#ffc0cb',
+    plum: '#dda0dd',
+    powderblue: '#b0e0e6',
+    purple: '#800080',
+    rebeccapurple: '#663399',
+    red: '#ff0000',
+    rosybrown: '#bc8f8f',
+    royalblue: '#4169e1',
+    saddlebrown: '#8b4513',
+    salmon: '#fa8072',
+    sandybrown: '#f4a460',
+    seagreen: '#2e8b57',
+    seashell: '#fff5ee',
+    sienna: '#a0522d',
+    silver: '#c0c0c0',
+    skyblue: '#87ceeb',
+    slateblue: '#6a5acd',
+    slategray: '#708090',
+    slategrey: '#708090',
+    snow: '#fffafa',
+    springgreen: '#00ff7f',
+    steelblue: '#4682b4',
+    tan: '#d2b48c',
+    teal: '#008080',
+    thistle: '#d8bfd8',
+    tomato: '#ff6347',
+    transparent: '#00000000',
+    turquoise: '#40e0d0',
+    violet: '#ee82ee',
+    wheat: '#f5deb3',
+    white: '#ffffff',
+    whitesmoke: '#f5f5f5',
+    yellow: '#ffff00',
+    yellowgreen: '#9acd32',
+}));
+
+function nativeColorFromHexLiteral(hex: string): NativeColorValue {
+    const normalized = hex.trim().replace(/^#/, '');
+    const red = Number.parseInt(normalized.slice(0, 2), 16);
+    const green = Number.parseInt(normalized.slice(2, 4), 16);
+    const blue = Number.parseInt(normalized.slice(4, 6), 16);
+    const alpha = normalized.length >= 8 ? Number.parseInt(normalized.slice(6, 8), 16) / 255 : 1;
+    return { red, green, blue, alpha };
+}
+
+function createNativeNamedColorMap(colors: Record<string, string>): Record<string, NativeColorValue> {
+    return Object.fromEntries(
+        Object.entries(colors).map(([name, hex]) => [name, nativeColorFromHexLiteral(hex)])
+    );
+}
+
+const CURRENT_COLOR_KEYWORD = 'currentcolor';
+
+function cloneNativeColor(color: NativeColorValue | undefined): NativeColorValue | undefined {
+    return color ? { ...color } : undefined;
+}
+
+function getDefaultCurrentColor(): NativeColorValue {
+    return cloneNativeColor(CSS_NAMED_COLORS.black) ?? { red: 0, green: 0, blue: 0, alpha: 1 };
+}
+
+function isCurrentColorKeyword(value: NativePropValue | undefined): value is string {
+    return typeof value === 'string' && value.trim().toLowerCase() === CURRENT_COLOR_KEYWORD;
+}
+
+function nativeColorToCssColorLiteral(color: NativeColorValue): string {
+    return `rgba(${color.red}, ${color.green}, ${color.blue}, ${Number(color.alpha.toFixed(3))})`;
+}
+
+function resolveStyleCurrentColor(
+    style: Record<string, NativePropValue> | undefined,
+    inheritedColor?: NativeColorValue,
+): NativeColorValue {
+    const fallbackColor = cloneNativeColor(inheritedColor) ?? getDefaultCurrentColor();
+    const resolvedColor = parseCssColor(style?.color, fallbackColor);
+    return resolvedColor ?? fallbackColor;
+}
+
+function normalizeResolvedCurrentTextColor(
+    style: Record<string, NativePropValue> | undefined,
+    inheritedColor?: NativeColorValue,
+): Record<string, NativePropValue> | undefined {
+    if (!style || !isCurrentColorKeyword(style.color)) {
+        return style;
+    }
+
+    return {
+        ...style,
+        color: nativeColorToCssColorLiteral(resolveStyleCurrentColor(style, inheritedColor)),
+    };
+}
+
 interface NativeStyleScope {
     tagName: string;
     classNames: string[];
     attributes: Record<string, string>;
     pseudoStates: string[];
+    previousSiblings?: NativeStyleScope[];
+    nextSiblings?: NativeStyleScope[];
+    children?: NativeStyleScope[];
+    childIndex?: number;
+    siblingCount?: number;
+    sameTypeIndex?: number;
+    sameTypeCount?: number;
+    containerNames?: string[];
+    containerWidth?: number;
+    isContainer?: boolean;
 }
 
 interface NativeRenderHints {
     fillWidth?: boolean;
+    fillHeight?: boolean;
+    availableWidth?: number;
+    availableHeight?: number;
+    negotiatedMaxWidth?: number;
+    negotiatedMaxHeight?: number;
+    parentFlexLayout?: 'Row' | 'Column';
+    parentRowBaselineAlignment?: 'first' | 'last';
+    absoluteOverlay?: boolean;
 }
 
 interface NativeChunkedRow {
@@ -168,11 +421,37 @@ interface NativeGradientValue {
     direction: NativeGradientDirection;
 }
 
+interface NativeFlexStyleValues {
+    grow?: number;
+    shrink?: number;
+    basis?: NativePropValue;
+}
+
 interface NativeShadowValue {
     offsetX: number;
     offsetY: number;
     blur: number;
     color: NativeColorValue;
+}
+
+type NativeBorderStyleKeyword = 'solid' | 'dashed' | 'dotted' | 'none' | 'unsupported';
+
+interface NativeBorderSideValue {
+    width: string;
+    color: NativeColorValue;
+    style?: NativeBorderStyleKeyword;
+}
+
+interface NativeBorderValue {
+    width?: string;
+    color?: NativeColorValue;
+    style?: NativeBorderStyleKeyword;
+    style?: NativeBorderStyleKeyword;
+    top?: NativeBorderSideValue;
+    right?: NativeBorderSideValue;
+    bottom?: NativeBorderSideValue;
+    left?: NativeBorderSideValue;
+    style?: NativeBorderStyleKeyword;
 }
 
 const DEFAULT_COMPONENT_MAP: Record<string, string> = {
@@ -182,18 +461,13 @@ const DEFAULT_COMPONENT_MAP: Record<string, string> = {
     header: 'View',
     footer: 'View',
     nav: 'View',
-    section: 'View',
     article: 'View',
     aside: 'View',
     div: 'View',
-    form: 'Form',
-    fieldset: 'View',
     figure: 'View',
     figcaption: 'Text',
     details: 'View',
     dialog: 'View',
-    menu: 'View',
-    summary: 'Text',
     ul: 'List',
     ol: 'List',
     li: 'ListItem',
@@ -840,6 +1114,208 @@ function toSpLiteral(
     return resolved !== undefined ? `${formatFloat(resolved)}.sp` : undefined;
 }
 
+function parsePlainNumericValue(value: NativePropValue | undefined): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!/^-?(?:\d+|\d*\.\d+)$/.test(trimmed)) {
+        return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseFlexShorthand(value: NativePropValue | undefined): NativeFlexStyleValues | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return { grow: value, shrink: 1, basis: 0 };
+    }
+
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return undefined;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (normalized === 'none') {
+        return { grow: 0, shrink: 0, basis: 'auto' };
+    }
+
+    if (normalized === 'auto') {
+        return { grow: 1, shrink: 1, basis: 'auto' };
+    }
+
+    if (normalized === 'initial') {
+        return { grow: 0, shrink: 1, basis: 'auto' };
+    }
+
+    const numericValue = parsePlainNumericValue(trimmed);
+    if (numericValue !== undefined) {
+        return { grow: numericValue, shrink: 1, basis: 0 };
+    }
+
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+        return { grow: 1, shrink: 1, basis: tokens[0] };
+    }
+
+    if (tokens.length === 2) {
+        const grow = parsePlainNumericValue(tokens[0]);
+        if (grow === undefined) {
+            return undefined;
+        }
+
+        const shrink = parsePlainNumericValue(tokens[1]);
+        return shrink !== undefined
+            ? { grow, shrink, basis: 0 }
+            : { grow, shrink: 1, basis: tokens[1] };
+    }
+
+    if (tokens.length === 3) {
+        const grow = parsePlainNumericValue(tokens[0]);
+        const shrink = parsePlainNumericValue(tokens[1]);
+        if (grow === undefined || shrink === undefined) {
+            return undefined;
+        }
+
+        return { grow, shrink, basis: tokens[2] };
+    }
+
+    return undefined;
+}
+
+function resolveFlexStyleValues(style: Record<string, NativePropValue> | undefined): NativeFlexStyleValues {
+    const shorthand = parseFlexShorthand(style?.flex);
+    return {
+        grow: parsePlainNumericValue(style?.flexGrow) ?? shorthand?.grow,
+        shrink: parsePlainNumericValue(style?.flexShrink) ?? shorthand?.shrink,
+        basis: style?.flexBasis ?? shorthand?.basis,
+    };
+}
+
+function resolveOpacityValue(value: NativePropValue | undefined): number | undefined {
+    const opacity = parsePlainNumericValue(value);
+    if (opacity === undefined) {
+        return undefined;
+    }
+
+    return Math.min(1, Math.max(0, opacity));
+}
+
+function resolveAspectRatioValue(value: NativePropValue | undefined): number | undefined {
+    const direct = parsePlainNumericValue(value);
+    if (direct !== undefined) {
+        return direct > 0 ? direct : undefined;
+    }
+
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const ratioMatch = value.trim().match(/^(-?(?:\d+|\d*\.\d+))\s*\/\s*(-?(?:\d+|\d*\.\d+))$/);
+    if (!ratioMatch) {
+        return undefined;
+    }
+
+    const numerator = Number(ratioMatch[1]);
+    const denominator = Number(ratioMatch[2]);
+    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
+        return undefined;
+    }
+
+    const ratio = numerator / denominator;
+    return ratio > 0 ? ratio : undefined;
+}
+
+function parsePercentageValue(value: NativePropValue | undefined): number | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const match = value.trim().match(/^(-?(?:\d+|\d*\.\d+))%$/);
+    if (!match) {
+        return undefined;
+    }
+
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function resolveAxisReferenceLength(
+    axis: 'horizontal' | 'vertical',
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions,
+): number {
+    if (axis === 'horizontal') {
+        return hints?.availableWidth ?? styleResolveOptions.viewportWidth ?? 390;
+    }
+
+    return hints?.availableHeight ?? styleResolveOptions.viewportHeight ?? 844;
+}
+
+function resolveAxisUnitNumber(
+    value: NativePropValue | undefined,
+    axis: 'horizontal' | 'vertical',
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): number | undefined {
+    const percentage = parsePercentageValue(value);
+    if (percentage !== undefined) {
+        return resolveAxisReferenceLength(axis, hints, styleResolveOptions) * (percentage / 100);
+    }
+
+    return toScaledUnitNumber(value, styleResolveOptions);
+}
+
+function toAxisDpLiteral(
+    value: NativePropValue | undefined,
+    axis: 'horizontal' | 'vertical',
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): string | undefined {
+    const resolved = resolveAxisUnitNumber(value, axis, hints, styleResolveOptions);
+    return resolved !== undefined ? `${formatFloat(resolved)}.dp` : undefined;
+}
+
+function toAxisPointLiteral(
+    value: NativePropValue | undefined,
+    axis: 'horizontal' | 'vertical',
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): string | undefined {
+    const resolved = resolveAxisUnitNumber(value, axis, hints, styleResolveOptions);
+    return resolved !== undefined ? formatFloat(resolved) : undefined;
+}
+
+function isHiddenOverflowValue(value: NativePropValue | undefined): boolean {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'hidden' || normalized === 'clip';
+}
+
+function shouldClipNativeOverflow(style: Record<string, NativePropValue> | undefined): boolean {
+    if (!style) {
+        return false;
+    }
+
+    return isHiddenOverflowValue(style.overflow)
+        || isHiddenOverflowValue(style.overflowX)
+        || isHiddenOverflowValue(style.overflowY);
+}
+
 function parseCssUnitValue(value: NativePropValue | undefined): { value: number; unit: string } | undefined {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return { value, unit: '' };
@@ -1109,6 +1585,54 @@ function createNativeStyleScope(tagName: string): NativeStyleScope {
     };
 }
 
+function resolveNativeContainerNames(style: Record<string, NativePropValue> | undefined): string[] {
+    if (!style || typeof style.containerName !== 'string') {
+        return [];
+    }
+
+    return style.containerName
+        .split(/\s+/)
+        .map((containerName) => containerName.trim().toLowerCase())
+        .filter((containerName) => containerName.length > 0 && containerName !== 'none');
+}
+
+function resolveNativeContainerWidth(
+    style: Record<string, NativePropValue> | undefined,
+    options: NativeStyleResolveOptions,
+): number | undefined {
+    if (!style) {
+        return undefined;
+    }
+
+    if (isFillValue(style.width)) {
+        return options.viewportWidth ?? 390;
+    }
+
+    return resolveAxisUnitNumber(style.width, 'horizontal', undefined, options)
+        ?? resolveAxisUnitNumber(style.maxWidth, 'horizontal', undefined, options)
+        ?? resolveAxisUnitNumber(style.minWidth, 'horizontal', undefined, options)
+        ?? (options.viewportWidth ?? 390);
+}
+
+function resolveNativeContainerScope(
+    style: Record<string, NativePropValue> | undefined,
+    options: NativeStyleResolveOptions,
+): Pick<NativeStyleScope, 'containerNames' | 'containerWidth' | 'isContainer'> {
+    const containerNames = resolveNativeContainerNames(style);
+    const containerType = typeof style?.containerType === 'string'
+        ? style.containerType.trim().toLowerCase()
+        : undefined;
+    const isContainer = Boolean(containerType && containerType !== 'normal') || containerNames.length > 0;
+
+    return isContainer
+        ? {
+            containerNames,
+            containerWidth: resolveNativeContainerWidth(style, options),
+            isContainer: true,
+        }
+        : {};
+}
+
 function buildGlobalInheritedTextStyles(options: NativeStyleResolveOptions): Record<string, NativePropValue> {
     const htmlScope = createNativeStyleScope('html');
     const bodyScope = createNativeStyleScope('body');
@@ -1119,20 +1643,92 @@ function buildGlobalInheritedTextStyles(options: NativeStyleResolveOptions): Rec
         styles.resolveNativeStyles(bodyScope, [htmlScope], options) as Record<string, NativePropValue>
     );
 
-    return {
+    const mergedInheritedStyles = {
         ...(htmlStyles ?? {}),
         ...(bodyStyles ?? {}),
     };
+
+    return normalizeResolvedCurrentTextColor(mergedInheritedStyles) ?? mergedInheritedStyles;
 }
 
 function buildRootResolvedStyleMap(nodes: NativeNode[], options: NativeStyleResolveOptions): NativeResolvedStyleMap {
+    const scopeSnapshots = buildNativeStyleScopeSnapshots(nodes);
     return buildResolvedStyleMap(
         nodes,
         options,
         [],
         new WeakMap<NativeElementNode, Record<string, NativePropValue>>(),
         buildGlobalInheritedTextStyles(options),
+        scopeSnapshots,
     );
+}
+
+function buildNativeStyleScopeSnapshots(nodes: NativeNode[]): NativeStyleScope[] {
+    const elementNodes = nodes.filter((node): node is NativeElementNode => node.kind === 'element');
+    const sameTypeCounts = new Map<string, number>();
+    for (const node of elementNodes) {
+        sameTypeCounts.set(node.sourceTag, (sameTypeCounts.get(node.sourceTag) ?? 0) + 1);
+    }
+
+    const previousTypeCounts = new Map<string, number>();
+    const baseScopes: NativeStyleScope[] = [];
+
+    for (const node of elementNodes) {
+        const sameTypeIndex = (previousTypeCounts.get(node.sourceTag) ?? 0) + 1;
+        const children = buildNativeStyleScopeSnapshots(node.children);
+        baseScopes.push({
+            tagName: node.sourceTag,
+            classNames: getClassList(node),
+            attributes: getSelectorAttributes(node),
+            pseudoStates: getNativePseudoStates(node),
+            childIndex: baseScopes.length + 1,
+            siblingCount: elementNodes.length,
+            sameTypeIndex,
+            sameTypeCount: sameTypeCounts.get(node.sourceTag),
+            ...(children.length > 0 ? { children } : {}),
+        });
+        previousTypeCounts.set(node.sourceTag, sameTypeIndex);
+    }
+
+    const cloneRelativeSiblingSequence = (scopes: NativeStyleScope[]): NativeStyleScope[] => {
+        const clones: NativeStyleScope[] = [];
+
+        for (const scope of scopes) {
+            const clonedChildren = scope.children && scope.children.length > 0
+                ? cloneRelativeSiblingSequence(scope.children)
+                : undefined;
+
+            clones.push({
+                tagName: scope.tagName,
+                classNames: [...scope.classNames],
+                attributes: { ...scope.attributes },
+                pseudoStates: [...scope.pseudoStates],
+                ...(scope.childIndex !== undefined ? { childIndex: scope.childIndex } : {}),
+                ...(scope.siblingCount !== undefined ? { siblingCount: scope.siblingCount } : {}),
+                ...(scope.sameTypeIndex !== undefined ? { sameTypeIndex: scope.sameTypeIndex } : {}),
+                ...(scope.sameTypeCount !== undefined ? { sameTypeCount: scope.sameTypeCount } : {}),
+                ...(scope.containerNames ? { containerNames: [...scope.containerNames] } : {}),
+                ...(scope.containerWidth !== undefined ? { containerWidth: scope.containerWidth } : {}),
+                ...(scope.isContainer ? { isContainer: true } : {}),
+                ...(clonedChildren ? { children: clonedChildren } : {}),
+                ...(clones.length > 0 ? { previousSiblings: [...clones] } : {}),
+            });
+        }
+
+        return clones;
+    };
+
+    const snapshots: NativeStyleScope[] = [];
+    for (let index = 0; index < baseScopes.length; index++) {
+        const baseScope = baseScopes[index];
+        snapshots.push({
+            ...baseScope,
+            previousSiblings: [...snapshots],
+            nextSiblings: cloneRelativeSiblingSequence(baseScopes.slice(index + 1)),
+        });
+    }
+
+    return snapshots;
 }
 
 function getNativePseudoStates(node: NativeElementNode): string[] {
@@ -1150,7 +1746,14 @@ function getNativePseudoStates(node: NativeElementNode): string[] {
         pseudoStates.add('selected');
     }
 
-    if (node.component === 'TextInput') {
+    if (
+        node.component === 'TextInput' && (
+            toNativeBoolean(node.props.autoFocus)
+            || toNativeBoolean(node.props.autofocus)
+            || toNativeBoolean(node.props.focused)
+            || toNativeBoolean(node.props['aria-focused'])
+        )
+    ) {
         pseudoStates.add('focus');
     }
 
@@ -1163,13 +1766,11 @@ function buildResolvedStyleMap(
     ancestors: NativeStyleScope[] = [],
     resolvedStyles: NativeResolvedStyleMap = new WeakMap(),
     inheritedTextStyles: Record<string, NativePropValue> = {},
+    scopeSnapshots: NativeStyleScope[] = buildNativeStyleScopeSnapshots(nodes),
 ): NativeResolvedStyleMap {
-    for (const node of nodes) {
-        if (node.kind !== 'element') {
-            continue;
-        }
-
-        const scope: NativeStyleScope = {
+    const elementNodes = nodes.filter((node): node is NativeElementNode => node.kind === 'element');
+    for (const [index, node] of elementNodes.entries()) {
+        const scope = scopeSnapshots[index] ?? {
             tagName: node.sourceTag,
             classNames: getClassList(node),
             attributes: getSelectorAttributes(node),
@@ -1186,22 +1787,30 @@ function buildResolvedStyleMap(
             : hasClassStyles
                 ? classStyles
                 : undefined;
-        const resolvedStyle = ownStyle
+        const inheritedCurrentColor = parseCssColor(inheritedTextStyles.color, getDefaultCurrentColor()) ?? getDefaultCurrentColor();
+        const mergedStyle = ownStyle
             ? { ...inheritedTextStyles, ...ownStyle }
             : Object.keys(inheritedTextStyles).length > 0
                 ? { ...inheritedTextStyles }
                 : undefined;
+        const resolvedStyle = normalizeResolvedCurrentTextColor(mergedStyle, inheritedCurrentColor);
 
         if (resolvedStyle) {
             resolvedStyles.set(node, resolvedStyle);
         }
 
+        const nextScope: NativeStyleScope = {
+            ...scope,
+            ...resolveNativeContainerScope(resolvedStyle, options),
+        };
+
         buildResolvedStyleMap(
             node.children,
             options,
-            [...ancestors, scope],
+            [...ancestors, nextScope],
             resolvedStyles,
             pickInheritedTextStyles(resolvedStyle) ?? inheritedTextStyles,
+            scope.children ?? [],
         );
     }
 
@@ -1218,33 +1827,429 @@ function getStyleObject(
         return mappedStyle;
     }
 
-    const classStyles = styles.resolveNativeStyles({
+    const fallbackScope = buildNativeStyleScopeSnapshots([node])[0] ?? {
         tagName: node.sourceTag,
         classNames: getClassList(node),
         attributes: getSelectorAttributes(node),
         pseudoStates: getNativePseudoStates(node),
-    }, [], styleResolveOptions) as Record<string, NativePropValue>;
+    };
+    const classStyles = styles.resolveNativeStyles(fallbackScope, [], styleResolveOptions) as Record<string, NativePropValue>;
     const globalInheritedTextStyles = buildGlobalInheritedTextStyles(styleResolveOptions);
     const inlineStyle = getInlineStyleObject(node);
     const hasClassStyles = Object.keys(classStyles).length > 0;
     const hasGlobalInheritedTextStyles = Object.keys(globalInheritedTextStyles).length > 0;
+    const globalCurrentColor = parseCssColor(globalInheritedTextStyles.color, getDefaultCurrentColor()) ?? getDefaultCurrentColor();
 
     if (inlineStyle) {
-        return {
+        const mergedStyle = {
             ...globalInheritedTextStyles,
             ...(hasClassStyles ? classStyles : {}),
             ...inlineStyle,
         };
+
+        return normalizeResolvedCurrentTextColor(mergedStyle, globalCurrentColor);
     }
 
     if (!hasClassStyles && !hasGlobalInheritedTextStyles) {
         return undefined;
     }
 
-    return {
+    const mergedStyle = {
         ...globalInheritedTextStyles,
         ...(hasClassStyles ? classStyles : {}),
     };
+
+    return normalizeResolvedCurrentTextColor(mergedStyle, globalCurrentColor);
+}
+
+function resolveNativeItemOrder(
+    node: NativeNode,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): number {
+    if (node.kind !== 'element') {
+        return 0;
+    }
+
+    return parsePlainNumericValue(getStyleObject(node, resolvedStyles, styleResolveOptions)?.order) ?? 0;
+}
+
+function resolveNativeAvailableAxisSize(
+    node: NativeElementNode,
+    axis: 'horizontal' | 'vertical',
+    resolvedStyles: NativeResolvedStyleMap | undefined,
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): number {
+    if (node.component === 'Screen') {
+        return resolveAxisReferenceLength(axis, hints, styleResolveOptions);
+    }
+
+    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
+    const sizeKey = axis === 'horizontal' ? 'width' : 'height';
+    const minKey = axis === 'horizontal' ? 'minWidth' : 'minHeight';
+    const maxKey = axis === 'horizontal' ? 'maxWidth' : 'maxHeight';
+
+    if (style && isFillValue(style[sizeKey])) {
+        return resolveAxisReferenceLength(axis, hints, styleResolveOptions);
+    }
+
+    return resolveAxisUnitNumber(style?.[sizeKey], axis, hints, styleResolveOptions)
+        ?? resolveAxisUnitNumber(style?.[maxKey], axis, hints, styleResolveOptions)
+        ?? resolveAxisUnitNumber(style?.[minKey], axis, hints, styleResolveOptions)
+        ?? resolveAxisReferenceLength(axis, hints, styleResolveOptions);
+}
+
+function resolveNativeFlexContainerLayout(
+    node: NativeElementNode | undefined,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): 'Row' | 'Column' | undefined {
+    if (!node) {
+        return undefined;
+    }
+
+    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
+    if (!style) {
+        return undefined;
+    }
+
+    if (typeof style.flexDirection === 'string') {
+        return style.flexDirection.trim().toLowerCase() === 'row' ? 'Row' : 'Column';
+    }
+
+    const display = typeof style.display === 'string' ? style.display.trim().toLowerCase() : undefined;
+    if (display === 'flex' || display === 'inline-flex') {
+        return 'Row';
+    }
+
+    return undefined;
+}
+
+function hasExplicitNativeAxisSize(
+    node: NativeElementNode,
+    axis: 'horizontal' | 'vertical',
+    resolvedStyles?: NativeResolvedStyleMap,
+    hints?: NativeRenderHints,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): boolean {
+    if (node.component === 'Screen') {
+        return true;
+    }
+
+    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
+    if (!style) {
+        return false;
+    }
+
+    const sizeKey = axis === 'horizontal' ? 'width' : 'height';
+    const minKey = axis === 'horizontal' ? 'minWidth' : 'minHeight';
+    const maxKey = axis === 'horizontal' ? 'maxWidth' : 'maxHeight';
+
+    if (isFillValue(style[sizeKey])) {
+        return true;
+    }
+
+    return resolveAxisUnitNumber(style[sizeKey], axis, hints, styleResolveOptions) !== undefined
+        || resolveAxisUnitNumber(style[minKey], axis, hints, styleResolveOptions) !== undefined
+        || resolveAxisUnitNumber(style[maxKey], axis, hints, styleResolveOptions) !== undefined;
+}
+
+function shouldStretchFlexChildCrossAxis(
+    child: NativeNode,
+    parentFlexLayout: 'Row' | 'Column' | undefined,
+    parentNode: NativeElementNode | undefined,
+    parentHints: NativeRenderHints | undefined,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): boolean {
+    if (!parentFlexLayout || child.kind !== 'element' || !parentNode) {
+        return false;
+    }
+
+    const childStyle = getStyleObject(child, resolvedStyles, styleResolveOptions);
+    const childAlignSelf = resolveSelfAlignmentKeyword(childStyle?.alignSelf);
+    const childBaselineAlignSelf = resolveBaselineAlignmentKeyword(childStyle?.alignSelf);
+    if (childAlignSelf === 'stretch') {
+        return true;
+    }
+
+    if (childAlignSelf || childBaselineAlignSelf) {
+        return false;
+    }
+
+    const parentStyle = getStyleObject(parentNode, resolvedStyles, styleResolveOptions);
+    const parentAlignItems = resolveCrossAlignmentKeyword(parentStyle?.alignItems);
+    if (parentAlignItems !== undefined) {
+        return parentAlignItems === 'stretch';
+    }
+
+    return parentFlexLayout === 'Column'
+        || (parentFlexLayout === 'Row' && hasExplicitNativeAxisSize(parentNode, 'vertical', resolvedStyles, parentHints, styleResolveOptions));
+}
+
+function resolveNativeFlexMainAxisGap(
+    node: NativeElementNode,
+    layout: 'Row' | 'Column',
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): number {
+    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
+    if (!style) {
+        return 0;
+    }
+
+    return toScaledUnitNumber(
+        style.gap ?? (layout === 'Row' ? style.columnGap : style.rowGap) ?? style.gap,
+        styleResolveOptions,
+    ) ?? 0;
+}
+
+function resolveNativeFlexShrinkTargets(
+    parentNode: NativeElementNode | undefined,
+    orderedNodes: NativeNode[],
+    parentFlexLayout: 'Row' | 'Column' | undefined,
+    availableWidth: number | undefined,
+    availableHeight: number | undefined,
+    parentHints: NativeRenderHints | undefined,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): WeakMap<NativeElementNode, number> {
+    const targets = new WeakMap<NativeElementNode, number>();
+
+    if (!parentNode || !parentFlexLayout || !orderedNodes.every((child) => child.kind === 'element')) {
+        return targets;
+    }
+
+    const mainAxis = parentFlexLayout === 'Row' ? 'horizontal' : 'vertical';
+    const availableMainSize = parentFlexLayout === 'Row' ? availableWidth : availableHeight;
+    if (availableMainSize === undefined) {
+        return targets;
+    }
+
+    if (!hasExplicitNativeAxisSize(parentNode, mainAxis, resolvedStyles, parentHints, styleResolveOptions)) {
+        return targets;
+    }
+
+    const availableItemsSize = Math.max(
+        0,
+        availableMainSize - (resolveNativeFlexMainAxisGap(parentNode, parentFlexLayout, resolvedStyles, styleResolveOptions) * Math.max(0, orderedNodes.length - 1)),
+    );
+    const childHints: NativeRenderHints = {
+        availableWidth,
+        availableHeight,
+    };
+    const sizeKey = mainAxis === 'horizontal' ? 'width' : 'height';
+    const minSizeKey = mainAxis === 'horizontal' ? 'minWidth' : 'minHeight';
+    const maxSizeKey = mainAxis === 'horizontal' ? 'maxWidth' : 'maxHeight';
+    const shrinkableItems: Array<{
+        node: NativeElementNode;
+        baseSize: number;
+        remainingSize: number;
+        shrinkWeight: number;
+        minSize: number;
+    }> = [];
+    let occupiedSize = 0;
+
+    for (const child of orderedNodes) {
+        const elementChild = child as NativeElementNode;
+        const childStyle = getStyleObject(elementChild, resolvedStyles, styleResolveOptions);
+        if (!childStyle) {
+            continue;
+        }
+
+        const flexStyle = resolveFlexStyleValues(childStyle);
+        const minSize = resolveAxisUnitNumber(childStyle[minSizeKey], mainAxis, childHints, styleResolveOptions) ?? 0;
+        const maxSize = resolveAxisUnitNumber(childStyle[maxSizeKey], mainAxis, childHints, styleResolveOptions);
+        let baseSize = resolveAxisUnitNumber(flexStyle.basis, mainAxis, childHints, styleResolveOptions)
+            ?? resolveAxisUnitNumber(childStyle[sizeKey], mainAxis, childHints, styleResolveOptions);
+        if (baseSize === undefined || baseSize <= 0.0001) {
+            continue;
+        }
+
+        if (maxSize !== undefined) {
+            baseSize = Math.min(baseSize, maxSize);
+        }
+        baseSize = Math.max(baseSize, minSize);
+
+        const shrink = flexStyle.shrink ?? 1;
+        if (shrink === 0) {
+            occupiedSize += baseSize;
+            continue;
+        }
+
+        shrinkableItems.push({
+            node: elementChild,
+            baseSize,
+            remainingSize: baseSize,
+            shrinkWeight: baseSize * Math.max(shrink, 0),
+            minSize,
+        });
+        occupiedSize += baseSize;
+    }
+
+    const overflow = occupiedSize - availableItemsSize;
+    if (overflow <= 0.0001 || shrinkableItems.length === 0) {
+        return targets;
+    }
+
+    let remainingOverflow = overflow;
+    let activeItems = [...shrinkableItems];
+    while (remainingOverflow > 0.0001 && activeItems.length > 0) {
+        const totalShrinkWeight = activeItems.reduce((total, item) => total + item.shrinkWeight, 0);
+        if (totalShrinkWeight <= 0.0001) {
+            break;
+        }
+
+        let clampedThisPass = false;
+        for (const item of activeItems) {
+            const proportionalReduction = remainingOverflow * (item.shrinkWeight / totalShrinkWeight);
+            const nextSize = item.remainingSize - proportionalReduction;
+            if (nextSize > item.minSize + 0.0001) {
+                continue;
+            }
+
+            remainingOverflow -= Math.max(0, item.remainingSize - item.minSize);
+            item.remainingSize = item.minSize;
+            clampedThisPass = true;
+        }
+
+        if (clampedThisPass) {
+            activeItems = activeItems.filter((item) => item.remainingSize > item.minSize + 0.0001);
+            continue;
+        }
+
+        for (const item of activeItems) {
+            const proportionalReduction = remainingOverflow * (item.shrinkWeight / totalShrinkWeight);
+            item.remainingSize = Math.max(item.minSize, item.remainingSize - proportionalReduction);
+        }
+        remainingOverflow = 0;
+    }
+
+    for (const item of shrinkableItems) {
+        if (item.remainingSize < item.baseSize - 0.0001) {
+            targets.set(item.node, item.remainingSize);
+        }
+    }
+
+    return targets;
+}
+
+function resolvePositionMode(value: NativePropValue | undefined): 'relative' | 'absolute' | 'fixed' | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'relative' || normalized === 'absolute' || normalized === 'fixed'
+        ? normalized
+        : undefined;
+}
+
+function isAbsolutelyPositionedNode(
+    node: NativeNode,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): boolean {
+    if (node.kind !== 'element') {
+        return false;
+    }
+
+    return resolvePositionMode(getStyleObject(node, resolvedStyles, styleResolveOptions)?.position) === 'absolute';
+}
+
+function isFixedPositionedNode(
+    node: NativeNode,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): boolean {
+    if (node.kind !== 'element') {
+        return false;
+    }
+
+    return resolvePositionMode(getStyleObject(node, resolvedStyles, styleResolveOptions)?.position) === 'fixed';
+}
+
+function splitAbsolutePositionedChildren(
+    nodes: NativeNode[],
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): { flowChildren: NativeNode[]; absoluteChildren: NativeElementNode[] } {
+    const flowChildren: NativeNode[] = [];
+    const absoluteChildren: NativeElementNode[] = [];
+
+    for (const node of nodes) {
+        if (isAbsolutelyPositionedNode(node, resolvedStyles, styleResolveOptions)) {
+            absoluteChildren.push(node as NativeElementNode);
+            continue;
+        }
+
+        flowChildren.push(node);
+    }
+
+    return { flowChildren, absoluteChildren };
+}
+
+function splitFixedPositionedChildren(
+    nodes: NativeNode[],
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): { flowChildren: NativeNode[]; fixedChildren: NativeElementNode[] } {
+    const flowChildren: NativeNode[] = [];
+    const fixedChildren: NativeElementNode[] = [];
+
+    for (const node of nodes) {
+        if (isFixedPositionedNode(node, resolvedStyles, styleResolveOptions)) {
+            fixedChildren.push(node as NativeElementNode);
+            continue;
+        }
+
+        flowChildren.push(node);
+    }
+
+    return { flowChildren, fixedChildren };
+}
+
+function shouldApplyNativeItemOrdering(
+    parentNode: NativeElementNode,
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): boolean {
+    const style = getStyleObject(parentNode, resolvedStyles, styleResolveOptions);
+    const display = typeof style?.display === 'string'
+        ? style.display.trim().toLowerCase()
+        : undefined;
+
+    return display === 'flex'
+        || display === 'inline-flex'
+        || display === 'grid'
+        || display === 'inline-grid'
+        || typeof style?.flexDirection === 'string';
+}
+
+function getOrderedNativeChildren(
+    parentNode: NativeElementNode,
+    nodes: NativeNode[],
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): NativeNode[] {
+    if (!shouldApplyNativeItemOrdering(parentNode, resolvedStyles, styleResolveOptions)) {
+        return nodes;
+    }
+
+    const orderedEntries = nodes.map((node, index) => ({
+        node,
+        index,
+        order: resolveNativeItemOrder(node, resolvedStyles, styleResolveOptions),
+    }));
+
+    if (!orderedEntries.some((entry) => entry.order !== 0)) {
+        return nodes;
+    }
+
+    return [...orderedEntries]
+        .sort((left, right) => left.order - right.order || left.index - right.index)
+        .map((entry) => entry.node);
 }
 
 function getNativeBindingReference(node: NativeElementNode): NativeBindingReference | undefined {
@@ -1767,7 +2772,7 @@ function estimateNodePreferredWidth(
         return styleResolveOptions.viewportWidth ?? 390;
     }
 
-    const explicitWidth = toScaledUnitNumber(style?.width ?? style?.minWidth, styleResolveOptions);
+    const explicitWidth = resolveAxisUnitNumber(style?.width ?? style?.minWidth, 'horizontal', undefined, styleResolveOptions);
     if (explicitWidth !== undefined && explicitWidth > 0) {
         return explicitWidth;
     }
@@ -1862,6 +2867,7 @@ function resolveChunkedLayout(
         return undefined;
     }
 
+    const orderedChildren = getOrderedNativeChildren(node, node.children, resolvedStyles, styleResolveOptions);
     const viewportWidth = styleResolveOptions.viewportWidth ?? 390;
     const rowGap = toScaledUnitNumber(style.rowGap ?? style.gap, styleResolveOptions);
     const columnGap = toScaledUnitNumber(style.columnGap ?? style.gap, styleResolveOptions) ?? rowGap ?? 0;
@@ -1872,7 +2878,7 @@ function resolveChunkedLayout(
         if (weights && weights.length > 1) {
             return {
                 kind: 'grid',
-                rows: chunkNodesIntoGridRows(node.children, weights),
+                rows: chunkNodesIntoGridRows(orderedChildren, weights),
                 rowGap,
                 columnGap,
             };
@@ -1881,7 +2887,7 @@ function resolveChunkedLayout(
 
     if (isWrapEnabled(style) && isRowFlexLayout(style)) {
         const availableWidth = Math.max(160, viewportWidth - estimateHorizontalPadding(style, styleResolveOptions));
-        const rows = chunkNodesIntoWrappedRows(node.children, availableWidth, columnGap, resolvedStyles, styleResolveOptions);
+        const rows = chunkNodesIntoWrappedRows(orderedChildren, availableWidth, columnGap, resolvedStyles, styleResolveOptions);
         if (rows.length > 1) {
             return {
                 kind: 'wrap',
@@ -1930,8 +2936,8 @@ function hasNativeContainerDecoration(
     return resolveBackgroundGradient(style) !== undefined
         || resolveBackgroundColor(style, styleResolveOptions) !== undefined
         || resolveBackdropBlurRadius(style, styleResolveOptions) !== undefined
-        || parseBorderValue(style.border, (value) => toDpLiteral(value, styleResolveOptions)) !== undefined
-        || parseBoxShadow(style.boxShadow) !== undefined;
+        || resolveNativeBorder(style, (value) => toDpLiteral(value, styleResolveOptions)) !== undefined
+        || parseBoxShadow(style.boxShadow, resolveStyleCurrentColor(style)) !== undefined;
 }
 
 function shouldDefaultFillWidthHint(
@@ -1969,20 +2975,171 @@ function isFillValue(value: NativePropValue | undefined): boolean {
 
 function extractColorToken(value: string): string | undefined {
     const trimmed = value.trim();
-    const directMatch = trimmed.match(/^(rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8})$/);
+    const directMatch = trimmed.match(/^((?:rgba?|hsla?|hwb)\([^\)]+\)|#[0-9a-fA-F]{3,8}|currentcolor)$/i);
     if (directMatch) {
         return directMatch[1];
     }
 
-    const embeddedMatch = trimmed.match(/(rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8})/);
-    return embeddedMatch?.[1];
+    const normalized = trimmed.toLowerCase();
+    if (normalized === CURRENT_COLOR_KEYWORD) {
+        return normalized;
+    }
+
+    if (CSS_NAMED_COLORS[normalized]) {
+        return normalized;
+    }
+
+    const embeddedMatch = trimmed.match(/((?:rgba?|hsla?|hwb)\([^\)]+\)|#[0-9a-fA-F]{3,8}|currentcolor)/i);
+    if (embeddedMatch) {
+        return embeddedMatch[1];
+    }
+
+    const functionNameMatch = trimmed.match(/([a-z-]+)\(/i);
+    if (functionNameMatch) {
+        const functionName = functionNameMatch[1].toLowerCase();
+        if (functionName !== 'rgb' && functionName !== 'rgba' && functionName !== 'hsl' && functionName !== 'hsla' && functionName !== 'hwb') {
+            return undefined;
+        }
+    }
+
+    return trimmed
+        .toLowerCase()
+        .split(/[^a-z-]+/)
+        .find((token) => token.length > 0 && (token === CURRENT_COLOR_KEYWORD || Boolean(CSS_NAMED_COLORS[token])));
 }
 
-function parseCssColor(value: NativePropValue | undefined): NativeColorValue | undefined {
+function parseCssHue(value: string): number | undefined {
+    const match = value.trim().toLowerCase().match(/^(-?(?:\d+|\d*\.\d+))(deg|grad|rad|turn)?$/);
+    if (!match) {
+        return undefined;
+    }
+
+    const numericValue = Number(match[1]);
+    if (!Number.isFinite(numericValue)) {
+        return undefined;
+    }
+
+    switch (match[2] ?? 'deg') {
+        case 'turn':
+            return numericValue * 360;
+        case 'rad':
+            return numericValue * (180 / Math.PI);
+        case 'grad':
+            return numericValue * 0.9;
+        default:
+            return numericValue;
+    }
+}
+
+function parseCssPercentageChannel(value: string): number | undefined {
+    const match = value.trim().match(/^(-?(?:\d+|\d*\.\d+))%$/);
+    if (!match) {
+        return undefined;
+    }
+
+    const numericValue = Number(match[1]);
+    return Number.isFinite(numericValue) ? Math.max(0, Math.min(100, numericValue)) / 100 : undefined;
+}
+
+function parseCssAlphaValue(value: string): number | undefined {
+    const trimmed = value.trim();
+    if (trimmed.endsWith('%')) {
+        const percentage = Number(trimmed.slice(0, -1));
+        return Number.isFinite(percentage) ? Math.max(0, Math.min(100, percentage)) / 100 : undefined;
+    }
+
+    const numericValue = Number(trimmed);
+    return Number.isFinite(numericValue) ? Math.max(0, Math.min(1, numericValue)) : undefined;
+}
+
+function parseCssColorFunctionArguments(value: string): string[] {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return [];
+    }
+
+    if (trimmed.includes(',')) {
+        return splitCssFunctionArguments(trimmed).map((part) => part.trim()).filter(Boolean);
+    }
+
+    const alphaSplit = trimmed.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+    if (alphaSplit.length === 0 || alphaSplit.length > 2) {
+        return [];
+    }
+
+    const channels = alphaSplit[0].split(/\s+/).filter(Boolean);
+    return alphaSplit[1] ? [...channels, alphaSplit[1]] : channels;
+}
+
+function parseCssRgbChannel(value: string): number | undefined {
+    const trimmed = value.trim();
+    if (trimmed.endsWith('%')) {
+        const percentage = Number(trimmed.slice(0, -1));
+        return Number.isFinite(percentage)
+            ? Math.round((Math.max(0, Math.min(100, percentage)) / 100) * 255)
+            : undefined;
+    }
+
+    const numericValue = Number(trimmed);
+    return Number.isFinite(numericValue)
+        ? Math.round(Math.max(0, Math.min(255, numericValue)))
+        : undefined;
+}
+
+function hslToRgb(hue: number, saturation: number, lightness: number): { red: number; green: number; blue: number } {
+    const normalizedHue = ((hue % 360) + 360) % 360;
+    const chroma = (1 - Math.abs((2 * lightness) - 1)) * saturation;
+    const segment = normalizedHue / 60;
+    const x = chroma * (1 - Math.abs((segment % 2) - 1));
+
+    const [redPrime, greenPrime, bluePrime] = segment < 1
+        ? [chroma, x, 0]
+        : segment < 2
+            ? [x, chroma, 0]
+            : segment < 3
+                ? [0, chroma, x]
+                : segment < 4
+                    ? [0, x, chroma]
+                    : segment < 5
+                        ? [x, 0, chroma]
+                        : [chroma, 0, x];
+
+    const adjustment = lightness - (chroma / 2);
+    return {
+        red: Math.round((redPrime + adjustment) * 255),
+        green: Math.round((greenPrime + adjustment) * 255),
+        blue: Math.round((bluePrime + adjustment) * 255),
+    };
+}
+
+function hwbToRgb(hue: number, whiteness: number, blackness: number): { red: number; green: number; blue: number } {
+    const sum = whiteness + blackness;
+    const normalizedWhiteness = sum > 1 ? whiteness / sum : whiteness;
+    const normalizedBlackness = sum > 1 ? blackness / sum : blackness;
+    const pureHue = hslToRgb(hue, 1, 0.5);
+    const factor = Math.max(0, 1 - normalizedWhiteness - normalizedBlackness);
+
+    return {
+        red: Math.round(((pureHue.red / 255) * factor + normalizedWhiteness) * 255),
+        green: Math.round(((pureHue.green / 255) * factor + normalizedWhiteness) * 255),
+        blue: Math.round(((pureHue.blue / 255) * factor + normalizedWhiteness) * 255),
+    };
+}
+
+function parseCssColor(value: NativePropValue | undefined, currentColor: NativeColorValue = getDefaultCurrentColor()): NativeColorValue | undefined {
     if (typeof value !== 'string') return undefined;
 
     const token = extractColorToken(value);
     if (!token) return undefined;
+
+    if (token.toLowerCase() === CURRENT_COLOR_KEYWORD) {
+        return cloneNativeColor(currentColor) ?? getDefaultCurrentColor();
+    }
+
+    const namedColor = CSS_NAMED_COLORS[token.toLowerCase()];
+    if (namedColor) {
+        return { ...namedColor };
+    }
 
     const hexMatch = token.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
     if (hexMatch) {
@@ -2004,18 +3161,60 @@ function parseCssColor(value: NativePropValue | undefined): NativeColorValue | u
         return { red, green, blue, alpha };
     }
 
+    const hslMatch = token.match(/^hsla?\(([^\)]+)\)$/i);
+    if (hslMatch) {
+        const parts = parseCssColorFunctionArguments(hslMatch[1]);
+        if (parts.length < 3) {
+            return undefined;
+        }
+
+        const hue = parseCssHue(parts[0]);
+        const saturation = parseCssPercentageChannel(parts[1]);
+        const lightness = parseCssPercentageChannel(parts[2]);
+        const alpha = parts[3] !== undefined ? parseCssAlphaValue(parts[3]) : 1;
+        if (hue === undefined || saturation === undefined || lightness === undefined || alpha === undefined) {
+            return undefined;
+        }
+
+        return {
+            ...hslToRgb(hue, saturation, lightness),
+            alpha,
+        };
+    }
+
+    const hwbMatch = token.match(/^hwb\(([^\)]+)\)$/i);
+    if (hwbMatch) {
+        const parts = parseCssColorFunctionArguments(hwbMatch[1]);
+        if (parts.length < 3) {
+            return undefined;
+        }
+
+        const hue = parseCssHue(parts[0]);
+        const whiteness = parseCssPercentageChannel(parts[1]);
+        const blackness = parseCssPercentageChannel(parts[2]);
+        const alpha = parts[3] !== undefined ? parseCssAlphaValue(parts[3]) : 1;
+        if (hue === undefined || whiteness === undefined || blackness === undefined || alpha === undefined) {
+            return undefined;
+        }
+
+        return {
+            ...hwbToRgb(hue, whiteness, blackness),
+            alpha,
+        };
+    }
+
     const rgbMatch = token.match(/^rgba?\(([^\)]+)\)$/i);
     if (!rgbMatch) return undefined;
 
-    const parts = rgbMatch[1].split(',').map((part) => part.trim());
+    const parts = parseCssColorFunctionArguments(rgbMatch[1]);
     if (parts.length < 3) return undefined;
 
-    const red = Number(parts[0]);
-    const green = Number(parts[1]);
-    const blue = Number(parts[2]);
-    const alpha = parts[3] !== undefined ? Number(parts[3]) : 1;
+    const red = parseCssRgbChannel(parts[0]);
+    const green = parseCssRgbChannel(parts[1]);
+    const blue = parseCssRgbChannel(parts[2]);
+    const alpha = parts[3] !== undefined ? parseCssAlphaValue(parts[3]) : 1;
 
-    if ([red, green, blue, alpha].some((item) => Number.isNaN(item))) {
+    if (alpha === undefined || red === undefined || green === undefined || blue === undefined) {
         return undefined;
     }
 
@@ -2096,21 +3295,26 @@ function resolveGradientDirection(angle: number | undefined): NativeGradientDire
         : 'bottomTrailingToTopLeading';
 }
 
-function parseLinearGradient(value: NativePropValue | undefined): NativeGradientValue | undefined {
+function parseLinearGradient(value: NativePropValue | undefined, currentColor: NativeColorValue = getDefaultCurrentColor()): NativeGradientValue | undefined {
     if (typeof value !== 'string') return undefined;
 
     const trimmed = value.trim();
-    if (!/^linear-gradient\(/i.test(trimmed)) {
+    const gradientMatch = trimmed.match(/^linear-gradient\((.*)\)$/i);
+    if (!gradientMatch) {
         return undefined;
     }
 
-    const colorTokens = trimmed.match(/rgba?\([^\)]+\)|#[0-9a-fA-F]{3,8}/g);
-    if (!colorTokens || colorTokens.length < 2) {
+    const segments = splitCssFunctionArguments(gradientMatch[1]).map((segment) => segment.trim()).filter(Boolean);
+    if (segments.length < 2) {
         return undefined;
     }
 
-    const colors = colorTokens
-        .map((token) => parseCssColor(token))
+    const colorSegments = /^(-?\d+(?:\.\d+)?)deg$/i.test(segments[0]) || /^to\s+/i.test(segments[0])
+        ? segments.slice(1)
+        : segments;
+
+    const colors = colorSegments
+        .map((token) => parseCssColor(token, currentColor))
         .filter((color): color is NativeColorValue => Boolean(color));
     if (colors.length < 2) {
         return undefined;
@@ -2175,11 +3379,11 @@ function toSwiftGradientLiteral(gradient: NativeGradientValue): string {
     return `LinearGradient(colors: [${colors}], startPoint: ${startPoint}, endPoint: ${endPoint})`;
 }
 
-function parseBoxShadow(value: NativePropValue | undefined): NativeShadowValue | undefined {
+function parseBoxShadow(value: NativePropValue | undefined, currentColor: NativeColorValue = getDefaultCurrentColor()): NativeShadowValue | undefined {
     if (typeof value !== 'string') return undefined;
 
     const colorToken = extractColorToken(value);
-    const color = parseCssColor(colorToken ?? value);
+    const color = parseCssColor(colorToken ?? value, currentColor);
     if (!color) {
         return undefined;
     }
@@ -2235,6 +3439,297 @@ function resolveBackdropBlurRadius(
     return parseBlurFilterRadius(style.backdropFilter, styleResolveOptions);
 }
 
+interface NativeTransformValue {
+    translateX?: number;
+    translateY?: number;
+    scaleX?: number;
+    scaleY?: number;
+    rotationDegrees?: number;
+}
+
+function parseCssAngleDegrees(value: string): number | undefined {
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === '0') {
+        return 0;
+    }
+
+    const match = trimmed.match(/^(-?(?:\d+|\d*\.\d+))deg$/);
+    if (!match) {
+        return undefined;
+    }
+
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseNativeTransform(
+    value: NativePropValue | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): NativeTransformValue | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'none') {
+        return undefined;
+    }
+
+    const transform: NativeTransformValue = {};
+    const pattern = /([a-z-]+)\(([^()]*)\)/gi;
+    let matched = false;
+
+    for (const match of trimmed.matchAll(pattern)) {
+        matched = true;
+        const functionName = match[1].toLowerCase();
+        const args = splitCssFunctionArguments(match[2]);
+
+        if (functionName === 'translate') {
+            const x = toScaledUnitNumber(args[0], styleResolveOptions);
+            const y = args[1] ? toScaledUnitNumber(args[1], styleResolveOptions) : 0;
+            if (x !== undefined) {
+                transform.translateX = (transform.translateX ?? 0) + x;
+            }
+            if (y !== undefined) {
+                transform.translateY = (transform.translateY ?? 0) + y;
+            }
+            continue;
+        }
+
+        if (functionName === 'translatex') {
+            const x = toScaledUnitNumber(args[0], styleResolveOptions);
+            if (x !== undefined) {
+                transform.translateX = (transform.translateX ?? 0) + x;
+            }
+            continue;
+        }
+
+        if (functionName === 'translatey') {
+            const y = toScaledUnitNumber(args[0], styleResolveOptions);
+            if (y !== undefined) {
+                transform.translateY = (transform.translateY ?? 0) + y;
+            }
+            continue;
+        }
+
+        if (functionName === 'scale') {
+            const x = parsePlainNumericValue(args[0]);
+            const y = args[1] ? parsePlainNumericValue(args[1]) : x;
+            if (x !== undefined) {
+                transform.scaleX = (transform.scaleX ?? 1) * x;
+            }
+            if (y !== undefined) {
+                transform.scaleY = (transform.scaleY ?? 1) * y;
+            }
+            continue;
+        }
+
+        if (functionName === 'scalex') {
+            const x = parsePlainNumericValue(args[0]);
+            if (x !== undefined) {
+                transform.scaleX = (transform.scaleX ?? 1) * x;
+            }
+            continue;
+        }
+
+        if (functionName === 'scaley') {
+            const y = parsePlainNumericValue(args[0]);
+            if (y !== undefined) {
+                transform.scaleY = (transform.scaleY ?? 1) * y;
+            }
+            continue;
+        }
+
+        if (functionName === 'rotate') {
+            const rotation = parseCssAngleDegrees(args[0] ?? '');
+            if (rotation !== undefined) {
+                transform.rotationDegrees = (transform.rotationDegrees ?? 0) + rotation;
+            }
+        }
+    }
+
+    return matched && Object.keys(transform).length > 0 ? transform : undefined;
+}
+
+function resolveCrossAlignmentKeyword(
+    value: NativePropValue | undefined,
+): 'start' | 'center' | 'end' | 'stretch' | 'baseline' | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    switch (normalized) {
+        case 'flex-start':
+        case 'start':
+        case 'left':
+        case 'top':
+        case 'self-start':
+            return 'start';
+        case 'center':
+            return 'center';
+        case 'flex-end':
+        case 'end':
+        case 'right':
+        case 'bottom':
+        case 'self-end':
+            return 'end';
+        case 'normal':
+        case 'stretch':
+            return 'stretch';
+        case 'baseline':
+        case 'first baseline':
+        case 'last baseline':
+            return 'baseline';
+        default:
+            return undefined;
+    }
+}
+
+function resolveBaselineAlignmentKeyword(value: NativePropValue | undefined): 'first' | 'last' | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'last baseline') {
+        return 'last';
+    }
+
+    if (normalized === 'baseline' || normalized === 'first baseline') {
+        return 'first';
+    }
+
+    return undefined;
+}
+
+function resolveRowBaselineSelfAlignment(
+    nodes: NativeNode[],
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): 'first' | 'last' | undefined {
+    let hasFirstBaseline = false;
+
+    for (const node of nodes) {
+        if (node.kind !== 'element' || node.component !== 'Text') {
+            continue;
+        }
+
+        const baselineAlignment = resolveBaselineAlignmentKeyword(getStyleObject(node, resolvedStyles, styleResolveOptions)?.alignSelf);
+        if (baselineAlignment === 'last') {
+            return 'last';
+        }
+
+        if (baselineAlignment === 'first') {
+            hasFirstBaseline = true;
+        }
+    }
+
+    return hasFirstBaseline ? 'first' : undefined;
+}
+
+function resolveSelfAlignmentKeyword(value: NativePropValue | undefined): 'start' | 'center' | 'end' | 'stretch' | undefined {
+    const alignment = resolveCrossAlignmentKeyword(value);
+    return alignment === 'baseline' ? undefined : alignment;
+}
+
+function resolveComposeSelfAlignmentCall(
+    parentFlexLayout: 'Row' | 'Column' | undefined,
+    style: Record<string, NativePropValue> | undefined,
+): string | undefined {
+    const alignSelf = resolveSelfAlignmentKeyword(style?.alignSelf);
+    if (!alignSelf || !parentFlexLayout) {
+        return undefined;
+    }
+
+    if (alignSelf === 'stretch') {
+        if (parentFlexLayout === 'Row') {
+            return style?.height === undefined && style?.minHeight === undefined && style?.maxHeight === undefined
+                ? 'fillMaxHeight()'
+                : undefined;
+        }
+
+        return style?.width === undefined && style?.minWidth === undefined && style?.maxWidth === undefined
+            ? 'fillMaxWidth()'
+            : undefined;
+    }
+
+    if (parentFlexLayout === 'Row') {
+        switch (alignSelf) {
+            case 'center':
+                return 'align(Alignment.CenterVertically)';
+            case 'end':
+                return 'align(Alignment.Bottom)';
+            default:
+                return 'align(Alignment.Top)';
+        }
+    }
+
+    switch (alignSelf) {
+        case 'center':
+            return 'align(Alignment.CenterHorizontally)';
+        case 'end':
+            return 'align(Alignment.End)';
+        default:
+            return 'align(Alignment.Start)';
+    }
+}
+
+function resolveSwiftSelfAlignmentModifier(
+    parentFlexLayout: 'Row' | 'Column' | undefined,
+    style: Record<string, NativePropValue> | undefined,
+): string | undefined {
+    const alignSelf = resolveSelfAlignmentKeyword(style?.alignSelf);
+    if (!alignSelf || !parentFlexLayout) {
+        return undefined;
+    }
+
+    if (alignSelf === 'stretch') {
+        if (parentFlexLayout === 'Row') {
+            return style?.height === undefined && style?.minHeight === undefined && style?.maxHeight === undefined
+                ? '.frame(maxHeight: .infinity, alignment: .topLeading)'
+                : undefined;
+        }
+
+        return style?.width === undefined && style?.minWidth === undefined && style?.maxWidth === undefined
+            ? '.frame(maxWidth: .infinity, alignment: .leading)'
+            : undefined;
+    }
+
+    if (parentFlexLayout === 'Row') {
+        switch (alignSelf) {
+            case 'center':
+                return '.frame(maxHeight: .infinity, alignment: .center)';
+            case 'end':
+                return '.frame(maxHeight: .infinity, alignment: .bottomLeading)';
+            default:
+                return '.frame(maxHeight: .infinity, alignment: .topLeading)';
+        }
+    }
+
+    switch (alignSelf) {
+        case 'center':
+            return '.frame(maxWidth: .infinity, alignment: .center)';
+        case 'end':
+            return '.frame(maxWidth: .infinity, alignment: .trailing)';
+        default:
+            return '.frame(maxWidth: .infinity, alignment: .leading)';
+    }
+}
+
+function resolvePositionInsets(
+    style: Record<string, NativePropValue> | undefined,
+    hints: NativeRenderHints | undefined,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): { top?: number; right?: number; bottom?: number; left?: number } {
+    return {
+        top: resolveAxisUnitNumber(style?.top, 'vertical', hints, styleResolveOptions),
+        right: resolveAxisUnitNumber(style?.right, 'horizontal', hints, styleResolveOptions),
+        bottom: resolveAxisUnitNumber(style?.bottom, 'vertical', hints, styleResolveOptions),
+        left: resolveAxisUnitNumber(style?.left, 'horizontal', hints, styleResolveOptions),
+    };
+}
+
 function liftColorAlpha(color: NativeColorValue, delta: number): NativeColorValue {
     return {
         ...color,
@@ -2246,10 +3741,11 @@ function resolveBackgroundColor(
     style: Record<string, NativePropValue>,
     styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
 ): NativeColorValue | undefined {
+    const currentColor = resolveStyleCurrentColor(style);
     const background = typeof style.background === 'string' && /^linear-gradient\(/i.test(style.background.trim())
         ? undefined
-        : parseCssColor(style.background);
-    const resolved = parseCssColor(style.backgroundColor) ?? background;
+        : parseCssColor(style.background, currentColor);
+    const resolved = parseCssColor(style.backgroundColor, currentColor) ?? background;
     const backdropBlur = resolved ? resolveBackdropBlurRadius(style, styleResolveOptions) : undefined;
 
     if (!resolved || backdropBlur === undefined || resolved.alpha >= 1) {
@@ -2260,24 +3756,336 @@ function resolveBackgroundColor(
 }
 
 function resolveBackgroundGradient(style: Record<string, NativePropValue>): NativeGradientValue | undefined {
-    return parseLinearGradient(style.background);
+    return parseLinearGradient(style.background, resolveStyleCurrentColor(style));
 }
 
 function parseBorderValue(
     value: NativePropValue | undefined,
     unitParser: (value: NativePropValue | undefined) => string | undefined,
-): { width?: string; color?: NativeColorValue } | undefined {
+    currentColor: NativeColorValue,
+): { width?: string; color?: NativeColorValue; style?: NativeBorderStyleKeyword } | undefined {
     if (typeof value !== 'string') return undefined;
 
     const widthMatch = value.match(/-?\d+(?:\.\d+)?(?:px|dp|pt)?/i);
     const width = widthMatch ? unitParser(widthMatch[0]) : undefined;
-    const color = parseCssColor(value);
+    const color = parseCssColor(value, currentColor);
+    const style = parseBorderStyleKeyword(value);
 
-    if (!width && !color) {
+    if (!width && !color && !style) {
         return undefined;
     }
 
-    return { width, color };
+    return { width, color, style };
+}
+
+function parseBorderStyleKeyword(value: NativePropValue | undefined): NativeBorderStyleKeyword | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+        return undefined;
+    }
+
+    if (/(^|\s)(none|hidden)(\s|$)/.test(normalized)) {
+        return 'none';
+    }
+
+    if (/(^|\s)solid(\s|$)/.test(normalized)) {
+        return 'solid';
+    }
+
+    if (/(^|\s)dashed(\s|$)/.test(normalized)) {
+        return 'dashed';
+    }
+
+    if (/(^|\s)dotted(\s|$)/.test(normalized)) {
+        return 'dotted';
+    }
+
+    if (/(^|\s)(double|groove|ridge|inset|outset)(\s|$)/.test(normalized)) {
+        return 'unsupported';
+    }
+
+    return undefined;
+}
+
+function areNativeColorsEqual(left: NativeColorValue | undefined, right: NativeColorValue | undefined): boolean {
+    if (!left || !right) {
+        return left === right;
+    }
+
+    return left.red === right.red
+        && left.green === right.green
+        && left.blue === right.blue
+        && Math.abs(left.alpha - right.alpha) < 0.0001;
+}
+
+function parseNativeBorderNumericWidth(width: string): number {
+    const parsedWidth = Number.parseFloat(width);
+    return Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : 1;
+}
+
+function buildComposeBorderLineCap(style: NativeBorderStyleKeyword | undefined): string {
+    return style === 'dotted'
+        ? 'androidx.compose.ui.graphics.StrokeCap.Round'
+        : 'androidx.compose.ui.graphics.StrokeCap.Square';
+}
+
+function buildComposeBorderJoinInset(side: NativeBorderSideValue | undefined, strokeVariable: string): string {
+    return side ? `${side.width}.toPx() / 2f` : `${strokeVariable} / 2f`;
+}
+
+function buildComposeBorderDashPattern(style: NativeBorderStyleKeyword | undefined, strokeVariable: string): string | undefined {
+    if (style === 'dotted') {
+        return `floatArrayOf(${strokeVariable}, ${strokeVariable} * 1.5f)`;
+    }
+
+    if (style === 'dashed') {
+        return `floatArrayOf(${strokeVariable} * 3f, ${strokeVariable} * 2f)`;
+    }
+
+    return undefined;
+}
+
+function buildSwiftBorderDashPattern(style: NativeBorderStyleKeyword | undefined, widthValue: number): string | undefined {
+    if (style === 'dotted') {
+        return `[${formatFloat(widthValue)}, ${formatFloat(widthValue * 1.5)}]`;
+    }
+
+    if (style === 'dashed') {
+        return `[${formatFloat(widthValue * 3)}, ${formatFloat(widthValue * 2)}]`;
+    }
+
+    return undefined;
+}
+
+function buildSwiftBorderLineCap(style: NativeBorderStyleKeyword | undefined): string {
+    return style === 'dotted' ? '.round' : '.square';
+}
+
+function buildSwiftBorderJoinInset(side: NativeBorderSideValue | undefined, widthValue: number): string {
+    return side ? `CGFloat(${side.width}) / 2` : `CGFloat(${formatFloat(widthValue)}) / 2`;
+}
+
+function resolveNativeBorder(
+    style: Record<string, NativePropValue>,
+    unitParser: (value: NativePropValue | undefined) => string | undefined,
+): NativeBorderValue | undefined {
+    const currentColor = resolveStyleCurrentColor(style);
+    const shorthandBorder = parseBorderValue(style.border, unitParser, currentColor);
+    const globalWidth = unitParser(style.borderWidth) ?? shorthandBorder?.width;
+    const globalColor = parseCssColor(style.borderColor, currentColor) ?? shorthandBorder?.color;
+    const globalStyle = parseBorderStyleKeyword(style.borderStyle) ?? shorthandBorder?.style;
+    const sideKeys = [
+        { shorthand: 'borderTop', width: 'borderTopWidth', color: 'borderTopColor', style: 'borderTopStyle' },
+        { shorthand: 'borderRight', width: 'borderRightWidth', color: 'borderRightColor', style: 'borderRightStyle' },
+        { shorthand: 'borderBottom', width: 'borderBottomWidth', color: 'borderBottomColor', style: 'borderBottomStyle' },
+        { shorthand: 'borderLeft', width: 'borderLeftWidth', color: 'borderLeftColor', style: 'borderLeftStyle' },
+    ] as const;
+    const hasSideSpecificBorder = sideKeys.some((keys) => style[keys.shorthand] !== undefined || style[keys.width] !== undefined || style[keys.color] !== undefined || style[keys.style] !== undefined);
+
+    const isRenderableBorder = (
+        width: string | undefined,
+        color: NativeColorValue | undefined,
+        borderStyle: NativeBorderStyleKeyword | undefined,
+    ): boolean => Boolean(width && color && borderStyle !== 'none' && borderStyle !== 'unsupported');
+
+    if (!hasSideSpecificBorder) {
+        return isRenderableBorder(globalWidth, globalColor, globalStyle)
+            ? { width: globalWidth, color: globalColor, style: globalStyle }
+            : undefined;
+    }
+
+    const resolvedSides = sideKeys.map((keys) => {
+        const sideBorder = parseBorderValue(style[keys.shorthand], unitParser, currentColor);
+        return {
+            width: unitParser(style[keys.width]) ?? sideBorder?.width ?? globalWidth,
+            color: parseCssColor(style[keys.color], currentColor) ?? sideBorder?.color ?? globalColor,
+            style: parseBorderStyleKeyword(style[keys.style]) ?? sideBorder?.style ?? globalStyle,
+        };
+    });
+
+    const [firstSide] = resolvedSides;
+    if (
+        firstSide
+        && isRenderableBorder(firstSide.width, firstSide.color, firstSide.style)
+        && resolvedSides.every((side) => side.width === firstSide.width && areNativeColorsEqual(side.color, firstSide.color) && side.style === firstSide.style)
+    ) {
+        return {
+            width: firstSide.width,
+            color: firstSide.color,
+            style: firstSide.style,
+        };
+    }
+
+    const renderedBorder: NativeBorderValue = {};
+    const sideNames = ['top', 'right', 'bottom', 'left'] as const;
+
+    resolvedSides.forEach((side, index) => {
+        if (isRenderableBorder(side.width, side.color, side.style)) {
+            renderedBorder[sideNames[index]] = {
+                width: side.width!,
+                color: side.color!,
+                style: side.style,
+            };
+        }
+    });
+
+    return renderedBorder.top || renderedBorder.right || renderedBorder.bottom || renderedBorder.left
+        ? renderedBorder
+        : undefined;
+}
+
+function hasNativeSideBorders(border: NativeBorderValue | undefined): boolean {
+    return Boolean(border?.top || border?.right || border?.bottom || border?.left);
+}
+
+function buildComposeSideBorderModifier(border: NativeBorderValue): string | undefined {
+    if (!hasNativeSideBorders(border)) {
+        return undefined;
+    }
+
+    const commands: string[] = [];
+    if (border.top) {
+        commands.push(`val topStroke = ${border.top.width}.toPx()`);
+        const topStartX = buildComposeBorderJoinInset(border.left, 'topStroke');
+        const topEndX = `size.width - (${buildComposeBorderJoinInset(border.right, 'topStroke')})`;
+        const topCap = buildComposeBorderLineCap(border.top.style);
+        const topDashPattern = buildComposeBorderDashPattern(border.top.style, 'topStroke');
+        const topPathEffect = topDashPattern
+            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${topDashPattern})`
+            : '';
+        commands.push(`drawLine(color = ${toComposeColorLiteral(border.top.color)}, start = androidx.compose.ui.geometry.Offset(${topStartX}, topStroke / 2f), end = androidx.compose.ui.geometry.Offset(${topEndX}, topStroke / 2f), strokeWidth = topStroke, cap = ${topCap}${topPathEffect})`);
+    }
+    if (border.right) {
+        commands.push(`val rightStroke = ${border.right.width}.toPx()`);
+        const rightStartY = buildComposeBorderJoinInset(border.top, 'rightStroke');
+        const rightEndY = `size.height - (${buildComposeBorderJoinInset(border.bottom, 'rightStroke')})`;
+        const rightCap = buildComposeBorderLineCap(border.right.style);
+        const rightDashPattern = buildComposeBorderDashPattern(border.right.style, 'rightStroke');
+        const rightPathEffect = rightDashPattern
+            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${rightDashPattern})`
+            : '';
+        commands.push(`drawLine(color = ${toComposeColorLiteral(border.right.color)}, start = androidx.compose.ui.geometry.Offset(size.width - (rightStroke / 2f), ${rightStartY}), end = androidx.compose.ui.geometry.Offset(size.width - (rightStroke / 2f), ${rightEndY}), strokeWidth = rightStroke, cap = ${rightCap}${rightPathEffect})`);
+    }
+    if (border.bottom) {
+        commands.push(`val bottomStroke = ${border.bottom.width}.toPx()`);
+        const bottomStartX = buildComposeBorderJoinInset(border.left, 'bottomStroke');
+        const bottomEndX = `size.width - (${buildComposeBorderJoinInset(border.right, 'bottomStroke')})`;
+        const bottomCap = buildComposeBorderLineCap(border.bottom.style);
+        const bottomDashPattern = buildComposeBorderDashPattern(border.bottom.style, 'bottomStroke');
+        const bottomPathEffect = bottomDashPattern
+            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${bottomDashPattern})`
+            : '';
+        commands.push(`drawLine(color = ${toComposeColorLiteral(border.bottom.color)}, start = androidx.compose.ui.geometry.Offset(${bottomStartX}, size.height - (bottomStroke / 2f)), end = androidx.compose.ui.geometry.Offset(${bottomEndX}, size.height - (bottomStroke / 2f)), strokeWidth = bottomStroke, cap = ${bottomCap}${bottomPathEffect})`);
+    }
+    if (border.left) {
+        commands.push(`val leftStroke = ${border.left.width}.toPx()`);
+        const leftStartY = buildComposeBorderJoinInset(border.top, 'leftStroke');
+        const leftEndY = `size.height - (${buildComposeBorderJoinInset(border.bottom, 'leftStroke')})`;
+        const leftCap = buildComposeBorderLineCap(border.left.style);
+        const leftDashPattern = buildComposeBorderDashPattern(border.left.style, 'leftStroke');
+        const leftPathEffect = leftDashPattern
+            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${leftDashPattern})`
+            : '';
+        commands.push(`drawLine(color = ${toComposeColorLiteral(border.left.color)}, start = androidx.compose.ui.geometry.Offset(leftStroke / 2f, ${leftStartY}), end = androidx.compose.ui.geometry.Offset(leftStroke / 2f, ${leftEndY}), strokeWidth = leftStroke, cap = ${leftCap}${leftPathEffect})`);
+    }
+
+    return commands.length > 0 ? `drawBehind { ${commands.join('; ')} }` : undefined;
+}
+
+function buildComposeUniformStyledBorderModifier(border: NativeBorderValue, radius?: string): string | undefined {
+    if (!border.width || !border.color || (border.style !== 'dashed' && border.style !== 'dotted')) {
+        return undefined;
+    }
+
+    const dashPattern = buildComposeBorderDashPattern(border.style, 'strokeWidth');
+    if (!dashPattern) {
+        return undefined;
+    }
+
+    if (radius) {
+        return `drawBehind { val strokeWidth = ${border.width}.toPx(); val dashPattern = ${dashPattern}; val borderRadius = ${radius}.toPx(); drawRoundRect(color = ${toComposeColorLiteral(border.color)}, cornerRadius = androidx.compose.ui.geometry.CornerRadius(borderRadius, borderRadius), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dashPattern))) }`;
+    }
+
+    return `drawBehind { val strokeWidth = ${border.width}.toPx(); val dashPattern = ${dashPattern}; drawRect(color = ${toComposeColorLiteral(border.color)}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dashPattern))) }`;
+}
+
+function buildSwiftSideBorderOverlay(border: NativeBorderValue, radius?: string): string | undefined {
+    if (!hasNativeSideBorders(border)) {
+        return undefined;
+    }
+
+    const sideEntries = [
+        ['top', border.top],
+        ['right', border.right],
+        ['bottom', border.bottom],
+        ['left', border.left],
+    ].filter((entry): entry is ['top' | 'right' | 'bottom' | 'left', NativeBorderSideValue] => Boolean(entry[1]));
+
+    const hasStyledSides = sideEntries.some(([, side]) => side.style === 'dashed' || side.style === 'dotted');
+    if (hasStyledSides) {
+        const overlays = sideEntries.map(([sideName, side]) => {
+            const widthValue = parseNativeBorderNumericWidth(side.width);
+            const dashPattern = buildSwiftBorderDashPattern(side.style, widthValue);
+            const lineCap = buildSwiftBorderLineCap(side.style);
+            const strokeStyle = dashPattern
+                ? `StrokeStyle(lineWidth: ${side.width}, lineCap: ${lineCap}, dash: ${dashPattern})`
+                : `StrokeStyle(lineWidth: ${side.width}, lineCap: ${lineCap})`;
+
+            switch (sideName) {
+                case 'top':
+                    return `Path { path in path.move(to: CGPoint(x: ${buildSwiftBorderJoinInset(border.left, widthValue)}, y: CGFloat(${side.width}) / 2)); path.addLine(to: CGPoint(x: proxy.size.width - (${buildSwiftBorderJoinInset(border.right, widthValue)}), y: CGFloat(${side.width}) / 2)) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
+                case 'right':
+                    return `Path { path in path.move(to: CGPoint(x: proxy.size.width - (CGFloat(${side.width}) / 2), y: ${buildSwiftBorderJoinInset(border.top, widthValue)})); path.addLine(to: CGPoint(x: proxy.size.width - (CGFloat(${side.width}) / 2), y: proxy.size.height - (${buildSwiftBorderJoinInset(border.bottom, widthValue)}))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
+                case 'bottom':
+                    return `Path { path in path.move(to: CGPoint(x: ${buildSwiftBorderJoinInset(border.left, widthValue)}, y: proxy.size.height - (CGFloat(${side.width}) / 2))); path.addLine(to: CGPoint(x: proxy.size.width - (${buildSwiftBorderJoinInset(border.right, widthValue)}), y: proxy.size.height - (CGFloat(${side.width}) / 2))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
+                case 'left':
+                default:
+                    return `Path { path in path.move(to: CGPoint(x: CGFloat(${side.width}) / 2, y: ${buildSwiftBorderJoinInset(border.top, widthValue)})); path.addLine(to: CGPoint(x: CGFloat(${side.width}) / 2, y: proxy.size.height - (${buildSwiftBorderJoinInset(border.bottom, widthValue)}))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
+            }
+        });
+
+        const clipModifier = radius ? `.clipShape(RoundedRectangle(cornerRadius: ${radius}))` : '';
+        return `.overlay { GeometryReader { proxy in ZStack { ${overlays.join('; ')} } }${clipModifier} }`;
+    }
+
+    const overlays: string[] = [];
+    if (border.top) {
+        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.top.color)}).frame(height: ${border.top.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)`);
+    }
+    if (border.right) {
+        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.right.color)}).frame(width: ${border.right.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)`);
+    }
+    if (border.bottom) {
+        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.bottom.color)}).frame(height: ${border.bottom.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)`);
+    }
+    if (border.left) {
+        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.left.color)}).frame(width: ${border.left.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)`);
+    }
+
+    if (overlays.length === 0) {
+        return undefined;
+    }
+
+    const clipModifier = radius ? `.clipShape(RoundedRectangle(cornerRadius: ${radius}))` : '';
+    return `.overlay { ZStack { ${overlays.join('; ')} }${clipModifier} }`;
+}
+
+function buildSwiftUniformStyledBorderModifier(border: NativeBorderValue, radius?: string): string | undefined {
+    if (!border.width || !border.color || (border.style !== 'dashed' && border.style !== 'dotted')) {
+        return undefined;
+    }
+
+    const widthValue = parseNativeBorderNumericWidth(border.width);
+    const dashPattern = buildSwiftBorderDashPattern(border.style, widthValue);
+    if (!dashPattern) {
+        return undefined;
+    }
+    const shape = radius ? `RoundedRectangle(cornerRadius: ${radius})` : 'Rectangle()';
+    return `.overlay(${shape}.stroke(${toSwiftColorLiteral(border.color)}, style: StrokeStyle(lineWidth: ${border.width}, dash: ${dashPattern})))`;
 }
 
 function resolveTextTransform(value: NativePropValue | undefined): 'uppercase' | 'lowercase' | 'capitalize' | undefined {
@@ -2462,6 +4270,10 @@ function buildComposeArrangement(
 function buildComposeCrossAlignment(layout: 'Row' | 'Column', style: Record<string, NativePropValue> | undefined): string | undefined {
     if (!style || typeof style.alignItems !== 'string') return undefined;
 
+    if (layout === 'Row' && resolveBaselineAlignmentKeyword(style.alignItems)) {
+        return undefined;
+    }
+
     const align = style.alignItems.trim().toLowerCase();
     if (layout === 'Row') {
         switch (align) {
@@ -2604,29 +4416,65 @@ function buildComposeModifier(
         const padding = toDpLiteral(style.padding, styleResolveOptions);
         const paddingHorizontal = toDpLiteral(style.paddingHorizontal, styleResolveOptions);
         const paddingVertical = toDpLiteral(style.paddingVertical, styleResolveOptions);
-        const width = toDpLiteral(style.width, styleResolveOptions);
-        const height = toDpLiteral(style.height, styleResolveOptions);
-        const minWidth = toDpLiteral(style.minWidth, styleResolveOptions);
-        const maxWidth = toDpLiteral(style.maxWidth, styleResolveOptions);
-        const minHeight = toDpLiteral(style.minHeight, styleResolveOptions);
-        const maxHeight = toDpLiteral(style.maxHeight, styleResolveOptions);
+        const parentFlexLayout = hints.parentFlexLayout;
+        const flexStyle = resolveFlexStyleValues(style);
+        const flexBasisValue = parentFlexLayout === 'Row'
+            ? resolveAxisUnitNumber(flexStyle.basis, 'horizontal', hints, styleResolveOptions)
+            : parentFlexLayout === 'Column'
+                ? resolveAxisUnitNumber(flexStyle.basis, 'vertical', hints, styleResolveOptions)
+                : undefined;
+        const flexBasis = flexBasisValue !== undefined ? `${formatFloat(flexBasisValue)}.dp` : undefined;
+        const hasFlexBasisSizeHint = flexBasisValue !== undefined && Math.abs(flexBasisValue) > 0.0001;
+        const flexShrink = flexStyle.shrink;
+        const shrinkableMainAxisBasis = hasFlexBasisSizeHint && flexShrink !== 0;
+        const suppressExactWidth = parentFlexLayout === 'Row' && hints.negotiatedMaxWidth !== undefined && flexShrink !== 0;
+        const suppressExactHeight = parentFlexLayout === 'Column' && hints.negotiatedMaxHeight !== undefined && flexShrink !== 0;
+        const width = (!suppressExactWidth ? toAxisDpLiteral(style.width, 'horizontal', hints, styleResolveOptions) : undefined)
+            ?? (parentFlexLayout === 'Row' && hasFlexBasisSizeHint && !shrinkableMainAxisBasis ? flexBasis : undefined);
+        const height = (!suppressExactHeight ? toAxisDpLiteral(style.height, 'vertical', hints, styleResolveOptions) : undefined)
+            ?? (parentFlexLayout === 'Column' && hasFlexBasisSizeHint && !shrinkableMainAxisBasis ? flexBasis : undefined);
+        const minWidth = toAxisDpLiteral(style.minWidth, 'horizontal', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Row' && hasFlexBasisSizeHint && flexShrink === 0 ? flexBasis : undefined);
+        const negotiatedMaxWidth = hints.negotiatedMaxWidth !== undefined
+            ? `${formatFloat(hints.negotiatedMaxWidth)}.dp`
+            : undefined;
+        const maxWidth = negotiatedMaxWidth
+            ?? toAxisDpLiteral(style.maxWidth, 'horizontal', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Row' && shrinkableMainAxisBasis ? flexBasis : undefined);
+        const minHeight = toAxisDpLiteral(style.minHeight, 'vertical', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Column' && hasFlexBasisSizeHint && flexShrink === 0 ? flexBasis : undefined);
+        const negotiatedMaxHeight = hints.negotiatedMaxHeight !== undefined
+            ? `${formatFloat(hints.negotiatedMaxHeight)}.dp`
+            : undefined;
+        const maxHeight = negotiatedMaxHeight
+            ?? toAxisDpLiteral(style.maxHeight, 'vertical', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Column' && shrinkableMainAxisBasis ? flexBasis : undefined);
         const radius = toDpLiteral(style.borderRadius, styleResolveOptions);
         const backgroundGradient = resolveBackgroundGradient(style);
         const backdropBlur = resolveBackdropBlurRadius(style, styleResolveOptions);
         const backgroundColor = resolveBackgroundColor(style, styleResolveOptions);
-        const border = parseBorderValue(style.border, (value) => toDpLiteral(value, styleResolveOptions));
-        const shadow = parseBoxShadow(style.boxShadow);
+        const border = resolveNativeBorder(style, (value) => toDpLiteral(value, styleResolveOptions));
+        const shadow = parseBoxShadow(style.boxShadow, resolveStyleCurrentColor(style));
+        const aspectRatio = resolveAspectRatioValue(style.aspectRatio);
+        const opacity = resolveOpacityValue(style.opacity);
+        const zIndex = parsePlainNumericValue(style.zIndex);
+        const shouldClipOverflow = shouldClipNativeOverflow(style);
+        const transform = parseNativeTransform(style.transform, styleResolveOptions);
+        const positionMode = resolvePositionMode(style.position);
+        const positionInsets = resolvePositionInsets(style, hints, styleResolveOptions);
+        const selfAlignment = resolveComposeSelfAlignmentCall(hints.parentFlexLayout, style);
+        const childBaselineAlignment = resolveBaselineAlignmentKeyword(style.alignSelf);
+        const shouldAlignByBaseline = node.component === 'Text'
+            && hints.parentFlexLayout === 'Row'
+            && (childBaselineAlignment !== undefined
+                || (hints.parentRowBaselineAlignment !== undefined && resolveSelfAlignmentKeyword(style.alignSelf) === undefined));
+        const selfAlignmentFillsWidth = selfAlignment === 'fillMaxWidth()';
+        const selfAlignmentFillsHeight = selfAlignment === 'fillMaxHeight()';
         const marginCalls = buildComposeMarginPaddingCalls(style, styleResolveOptions);
         const autoMarginCalls = buildComposeAutoMarginCalls(style);
         const shouldForceAutoMarginFillWidth = shouldCenterConstrainedHorizontalAutoMargins(style);
         const paddingCalls: string[] = [];
-        const flexValue = typeof style.flex === 'number'
-            ? style.flex
-            : typeof style.flex === 'string' && /^-?\d+(?:\.\d+)?$/.test(style.flex.trim())
-                ? Number(style.flex)
-                : typeof style.flexGrow === 'number'
-                    ? style.flexGrow
-                    : undefined;
+        const flexValue = flexStyle.grow;
 
         if (padding) {
             paddingCalls.push(`padding(${padding})`);
@@ -2656,18 +4504,20 @@ function buildComposeModifier(
             parts.push('fillMaxWidth()');
         }
 
-        if (isFillValue(style.width)) {
+        if (isFillValue(style.width) && !suppressExactWidth) {
             parts.push('fillMaxWidth()');
         } else if (width) {
             parts.push(`width(${width})`);
-        } else if (hints.fillWidth && !shouldForceAutoMarginFillWidth) {
+        } else if (hints.fillWidth && !shouldForceAutoMarginFillWidth && !selfAlignmentFillsWidth) {
             parts.push('fillMaxWidth()');
         }
 
-        if (isFillValue(style.height)) {
+        if (isFillValue(style.height) && !suppressExactHeight) {
             parts.push('fillMaxHeight()');
         } else if (height) {
             parts.push(`height(${height})`);
+        } else if (hints.fillHeight && !selfAlignmentFillsHeight) {
+            parts.push('fillMaxHeight()');
         }
 
         const widthInArgs: string[] = [];
@@ -2682,6 +4532,10 @@ function buildComposeModifier(
         if (maxHeight) heightInArgs.push(`max = ${maxHeight}`);
         if (heightInArgs.length > 0) {
             parts.push(`heightIn(${heightInArgs.join(', ')})`);
+        }
+
+        if (aspectRatio !== undefined) {
+            parts.push(`aspectRatio(${formatFloat(aspectRatio)}f)`);
         }
 
         parts.push(...autoMarginCalls);
@@ -2709,11 +4563,62 @@ function buildComposeModifier(
         }
 
         if (border?.width && border.color) {
-            if (radius) {
+            const styledBorderModifier = buildComposeUniformStyledBorderModifier(border, radius);
+            if (styledBorderModifier) {
+                parts.push(styledBorderModifier);
+            } else if (radius) {
                 parts.push(`border(${border.width}, ${toComposeColorLiteral(border.color)}, RoundedCornerShape(${radius}))`);
             } else {
                 parts.push(`border(${border.width}, ${toComposeColorLiteral(border.color)})`);
             }
+        } else {
+            const sideBorderModifier = buildComposeSideBorderModifier(border ?? {});
+            if (sideBorderModifier) {
+                parts.push(sideBorderModifier);
+            }
+        }
+
+        const positionUsesEndX = positionInsets.left === undefined && positionInsets.right !== undefined;
+        const positionUsesEndY = positionInsets.top === undefined && positionInsets.bottom !== undefined;
+        const combinedOffsetX = (positionInsets.left ?? (positionInsets.right !== undefined ? -positionInsets.right : 0)) + (transform?.translateX ?? 0);
+        const combinedOffsetY = (positionInsets.top ?? (positionInsets.bottom !== undefined ? -positionInsets.bottom : 0)) + (transform?.translateY ?? 0);
+        if ((positionMode === 'absolute' || positionMode === 'fixed') && hints.absoluteOverlay && (positionUsesEndX || positionUsesEndY)) {
+            parts.push(`align(Alignment.${positionUsesEndY ? 'Bottom' : 'Top'}${positionUsesEndX ? 'End' : 'Start'})`);
+        }
+
+        const offsetArgs: string[] = [];
+        if (combinedOffsetX !== 0) offsetArgs.push(`x = ${formatFloat(combinedOffsetX)}.dp`);
+        if (combinedOffsetY !== 0) offsetArgs.push(`y = ${formatFloat(combinedOffsetY)}.dp`);
+        if (offsetArgs.length > 0) {
+            parts.push(`offset(${offsetArgs.join(', ')})`);
+        }
+
+        const graphicsLayerArgs: string[] = [];
+        if (transform?.scaleX !== undefined) graphicsLayerArgs.push(`scaleX = ${formatFloat(transform.scaleX)}f`);
+        if (transform?.scaleY !== undefined) graphicsLayerArgs.push(`scaleY = ${formatFloat(transform.scaleY)}f`);
+        if (transform?.rotationDegrees !== undefined) graphicsLayerArgs.push(`rotationZ = ${formatFloat(transform.rotationDegrees)}f`);
+        if (graphicsLayerArgs.length > 0) {
+            parts.push(`graphicsLayer(${graphicsLayerArgs.join(', ')})`);
+        }
+
+        if (selfAlignment) {
+            parts.push(selfAlignment);
+        }
+
+        if (shouldAlignByBaseline) {
+            parts.push('alignByBaseline()');
+        }
+
+        if (shouldClipOverflow) {
+            parts.push(`clip(${radius ? `RoundedCornerShape(${radius})` : 'RectangleShape'})`);
+        }
+
+        if (opacity !== undefined && opacity < 1) {
+            parts.push(`alpha(${formatFloat(opacity)}f)`);
+        }
+
+        if (zIndex !== undefined && zIndex !== 0) {
+            parts.push(`zIndex(${formatFloat(zIndex)}f)`);
         }
 
         if (flexValue !== undefined && Number.isFinite(flexValue) && flexValue > 0) {
@@ -2735,12 +4640,62 @@ function renderComposeChildren(
     level: number,
     context: AndroidComposeContext,
     parentLayout?: 'Column' | 'Row',
+    parentNode?: NativeElementNode,
+    parentHints?: NativeRenderHints,
 ): string[] {
     const lines: string[] = [];
-    for (const child of nodes) {
-        const childHints = parentLayout === 'Column' && shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions)
-            ? { fillWidth: true }
-            : {};
+    const orderedNodes = parentNode
+        ? getOrderedNativeChildren(parentNode, nodes, context.resolvedStyles, context.styleResolveOptions)
+        : nodes;
+    const availableWidth = parentNode
+        ? resolveNativeAvailableAxisSize(parentNode, 'horizontal', context.resolvedStyles, parentHints, context.styleResolveOptions)
+        : resolveAxisReferenceLength('horizontal', parentHints, context.styleResolveOptions);
+    const availableHeight = parentNode
+        ? resolveNativeAvailableAxisSize(parentNode, 'vertical', context.resolvedStyles, parentHints, context.styleResolveOptions)
+        : resolveAxisReferenceLength('vertical', parentHints, context.styleResolveOptions);
+    const parentFlexLayout = resolveNativeFlexContainerLayout(parentNode, context.resolvedStyles, context.styleResolveOptions);
+    const flexShrinkTargets = resolveNativeFlexShrinkTargets(
+        parentNode,
+        orderedNodes,
+        parentFlexLayout,
+        availableWidth,
+        availableHeight,
+        parentHints,
+        context.resolvedStyles,
+        context.styleResolveOptions,
+    );
+    const parentRowBaselineAlignment = parentFlexLayout === 'Row'
+        ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
+        : undefined;
+    for (const child of orderedNodes) {
+        const shouldDefaultFillCrossAxis = shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions);
+        const shouldStretchCrossAxis = shouldStretchFlexChildCrossAxis(
+            child,
+            parentFlexLayout,
+            parentNode,
+            parentHints,
+            context.resolvedStyles,
+            context.styleResolveOptions,
+        );
+        const childHints: NativeRenderHints = {
+            availableWidth,
+            availableHeight,
+            ...(parentLayout === 'Column' && shouldDefaultFillCrossAxis
+                && (!parentFlexLayout || (parentFlexLayout === 'Column' && shouldStretchCrossAxis))
+                ? { fillWidth: true }
+                : {}),
+            ...(parentLayout === 'Row' && parentFlexLayout === 'Row' && shouldDefaultFillCrossAxis && shouldStretchCrossAxis
+                ? { fillHeight: true }
+                : {}),
+            ...(child.kind === 'element' && parentFlexLayout === 'Row' && flexShrinkTargets.has(child)
+                ? { negotiatedMaxWidth: flexShrinkTargets.get(child) }
+                : {}),
+            ...(child.kind === 'element' && parentFlexLayout === 'Column' && flexShrinkTargets.has(child)
+                ? { negotiatedMaxHeight: flexShrinkTargets.get(child) }
+                : {}),
+            ...(parentFlexLayout ? { parentFlexLayout } : {}),
+            ...(parentRowBaselineAlignment ? { parentRowBaselineAlignment } : {}),
+        };
         lines.push(...renderComposeNode(child, level, context, childHints));
     }
     return lines;
@@ -2777,6 +4732,7 @@ function renderComposeChunkedLayout(
     level: number,
     context: AndroidComposeContext,
     modifier: string,
+    hints: NativeRenderHints,
 ): string[] {
     const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
     const outerGap = layout.rowGap !== undefined ? `Arrangement.spacedBy(${formatFloat(layout.rowGap)}.dp)` : undefined;
@@ -2784,13 +4740,17 @@ function renderComposeChunkedLayout(
     if (layout.kind === 'grid' && layout.rows.length === 1) {
         const [row] = layout.rows;
         const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, modifier, layout.columnGap)}) {`];
+        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + entry, 0) : undefined;
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const cellModifier = weight !== undefined
                 ? `Modifier.weight(${formatFloat(weight)}f).fillMaxWidth()`
                 : 'Modifier';
+            const cellAvailableWidth = weight !== undefined && totalWeight && hints.availableWidth !== undefined
+                ? Math.max(0, (hints.availableWidth - ((layout.columnGap ?? 0) * Math.max(0, row.items.length - 1))) * (weight / totalWeight))
+                : hints.availableWidth;
             lines.push(`${indent(level + 1)}Box(modifier = ${cellModifier}) {`);
-            lines.push(...renderComposeNode(child, level + 2, context, { fillWidth: shouldFillChunkedCellChild(child) }));
+            lines.push(...renderComposeNode(child, level + 2, context, { fillWidth: shouldFillChunkedCellChild(child), availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight }));
             lines.push(`${indent(level + 1)}}`);
         });
         lines.push(`${indent(level)}}`);
@@ -2799,6 +4759,7 @@ function renderComposeChunkedLayout(
 
     const lines = [`${indent(level)}Column(modifier = ${modifier}${outerGap ? `, verticalArrangement = ${outerGap}` : ''}) {`];
     for (const row of layout.rows) {
+        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + entry, 0) : undefined;
         lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, 'Modifier.fillMaxWidth()', layout.columnGap)}) {`);
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
@@ -2806,14 +4767,37 @@ function renderComposeChunkedLayout(
             const cellModifier = weight !== undefined
                 ? `Modifier.weight(${formatFloat(weight)}f)${fillChild ? '.fillMaxWidth()' : ''}`
                 : 'Modifier';
+            const cellAvailableWidth = weight !== undefined && totalWeight && hints.availableWidth !== undefined
+                ? Math.max(0, (hints.availableWidth - ((layout.columnGap ?? 0) * Math.max(0, row.items.length - 1))) * (weight / totalWeight))
+                : hints.availableWidth;
             lines.push(`${indent(level + 2)}Box(modifier = ${cellModifier}) {`);
-            lines.push(...renderComposeNode(child, level + 3, context, fillChild ? { fillWidth: true } : {}));
+            lines.push(...renderComposeNode(child, level + 3, context, fillChild ? { fillWidth: true, availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight } : { availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight }));
             lines.push(`${indent(level + 2)}}`);
         });
         lines.push(`${indent(level + 1)}}`);
     }
     lines.push(`${indent(level)}}`);
     return lines;
+}
+
+function renderComposeContainerBody(
+    node: NativeElementNode,
+    level: number,
+    context: AndroidComposeContext,
+    modifier: string,
+    hints: NativeRenderHints,
+): string[] {
+    const chunkedLayout = resolveChunkedLayout(node, context.resolvedStyles, context.styleResolveOptions);
+    if (chunkedLayout) {
+        return renderComposeChunkedLayout(node, chunkedLayout, level, context, modifier, hints);
+    }
+
+    const layout = resolveComposeLayout(node, context.resolvedStyles);
+    return [
+        `${indent(level)}${layout}(${buildComposeLayoutArguments(node, layout, modifier, context.resolvedStyles, context.styleResolveOptions)}) {`,
+        ...renderComposeChildren(node.children, level + 1, context, layout, node, hints),
+        `${indent(level)}}`,
+    ];
 }
 
 function buildComposeLayoutArguments(
@@ -3023,16 +5007,41 @@ function renderComposeNode(
         return lines;
     }
 
-    const chunkedLayout = resolveChunkedLayout(node, context.resolvedStyles, context.styleResolveOptions);
-    if (chunkedLayout) {
-        lines.push(...renderComposeChunkedLayout(node, chunkedLayout, level, context, modifier));
+    if (node.component === 'Screen') {
+        const { flowChildren, fixedChildren } = splitFixedPositionedChildren(node.children, context.resolvedStyles, context.styleResolveOptions);
+        if (fixedChildren.length > 0) {
+            const flowNode: NativeElementNode = flowChildren.length === node.children.length
+                ? node
+                : { ...node, children: flowChildren };
+            lines.push(`${indent(level)}Box {`);
+            lines.push(...renderComposeContainerBody(flowNode, level + 1, context, modifier, hints));
+            lines.push(`${indent(level + 1)}Box(modifier = Modifier.matchParentSize()) {`);
+            for (const child of fixedChildren) {
+                lines.push(...renderComposeNode(child, level + 2, context, { availableWidth: hints.availableWidth, availableHeight: hints.availableHeight, absoluteOverlay: true }));
+            }
+            lines.push(`${indent(level + 1)}}`);
+            lines.push(`${indent(level)}}`);
+            return lines;
+        }
+    }
+
+    const { flowChildren, absoluteChildren } = splitAbsolutePositionedChildren(node.children, context.resolvedStyles, context.styleResolveOptions);
+    if (absoluteChildren.length > 0 && node.component !== 'Screen') {
+        const flowNode: NativeElementNode = flowChildren.length === node.children.length
+            ? node
+            : { ...node, children: flowChildren };
+        lines.push(`${indent(level)}Box {`);
+        lines.push(...renderComposeContainerBody(flowNode, level + 1, context, modifier, hints));
+        lines.push(`${indent(level + 1)}Box(modifier = Modifier.matchParentSize()) {`);
+        for (const child of absoluteChildren) {
+            lines.push(...renderComposeNode(child, level + 2, context, { availableWidth: hints.availableWidth, availableHeight: hints.availableHeight, absoluteOverlay: true }));
+        }
+        lines.push(`${indent(level + 1)}}`);
+        lines.push(`${indent(level)}}`);
         return lines;
     }
 
-    const layout = resolveComposeLayout(node, context.resolvedStyles);
-    lines.push(`${indent(level)}${layout}(${buildComposeLayoutArguments(node, layout, modifier, context.resolvedStyles, context.styleResolveOptions)}) {`);
-    lines.push(...renderComposeChildren(node.children, level + 1, context, layout));
-    lines.push(`${indent(level)}}`);
+    lines.push(...renderComposeContainerBody(node, level, context, modifier, hints));
     return lines;
 }
 
@@ -3108,18 +5117,55 @@ function buildSwiftUIModifiers(
         const padding = toPointLiteral(style.padding, styleResolveOptions);
         const paddingHorizontal = toPointLiteral(style.paddingHorizontal, styleResolveOptions);
         const paddingVertical = toPointLiteral(style.paddingVertical, styleResolveOptions);
-        const width = toPointLiteral(style.width, styleResolveOptions);
-        const height = toPointLiteral(style.height, styleResolveOptions);
-        const minWidth = toPointLiteral(style.minWidth, styleResolveOptions);
-        const maxWidth = toPointLiteral(style.maxWidth, styleResolveOptions);
-        const minHeight = toPointLiteral(style.minHeight, styleResolveOptions);
-        const maxHeight = toPointLiteral(style.maxHeight, styleResolveOptions);
+        const parentFlexLayout = hints.parentFlexLayout;
+        const flexStyle = resolveFlexStyleValues(style);
+        const flexBasisValue = parentFlexLayout === 'Row'
+            ? resolveAxisUnitNumber(flexStyle.basis, 'horizontal', hints, styleResolveOptions)
+            : parentFlexLayout === 'Column'
+                ? resolveAxisUnitNumber(flexStyle.basis, 'vertical', hints, styleResolveOptions)
+                : undefined;
+        const flexBasis = flexBasisValue !== undefined ? formatFloat(flexBasisValue) : undefined;
+        const hasFlexBasisSizeHint = flexBasisValue !== undefined && Math.abs(flexBasisValue) > 0.0001;
+        const flexShrink = flexStyle.shrink;
+        const shrinkableMainAxisBasis = hasFlexBasisSizeHint && flexShrink !== 0;
+        const suppressExactWidth = parentFlexLayout === 'Row' && hints.negotiatedMaxWidth !== undefined && flexShrink !== 0;
+        const suppressExactHeight = parentFlexLayout === 'Column' && hints.negotiatedMaxHeight !== undefined && flexShrink !== 0;
+        const width = (!suppressExactWidth ? toAxisPointLiteral(style.width, 'horizontal', hints, styleResolveOptions) : undefined)
+            ?? (parentFlexLayout === 'Row' && hasFlexBasisSizeHint && !shrinkableMainAxisBasis ? flexBasis : undefined);
+        const height = (!suppressExactHeight ? toAxisPointLiteral(style.height, 'vertical', hints, styleResolveOptions) : undefined)
+            ?? (parentFlexLayout === 'Column' && hasFlexBasisSizeHint && !shrinkableMainAxisBasis ? flexBasis : undefined);
+        const minWidth = toAxisPointLiteral(style.minWidth, 'horizontal', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Row' && hasFlexBasisSizeHint && flexShrink === 0 ? flexBasis : undefined);
+        const negotiatedMaxWidth = hints.negotiatedMaxWidth !== undefined
+            ? formatFloat(hints.negotiatedMaxWidth)
+            : undefined;
+        const maxWidth = negotiatedMaxWidth
+            ?? toAxisPointLiteral(style.maxWidth, 'horizontal', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Row' && shrinkableMainAxisBasis ? flexBasis : undefined);
+        const minHeight = toAxisPointLiteral(style.minHeight, 'vertical', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Column' && hasFlexBasisSizeHint && flexShrink === 0 ? flexBasis : undefined);
+        const negotiatedMaxHeight = hints.negotiatedMaxHeight !== undefined
+            ? formatFloat(hints.negotiatedMaxHeight)
+            : undefined;
+        const maxHeight = negotiatedMaxHeight
+            ?? toAxisPointLiteral(style.maxHeight, 'vertical', hints, styleResolveOptions)
+            ?? (parentFlexLayout === 'Column' && shrinkableMainAxisBasis ? flexBasis : undefined);
         const radius = toPointLiteral(style.borderRadius, styleResolveOptions);
         const backgroundGradient = resolveBackgroundGradient(style);
         const backdropBlur = resolveBackdropBlurRadius(style, styleResolveOptions);
         const backgroundColor = resolveBackgroundColor(style, styleResolveOptions);
-        const border = parseBorderValue(style.border, (value) => toPointLiteral(value, styleResolveOptions));
-        const shadow = parseBoxShadow(style.boxShadow);
+        const border = resolveNativeBorder(style, (value) => toPointLiteral(value, styleResolveOptions));
+        const shadow = parseBoxShadow(style.boxShadow, resolveStyleCurrentColor(style));
+        const aspectRatio = resolveAspectRatioValue(style.aspectRatio);
+        const opacity = resolveOpacityValue(style.opacity);
+        const zIndex = parsePlainNumericValue(style.zIndex);
+        const shouldClipOverflow = shouldClipNativeOverflow(style);
+        const transform = parseNativeTransform(style.transform, styleResolveOptions);
+        const positionMode = resolvePositionMode(style.position);
+        const positionInsets = resolvePositionInsets(style, hints, styleResolveOptions);
+        const selfAlignment = resolveSwiftSelfAlignmentModifier(hints.parentFlexLayout, style);
+        const selfAlignmentFillsWidth = selfAlignment?.startsWith('.frame(maxWidth: .infinity') ?? false;
+        const selfAlignmentFillsHeight = selfAlignment?.startsWith('.frame(maxHeight: .infinity') ?? false;
         const color = parseCssColor(style.color);
         const fontSize = toPointLiteral(style.fontSize, styleResolveOptions);
         const fontWeight = resolveSwiftFontWeight(style.fontWeight);
@@ -3131,13 +5177,7 @@ function buildSwiftUIModifiers(
         const marginModifiers = buildSwiftMarginPaddingModifiers(style, styleResolveOptions);
         const autoMarginModifiers = buildSwiftAutoMarginModifiers(style);
         const hasAutoMarginMaxWidth = autoMarginModifiers.some((modifier) => modifier.startsWith('.frame(maxWidth: .infinity'));
-        const flexValue = typeof style.flex === 'number'
-            ? style.flex
-            : typeof style.flex === 'string' && /^-?\d+(?:\.\d+)?$/.test(style.flex.trim())
-                ? Number(style.flex)
-                : typeof style.flexGrow === 'number'
-                    ? style.flexGrow
-                    : undefined;
+        const flexValue = flexStyle.grow;
 
         if (padding) {
             modifiers.push(`.padding(${padding})`);
@@ -3157,19 +5197,21 @@ function buildSwiftUIModifiers(
         }
 
         const frameArgs: string[] = [];
-        if (isFillValue(style.width)) {
+        if (isFillValue(style.width) && !suppressExactWidth) {
             if (!hasAutoMarginMaxWidth) {
                 frameArgs.push('maxWidth: .infinity');
             }
         } else if (width) {
             frameArgs.push(`width: ${width}`);
-        } else if (hints.fillWidth && !hasAutoMarginMaxWidth) {
+        } else if (hints.fillWidth && !hasAutoMarginMaxWidth && !selfAlignmentFillsWidth) {
             frameArgs.push('maxWidth: .infinity');
         }
-        if (isFillValue(style.height)) {
+        if (isFillValue(style.height) && !suppressExactHeight) {
             frameArgs.push('maxHeight: .infinity');
         } else if (height) {
             frameArgs.push(`height: ${height}`);
+        } else if (hints.fillHeight && !selfAlignmentFillsHeight) {
+            frameArgs.push('maxHeight: .infinity');
         }
         if (minWidth) frameArgs.push(`minWidth: ${minWidth}`);
         if (maxWidth) frameArgs.push(`maxWidth: ${maxWidth}`);
@@ -3177,6 +5219,10 @@ function buildSwiftUIModifiers(
         if (maxHeight) frameArgs.push(`maxHeight: ${maxHeight}`);
         if (frameArgs.length > 0) {
             modifiers.push(`.frame(${frameArgs.join(', ')})`);
+        }
+
+        if (aspectRatio !== undefined) {
+            modifiers.push(`.aspectRatio(${formatFloat(aspectRatio)}, contentMode: .fit)`);
         }
 
         if (backdropBlur !== undefined) {
@@ -3194,14 +5240,52 @@ function buildSwiftUIModifiers(
             modifiers.push(`.clipShape(RoundedRectangle(cornerRadius: ${radius}))`);
         }
 
+        if (shouldClipOverflow && !radius) {
+            modifiers.push('.clipped()');
+        }
+
         if (border?.width && border.color) {
-            const radiusValue = radius ?? '0';
-            modifiers.push(`.overlay(RoundedRectangle(cornerRadius: ${radiusValue}).stroke(${toSwiftColorLiteral(border.color)}, lineWidth: ${border.width}))`);
+            const styledBorderModifier = buildSwiftUniformStyledBorderModifier(border, radius);
+            if (styledBorderModifier) {
+                modifiers.push(styledBorderModifier);
+            } else {
+                const radiusValue = radius ?? '0';
+                modifiers.push(`.overlay(RoundedRectangle(cornerRadius: ${radiusValue}).stroke(${toSwiftColorLiteral(border.color)}, lineWidth: ${border.width}))`);
+            }
+        } else {
+            const sideBorderOverlay = buildSwiftSideBorderOverlay(border ?? {}, radius);
+            if (sideBorderOverlay) {
+                modifiers.push(sideBorderOverlay);
+            }
         }
 
         if (shadow) {
             modifiers.push(`.shadow(color: ${toSwiftColorLiteral(shadow.color)}, radius: ${toSwiftShadowRadius(shadow)}, x: ${formatFloat(shadow.offsetX)}, y: ${formatFloat(shadow.offsetY)})`);
         }
+
+        const positionUsesEndX = positionInsets.left === undefined && positionInsets.right !== undefined;
+        const positionUsesEndY = positionInsets.top === undefined && positionInsets.bottom !== undefined;
+        const combinedOffsetX = (positionInsets.left ?? (positionInsets.right !== undefined ? -positionInsets.right : 0)) + (transform?.translateX ?? 0);
+        const combinedOffsetY = (positionInsets.top ?? (positionInsets.bottom !== undefined ? -positionInsets.bottom : 0)) + (transform?.translateY ?? 0);
+        if ((positionMode === 'absolute' || positionMode === 'fixed') && hints.absoluteOverlay) {
+            modifiers.push(`.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: ${positionUsesEndY ? '.bottom' : '.top'}${positionUsesEndX ? 'Trailing' : 'Leading'})`);
+        }
+        if (combinedOffsetX !== 0 || combinedOffsetY !== 0) {
+            modifiers.push(`.offset(x: ${formatFloat(combinedOffsetX)}, y: ${formatFloat(combinedOffsetY)})`);
+        }
+        if (transform?.scaleX !== undefined || transform?.scaleY !== undefined) {
+            modifiers.push(`.scaleEffect(x: ${formatFloat(transform.scaleX ?? 1)}, y: ${formatFloat(transform.scaleY ?? 1)}, anchor: .center)`);
+        }
+        if (transform?.rotationDegrees !== undefined) {
+            modifiers.push(`.rotationEffect(.degrees(${formatFloat(transform.rotationDegrees)}))`);
+        }
+
+        if (selfAlignment) {
+            modifiers.push(selfAlignment);
+        }
+
+        if (opacity !== undefined && opacity < 1) modifiers.push(`.opacity(${formatFloat(opacity)})`);
+        if (zIndex !== undefined && zIndex !== 0) modifiers.push(`.zIndex(${formatFloat(zIndex)})`);
 
         if (color) modifiers.push(`.foregroundStyle(${toSwiftColorLiteral(color)})`);
         if (fontSize || fontWeight || fontDesign) {
@@ -3217,6 +5301,7 @@ function buildSwiftUIModifiers(
         if (textDecoration?.strikethrough) modifiers.push('.strikethrough()');
         if (flexValue !== undefined && Number.isFinite(flexValue) && flexValue > 0) {
             modifiers.push('.frame(maxWidth: .infinity, alignment: .leading)');
+            modifiers.push(`.layoutPriority(${formatFloat(flexValue)})`);
         }
 
         modifiers.push(...marginModifiers);
@@ -3240,7 +5325,30 @@ function buildSwiftUIButtonModifiers(
     return style ? ['.buttonStyle(.plain)', ...modifiers] : modifiers;
 }
 
-function resolveSwiftRowAlignment(style: Record<string, NativePropValue> | undefined): string {
+function resolveSwiftRowAlignment(
+    style: Record<string, NativePropValue> | undefined,
+    children: NativeNode[] = [],
+    resolvedStyles?: NativeResolvedStyleMap,
+    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
+): string {
+    const baselineAlignment = resolveBaselineAlignmentKeyword(style?.alignItems);
+    if (baselineAlignment === 'last') {
+        return '.lastTextBaseline';
+    }
+
+    if (baselineAlignment === 'first') {
+        return '.firstTextBaseline';
+    }
+
+    const selfBaselineAlignment = resolveRowBaselineSelfAlignment(children, resolvedStyles, styleResolveOptions);
+    if (selfBaselineAlignment === 'last') {
+        return '.lastTextBaseline';
+    }
+
+    if (selfBaselineAlignment === 'first') {
+        return '.firstTextBaseline';
+    }
+
     const align = typeof style?.alignItems === 'string' ? style.alignItems.trim().toLowerCase() : undefined;
     return align === 'center'
         ? '.center'
@@ -3275,7 +5383,7 @@ function buildSwiftUILayout(
     const spacing = toPointLiteral(style?.gap ?? (layout === 'HStack' ? style?.columnGap : style?.rowGap) ?? style?.gap, styleResolveOptions) ?? '12';
 
     if (layout === 'HStack') {
-        return `HStack(alignment: ${resolveSwiftRowAlignment(style)}, spacing: ${spacing})`;
+        return `HStack(alignment: ${resolveSwiftRowAlignment(style, node.children, resolvedStyles, styleResolveOptions)}, spacing: ${spacing})`;
     }
 
     return `VStack(alignment: ${resolveSwiftColumnAlignment(style)}, spacing: ${spacing})`;
@@ -3286,19 +5394,25 @@ function renderSwiftChunkedLayout(
     layout: NativeChunkedLayout,
     level: number,
     context: SwiftUIContext,
+    hints: NativeRenderHints,
 ): string[] {
     const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
     const rowSpacing = layout.rowGap !== undefined ? formatFloat(layout.rowGap) : '12';
     const columnSpacing = layout.columnGap !== undefined ? formatFloat(layout.columnGap) : '12';
-    const rowAlignment = resolveSwiftRowAlignment(style);
+    const rowAlignment = resolveSwiftRowAlignment(style, node.children, context.resolvedStyles, context.styleResolveOptions);
     const columnAlignment = resolveSwiftColumnAlignment(style);
 
     if (layout.kind === 'grid' && layout.rows.length === 1) {
         const [row] = layout.rows;
         const lines = [`${indent(level)}HStack(alignment: ${rowAlignment}, spacing: ${columnSpacing}) {`];
+        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + entry, 0) : undefined;
         row.items.forEach((child, index) => {
+            const weight = row.weights?.[index];
+            const cellAvailableWidth = weight !== undefined && totalWeight && hints.availableWidth !== undefined
+                ? Math.max(0, (hints.availableWidth - ((layout.columnGap ?? 0) * Math.max(0, row.items.length - 1))) * (weight / totalWeight))
+                : hints.availableWidth;
             lines.push(`${indent(level + 1)}VStack(alignment: .leading, spacing: 0) {`);
-            lines.push(...renderSwiftUINode(child, level + 2, context, { fillWidth: shouldFillChunkedCellChild(child) }));
+            lines.push(...renderSwiftUINode(child, level + 2, context, { fillWidth: shouldFillChunkedCellChild(child), availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight }));
             lines.push(`${indent(level + 1)}}`);
             lines.push(`${indent(level + 2)}.frame(maxWidth: .infinity, alignment: .leading)`);
             if (row.weights?.[index] !== undefined) {
@@ -3311,11 +5425,16 @@ function renderSwiftChunkedLayout(
 
     const lines = [`${indent(level)}VStack(alignment: ${columnAlignment}, spacing: ${rowSpacing}) {`];
     for (const row of layout.rows) {
+        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + entry, 0) : undefined;
         lines.push(`${indent(level + 1)}HStack(alignment: ${rowAlignment}, spacing: ${columnSpacing}) {`);
         row.items.forEach((child, index) => {
             const fillChild = layout.kind === 'grid' && shouldFillChunkedCellChild(child);
+            const weight = row.weights?.[index];
+            const cellAvailableWidth = weight !== undefined && totalWeight && hints.availableWidth !== undefined
+                ? Math.max(0, (hints.availableWidth - ((layout.columnGap ?? 0) * Math.max(0, row.items.length - 1))) * (weight / totalWeight))
+                : hints.availableWidth;
             lines.push(`${indent(level + 2)}VStack(alignment: .leading, spacing: 0) {`);
-            lines.push(...renderSwiftUINode(child, level + 3, context, fillChild ? { fillWidth: true } : {}));
+            lines.push(...renderSwiftUINode(child, level + 3, context, fillChild ? { fillWidth: true, availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight } : { availableWidth: cellAvailableWidth, availableHeight: hints.availableHeight }));
             lines.push(`${indent(level + 2)}}`);
             if (fillChild || row.weights?.[index] !== undefined) {
                 lines.push(`${indent(level + 3)}.frame(maxWidth: .infinity, alignment: .leading)`);
@@ -3342,17 +5461,104 @@ function appendSwiftUIModifiers(lines: string[], modifiers: string[], level: num
     ];
 }
 
+function appendSwiftUIOverlays(lines: string[], overlays: string[][], level: number): string[] {
+    if (overlays.length === 0) {
+        return lines;
+    }
+
+    const result = [...lines];
+    for (const overlayLines of overlays) {
+        result.push(`${indent(level + 1)}.overlay(alignment: .topLeading) {`);
+        result.push(...overlayLines);
+        result.push(`${indent(level + 1)}}`);
+    }
+
+    return result;
+}
+
+function renderSwiftUIContainerBody(
+    node: NativeElementNode,
+    level: number,
+    context: SwiftUIContext,
+    hints: NativeRenderHints,
+): string[] {
+    const chunkedLayout = resolveChunkedLayout(node, context.resolvedStyles, context.styleResolveOptions);
+    if (chunkedLayout) {
+        return renderSwiftChunkedLayout(node, chunkedLayout, level, context, hints);
+    }
+
+    const layoutKind = resolveSwiftUILayout(node, context.resolvedStyles);
+    const layout = buildSwiftUILayout(node, layoutKind, context.resolvedStyles, context.styleResolveOptions);
+    const lines = [
+        `${indent(level)}${layout} {`,
+        ...renderSwiftUIChildren(node.children, level + 1, context, layoutKind, node, hints),
+        `${indent(level)}}`,
+    ];
+
+    return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node, context.resolvedStyles, hints, context.styleResolveOptions), level);
+}
+
 function renderSwiftUIChildren(
     nodes: NativeNode[],
     level: number,
     context: SwiftUIContext,
     parentLayout?: 'VStack' | 'HStack',
+    parentNode?: NativeElementNode,
+    parentHints?: NativeRenderHints,
 ): string[] {
     const lines: string[] = [];
-    for (const child of nodes) {
-        const childHints = parentLayout === 'VStack' && shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions)
-            ? { fillWidth: true }
-            : {};
+    const orderedNodes = parentNode
+        ? getOrderedNativeChildren(parentNode, nodes, context.resolvedStyles, context.styleResolveOptions)
+        : nodes;
+    const availableWidth = parentNode
+        ? resolveNativeAvailableAxisSize(parentNode, 'horizontal', context.resolvedStyles, parentHints, context.styleResolveOptions)
+        : resolveAxisReferenceLength('horizontal', parentHints, context.styleResolveOptions);
+    const availableHeight = parentNode
+        ? resolveNativeAvailableAxisSize(parentNode, 'vertical', context.resolvedStyles, parentHints, context.styleResolveOptions)
+        : resolveAxisReferenceLength('vertical', parentHints, context.styleResolveOptions);
+    const parentFlexLayout = resolveNativeFlexContainerLayout(parentNode, context.resolvedStyles, context.styleResolveOptions);
+    const flexShrinkTargets = resolveNativeFlexShrinkTargets(
+        parentNode,
+        orderedNodes,
+        parentFlexLayout,
+        availableWidth,
+        availableHeight,
+        parentHints,
+        context.resolvedStyles,
+        context.styleResolveOptions,
+    );
+    const parentRowBaselineAlignment = parentFlexLayout === 'Row'
+        ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
+        : undefined;
+    for (const child of orderedNodes) {
+        const shouldDefaultFillCrossAxis = shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions);
+        const shouldStretchCrossAxis = shouldStretchFlexChildCrossAxis(
+            child,
+            parentFlexLayout,
+            parentNode,
+            parentHints,
+            context.resolvedStyles,
+            context.styleResolveOptions,
+        );
+        const childHints: NativeRenderHints = {
+            availableWidth,
+            availableHeight,
+            ...(parentLayout === 'VStack' && shouldDefaultFillCrossAxis
+                && (!parentFlexLayout || (parentFlexLayout === 'Column' && shouldStretchCrossAxis))
+                ? { fillWidth: true }
+                : {}),
+            ...(parentLayout === 'HStack' && parentFlexLayout === 'Row' && shouldDefaultFillCrossAxis && shouldStretchCrossAxis
+                ? { fillHeight: true }
+                : {}),
+            ...(child.kind === 'element' && parentFlexLayout === 'Row' && flexShrinkTargets.has(child)
+                ? { negotiatedMaxWidth: flexShrinkTargets.get(child) }
+                : {}),
+            ...(child.kind === 'element' && parentFlexLayout === 'Column' && flexShrinkTargets.has(child)
+                ? { negotiatedMaxHeight: flexShrinkTargets.get(child) }
+                : {}),
+            ...(parentFlexLayout ? { parentFlexLayout } : {}),
+            ...(parentRowBaselineAlignment ? { parentRowBaselineAlignment } : {}),
+        };
         lines.push(...renderSwiftUINode(child, level, context, childHints));
     }
     return lines;
@@ -3543,21 +5749,31 @@ function renderSwiftUINode(
     }
 
     if (node.component === 'Screen') {
-        const layoutKind = resolveSwiftUILayout(node, context.resolvedStyles);
-        const layout = buildSwiftUILayout(node, layoutKind, context.resolvedStyles, context.styleResolveOptions);
+        const { flowChildren, fixedChildren } = splitFixedPositionedChildren(node.children, context.resolvedStyles, context.styleResolveOptions);
+        const flowNode: NativeElementNode = flowChildren.length === node.children.length
+            ? node
+            : { ...node, children: flowChildren };
+        const layoutKind = resolveSwiftUILayout(flowNode, context.resolvedStyles);
+        const layout = buildSwiftUILayout(flowNode, layoutKind, context.resolvedStyles, context.styleResolveOptions);
         const contentLines = [
             `${indent(level + 1)}${layout} {`,
-            ...renderSwiftUIChildren(node.children, level + 2, context, layoutKind),
+            ...renderSwiftUIChildren(flowNode.children, level + 2, context, layoutKind, flowNode, hints),
             `${indent(level + 1)}}`,
         ];
-        const screenContent = appendSwiftUIModifiers(contentLines, buildSwiftUIModifiers(node, context.resolvedStyles, hints, context.styleResolveOptions), level + 1);
-        return [
+        const screenContent = appendSwiftUIModifiers(contentLines, buildSwiftUIModifiers(flowNode, context.resolvedStyles, hints, context.styleResolveOptions), level + 1);
+        const screenLines = [
             ...baseLines,
             `${indent(level)}ScrollView {`,
             ...screenContent,
             `${indent(level)}}`,
             `${indent(level + 1)}.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)`,
         ];
+        if (fixedChildren.length === 0) {
+            return screenLines;
+        }
+
+        const overlays = fixedChildren.map((child) => renderSwiftUINode(child, level + 2, context, { availableWidth: hints.availableWidth, availableHeight: hints.availableHeight, absoluteOverlay: true }));
+        return appendSwiftUIOverlays(screenLines, overlays, level);
     }
 
     if (node.component === 'Media' || node.component === 'WebView' || node.component === 'Canvas' || node.component === 'Vector') {
@@ -3572,20 +5788,17 @@ function renderSwiftUINode(
         );
     }
 
-    const chunkedLayout = resolveChunkedLayout(node, context.resolvedStyles, context.styleResolveOptions);
-    if (chunkedLayout) {
-        return [...baseLines, ...renderSwiftChunkedLayout(node, chunkedLayout, level, context)];
+    const { flowChildren, absoluteChildren } = splitAbsolutePositionedChildren(node.children, context.resolvedStyles, context.styleResolveOptions);
+    if (absoluteChildren.length > 0 && node.component !== 'Screen') {
+        const flowNode: NativeElementNode = flowChildren.length === node.children.length
+            ? node
+            : { ...node, children: flowChildren };
+        const base = [...baseLines, ...renderSwiftUIContainerBody(flowNode, level, context, hints)];
+        const overlays = absoluteChildren.map((child) => renderSwiftUINode(child, level + 2, context, { availableWidth: hints.availableWidth, availableHeight: hints.availableHeight, absoluteOverlay: true }));
+        return appendSwiftUIOverlays(base, overlays, level);
     }
 
-    const layoutKind = resolveSwiftUILayout(node, context.resolvedStyles);
-    const layout = buildSwiftUILayout(node, layoutKind, context.resolvedStyles, context.styleResolveOptions);
-    const lines = [
-        ...baseLines,
-        `${indent(level)}${layout} {`,
-        ...renderSwiftUIChildren(node.children, level + 1, context, layoutKind),
-        `${indent(level)}}`,
-    ];
-    return appendSwiftUIModifiers(lines, buildSwiftUIModifiers(node, context.resolvedStyles, hints, context.styleResolveOptions), level);
+    return [...baseLines, ...renderSwiftUIContainerBody(node, level, context, hints)];
 }
 
 function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
@@ -3664,10 +5877,10 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
     };
 
     const bodyLines = tree.roots.length === 1
-        ? renderComposeNode(tree.roots[0], 1, context)
+        ? renderComposeNode(tree.roots[0], 1, context, { availableWidth: styleResolveOptions.viewportWidth, availableHeight: styleResolveOptions.viewportHeight })
         : [
             '    Column(modifier = Modifier.fillMaxSize()) {',
-            ...renderComposeChildren(tree.roots, 2, context, 'Column'),
+            ...renderComposeChildren(tree.roots, 2, context, 'Column', undefined, { availableWidth: styleResolveOptions.viewportWidth, availableHeight: styleResolveOptions.viewportHeight }),
             '    }',
         ];
 
@@ -3686,7 +5899,11 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
         lines.push('import androidx.compose.foundation.rememberScrollState');
         lines.push('import androidx.compose.foundation.text.BasicTextField');
         lines.push('import androidx.compose.foundation.verticalScroll');
+        lines.push('import androidx.compose.ui.draw.alpha');
+        lines.push('import androidx.compose.ui.draw.clip');
+        lines.push('import androidx.compose.ui.draw.drawBehind');
         lines.push('import androidx.compose.ui.draw.shadow');
+        lines.push('import androidx.compose.ui.graphics.graphicsLayer');
         lines.push('import androidx.compose.material3.*');
         lines.push('import androidx.compose.runtime.*');
         lines.push('import androidx.compose.foundation.shape.RoundedCornerShape');
@@ -3694,6 +5911,7 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
         lines.push('import androidx.compose.ui.Modifier');
         lines.push('import androidx.compose.ui.graphics.Brush');
         lines.push('import androidx.compose.ui.graphics.Color');
+        lines.push('import androidx.compose.ui.graphics.RectangleShape');
         lines.push('import androidx.compose.ui.graphics.SolidColor');
         if (context.helperFlags.has('uriHandler')) {
             lines.push('import androidx.compose.ui.platform.LocalUriHandler');
@@ -3703,6 +5921,7 @@ export function renderAndroidCompose(input: Child | NativeTree, options: Android
         lines.push('import androidx.compose.ui.text.style.TextDecoration');
         lines.push('import androidx.compose.ui.text.style.TextAlign');
         lines.push('import androidx.compose.ui.tooling.preview.Preview');
+        lines.push('import androidx.compose.ui.zIndex');
         lines.push('import androidx.compose.ui.unit.dp');
         lines.push('import androidx.compose.ui.unit.sp');
         lines.push('');
@@ -3763,10 +5982,10 @@ export function renderSwiftUI(input: Child | NativeTree, options: SwiftUIOptions
     };
 
     const bodyLines = tree.roots.length === 1
-        ? renderSwiftUINode(tree.roots[0], 2, context)
+        ? renderSwiftUINode(tree.roots[0], 2, context, { availableWidth: styleResolveOptions.viewportWidth, availableHeight: styleResolveOptions.viewportHeight })
         : [
             `${indent(2)}VStack(alignment: .leading, spacing: 12) {`,
-            ...renderSwiftUIChildren(tree.roots, 3, context, 'VStack'),
+            ...renderSwiftUIChildren(tree.roots, 3, context, 'VStack', undefined, { availableWidth: styleResolveOptions.viewportWidth, availableHeight: styleResolveOptions.viewportHeight }),
             `${indent(2)}}`,
         ];
 

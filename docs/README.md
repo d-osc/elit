@@ -5,6 +5,7 @@ Welcome to the Elit documentation! 📚
 ## Getting Started
 
 - **[Quick Start Guide](./QUICK_START.md)** - Get up and running in 5 minutes
+- **[Native CSS Support](./native-css-support.md)** - Current Compose and SwiftUI CSS subset, limits, and priority backlog
 - **[WAPK Guide](./wapk.md)** - Package, inspect, run, and sync `.wapk` archives
 - **[API Reference](./API.md)** - Complete API documentation
 - **[Comparison Guide](./COMPARISON.md)** - Compare Elit with React, Vue, Svelte
