@@ -58,7 +58,7 @@ Use this table as the import map for generated code.
 | `elit` | Client-side all-in-one entry | DOM helpers, element factories, state, styles, router, HMR |
 | `elit/dom` | DOM renderer and SSR string rendering | `dom`, `render`, `renderToString`, `mount` |
 | `elit/el` | HTML, SVG, and MathML element factories | `div`, `button`, `html`, `body`, `script`, and many more |
-| `elit/native` | Native target proof of concept using the same Elit syntax | `renderNativeTree`, `renderNativeJson`, `renderAndroidCompose`, `renderSwiftUI` |
+| `elit/native` | Shared native generation foundation using the same Elit syntax | `renderNativeTree`, `renderNativeJson`, `renderAndroidCompose`, `renderSwiftUI` |
 | `elit/state` | Reactive state and render helpers | `createState`, `computed`, `reactive`, `text`, `bindValue`, `bindChecked`, `createSharedState` |
 | `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
 | `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
@@ -70,9 +70,9 @@ Use this table as the import map for generated code.
 
 Advanced subpaths also exist for lower-level adapters and internals: `elit/http`, `elit/https`, `elit/ws`, `elit/wss`, `elit/fs`, `elit/path`, `elit/mime-types`, `elit/chokidar`, `elit/runtime`, `elit/test-runtime`, `elit/test-reporter`, and `elit/types`.
 
-## Native Target POC
+## Native Target Foundation
 
-Elit now includes an early native-target foundation that keeps the existing element syntax and converts it into a serializable native tree. This is not a full Android/iOS renderer yet, but it is the first reusable layer for compiling one UI definition into multiple targets.
+Elit now includes a practical native-generation foundation that keeps the existing element syntax and can emit a serializable native tree, Jetpack Compose, and SwiftUI from the same source tree. It is still a CSS-subset renderer rather than a browser-complete Android/iOS engine, but it is already useful for shared mobile UI scaffolds, parity checks, and generated native screens.
 
 ```ts
 import { a, button, div, h1, img, input } from 'elit/el';
@@ -132,8 +132,10 @@ Current scope:
 - Maps common tags into generic native components such as `View`, `Text`, `Button`, `Image`, and `TextInput`.
 - Maps checkbox inputs into native toggle controls and turns absolute `href` links into native URL-opening actions.
 - Produces serializable IR suitable for future Android/iOS code generators.
-- Can generate first-pass Jetpack Compose code for a practical subset of tags.
-- Can generate first-pass SwiftUI code for the same practical subset.
+- Can generate Jetpack Compose code for a practical subset of shared mobile UI.
+- Can generate SwiftUI code for the same practical subset.
+- Resolves a practical native CSS subset for typography, spacing, gradients, shadows, flex and simple grid layouts, `currentColor`, named colors, and per-side solid, dashed, and dotted borders.
+- Supports native selector matching for tag, class, id, and attribute selectors; sibling combinators; child and type position pseudo-classes; and practical `:not(...)` and `:has(...)` subsets.
 - Can be wired into `elit mobile sync|build|run` through `mobile.native.entry` so generated files land in the mobile scaffold automatically.
 - Keeps source tag information so platform backends can apply custom rules later.
 
