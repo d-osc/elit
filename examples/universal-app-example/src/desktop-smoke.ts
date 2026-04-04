@@ -1,3 +1,5 @@
-import { launchDesktopExample } from './desktop-app';
+import { setDesktopRenderOptions } from '../../../src/render-context';
 
-launchDesktopExample({ autoClose: true });
+import './web-main';
+
+setDesktopRenderOptions({ autoClose: true });

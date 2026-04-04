@@ -2,6 +2,7 @@
  * Elit - DomNode Core Class
  */
 
+import { captureRenderedVNode, detectRenderRuntimeTarget } from './render-context';
 import type { VNode, Child, Children, Props, State, StateOptions, VirtualListController, JsonNode, VNodeJson } from './types';
 
 /**
@@ -49,6 +50,10 @@ function resolveTextareaValue(tagName: string, props: Props): string | undefined
     return tagName === 'textarea' && props.value != null
         ? normalizeFormControlValue(props.value)
         : undefined;
+}
+
+function hasDocumentApi(): boolean {
+    return typeof document !== 'undefined';
 }
 
 export class DomNode {
@@ -193,6 +198,17 @@ export class DomNode {
     }
 
     render(rootElement: string | HTMLElement, vNode: VNode): HTMLElement {
+        if (!hasDocumentApi()) {
+            const runtimeTarget = detectRenderRuntimeTarget();
+
+            if (runtimeTarget === 'desktop' || runtimeTarget === 'mobile') {
+                captureRenderedVNode(rootElement, vNode, runtimeTarget);
+                return {} as HTMLElement;
+            }
+
+            throw new Error('render() requires a DOM or an Elit desktop/mobile runtime target.');
+        }
+
         const el = ensureElement(resolveElement(rootElement), rootElement);
 
         // Clear existing content before rendering

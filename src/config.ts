@@ -127,6 +127,8 @@ export interface MobileNativeIosConfig {
 }
 
 export interface DesktopConfig {
+    /** Desktop entry file used when the CLI command omits <entry> */
+    entry?: string;
     /** Native desktop runtime: quickjs, bun, node, deno */
     runtime?: 'quickjs' | 'bun' | 'node' | 'deno';
     /** Desktop entry compiler: auto, none, esbuild, tsx, tsup */

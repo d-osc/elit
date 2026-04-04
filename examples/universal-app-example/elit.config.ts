@@ -25,6 +25,7 @@ export default defineConfig({
     }],
     desktop: {
         compiler: 'auto',
+        entry: './src/web-main.ts',
         outDir: './desktop-dist',
         runtime: 'quickjs',
     },
@@ -48,8 +49,7 @@ export default defineConfig({
             'android.permission.ACCESS_NETWORK_STATE',
         ],
         native: {
-            entry: './src/native-screen.ts',
-            exportName: 'screen',
+            entry: './src/web-main.ts',
             ios: {
                 enabled: false,
             },

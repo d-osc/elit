@@ -592,8 +592,8 @@ Build Options:
   --silent               Disable logging
 
 Desktop Options:
-  elit desktop <entry>                       Run an Elit desktop entry
-  elit desktop build <entry>                Build a standalone desktop executable
+  elit desktop [entry]                      Run an Elit desktop entry
+  elit desktop build [entry]                Build a standalone desktop executable
   elit desktop wapk <file.wapk>             Run a packaged app in the desktop shell
   elit desktop --runtime node src/main.ts   Run with Node.js backend runtime
   elit desktop build --release src/main.ts  Build a release desktop executable
@@ -627,6 +627,7 @@ Note: Build configuration supports both single and multiple builds:
       - Single build: build: { entry: 'src/app.ts', outDir: 'dist' }
       - Multiple builds: build: [{ entry: 'src/app1.ts' }, { entry: 'src/app2.ts' }]
       When using array, all builds run sequentially.
+  Desktop commands can also read desktop.entry from elit.config.ts when [entry] is omitted.
 
 Preview Options:
   -p, --port <number>      Port to run server on (default: 4173)

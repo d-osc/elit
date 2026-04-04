@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { build as esbuild } from 'esbuild';
@@ -48,6 +48,11 @@ interface PreparedEntry {
     appName: string;
     entryPath: string;
     cleanupPath?: string;
+}
+
+interface DesktopBootstrapEntry {
+    bootstrapPath: string;
+    cleanupPaths: string[];
 }
 
 interface DesktopWapkRunOptions {
@@ -129,6 +134,111 @@ function resolveWorkspacePackageImport(specifier: string, startDir: string): str
     return existsSync(candidate) ? candidate : undefined;
 }
 
+function toDesktopBootstrapImportPath(fromPath: string, toPath: string): string {
+    const importPath = relative(dirname(fromPath), toPath).replace(/\\/g, '/');
+    return importPath.startsWith('./') || importPath.startsWith('../') ? importPath : `./${importPath}`;
+}
+
+function formatDesktopDisplayName(value: string): string {
+    if (!value) {
+        return 'Elit';
+    }
+
+    return value
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join(' ');
+}
+
+function resolveDesktopEntryDisplayName(entryPath: string, fallbackName: string): string {
+    let currentDir = dirname(resolve(entryPath));
+
+    while (true) {
+        const packageJsonPath = join(currentDir, 'package.json');
+        if (existsSync(packageJsonPath)) {
+            try {
+                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+                    appName?: string;
+                    name?: string;
+                    productName?: string;
+                };
+                const configuredName = packageJson.productName ?? packageJson.appName ?? packageJson.name;
+                if (configuredName) {
+                    return formatDesktopDisplayName(configuredName);
+                }
+            } catch {
+                // Ignore invalid package metadata while walking upward.
+            }
+        }
+
+        const parentDir = dirname(currentDir);
+        if (parentDir === currentDir) {
+            break;
+        }
+        currentDir = parentDir;
+    }
+
+    return formatDesktopDisplayName(fallbackName);
+}
+
+function createDesktopBootstrapEntry(entryPath: string, appName: string): DesktopBootstrapEntry {
+    const bootstrapId = randomUUID();
+    const bootstrapPath = join(dirname(entryPath), `.elit-desktop-bootstrap-${appName}-${bootstrapId}.ts`);
+    const preludePath = join(dirname(entryPath), `.elit-desktop-prelude-${appName}-${bootstrapId}.ts`);
+    const desktopAutoRenderPath = resolve(PACKAGE_ROOT, 'src', 'desktop-auto-render.ts');
+    const renderContextPath = resolve(PACKAGE_ROOT, 'src', 'render-context.ts');
+    const defaultTitle = `${resolveDesktopEntryDisplayName(entryPath, appName)} Desktop`;
+
+    writeFileSync(
+        preludePath,
+        [
+            `import { installDesktopRenderTracking } from ${JSON.stringify(toDesktopBootstrapImportPath(preludePath, desktopAutoRenderPath))};`,
+            `import { clearCapturedRenderedVNode, clearDesktopRenderOptions, setRenderRuntimeTarget } from ${JSON.stringify(toDesktopBootstrapImportPath(preludePath, renderContextPath))};`,
+            '',
+            `setRenderRuntimeTarget(${JSON.stringify('desktop')});`,
+            'clearCapturedRenderedVNode();',
+            'clearDesktopRenderOptions();',
+            'installDesktopRenderTracking();',
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+
+    writeFileSync(
+        bootstrapPath,
+        [
+            `import { completeDesktopAutoRender } from ${JSON.stringify(toDesktopBootstrapImportPath(bootstrapPath, desktopAutoRenderPath))};`,
+            `import ${JSON.stringify(toDesktopBootstrapImportPath(bootstrapPath, preludePath))};`,
+            `import ${JSON.stringify(toDesktopBootstrapImportPath(bootstrapPath, entryPath))};`,
+            '',
+            `const desktopAutoRenderOptions = ${JSON.stringify({
+                center: true,
+                height: 720,
+                title: defaultTitle,
+                width: 1080,
+            })};`,
+            '',
+            'try {',
+            '    completeDesktopAutoRender(desktopAutoRenderOptions);',
+            '} catch (error) {',
+            '    console.error(error);',
+            '    if (typeof process !== "undefined" && typeof process.exit === "function") {',
+            '        process.exit(1);',
+            '    }',
+            '    throw error;',
+            '}',
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+
+    return {
+        bootstrapPath,
+        cleanupPaths: [bootstrapPath, preludePath],
+    };
+}
+
 function createWorkspacePackagePlugin(entryDir: string) {
     return {
         name: 'workspace-package-self-reference',
@@ -142,13 +252,18 @@ function createWorkspacePackagePlugin(entryDir: string) {
 }
 
 export async function runDesktopCommand(args: string[]): Promise<void> {
-    if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    if (args.includes('--help') || args.includes('-h')) {
         printDesktopHelp();
         return;
     }
 
     const config = await loadConfig();
     const desktopConfig = config?.desktop;
+
+    if (args.length === 0 && !desktopConfig?.entry) {
+        printDesktopHelp();
+        return;
+    }
 
     if (args[0] === 'wapk') {
         await runDesktopWapkCommand(args.slice(1), desktopConfig);
@@ -165,6 +280,7 @@ export async function runDesktopCommand(args: string[]): Promise<void> {
 
 function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRunOptions {
     const options: DesktopRunOptions = {
+        entry: config?.entry,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -204,7 +320,7 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
     }
 
     if (!options.entry) {
-        throw new Error('Desktop mode requires an entry file.');
+        throw new Error('Desktop mode requires an entry file, either from the command line or desktop.entry in elit.config.ts.');
     }
 
     return options;
@@ -212,6 +328,7 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
 
 function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopBuildOptions {
     const options: DesktopBuildOptions = {
+        entry: config?.entry,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -279,10 +396,10 @@ function printDesktopHelp(): void {
         'Desktop mode for Elit',
         '',
         'Usage:',
-        '  elit desktop [options] <entry>',
+        '  elit desktop [options] [entry]',
         '  elit desktop wapk [options] <file.wapk>',
         '  elit desktop wapk run [options] <file.wapk>',
-        '  elit desktop build [options] <entry>',
+        '  elit desktop build [options] [entry]',
         '  elit desktop build [options]',
         '',
         'Run options:',
@@ -317,6 +434,7 @@ function printDesktopHelp(): void {
         '  - TypeScript and module-style QuickJS entries are transpiled automatically.',
         '  - The tsx compiler is Node-only and keeps loading the original source tree.',
         '  - The tsx and tsup compilers require those packages to be installed.',
+        '  - When [entry] is omitted, Elit falls back to desktop.entry from elit.config.ts.',
         '  - The build subcommand can be used without an entry to prebuild the native runtime.',
         '  - Desktop WAPK mode expects the packaged entry to start an HTTP app.',
         '  - Use --watcher for faster file change detection (less CPU usage).',
@@ -777,9 +895,12 @@ async function prepareEntry(
     }
 
     const appName = basename(entryPath, extname(entryPath));
-    if (!shouldCompileEntry(entryPath, runtime, compiler, mode)) {
+    const shouldCompile = shouldCompileEntry(entryPath, runtime, compiler, mode);
+    if (!shouldCompile) {
         return { appName, entryPath };
     }
+
+    const bootstrapEntry = createDesktopBootstrapEntry(entryPath, appName);
 
     const output = compileTarget(runtime);
     const compiledPath = join(dirname(entryPath), `.elit-desktop-${appName}-${randomUUID()}${output.extension}`);
@@ -789,7 +910,7 @@ async function prepareEntry(
             appName,
             compiledPath,
             compiler,
-            entryPath,
+            entryPath: bootstrapEntry.bootstrapPath,
             mode,
             output,
             runtime,
@@ -797,6 +918,12 @@ async function prepareEntry(
     } catch (error) {
         cleanupPreparedEntry({ appName, entryPath: compiledPath, cleanupPath: compiledPath });
         throw error;
+    } finally {
+        for (const cleanupPath of bootstrapEntry.cleanupPaths) {
+            if (existsSync(cleanupPath)) {
+                rmSync(cleanupPath, { force: true });
+            }
+        }
     }
 
     return {

@@ -7,6 +7,12 @@ import { build as esbuild } from 'esbuild';
 
 import { loadConfig } from './config';
 import { renderAndroidCompose, renderNativeJson, renderSwiftUI, type NativePlatform } from './native';
+import {
+    clearCapturedRenderedVNode,
+    getCapturedRenderedVNode,
+    restoreRenderRuntimeTarget,
+    setRenderRuntimeTarget,
+} from './render-context';
 import type { Child } from './types';
 
 type NativeTarget = 'android' | 'ios' | 'ir';
@@ -249,11 +255,14 @@ export async function generateNativeEntryOutput(options: NativeEntryRenderOption
 
 export async function loadNativeEntryValue(entryPath: string, exportName?: string): Promise<Child> {
     const tempFile = await compileNativeEntry(entryPath);
+    const previousTarget = setRenderRuntimeTarget('mobile');
+    clearCapturedRenderedVNode();
 
     try {
         const moduleRecord = await import(pathToFileURL(tempFile).href) as Record<string, unknown>;
         return await resolveNativeEntryExport(moduleRecord, exportName);
     } finally {
+        restoreRenderRuntimeTarget(previousTarget);
         safeCleanup(tempFile);
     }
 }
@@ -322,6 +331,11 @@ export async function resolveNativeEntryExport(moduleRecord: Record<string, unkn
         }
     }
 
+    const capturedRender = getCapturedRenderedVNode();
+    if (capturedRender?.vNode) {
+        return capturedRender.vNode;
+    }
+
     const remainingExports = Object.keys(moduleRecord).filter((key) => key !== '__esModule');
     if (remainingExports.length === 1) {
         const [candidate] = remainingExports;
@@ -329,7 +343,7 @@ export async function resolveNativeEntryExport(moduleRecord: Record<string, unkn
     }
 
     throw new Error(
-        'Native entry must export a value or zero-argument function as default, screen, app, or another named export via --export.',
+        'Native entry must export a value or zero-argument function as default, screen, app, or another named export via --export, or call render(...) so the CLI can capture the VNode.',
     );
 }
 

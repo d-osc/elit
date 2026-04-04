@@ -1,8 +1,9 @@
-import { a, article, button, div, h1, h2, input, label, li, p, section, span, textarea, ul } from '../../../src/el';
 import { render } from '../../../src/dom';
+import { detectRenderRuntimeTarget, setDesktopRenderOptions, type RenderRuntimeTarget } from '../../../src/render-context';
 import { bindChecked, bindValue } from '../../../src/state';
 
 import {
+    APP_NAME,
     APP_LINK,
     createUniversalExampleState,
     createUniversalStatusMessages,
@@ -10,33 +11,94 @@ import {
     UNIVERSAL_PRIMARY_ACTION_LABEL,
 } from './shared';
 import { createHeroBadge, createStatusCard, createUniversalShell } from './universal-components';
-import './web-styles';
 
-const state = createUniversalExampleState();
+type UniversalSurface = Exclude<RenderRuntimeTarget, 'unknown'>;
 
-const app = createUniversalShell(
-    {
-        iconChild: createHeroBadge(),
-        heroActions: [
-            {
-                label: UNIVERSAL_PRIMARY_ACTION_LABEL,
-                className: 'btn btn-primary',
-                action: 'validation.record',
-                payload: { surface: 'web' },
-                onClick: () => {
-                    state.launchCount.value++;
+function resolveSurface(): UniversalSurface {
+    const runtimeTarget = detectRenderRuntimeTarget();
+
+    if (runtimeTarget === 'desktop' || runtimeTarget === 'mobile') {
+        return runtimeTarget;
+    }
+
+    return 'web';
+}
+
+function createHeroActions(surface: UniversalSurface, state = createUniversalExampleState()) {
+    switch (surface) {
+        case 'desktop':
+            return [
+                {
+                    label: 'Ping native shell',
+                    className: 'btn btn-primary',
+                    action: 'desktop:ping',
+                    payload: { surface: 'desktop' },
                 },
-            },
-            {
-                label: 'Open the Elit repository',
-                className: 'btn btn-secondary',
-                href: APP_LINK,
-                target: '_blank',
-                rel: 'noreferrer',
-            },
-        ],
+                {
+                    label: 'Close window',
+                    className: 'btn btn-secondary',
+                    action: 'desktop:quit',
+                    payload: { surface: 'desktop' },
+                },
+                {
+                    label: 'Open the Elit repository',
+                    className: 'btn btn-secondary',
+                    href: APP_LINK,
+                },
+            ];
+        case 'mobile':
+            return [
+                {
+                    label: UNIVERSAL_PRIMARY_ACTION_LABEL,
+                    className: 'btn btn-primary',
+                    action: 'validation.record',
+                    payload: { surface: 'mobile', target: 'android-compose' },
+                },
+                {
+                    label: 'Open the Elit repository',
+                    className: 'btn btn-secondary',
+                    href: APP_LINK,
+                },
+            ];
+        case 'web':
+        default:
+            return [
+                {
+                    label: UNIVERSAL_PRIMARY_ACTION_LABEL,
+                    className: 'btn btn-primary',
+                    action: 'validation.record',
+                    payload: { surface: 'web' },
+                    onClick: () => {
+                        state.launchCount.value++;
+                    },
+                },
+                {
+                    label: 'Open the Elit repository',
+                    className: 'btn btn-secondary',
+                    href: APP_LINK,
+                    target: '_blank',
+                    rel: 'noreferrer',
+                },
+            ];
+    }
+}
+
+function createApp(surface: UniversalSurface) {
+    const state = createUniversalExampleState();
+
+    return createUniversalShell({
+        iconChild: createHeroBadge(),
+        heroActions: createHeroActions(surface, state),
+        pageClassName: surface === 'mobile' ? 'page-native' : undefined,
+        heroClassName: surface === 'mobile' ? 'hero-native' : undefined,
+        heroLayoutProps: surface === 'mobile'
+            ? {
+                className: 'hero-layout-native',
+            }
+            : undefined,
+        panelGridClassName: surface === 'mobile' ? 'panel-grid-native' : undefined,
         form: {
-            title: UNIVERSAL_FORM_COPY.title,
+            title: surface === 'desktop' ? 'Desktop shell and shared content' : UNIVERSAL_FORM_COPY.title,
             questionLabel: UNIVERSAL_FORM_COPY.questionLabel,
             questionPlaceholder: UNIVERSAL_FORM_COPY.questionPlaceholder,
             questionInputProps: bindValue(state.validationTarget),
@@ -47,7 +109,18 @@ const app = createUniversalShell(
             toggleInputProps: bindChecked(state.nativeEnabled),
             statusItems: createUniversalStatusMessages(state).map((message) => createStatusCard(message)),
         },
-    },
-);
+    });
+}
 
-render('root', app);
+const surface = resolveSurface();
+
+if (surface === 'desktop') {
+    setDesktopRenderOptions({
+        center: true,
+        height: 720,
+        title: `${APP_NAME} Desktop`,
+        width: 1080,
+    });
+}
+
+render('root', createApp(surface));

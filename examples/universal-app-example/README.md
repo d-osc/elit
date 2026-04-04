@@ -5,17 +5,15 @@ This example keeps web, desktop, and mobile flows in one project so you can test
 ## What it validates
 
 - `bun run web:build` produces a browser build under `dist/`
-- `bun run desktop:smoke` launches a native desktop window and closes it automatically after IPC succeeds
-- `bun run desktop:build` can package the desktop entry into `desktop-dist/`
-- `bun run mobile:build:android` scaffolds, syncs built web assets, generates Android Compose from the same repo, and builds the Android app
+- `bun run desktop:run` and `bun run desktop:build` now use `src/web-main.ts` directly on the example's desktop runtime, with the desktop runtime auto-wrapping a captured `render(...)` call into a native window
+- `bun run desktop:smoke` wraps the same `src/web-main.ts` entry, then auto-closes after the desktop ready signal for automated verification
+- `bun run mobile:build:android` scaffolds, syncs built web assets, generates Android Compose from the same `src/web-main.ts` entry, and builds the Android app
 - `bun run mobile:run:android:auto` picks an emulator first, otherwise the first connected Android device, then installs and launches the app
 
 ## Project layout
 
-- `src/web-main.ts` is the browser entry rendered into `public/index.html`
-- `src/desktop.ts` is the manual desktop entry
-- `src/desktop-smoke.ts` is the auto-close desktop smoke entry used by tests
-- `src/native-screen.ts` is the mobile native UI source used for Compose generation
+- `src/web-main.ts` is the shared entry for web, desktop, and native mobile generation
+- `src/desktop-smoke.ts` is a tiny auto-close wrapper around `src/web-main.ts` used by tests
 - `src/shared.ts` contains text and data reused across web, desktop, and mobile
 - `src/universal-components.ts` keeps the shared component tree surface-agnostic while `elit/universal` attaches serializable action and route metadata
 - `test-universal.ps1` and `test-universal.sh` run the end-to-end smoke flow
@@ -49,7 +47,9 @@ bun run mobile:run:android:auto
 
 ## Notes
 
+- The old `src/desktop.ts`, `src/desktop-app.ts`, `src/desktop-html.ts`, and `src/native-screen.ts` files were removed because the shared `src/web-main.ts` entry now covers the main web, desktop, and mobile paths.
+- The shared desktop entry is now validated again on the example's current QuickJS desktop runtime as well as the external runtimes.
 - The desktop smoke entry auto-closes only for automated validation. Use `bun run desktop:run` for a manual desktop window.
 - Mobile validation in this repo is Android-focused on Windows. `mobile init` still creates iOS scaffold files because that is how the current CLI behaves.
 - The universal smoke test treats `mobile doctor --json` as informational so machines without a full Android toolchain still get a clear report before build fails.
-- Shared CTA metadata now flows through `elit/universal`, so the same component tree can describe desktop IPC actions and native mobile bridge actions without splitting the UI layout by platform.
+- `src/web-main.ts` now branches on the runtime target and still finishes with the same `render(...)` call, while desktop and native mobile flows read that render call instead of requiring separate main entries.
