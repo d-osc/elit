@@ -143,9 +143,18 @@ npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
 npx elit desktop build ./src/main.ts --release
+npx elit mobile init
+npx elit mobile run android
+npx elit native generate android ./src/native-screen.ts --name HomeScreen
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk --runtime bun`;
+
+const mobileCommands = `npx elit mobile init
+npx elit mobile doctor --cwd .
+npx elit mobile sync --cwd . --web-dir dist
+npx elit mobile run android --cwd .
+npx elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app`;
 
 const wapkCommands = `npx elit wapk pack .
 npx elit wapk pack . --include-deps
@@ -190,13 +199,56 @@ const configShape = `{
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  mobile?: {
+    cwd?: string;
+    appId?: string;
+    appName?: string;
+    webDir?: string;
+    mode?: 'native' | 'hybrid';
+    icon?: string;
+    permissions?: string[];
+    android?: {
+      target?: string;
+    };
+    ios?: {
+      target?: string;
+    };
+    native?: {
+      entry?: string;
+      exportName?: string;
+      android?: {
+        packageName?: string;
+        functionName?: string;
+      };
+      ios?: {
+        enabled?: boolean;
+        output?: string;
+        structName?: string;
+      };
+    };
+  };
+  desktop?: {
+    entry?: string;
+    runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
+    compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
+    release?: boolean;
+    outDir?: string;
+    platform?: 'windows' | 'linux' | 'macos';
+    wapk?: {
+      runtime?: 'node' | 'bun' | 'deno';
+      syncInterval?: number;
+      useWatcher?: boolean;
+      release?: boolean;
+    };
+  };
   wapk?: {
     name?: string;
     version?: string;
     runtime?: 'node' | 'bun' | 'deno';
     entry?: string;
-    include?: string[];
-    exclude?: string[];
+    scripts?: Record<string, string>;
+    port?: number;
+    env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;
   };
 }`;
@@ -239,13 +291,38 @@ export default {
   test: {
     include: ['testing/unit/**/*.test.ts'],
   },
+  mobile: {
+    cwd: '.',
+    appId: 'com.elit.app',
+    appName: 'Elit App',
+    webDir: 'dist',
+    mode: 'native',
+    icon: './icon.png',
+    permissions: ['android.permission.INTERNET'],
+    native: {
+      entry: './src/main.ts',
+      ios: {
+        enabled: false,
+      },
+    },
+  },
+  desktop: {
+    entry: './src/main.ts',
+    runtime: 'quickjs',
+    compiler: 'auto',
+    release: false,
+    outDir: 'dist',
+    platform: 'windows',
+  },
   wapk: {
     name: '@acme/sample-app',
     version: '1.0.0',
     runtime: 'bun',
     entry: 'src/server.ts',
-    include: ['public/**'],
-    exclude: ['**/*.log'],
+    port: 3000,
+    env: {
+      NODE_ENV: 'production',
+    },
   },
 };`;
 
@@ -354,6 +431,7 @@ const Docs = () =>
               scrollLink('browser-app', text('Browser App', 'แอปเบราว์เซอร์')),
               scrollLink('cli', 'CLI'),
               scrollLink('desktop', text('Desktop Mode', 'Desktop Mode')),
+              scrollLink('mobile', text('Mobile & Native', 'Mobile และ Native')),
               scrollLink('wapk', 'WAPK'),
               scrollLink('config', text('Config File', 'Config File')),
               scrollLink('server', text('Server Patterns', 'รูปแบบฝั่ง Server')),
@@ -436,6 +514,12 @@ const Docs = () =>
               li(code('elit desktop --runtime quickjs|node|bun|deno')),
               li(code('elit desktop build --platform windows|linux|macos --out-dir dist')),
               li(code('elit desktop build --compiler auto|none|esbuild|tsx|tsup')),
+              li(code('elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist --icon ./icon.png --permission android.permission.CAMERA')),
+              li(code('elit mobile doctor --cwd . --json')),
+              li(code('elit mobile sync --cwd . --web-dir dist --icon ./icon.png --permission android.permission.CAMERA')),
+              li(code('elit mobile run android|ios --cwd . --target <device-id> --prod --icon ./icon.png --permission android.permission.CAMERA')),
+              li(code('elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app')),
+              li(code('elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview')),
               li(code('elit wapk pack [directory] --include-deps')),
               li(code('elit wapk run <file.wapk> --runtime node|bun|deno')),
               li(code('elit wapk run <file.wapk> --sync-interval 100 --watcher'))
@@ -443,8 +527,8 @@ const Docs = () =>
 
             h2({ id: 'desktop' }, text('Desktop Mode', 'Desktop Mode')),
             p(text(
-              'Desktop mode runs an Elit entry inside a native WebView shell and exposes the desktop APIs from elit/desktop.',
-              'Desktop mode จะรัน entry ของ Elit ภายใน native WebView shell และเปิดใช้ API จาก elit/desktop.'
+              'Desktop mode runs an Elit entry inside a native WebView shell and exposes the desktop APIs from elit/desktop. The entry can either call createWindow(...) directly or finish with a normal render(...) call from a shared UI entry.',
+              'Desktop mode จะรัน entry ของ Elit ภายใน native WebView shell และเปิดใช้ API จาก elit/desktop โดย entry จะเรียก createWindow(...) เองก็ได้ หรือจะจบด้วย render(...) จาก shared UI entry ก็ได้.'
             )),
             codeExample(desktopEntry),
             h4(text('Run and Build', 'สั่งรันและ build')),
@@ -453,10 +537,25 @@ npx elit desktop build ./src/main.ts --release`),
             ul(
               li(text('Runtime choices: quickjs, node, bun, deno.', 'runtime ที่เลือกได้: quickjs, node, bun, deno.')),
               li(text('Compiler choices: auto, none, esbuild, tsx, tsup.', 'compiler ที่เลือกได้: auto, none, esbuild, tsx, tsup.')),
+              li(text('Set desktop.entry in elit.config.* when you want elit desktop and elit desktop build to run without repeating the entry path.', 'ตั้ง desktop.entry ใน elit.config.* เมื่อต้องการให้ elit desktop และ elit desktop build ทำงานได้โดยไม่ต้องใส่ path entry ซ้ำทุกครั้ง.')),
+              li(text('When a shared entry only calls render(...), desktop mode captures the rendered VNode and auto-opens a native window from it.', 'ถ้า shared entry เรียกเพียง render(...), desktop mode จะ capture VNode ที่ render แล้วเปิด native window ให้อัตโนมัติจากผลลัพธ์นั้น.')),
               li(text('tsx is a Node loader mode, not a relocatable bundle mode.', 'tsx เป็น Node loader mode ไม่ใช่ bundle mode ที่ย้ายไฟล์ไปที่อื่นได้ง่าย.')),
               li(text('Desktop icon input supports .ico, .png, and .svg.', 'desktop icon รองรับ .ico, .png และ .svg.')),
               li(text('Icon auto-detect checks icon.* and favicon.* in the entry dir, project dir, and sibling public/ folders.', 'ระบบ auto-detect จะหา icon.* และ favicon.* จากโฟลเดอร์ entry, project root และ public/ ที่อยู่ข้างกัน.')),
               li(text('Use createWindowServer(app, opts) when you want to run an HTTP app inside the desktop shell.', 'ใช้ createWindowServer(app, opts) เมื่อต้องการรัน HTTP app ภายใน desktop shell.'))
+            ),
+
+            h2({ id: 'mobile' }, text('Mobile & Native', 'Mobile และ Native')),
+            p(text(
+              'Elit can scaffold native mobile projects and can also generate Android Compose, SwiftUI, or IR from the same Elit UI entry.',
+              'Elit สามารถ scaffold โปรเจ็กต์ mobile native และยัง generate Android Compose, SwiftUI หรือ IR จาก Elit UI entry ตัวเดียวกันได้.'
+            )),
+            codeExample(mobileCommands),
+            ul(
+              li(text('Set mobile defaults in elit.config.* under mobile for cwd, appId, appName, webDir, mode, icon, and permissions.', 'ตั้งค่า default ของ mobile ใน elit.config.* ใต้ mobile สำหรับ cwd, appId, appName, webDir, mode, icon และ permissions.')),
+              li(text('Set mobile.native.entry when sync, run, or build should also generate native UI files from the same entry module.', 'ตั้ง mobile.native.entry เมื่อต้องการให้ sync, run หรือ build generate ไฟล์ native UI จาก entry module เดียวกันด้วย.')),
+              li(text('A native entry can export a VNode, export a zero-argument function, or call render(...) so the CLI captures the rendered tree from a shared entry.', 'native entry จะ export VNode, export ฟังก์ชันไม่มีอาร์กิวเมนต์ หรือเรียก render(...) เพื่อให้ CLI capture rendered tree จาก shared entry ก็ได้.')),
+              li(text('Use examples/android-native-example for an Android-first flow, or examples/universal-app-example when you want one repo exercising web, desktop, and Android together.', 'ใช้ examples/android-native-example เมื่อต้องการ flow แบบ Android-first หรือใช้ examples/universal-app-example เมื่อต้องการ repo เดียวที่ทดสอบ web, desktop และ Android ร่วมกัน.'))
             ),
 
             h2({ id: 'wapk' }, 'WAPK'),
@@ -486,6 +585,8 @@ npx elit desktop build ./src/main.ts --release`),
               li(text('Only VITE_ variables are injected into client bundles.', 'มีเพียงตัวแปรที่ขึ้นต้นด้วย VITE_ เท่านั้นที่ถูก inject เข้า client bundle.')),
               li(text('Environment files load in this order: .env.{mode}.local, .env.{mode}, .env.local, .env.', 'ไฟล์ env จะถูกโหลดตามลำดับ: .env.{mode}.local, .env.{mode}, .env.local, .env.')),
               li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.')),
+              li(text('desktop config provides defaults for elit desktop, elit desktop build, and elit desktop wapk. Set desktop.entry when you want to omit the positional desktop entry path.', 'desktop config ให้ค่า default กับ elit desktop, elit desktop build และ elit desktop wapk โดยตั้ง desktop.entry ได้เมื่อต้องการละ path ของ desktop entry ออกจากคำสั่ง.')),
+              li(text('mobile config provides defaults for elit mobile init, sync, open, run, and build.', 'mobile config ให้ค่า default กับ elit mobile init, sync, open, run และ build.')),
               li(text('Configure WAPK packaging in config.wapk instead of a legacy wapk.config.json file.', 'ตั้งค่า WAPK ที่ config.wapk แทนไฟล์ legacy wapk.config.json.'))
             ),
 

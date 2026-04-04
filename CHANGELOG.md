@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.6] - 2026-04-04
+
+### Added
+- **Desktop entry config default** - Added `desktop.entry` support in `elit.config.*` for desktop run/build commands
+  - `elit desktop` and `elit desktop build` can now omit the positional entry when `desktop.entry` is configured
+  - CLI help and config docs now describe the optional entry behavior
+
+### Changed
+- **Shared render-based desktop/mobile entry flow** - Desktop mode and native generation can now reuse a normal `render(...)` entry instead of requiring separate platform-specific mains
+  - `render()` now captures the rendered VNode when running in Elit desktop/mobile runtimes without a DOM
+  - Native generation falls back to that captured `render(...)` output when the module does not export `default`, `screen`, `app`, `view`, or `root`
+  - Desktop run/build auto-wrap shared entries and open a native window from the captured render output when the entry does not call `createWindow()` directly
+- **Universal example consolidation** - `examples/universal-app-example` now runs web, desktop, and native mobile flows from the same `src/web-main.ts` entry
+  - `desktop.entry` and `mobile.native.entry` both point at the shared entry file
+  - Removed the example's legacy `desktop.ts`, `desktop-app.ts`, `desktop-html.ts`, and `native-screen.ts` split entry files
+
+### Fixed
+- **QuickJS shared-entry desktop startup** - Shared desktop entries now open correctly on the QuickJS runtime
+  - Desktop bootstrap no longer depends on Promise microtasks before `createWindow()` runs
+  - Fixes the no-window path for projects using `desktop.runtime: 'quickjs'`
+- **Desktop config fallback with no CLI args** - `elit desktop` no longer prints help when `desktop.entry` is configured and no explicit entry path is passed
+
+### Documentation
+- **Desktop/shared-entry docs refresh** - Updated README and example docs to describe `desktop.entry`, shared `render(...)` desktop entries, and native generation from the same entry module
+
+### Tests
+- Validated the shared-entry flow with:
+  - `bun ../../src/cli.ts build`
+  - `bun src/cli.ts native generate android examples/universal-app-example/src/web-main.ts`
+  - `bun run desktop:smoke`
+  - `bun run desktop:build`
+
 ## [3.4.5] - 2026-04-02
 
 ### Added
