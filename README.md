@@ -122,7 +122,7 @@ npx elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift
 npx elit native generate ir ./src/native-screen.ts --platform android --export screen
 ```
 
-The entry module should export a VNode tree or a zero-argument function that returns one. By default the CLI auto-detects `default`, `screen`, `app`, `view`, and `root` exports.
+The entry module can either export a VNode tree, export a zero-argument function that returns one, or call `render(...)` so the CLI can capture the rendered VNode from a shared entry. By default the CLI auto-detects `default`, `screen`, `app`, `view`, and `root` exports before falling back to that captured render path.
 
 For the current native CSS subset, supported style mapping, and parity backlog, see [docs/native-css-support.md](docs/native-css-support.md). For element and factory coverage across `elit/el`, see [docs/native-element-support.md](docs/native-element-support.md).
 
@@ -260,6 +260,7 @@ Desktop mode notes:
 
 - Cargo is required the first time the native runtime is built.
 - TypeScript entries are transpiled automatically when needed.
+- Set `desktop.entry` in `elit.config.*` when you want `elit desktop` and `elit desktop build` to run without repeating the entry path on every command.
 - Desktop build can prebuild the native runtime even without an entry file.
 - `tsx` compiler mode is Node-only and keeps loading the original source tree instead of bundling it.
 - `tsx` and `tsup` compiler modes require those packages to be installed in the project.
@@ -344,6 +345,7 @@ The config shape is:
     };
   };
   desktop?: {
+    entry?: string;
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
     compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
     release?: boolean;
@@ -420,6 +422,7 @@ export default {
     permissions: ['android.permission.INTERNET'],
   },
   desktop: {
+    entry: './src/main.ts',
     runtime: 'quickjs',
     compiler: 'auto',
     release: false,
@@ -451,7 +454,7 @@ Important details:
 - `dev.clients` is the most flexible setup when you want SSR, API routes, multiple apps, or per-client proxy rules.
 - `preview` supports the same concepts as `dev`: multiple clients, API routes, proxy rules, workers, SSR, and HTTPS.
 - Only `VITE_` variables are exposed to client code during bundling.
-- `desktop` config provides defaults for `elit desktop`, `elit desktop build`, and `elit desktop wapk`.
+- `desktop` config provides defaults for `elit desktop`, `elit desktop build`, and `elit desktop wapk`. Set `desktop.entry` when you want the run/build commands to omit the positional entry.
 - `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
@@ -637,6 +640,8 @@ For production builds, make sure your built HTML points at the production asset 
 ## Desktop Mode
 
 Desktop mode runs an Elit entry file inside a native WebView shell.
+
+That entry can either call `createWindow(...)` directly or finish with a normal `render(...)` call from a shared UI entry. When Elit desktop mode sees a shared render-only entry, it captures the rendered VNode and auto-opens a native window from it. If `desktop.entry` is configured in `elit.config.*`, you can run `npx elit desktop` or `npx elit desktop build` without passing the entry path again.
 
 Example desktop entry:
 
