@@ -1,6 +1,6 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
-import { a, button, div, frag, h1, h2, img, input, li, main, p, span, textarea, ul } from '../../src/el';
+import { a, audio, br, button, canvas, div, frag, h1, h2, head, hr, iframe, img, input, li, main, mathMath, mathMi, meta, option, optgroup, p, progress, select, slot, span, svgCircle, svgEllipse, svgLine, svgPath, svgPolygon, svgPolyline, svgRect, svgSvg, table, tbody, td, template, textarea, tr, ul, video } from '../../src/el';
 import { renderAndroidCompose, renderNativeJson, renderNativeTree, renderSwiftUI } from '../../src/native';
 import { bindChecked, bindValue, createState } from '../../src/state';
 import styles from '../../src/style';
@@ -108,6 +108,302 @@ describe('native target foundation', () => {
         expect(json).toContain('"value": "Hello"');
     });
 
+    it('omits document-only tags and preserves slot and br passthrough in native IR', () => {
+        const tree = renderNativeTree(
+            div(
+                head(meta({ charset: 'utf-8' })),
+                slot(span('Slot body')),
+                'Line',
+                br(),
+                'Break',
+                template(span('Hidden template')),
+            ),
+            { platform: 'android' },
+        );
+
+        const [root] = tree.roots;
+        expect(root?.kind).toBe('element');
+        if (!root || root.kind !== 'element') {
+            throw new Error('Expected root element node');
+        }
+
+        expect(root.children).toHaveLength(4);
+        expect(root.children[0]).toEqual({
+            kind: 'element',
+            component: 'Text',
+            sourceTag: 'span',
+            props: {},
+            events: [],
+            children: [{ kind: 'text', value: 'Slot body' }],
+        });
+        expect(root.children[1]).toEqual({
+            kind: 'element',
+            component: 'Text',
+            sourceTag: '#text',
+            props: {},
+            events: [],
+            children: [{ kind: 'text', value: 'Line' }],
+        });
+        expect(root.children[2]).toEqual({
+            kind: 'element',
+            component: 'Text',
+            sourceTag: '#text',
+            props: {},
+            events: [],
+            children: [{ kind: 'text', value: '\n' }],
+        });
+        expect(root.children[3]).toEqual({
+            kind: 'element',
+            component: 'Text',
+            sourceTag: '#text',
+            props: {},
+            events: [],
+            children: [{ kind: 'text', value: 'Break' }],
+        });
+    });
+
+    it('classifies svg and math factories as dedicated native surfaces', () => {
+        const tree = renderNativeTree(
+            div(
+                svgSvg(svgCircle({ cx: 10, cy: 10, r: 5 })),
+                mathMath(mathMi('x')),
+            ),
+            { platform: 'android' },
+        );
+
+        const [root] = tree.roots;
+        expect(root?.kind).toBe('element');
+        if (!root || root.kind !== 'element') {
+            throw new Error('Expected root element node');
+        }
+
+        expect(root.children[0]).toMatchObject({ kind: 'element', component: 'Vector', sourceTag: 'svg' });
+        expect(root.children[1]).toMatchObject({ kind: 'element', component: 'Math', sourceTag: 'math' });
+
+        const compose = renderAndroidCompose(
+            div(
+                svgSvg(svgCircle({ cx: 10, cy: 10, r: 5 })),
+                mathMath(mathMi('x')),
+            ),
+            { functionName: 'VectorMathScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                svgSvg(svgCircle({ cx: 10, cy: 10, r: 5 })),
+                mathMath(mathMi('x')),
+            ),
+            { structName: 'VectorMathScreen' },
+        );
+
+        expect(compose).toContain('androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 24.dp, height = 24.dp))');
+        expect(compose).toContain('drawCircle(color = Color(red = 0f, green = 0f, blue = 0f, alpha = 1f)');
+        expect(compose).toContain('ElitUnsupported(');
+        expect(compose).toContain('label = "Math"');
+
+        expect(swiftui).toContain('Canvas { context, size in');
+        expect(swiftui).toContain('vectorPath0.addEllipse(in: CGRect(');
+        expect(swiftui).toContain('elitUnsupportedPlaceholder(label: "Math", sourceTag: "math")');
+    });
+
+    it('renders the first svg subset into native vector canvas output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgCircle({ cx: 12, cy: 12, r: 10, fill: '#d56e43' }),
+                    svgRect({ x: 2, y: 2, width: 6, height: 4, stroke: '#261914', strokeWidth: 1 }),
+                    svgPath({ d: 'M 4 20 L 20 20 L 12 8 Z', fill: 'goldenrod' }),
+                ),
+            ),
+            { functionName: 'VectorSubsetScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgCircle({ cx: 12, cy: 12, r: 10, fill: '#d56e43' }),
+                    svgRect({ x: 2, y: 2, width: 6, height: 4, stroke: '#261914', strokeWidth: 1 }),
+                    svgPath({ d: 'M 4 20 L 20 20 L 12 8 Z', fill: 'goldenrod' }),
+                ),
+            ),
+            { structName: 'VectorSubsetScreen' },
+        );
+
+        expect(compose).toContain('androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 24.dp, height = 24.dp))');
+        expect(compose).toContain('drawCircle(color = Color(red = 0.835f, green = 0.431f, blue = 0.263f, alpha = 1f)');
+        expect(compose).toContain('drawRect(color = Color(red = 0.149f, green = 0.098f, blue = 0.078f, alpha = 1f)');
+        expect(compose).toContain('val vectorPath0 = androidx.compose.ui.graphics.Path().apply {');
+
+        expect(swiftui).toContain('Canvas { context, size in');
+        expect(swiftui).toContain('vectorPath0.addEllipse(in: CGRect(');
+        expect(swiftui).toContain('vectorPath1.addRect(CGRect(');
+        expect(swiftui).toContain('vectorPath2.move(to: CGPoint(');
+        expect(swiftui).toContain('context.fill(vectorPath2, with: .color(Color(red: 0.855, green: 0.647, blue: 0.125, opacity: 1)))');
+    });
+
+    it('renders expanded svg primitives into native vector canvas output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgLine({ x1: 1, y1: 2, x2: 11, y2: 3, stroke: '#123456', strokeWidth: 2 }),
+                    svgPolyline({ points: '2,20 8,14 12,18 18,10', stroke: '#008000', fill: 'none', strokeWidth: 1.5 }),
+                    svgPolygon({ points: '14,4 20,8 18,14 12,12', fill: '#ff8c00' }),
+                    svgEllipse({ cx: 6, cy: 7, rx: 3, ry: 2, fill: '#0f1419', stroke: '#d56e43', strokeWidth: 1 }),
+                ),
+            ),
+            { functionName: 'ExpandedVectorScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgLine({ x1: 1, y1: 2, x2: 11, y2: 3, stroke: '#123456', strokeWidth: 2 }),
+                    svgPolyline({ points: '2,20 8,14 12,18 18,10', stroke: '#008000', fill: 'none', strokeWidth: 1.5 }),
+                    svgPolygon({ points: '14,4 20,8 18,14 12,12', fill: '#ff8c00' }),
+                    svgEllipse({ cx: 6, cy: 7, rx: 3, ry: 2, fill: '#0f1419', stroke: '#d56e43', strokeWidth: 1 }),
+                ),
+            ),
+            { structName: 'ExpandedVectorScreen' },
+        );
+
+        expect(compose).not.toContain('ElitUnsupported(');
+        expect(compose).toContain('drawOval(color = Color(red = 0.059f, green = 0.078f, blue = 0.098f, alpha = 1f)');
+        expect(compose).toContain('drawOval(color = Color(red = 0.835f, green = 0.431f, blue = 0.263f, alpha = 1f)');
+        expect(compose).toContain('moveTo(1f * scaleX, 2f * scaleY)');
+        expect(compose).toContain('lineTo(11f * scaleX, 3f * scaleY)');
+        expect(compose).toContain('close()');
+
+        expect(swiftui).not.toContain('elitUnsupportedPlaceholder(label: "Vector", sourceTag: "svg")');
+        expect(swiftui).toContain('vectorPath0.move(to: CGPoint(x: CGFloat(1) * scaleX, y: CGFloat(2) * scaleY))');
+        expect(swiftui).toContain('vectorPath0.addLine(to: CGPoint(x: CGFloat(11) * scaleX, y: CGFloat(3) * scaleY))');
+        expect(swiftui).toContain('vectorPath2.closeSubpath()');
+        expect(swiftui).toContain('vectorPath3.addEllipse(in: CGRect(x: CGFloat(3) * scaleX, y: CGFloat(5) * scaleY, width: CGFloat(6) * scaleX, height: CGFloat(4) * scaleY))');
+    });
+
+    it('renders cubic quadratic and arc svg path commands into native vector output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgPath({ d: 'M 2 12 C 6 2 18 2 22 12 Q 18 22 10 18 A 4 4 0 0 1 6 14 Z', fill: 'none', stroke: '#123456', strokeWidth: 1.5 }),
+                ),
+            ),
+            { functionName: 'ComplexPathScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgPath({ d: 'M 2 12 C 6 2 18 2 22 12 Q 18 22 10 18 A 4 4 0 0 1 6 14 Z', fill: 'none', stroke: '#123456', strokeWidth: 1.5 }),
+                ),
+            ),
+            { structName: 'ComplexPathScreen' },
+        );
+
+        expect(compose).not.toContain('ElitUnsupported(');
+        expect(compose).toContain('cubicTo(6f * scaleX, 2f * scaleY, 18f * scaleX, 2f * scaleY, 22f * scaleX, 12f * scaleY)');
+        expect(compose).toContain('cubicTo(19.333f * scaleX, 18.667f * scaleY, 15.333f * scaleX, 20.667f * scaleY, 10f * scaleX, 18f * scaleY)');
+        expect(compose).toContain('cubicTo(7.791f * scaleX, 18f * scaleY, 6f * scaleX, 16.209f * scaleY, 6f * scaleX, 14f * scaleY)');
+        expect(compose).toContain('style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f * strokeScale)');
+
+        expect(swiftui).not.toContain('elitUnsupportedPlaceholder(label: "Vector", sourceTag: "svg")');
+        expect(swiftui).toContain('vectorPath0.addCurve(to: CGPoint(x: CGFloat(22) * scaleX, y: CGFloat(12) * scaleY), control1: CGPoint(x: CGFloat(6) * scaleX, y: CGFloat(2) * scaleY), control2: CGPoint(x: CGFloat(18) * scaleX, y: CGFloat(2) * scaleY))');
+        expect(swiftui).toContain('vectorPath0.addCurve(');
+    });
+
+    it('renders smooth cubic and smooth quadratic svg path commands into native vector output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgPath({ d: 'M 2 12 C 6 2 18 2 22 12 S 18 22 10 18 M 2 10 Q 6 2 10 10 T 18 10', fill: 'none', stroke: '#123456', strokeWidth: 1.5 }),
+                ),
+            ),
+            { functionName: 'SmoothPathScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                svgSvg(
+                    { viewBox: '0 0 24 24', width: 24, height: 24 },
+                    svgPath({ d: 'M 2 12 C 6 2 18 2 22 12 S 18 22 10 18 M 2 10 Q 6 2 10 10 T 18 10', fill: 'none', stroke: '#123456', strokeWidth: 1.5 }),
+                ),
+            ),
+            { structName: 'SmoothPathScreen' },
+        );
+
+        expect(compose).not.toContain('ElitUnsupported(');
+        expect(compose).toContain('cubicTo(26f * scaleX, 22f * scaleY, 18f * scaleX, 22f * scaleY, 10f * scaleX, 18f * scaleY)');
+        expect(compose).toContain('cubicTo(12.667f * scaleX, 15.333f * scaleY, 15.333f * scaleX, 15.333f * scaleY, 18f * scaleX, 10f * scaleY)');
+
+        expect(swiftui).not.toContain('elitUnsupportedPlaceholder(label: "Vector", sourceTag: "svg")');
+        expect(swiftui).toContain('control1: CGPoint(x: CGFloat(26) * scaleX, y: CGFloat(22) * scaleY), control2: CGPoint(x: CGFloat(18) * scaleX, y: CGFloat(22) * scaleY)');
+        expect(swiftui).toContain('control1: CGPoint(x: CGFloat(12.667) * scaleX, y: CGFloat(15.333) * scaleY), control2: CGPoint(x: CGFloat(15.333) * scaleX, y: CGFloat(15.333) * scaleY)');
+    });
+
+    it('renders first-pass canvas surfaces with intrinsic sizing instead of placeholders', () => {
+        const compose = renderAndroidCompose(
+            div(
+                canvas({ width: 320, height: 180 }),
+                canvas(),
+            ),
+            { functionName: 'CanvasSurfaceScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                canvas({ width: 320, height: 180 }),
+                canvas(),
+            ),
+            { structName: 'CanvasSurfaceScreen' },
+        );
+
+        expect(compose).toContain('androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 320.dp, height = 180.dp)) {');
+        expect(compose).toContain('androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 300.dp, height = 150.dp)) {');
+        expect(compose).not.toContain('label = "Canvas"');
+
+        expect(swiftui).toContain('Canvas { _, _ in');
+        expect(swiftui).toContain('.frame(width: 320, height: 180)');
+        expect(swiftui).toContain('.frame(width: 300, height: 150)');
+        expect(swiftui).not.toContain('elitUnsupportedPlaceholder(label: "Canvas", sourceTag: "canvas")');
+    });
+
+    it('renders declarative canvas draw ops into native canvas output', () => {
+        const drawOps = [
+            { kind: 'rect', x: 16, y: 16, width: 64, height: 32, fill: '#d56e43' },
+            { kind: 'line', x1: 16, y1: 80, x2: 128, y2: 80, stroke: '#123456', strokeWidth: 2 },
+            { kind: 'path', d: 'M 32 120 Q 64 96 96 120 T 160 120', fill: 'none', stroke: 'goldenrod', strokeWidth: 1.5 },
+        ];
+
+        const compose = renderAndroidCompose(
+            div(canvas({ width: 200, height: 160, drawOps })),
+            { functionName: 'CanvasDrawOpsScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(canvas({ width: 200, height: 160, drawOps })),
+            { structName: 'CanvasDrawOpsScreen' },
+        );
+
+        expect(compose).toContain('androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 200.dp, height = 160.dp)) {');
+        expect(compose).toContain('drawRect(color = Color(red = 0.835f, green = 0.431f, blue = 0.263f, alpha = 1f)');
+        expect(compose).toContain('moveTo(16f * scaleX, 80f * scaleY)');
+        expect(compose).toContain('lineTo(128f * scaleX, 80f * scaleY)');
+        expect(compose).toContain('cubicTo(53.333f * scaleX, 104f * scaleY, 74.667f * scaleX, 104f * scaleY, 96f * scaleX, 120f * scaleY)');
+        expect(compose).not.toContain('label = "Canvas"');
+
+        expect(swiftui).toContain('Canvas { context, size in');
+        expect(swiftui).toContain('vectorPath0.addRect(CGRect(x: CGFloat(16) * scaleX, y: CGFloat(16) * scaleY, width: CGFloat(64) * scaleX, height: CGFloat(32) * scaleY))');
+        expect(swiftui).toContain('vectorPath1.addLine(to: CGPoint(x: CGFloat(128) * scaleX, y: CGFloat(80) * scaleY))');
+        expect(swiftui).toContain('control1: CGPoint(x: CGFloat(53.333) * scaleX, y: CGFloat(104) * scaleY), control2: CGPoint(x: CGFloat(74.667) * scaleX, y: CGFloat(104) * scaleY)');
+        expect(swiftui).not.toContain('elitUnsupportedPlaceholder(label: "Canvas", sourceTag: "canvas")');
+    });
+
     it('renders Jetpack Compose code from the same Elit syntax', () => {
         const compose = renderAndroidCompose(
             div(
@@ -129,10 +425,12 @@ describe('native target foundation', () => {
         expect(compose).toContain('BasicTextField(');
         expect(compose).toContain('Checkbox(');
         expect(compose).toContain('uriHandler.openUri("https://elit.dev/docs")');
-        expect(compose).toContain('Box(modifier = Modifier.clickable { uriHandler.openUri("https://elit.dev/docs") }, contentAlignment = Alignment.Center)');
+        expect(compose).toContain('Box(modifier = Modifier.clickable { uriHandler.openUri("https://elit.dev/docs") }.semantics(mergeDescendants = true) { contentDescription = "Docs"; stateDescription = "Opens externally" }, contentAlignment = Alignment.Center)');
         expect(compose).toContain('// TODO: wire elit event(s): press');
-        expect(compose).toContain('Box(modifier = Modifier, contentAlignment = Alignment.Center)');
-        expect(compose).toContain('ElitImagePlaceholder(');
+        expect(compose).toContain('Box(modifier = Modifier.clickable { /* TODO: wire elit event(s): press */ }, contentAlignment = Alignment.Center)');
+        expect(compose).toContain('ElitImageSurface(');
+        expect(compose).toContain('source = "./logo.png"');
+        expect(compose).toContain('label = "LO"');
         expect(compose).toContain('@Preview(showBackground = true)');
     });
 
@@ -161,7 +459,7 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('Toggle("", isOn: $toggleValue0)');
         expect(swiftui).toContain('if let destination = URL(string: "https://elit.dev/docs") {');
         expect(swiftui).toContain('Button(action: {');
-        expect(swiftui).toContain('elitImagePlaceholder(label: "LO", source: "./logo.png", alt: "Logo")');
+        expect(swiftui).toContain('elitImageSurface(source: "./logo.png", label: "LO", alt: "Logo")');
         expect(swiftui).toContain('#Preview {');
     });
 
@@ -177,10 +475,1017 @@ describe('native target foundation', () => {
         );
 
         expect(compose).toContain('Modifier.fillMaxSize().verticalScroll(rememberScrollState())');
+        expect(compose).toContain('ElitImageSurface(');
         expect(compose).toContain('label = "EU"');
 
         expect(swiftui).toContain('ScrollView {');
-        expect(swiftui).toContain('elitImagePlaceholder(label: "EU", source: "./public/favicon.svg", alt: "Elit Universal Example icon")');
+        expect(swiftui).toContain('elitImageSurface(source: "./public/favicon.svg", label: "EU", alt: "Elit Universal Example icon")');
+    });
+
+    it('maps first-pass image surfaces with practical object-fit and object-position into native output', () => {
+        styles.addClass('hero-image', {
+            width: '240px',
+            height: '140px',
+            borderRadius: '24px',
+            objectFit: 'contain',
+            objectPosition: 'top left',
+        });
+
+        const compose = renderAndroidCompose(
+            div(img({ className: 'hero-image', src: 'https://elit.dev/media/hero.png', alt: 'Hero image' })),
+            { functionName: 'ImageSurfaceScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(img({ className: 'hero-image', src: 'https://elit.dev/media/hero.png', alt: 'Hero image' })),
+            { structName: 'ImageSurfaceScreen' },
+        );
+
+        expect(compose).toContain('ElitImageSurface(');
+        expect(compose).toContain('source = "https://elit.dev/media/hero.png"');
+        expect(compose).toContain('label = "HE"');
+        expect(compose).toContain('objectFit = "contain"');
+        expect(compose).toContain('objectPosition = "top-leading"');
+        expect(compose).toContain('private fun ElitImageSurface(source: String, label: String, contentDescription: String?, objectFit: String = "cover", objectPosition: String = "center", modifier: Modifier = Modifier) {');
+        expect(compose).toContain('elitLoadBackgroundBitmap(this, source, "no-repeat", objectFit, objectPosition)');
+
+        expect(swiftui).toContain('elitImageSurface(source: "https://elit.dev/media/hero.png", label: "HE", alt: "Hero image", objectFit: "contain", objectPosition: "top-leading")');
+        expect(swiftui).toContain('private func elitImageSurface(source: String, label: String, alt: String?, objectFit: String = "cover", objectPosition: String = "center") -> some View {');
+        expect(swiftui).toContain('elitBackgroundImage(image, backgroundSize: objectFit, backgroundPosition: objectPosition, backgroundRepeat: "no-repeat")');
+    });
+
+    it('maps select, progress, hr, and simple table cells into native output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                select(optgroup({ label: 'Primary' }, option('One'), option({ selected: true }, 'Two'))),
+                progress({ value: 25, max: 100 }),
+                hr(),
+                table(tbody(tr(td('A'), td('B')))),
+            ),
+            { functionName: 'ElementCoverageScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                select(optgroup({ label: 'Primary' }, option('One'), option({ selected: true }, 'Two'))),
+                progress({ value: 25, max: 100 }),
+                hr(),
+                table(tbody(tr(td('A'), td('B')))),
+            ),
+            { structName: 'ElementCoverageScreen' },
+        );
+
+        expect(compose).toContain('var pickerValue0 by remember { mutableStateOf("Two") }');
+        expect(compose).toContain('var pickerExpanded0 by remember { mutableStateOf(false) }');
+        expect(compose).toContain('DropdownMenu(expanded = pickerExpanded0, onDismissRequest = { pickerExpanded0 = false })');
+        expect(compose).toContain('DropdownMenuItem(text = { Text(text = "One") }, onClick = { pickerValue0 = "One"; pickerExpanded0 = false })');
+        expect(compose).toContain('LinearProgressIndicator(progress = 0.25f, modifier = Modifier)');
+        expect(compose).toContain('HorizontalDivider(modifier = Modifier)');
+        expect(compose).toContain('Column(modifier = Modifier.weight(1f, fill = true)) {');
+
+        expect(swiftui).toContain('@State private var pickerValue0 = "Two"');
+        expect(swiftui).toContain('Picker("", selection: $pickerValue0) {');
+        expect(swiftui).toContain('Text("Two").tag("Two")');
+        expect(swiftui).toContain('ProgressView(value: 0.25)');
+        expect(swiftui).toContain('Divider()');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .leading)');
+    });
+
+    it('renders first-pass webview and media surfaces instead of generic placeholders', () => {
+        const compose = renderAndroidCompose(
+            div(
+                iframe({ src: 'https://example.com/embed' }),
+                video({ src: 'https://cdn.example.com/demo.mp4', autoplay: true }, 'Demo video'),
+                audio({ src: 'https://cdn.example.com/theme.mp3' }, 'Theme audio'),
+            ),
+            { functionName: 'SurfaceScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                iframe({ src: 'https://example.com/embed' }),
+                video({ src: 'https://cdn.example.com/demo.mp4', autoplay: true }, 'Demo video'),
+                audio({ src: 'https://cdn.example.com/theme.mp3' }, 'Theme audio'),
+            ),
+            { structName: 'SurfaceScreen' },
+        );
+
+        expect(compose).toContain('ElitWebViewSurface(source = "https://example.com/embed", label = "Web content", modifier = Modifier)');
+        expect(compose).toContain('ElitVideoSurface(source = "https://cdn.example.com/demo.mp4", label = "Demo video", autoPlay = true, loop = false, muted = false, controls = false, poster = null, playsInline = false, modifier = Modifier)');
+        expect(compose).toContain('ElitAudioSurface(source = "https://cdn.example.com/theme.mp3", label = "Theme audio", autoPlay = false, loop = false, muted = false, modifier = Modifier)');
+        expect(compose).toContain('private fun ElitWebViewSurface(source: String, label: String?, modifier: Modifier = Modifier) {');
+        expect(compose).toContain('private fun ElitVideoSurface(source: String, label: String, autoPlay: Boolean, loop: Boolean, muted: Boolean, controls: Boolean, poster: String?, playsInline: Boolean, posterFit: String = "cover", posterPosition: String = "center", modifier: Modifier = Modifier) {');
+        expect(compose).toContain('private fun ElitAudioSurface(source: String, label: String, autoPlay: Boolean, loop: Boolean, muted: Boolean, modifier: Modifier = Modifier) {');
+
+        expect(swiftui).toContain('import WebKit');
+        expect(swiftui).toContain('import AVKit');
+        expect(swiftui).toContain('ElitWebViewSurface(source: "https://example.com/embed", label: "Web content")');
+        expect(swiftui).toContain('ElitVideoSurface(source: "https://cdn.example.com/demo.mp4", label: "Demo video", autoPlay: true, muted: false, controls: false, poster: nil, playsInline: false)');
+        expect(swiftui).toContain('ElitAudioSurface(source: "https://cdn.example.com/theme.mp3", label: "Theme audio", autoPlay: false, muted: false)');
+        expect(swiftui).toContain('struct ElitWebViewSurface: UIViewRepresentable {');
+        expect(swiftui).toContain('struct ElitVideoSurface: View {');
+        expect(swiftui).toContain('struct ElitAudioSurface: View {');
+    });
+
+    it('propagates muted state and accessibility labels into native surface helpers', () => {
+        const compose = renderAndroidCompose(
+            div(
+                iframe({ src: 'https://example.com/embed', title: 'Account console' }),
+                video({ src: 'https://cdn.example.com/promo.mp4', autoplay: true, loop: true, muted: true, 'aria-label': 'Promo clip' }),
+                audio({ src: 'https://cdn.example.com/ambient.mp3', muted: true, title: 'Ambient track' }),
+            ),
+            { functionName: 'AccessibleSurfaceScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                iframe({ src: 'https://example.com/embed', title: 'Account console' }),
+                video({ src: 'https://cdn.example.com/promo.mp4', autoplay: true, loop: true, muted: true, 'aria-label': 'Promo clip' }),
+                audio({ src: 'https://cdn.example.com/ambient.mp3', muted: true, title: 'Ambient track' }),
+            ),
+            { structName: 'AccessibleSurfaceScreen' },
+        );
+
+        expect(compose).toContain('ElitWebViewSurface(source = "https://example.com/embed", label = "Account console", modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Account console" })');
+        expect(compose).toContain('ElitVideoSurface(source = "https://cdn.example.com/promo.mp4", label = "Promo clip", autoPlay = true, loop = true, muted = true, controls = false, poster = null, playsInline = false, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Promo clip" })');
+        expect(compose).toContain('ElitAudioSurface(source = "https://cdn.example.com/ambient.mp3", label = "Ambient track", autoPlay = false, loop = false, muted = true, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Ambient track" })');
+        expect(compose).toContain('contentDescription = label');
+        expect(compose).toContain('mediaPlayer.setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)');
+
+        expect(swiftui).toContain('ElitWebViewSurface(source: "https://example.com/embed", label: "Account console")');
+        expect(swiftui).toContain('ElitVideoSurface(source: "https://cdn.example.com/promo.mp4", label: "Promo clip", autoPlay: true, muted: true, controls: false, poster: nil, playsInline: false)');
+        expect(swiftui).toContain('ElitAudioSurface(source: "https://cdn.example.com/ambient.mp3", label: "Ambient track", autoPlay: false, muted: true)');
+        expect(swiftui).toContain('webView.accessibilityLabel = label');
+        expect(swiftui).toContain('resolvedPlayer.isMuted = muted');
+        expect(swiftui).toContain('.accessibilityLabel(label)');
+    });
+
+    it('maps video controls poster and playsinline attrs into native surface helpers', () => {
+        const compose = renderAndroidCompose(
+            div(
+                video({ src: 'https://cdn.example.com/trailer.mp4', controls: true, poster: './poster.png', playsinline: true }, 'Trailer'),
+            ),
+            { functionName: 'VideoAttrSurfaceScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                video({ src: 'https://cdn.example.com/trailer.mp4', controls: true, poster: './poster.png', playsinline: true }, 'Trailer'),
+            ),
+            { structName: 'VideoAttrSurfaceScreen' },
+        );
+
+        expect(compose).toContain('ElitVideoSurface(source = "https://cdn.example.com/trailer.mp4", label = "Trailer", autoPlay = false, loop = false, muted = false, controls = true, poster = "./poster.png", playsInline = true, modifier = Modifier)');
+        expect(compose).toContain('if (controls) {');
+        expect(compose).toContain('posterView.setImageURI(android.net.Uri.parse(poster))');
+        expect(compose).toContain('Android VideoView already renders inline; playsInline is retained for parity with iOS generation.');
+
+        expect(swiftui).toContain('ElitVideoSurface(source: "https://cdn.example.com/trailer.mp4", label: "Trailer", autoPlay: false, muted: false, controls: true, poster: "./poster.png", playsInline: true)');
+        expect(swiftui).toContain('struct ElitVideoPlayerController: UIViewControllerRepresentable {');
+        expect(swiftui).toContain('AsyncImage(url: posterURL) { phase in');
+        expect(swiftui).toContain('controller.showsPlaybackControls = controls');
+        expect(swiftui).toContain('controller.entersFullScreenWhenPlaybackBegins = !playsInline');
+    });
+
+    it('maps video poster object-fit hints into native media helpers', () => {
+        styles.addClass('poster-contain', {
+            objectFit: 'contain',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                video({ className: 'poster-contain', src: 'https://cdn.example.com/trailer.mp4', poster: './poster.png' }, 'Trailer'),
+            ),
+            { functionName: 'VideoPosterFitScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                video({ className: 'poster-contain', src: 'https://cdn.example.com/trailer.mp4', poster: './poster.png' }, 'Trailer'),
+            ),
+            { structName: 'VideoPosterFitScreen' },
+        );
+
+        expect(compose).toContain('ElitVideoSurface(source = "https://cdn.example.com/trailer.mp4", label = "Trailer", autoPlay = false, loop = false, muted = false, controls = false, poster = "./poster.png", playsInline = false, posterFit = "contain", modifier = Modifier)');
+        expect(compose).toContain('private fun elitVideoPosterScaleType(posterFit: String, posterPosition: String): android.widget.ImageView.ScaleType = when (posterFit.trim().lowercase()) {');
+        expect(compose).toContain('posterView.scaleType = elitVideoPosterScaleType(posterFit, posterPosition)');
+
+        expect(swiftui).toContain('ElitVideoSurface(source: "https://cdn.example.com/trailer.mp4", label: "Trailer", autoPlay: false, muted: false, controls: false, poster: "./poster.png", playsInline: false, posterFit: "contain")');
+        expect(swiftui).toContain('private func elitPosterImage(_ image: Image, posterFit: String, posterPosition: String) -> some View {');
+        expect(swiftui).toContain('case "contain":');
+        expect(swiftui).toContain('.scaledToFit()');
+    });
+
+    it('maps video poster object-position hints into native media helpers', () => {
+        styles.addClass('poster-top-left', {
+            objectFit: 'contain',
+            objectPosition: 'top left',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                video({ className: 'poster-top-left', src: 'https://cdn.example.com/trailer.mp4', poster: './poster.png' }, 'Trailer'),
+            ),
+            { functionName: 'VideoPosterPositionScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                video({ className: 'poster-top-left', src: 'https://cdn.example.com/trailer.mp4', poster: './poster.png' }, 'Trailer'),
+            ),
+            { structName: 'VideoPosterPositionScreen' },
+        );
+
+        expect(compose).toContain('posterPosition = "top-leading"');
+        expect(compose).toContain('"top", "leading", "top-leading", "bottom-leading" -> android.widget.ImageView.ScaleType.FIT_START');
+        expect(compose).toContain('posterView.scaleType = elitVideoPosterScaleType(posterFit, posterPosition)');
+
+        expect(swiftui).toContain('posterPosition: "top-leading"');
+        expect(swiftui).toContain('private func elitPosterAlignment(_ posterPosition: String) -> Alignment {');
+        expect(swiftui).toContain('return .topLeading');
+        expect(swiftui).toContain('alignment: elitPosterAlignment(posterPosition)');
+    });
+
+    it('falls back to explicit placeholders when webview or media surfaces have no usable source', () => {
+        const compose = renderAndroidCompose(
+            div(
+                iframe(),
+                video('Demo video without source'),
+                audio({ title: 'Theme audio without source' }),
+            ),
+            { functionName: 'SurfaceFallbackScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                iframe(),
+                video('Demo video without source'),
+                audio({ title: 'Theme audio without source' }),
+            ),
+            { structName: 'SurfaceFallbackScreen' },
+        );
+
+        expect(compose).toContain('label = "WebView"');
+        expect(compose).toContain('sourceTag = "iframe"');
+        expect(compose).toContain('label = "Media"');
+        expect(compose).toContain('sourceTag = "video"');
+        expect(compose).toContain('sourceTag = "audio"');
+        expect(compose).not.toContain('private fun ElitWebViewSurface(source: String, label: String?, modifier: Modifier = Modifier) {');
+        expect(compose).not.toContain('private fun ElitVideoSurface(source: String, label: String, autoPlay: Boolean, loop: Boolean, muted: Boolean, controls: Boolean, poster: String?, playsInline: Boolean, posterFit: String = "cover", modifier: Modifier = Modifier) {');
+        expect(compose).not.toContain('private fun ElitAudioSurface(source: String, label: String, autoPlay: Boolean, loop: Boolean, muted: Boolean, modifier: Modifier = Modifier) {');
+
+        expect(swiftui).toContain('elitUnsupportedPlaceholder(label: "WebView", sourceTag: "iframe")');
+        expect(swiftui).toContain('elitUnsupportedPlaceholder(label: "Media", sourceTag: "video")');
+        expect(swiftui).toContain('elitUnsupportedPlaceholder(label: "Media", sourceTag: "audio")');
+        expect(swiftui).not.toContain('import WebKit');
+        expect(swiftui).not.toContain('import AVKit');
+        expect(swiftui).not.toContain('struct ElitWebViewSurface: UIViewRepresentable {');
+        expect(swiftui).not.toContain('struct ElitVideoSurface: View {');
+        expect(swiftui).not.toContain('struct ElitAudioSurface: View {');
+    });
+
+    it('keeps picker values and table spacing closer to native semantics', () => {
+        const choice = createState('jp');
+
+        const compose = renderAndroidCompose(
+            div(
+                select(
+                    { ...bindValue(choice) },
+                    option({ value: 'th' }, 'Thailand'),
+                    option({ value: 'jp' }, 'Japan'),
+                ),
+                table(tbody(tr(td('A'), td('B')))),
+            ),
+            { functionName: 'PickerSemanticScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                select(
+                    { ...bindValue(choice) },
+                    option({ value: 'th' }, 'Thailand'),
+                    option({ value: 'jp' }, 'Japan'),
+                ),
+                table(tbody(tr(td('A'), td('B')))),
+            ),
+            { structName: 'PickerSemanticScreen' },
+        );
+
+        expect(compose).toContain('var nativeState0 by remember { mutableStateOf("jp") }');
+        expect(compose).toContain('Text(text = when (nativeState0) { "th" -> "Thailand"; "jp" -> "Japan"; else -> nativeState0 })');
+        expect(compose).toContain('DropdownMenuItem(text = { Text(text = "Thailand") }, onClick = { nativeState0 = "th"; pickerExpanded0 = false })');
+        expect(compose).toContain('Column(modifier = Modifier.weight(1f, fill = true)) {');
+
+        expect(swiftui).toContain('Picker("", selection: $nativeState0) {');
+        expect(swiftui).toContain('Text("Thailand").tag("th")');
+        expect(swiftui).toContain('VStack(alignment: .leading, spacing: 0) {');
+        expect(swiftui).toContain('HStack(alignment: .top, spacing: 0) {');
+    });
+
+    it('maps practical text input attrs into native control output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                input({ type: 'password', value: 'secret', placeholder: 'Password', readOnly: true, autoFocus: true }),
+                input({ type: 'email', value: 'hello@example.com' }),
+                input({ type: 'number', value: 42 }),
+                input({ type: 'tel', value: '+66 2 123 4567' }),
+                input({ type: 'url', value: 'https://example.com' }),
+            ),
+            { functionName: 'InputAttrScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                input({ type: 'password', value: 'secret', placeholder: 'Password', readOnly: true, autoFocus: true }),
+                input({ type: 'email', value: 'hello@example.com' }),
+                input({ type: 'number', value: 42 }),
+                input({ type: 'tel', value: '+66 2 123 4567' }),
+                input({ type: 'url', value: 'https://example.com' }),
+            ),
+            { structName: 'InputAttrScreen' },
+        );
+
+        expect(compose).toContain('import androidx.compose.ui.focus.focusRequester');
+        expect(compose).toContain('val textFieldFocusRequester0 = remember { androidx.compose.ui.focus.FocusRequester() }');
+        expect(compose).toContain('LaunchedEffect(Unit) {');
+        expect(compose).toContain('textFieldFocusRequester0.requestFocus()');
+        expect(compose).toContain('modifier = Modifier.focusRequester(textFieldFocusRequester0),');
+        expect(compose).toContain('readOnly = true');
+        expect(compose).toContain('visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()');
+        expect(compose).toContain('keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)');
+        expect(compose).toContain('keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal)');
+        expect(compose).toContain('keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)');
+        expect(compose).toContain('keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri)');
+
+        expect(swiftui).toContain('@FocusState private var textFieldFocus0: Bool');
+        expect(swiftui).toContain('SecureField("Password", text: Binding(get: { textFieldValue0 }, set: { _ in }))');
+        expect(swiftui).toContain('.focused($textFieldFocus0)');
+        expect(swiftui).toContain('.onAppear { textFieldFocus0 = true }');
+        expect(swiftui).toContain('.keyboardType(.emailAddress)');
+        expect(swiftui).toContain('.keyboardType(.decimalPad)');
+        expect(swiftui).toContain('.keyboardType(.phonePad)');
+        expect(swiftui).toContain('.keyboardType(.URL)');
+        expect(swiftui).toContain('.textInputAutocapitalization(.never)');
+    });
+
+    it('dispatches practical native control events through bridge helpers', () => {
+        const noop = () => undefined;
+
+        const compose = renderAndroidCompose(
+            div(
+                input({ value: 'Draft', onInput: noop, onChange: noop, onSubmit: noop }),
+                input({ type: 'checkbox', checked: true, onInput: noop, onChange: noop }),
+                select(
+                    { value: 'draft', onInput: noop, onChange: noop },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+            ),
+            { functionName: 'NativeControlEventScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                input({ value: 'Draft', onInput: noop, onChange: noop, onSubmit: noop }),
+                input({ type: 'checkbox', checked: true, onInput: noop, onChange: noop }),
+                select(
+                    { value: 'draft', onInput: noop, onChange: noop },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+            ),
+            { structName: 'NativeControlEventScreen' },
+        );
+
+        expect(compose).toContain('object ElitNativeBridge {');
+        expect(compose).toContain('fun controlEventPayload(event: String, sourceTag: String, inputType: String? = null, value: String? = null, values: Iterable<String>? = null, checked: Boolean? = null, detailJson: String? = null): String {');
+        expect(compose).toContain('controlEventPayload(event = "input", sourceTag = "input", inputType = "text", value = nextValue)');
+        expect(compose).toContain('controlEventPayload(event = "change", sourceTag = "input", inputType = "text", value = nextValue)');
+        expect(compose).toContain('keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { ElitNativeBridge.dispatch(action = "elit.event.submit", payloadJson = ElitNativeBridge.controlEventPayload(event = "submit", sourceTag = "input", inputType = "text", value = textFieldValue0)) })');
+        expect(compose).toContain('controlEventPayload(event = "input", sourceTag = "input", inputType = "checkbox", checked = checked)');
+        expect(compose).toContain('controlEventPayload(event = "change", sourceTag = "input", inputType = "checkbox", checked = checked)');
+        expect(compose).toContain('controlEventPayload(event = "input", sourceTag = "select", inputType = "select-one", value = pickerValue0)');
+        expect(compose).toContain('controlEventPayload(event = "change", sourceTag = "select", inputType = "select-one", value = pickerValue0)');
+
+        expect(swiftui).toContain('enum ElitNativeBridge {');
+        expect(swiftui).toContain('static func controlEventPayload(event: String, sourceTag: String, inputType: String? = nil, value: String? = nil, values: [String]? = nil, checked: Bool? = nil, detailJson: String? = nil) -> String {');
+        expect(swiftui).toContain('ElitNativeBridge.dispatch(action: "elit.event.input", payloadJson: ElitNativeBridge.controlEventPayload(event: "input", sourceTag: "input", inputType: "text", value: nextValue))');
+        expect(swiftui).toContain('ElitNativeBridge.dispatch(action: "elit.event.change", payloadJson: ElitNativeBridge.controlEventPayload(event: "change", sourceTag: "input", inputType: "text", value: nextValue))');
+        expect(swiftui).toContain('.onSubmit { ElitNativeBridge.dispatch(action: "elit.event.submit", payloadJson: ElitNativeBridge.controlEventPayload(event: "submit", sourceTag: "input", inputType: "text", value: textFieldValue0)) }');
+        expect(swiftui).toContain('checked: nextChecked');
+        expect(swiftui).toContain('controlEventPayload(event: "input", sourceTag: "select", inputType: "select-one", value: nextValue)');
+        expect(swiftui).toContain('controlEventPayload(event: "change", sourceTag: "select", inputType: "select-one", value: nextValue)');
+    });
+
+    it('maps practical range inputs into native slider output', () => {
+        const score = createState(42);
+
+        const compose = renderAndroidCompose(
+            div(input({ type: 'range', min: 0, max: 100, step: 5, ...bindValue(score) })),
+            { functionName: 'RangeInputScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(input({ type: 'range', min: 0, max: 100, step: 5, ...bindValue(score) })),
+            { structName: 'RangeInputScreen' },
+        );
+
+        expect(compose).toContain('var nativeState0 by remember { mutableStateOf(42.0) }');
+        expect(compose).toContain('Slider(');
+        expect(compose).toContain('value = nativeState0.toFloat(),');
+        expect(compose).toContain('onValueChange = { nextValue -> nativeState0 = nextValue.toDouble() },');
+        expect(compose).toContain('valueRange = 0f..100f,');
+        expect(compose).toContain('steps = 19,');
+
+        expect(swiftui).toContain('@State private var nativeState0: Double = 42.0');
+        expect(swiftui).toContain('Slider(value: $nativeState0, in: 0...100, step: 5)');
+    });
+
+    it('maps disabled native form controls into non-interactive output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                button(
+                    {
+                        ...createUniversalBridgeProps({
+                            action: 'validation.record',
+                            route: '/native/disabled',
+                            payload: { control: 'button' },
+                        }),
+                        disabled: true,
+                    },
+                    'Disabled save',
+                ),
+                input({ value: 'Locked', disabled: true }),
+                input({ type: 'checkbox', checked: true, disabled: true }),
+                select({ disabled: true }, option({ value: 'draft' }, 'Draft'), option({ value: 'published', selected: true }, 'Published')),
+            ),
+            { functionName: 'DisabledControlScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                button(
+                    {
+                        ...createUniversalBridgeProps({
+                            action: 'validation.record',
+                            route: '/native/disabled',
+                            payload: { control: 'button' },
+                        }),
+                        disabled: true,
+                    },
+                    'Disabled save',
+                ),
+                input({ value: 'Locked', disabled: true }),
+                input({ type: 'checkbox', checked: true, disabled: true }),
+                select({ disabled: true }, option({ value: 'draft' }, 'Draft'), option({ value: 'published', selected: true }, 'Published')),
+            ),
+            { structName: 'DisabledControlScreen' },
+        );
+
+        expect(compose).toContain('enabled = false');
+        expect(compose).toContain('Checkbox(');
+        expect(compose).toContain('BasicTextField(');
+        expect(compose).not.toContain('clickable { pickerExpanded0 = true }');
+        expect(compose).not.toContain('object ElitNativeBridge {');
+
+        expect(swiftui).toContain('.disabled(true)');
+        expect(swiftui).toContain('Picker("", selection: $pickerValue0) {');
+        expect(swiftui).not.toContain('enum ElitNativeBridge {');
+    });
+
+    it('maps required single-select placeholders and static multiple select output into native controls', () => {
+        const compose = renderAndroidCompose(
+            div(
+                select(
+                    { required: true, 'aria-label': 'Status', 'aria-description': 'Pick a status' },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+                select(
+                    { multiple: true, value: ['email', 'sms'], 'aria-label': 'Channels' },
+                    option({ value: 'email' }, 'Email'),
+                    option({ value: 'sms' }, 'SMS'),
+                    option({ value: 'push', disabled: true }, 'Push'),
+                ),
+            ),
+            { functionName: 'SelectAttrScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                select(
+                    { required: true, 'aria-label': 'Status', 'aria-description': 'Pick a status' },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+                select(
+                    { multiple: true, value: ['email', 'sms'], 'aria-label': 'Channels' },
+                    option({ value: 'email' }, 'Email'),
+                    option({ value: 'sms' }, 'SMS'),
+                    option({ value: 'push', disabled: true }, 'Push'),
+                ),
+            ),
+            { structName: 'SelectAttrScreen' },
+        );
+
+        expect(compose).toContain('var pickerValue0 by remember { mutableStateOf("") }');
+        expect(compose).toContain('contentDescription = "Status"');
+        expect(compose).toContain('stateDescription = "Pick a status, Required, Invalid"');
+        expect(compose).toContain('var pickerValues1 by remember { mutableStateOf(setOf("email", "sms")) }');
+        expect(compose).toContain('checked = pickerValues1.contains("email")');
+        expect(compose).toContain('checked = pickerValues1.contains("push")');
+        expect(compose).toContain('enabled = false');
+
+        expect(swiftui).toContain('@State private var pickerValue0 = ""');
+        expect(swiftui).toContain('Text("Select").tag("")');
+        expect(swiftui).toContain('@State private var pickerValues1: Set<String> = ["email", "sms"]');
+        expect(swiftui).toContain('Toggle(isOn: Binding(get: { pickerValues1.contains("email") }');
+        expect(swiftui).toContain('.accessibilityLabel("Status")');
+        expect(swiftui).toContain('.accessibilityHint("Pick a status")');
+        expect(swiftui).toContain('.accessibilityValue("Required, Invalid")');
+        expect(swiftui).toContain('.disabled(true)');
+    });
+
+    it('binds multiple select arrays into native checkbox groups', () => {
+        const channels = createState<string[]>(['email', 'sms']);
+
+        const compose = renderAndroidCompose(
+            div(
+                select(
+                    { multiple: true, ...bindValue(channels), 'aria-label': 'Channels' },
+                    option({ value: 'email' }, 'Email'),
+                    option({ value: 'sms' }, 'SMS'),
+                    option({ value: 'push' }, 'Push'),
+                ),
+            ),
+            { functionName: 'BoundMultiSelectScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                select(
+                    { multiple: true, ...bindValue(channels), 'aria-label': 'Channels' },
+                    option({ value: 'email' }, 'Email'),
+                    option({ value: 'sms' }, 'SMS'),
+                    option({ value: 'push' }, 'Push'),
+                ),
+            ),
+            { structName: 'BoundMultiSelectScreen' },
+        );
+
+        expect(compose).toContain('var nativeState0 by remember { mutableStateOf(listOf("email", "sms")) }');
+        expect(compose).toContain('checked = nativeState0.contains("email")');
+        expect(compose).toContain('checked -> nativeState0 = listOf("email", "sms", "push").filter { candidate -> if (candidate == "push") checked else nativeState0.contains(candidate) }');
+
+        expect(swiftui).toContain('@State private var nativeState0: [String] = ["email", "sms"]');
+        expect(swiftui).toContain('Toggle(isOn: Binding(get: { nativeState0.contains("email") }, set: { isOn in nativeState0 = ["email", "sms", "push"].filter { option in option == "email" ? isOn : nativeState0.contains(option) } })) {');
+    });
+
+    it('maps download links and validation state into native accessibility output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                a(
+                    {
+                        href: 'https://example.com/files/report.pdf',
+                        download: 'quarterly-report.pdf',
+                        target: '_blank',
+                        rel: 'noopener external',
+                        'aria-label': 'Download report',
+                    },
+                    'Download report',
+                ),
+                input({ required: true, value: '', 'aria-label': 'Email' }),
+                input({ required: true, value: 'ready', 'aria-label': 'Project code' }),
+                input({ value: 'ok', 'aria-invalid': false, 'aria-label': 'Alias' }),
+            ),
+            { functionName: 'ValidationLinkScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                a(
+                    {
+                        href: 'https://example.com/files/report.pdf',
+                        download: 'quarterly-report.pdf',
+                        target: '_blank',
+                        rel: 'noopener external',
+                        'aria-label': 'Download report',
+                    },
+                    'Download report',
+                ),
+                input({ required: true, value: '', 'aria-label': 'Email' }),
+                input({ required: true, value: 'ready', 'aria-label': 'Project code' }),
+                input({ value: 'ok', 'aria-invalid': false, 'aria-label': 'Alias' }),
+            ),
+            { structName: 'ValidationLinkScreen' },
+        );
+
+        expect(compose).toContain('object ElitDownloadHandler {');
+        expect(compose).toContain('ElitDownloadHandler.download(localContext, "https://example.com/files/report.pdf", "quarterly-report.pdf")');
+        expect(compose).toContain('contentDescription = "Download report"');
+        expect(compose).toContain('stateDescription = "Downloads file, Opens externally"');
+        expect(compose).toContain('stateDescription = "Required, Invalid"');
+        expect(compose).toContain('stateDescription = "Required, Valid"');
+        expect(compose).toContain('stateDescription = "Valid"');
+
+        expect(swiftui).toContain('private func elitDownloadFile(from source: String, suggestedName: String? = nil) {');
+        expect(swiftui).toContain('elitDownloadFile(from: "https://example.com/files/report.pdf", suggestedName: "quarterly-report.pdf")');
+        expect(swiftui).toContain('.accessibilityLabel("Download report")');
+        expect(swiftui).toContain('.accessibilityHint("Downloads file, Opens externally")');
+        expect(swiftui).toContain('.accessibilityValue("Required, Invalid")');
+        expect(swiftui).toContain('.accessibilityValue("Required, Valid")');
+        expect(swiftui).toContain('.accessibilityValue("Valid")');
+    });
+
+    it('maps practical text input constraint validation into native output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                input({ type: 'email', value: 'invalid-email', 'aria-label': 'Work email' }),
+                input({ type: 'url', value: 'https://elit.dev/docs', 'aria-label': 'Docs URL' }),
+                input({ type: 'number', value: '4.25', min: 5, max: 10, step: 0.5, 'aria-label': 'Score' }),
+                input({ value: 'ab', minLength: 3, 'aria-label': 'Code' }),
+                input({ value: 'abcdef', maxLength: 5, 'aria-label': 'Short code' }),
+                input({ value: 'AB-12', pattern: '[A-Z]{3}-\\d{2}', 'aria-label': 'Ticket' }),
+                input({ value: 'ABC-12', pattern: '[A-Z]{3}-\\d{2}', 'aria-label': 'Ticket ok' }),
+            ),
+            { functionName: 'TextConstraintScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                input({ type: 'email', value: 'invalid-email', 'aria-label': 'Work email' }),
+                input({ type: 'url', value: 'https://elit.dev/docs', 'aria-label': 'Docs URL' }),
+                input({ type: 'number', value: '4.25', min: 5, max: 10, step: 0.5, 'aria-label': 'Score' }),
+                input({ value: 'ab', minLength: 3, 'aria-label': 'Code' }),
+                input({ value: 'abcdef', maxLength: 5, 'aria-label': 'Short code' }),
+                input({ value: 'AB-12', pattern: '[A-Z]{3}-\\d{2}', 'aria-label': 'Ticket' }),
+                input({ value: 'ABC-12', pattern: '[A-Z]{3}-\\d{2}', 'aria-label': 'Ticket ok' }),
+            ),
+            { structName: 'TextConstraintScreen' },
+        );
+
+        expect(compose).toContain('contentDescription = "Work email"; stateDescription = "Invalid"');
+        expect(compose).toContain('contentDescription = "Docs URL"; stateDescription = "Valid"');
+        expect(compose).toContain('contentDescription = "Score"; stateDescription = "Invalid"');
+        expect(compose).toContain('contentDescription = "Code"; stateDescription = "Invalid"');
+        expect(compose).toContain('contentDescription = "Short code"; stateDescription = "Invalid"');
+        expect(compose).toContain('contentDescription = "Ticket"; stateDescription = "Invalid"');
+        expect(compose).toContain('contentDescription = "Ticket ok"; stateDescription = "Valid"');
+
+        expect(swiftui).toContain('.accessibilityLabel("Work email")');
+        expect(swiftui).toContain('.accessibilityLabel("Docs URL")');
+        expect(swiftui).toContain('.accessibilityLabel("Ticket ok")');
+        expect((swiftui.match(/\.accessibilityValue\("Invalid"\)/g) ?? []).length).toBeGreaterThanOrEqual(4);
+        expect((swiftui.match(/\.accessibilityValue\("Valid"\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('keeps disabled controls out of automatic native valid and invalid state output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                input({ required: true, disabled: true, value: '', 'aria-label': 'Archived code' }),
+                select({ required: true, disabled: true, 'aria-label': 'Archived status' }, option({ value: 'draft' }, 'Draft')),
+                input({ type: 'checkbox', required: true, disabled: true, checked: false, 'aria-label': 'Archived consent' }),
+                input({ required: true, value: '', 'aria-label': 'Live code' }),
+            ),
+            { functionName: 'DisabledValidationStateScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                input({ required: true, disabled: true, value: '', 'aria-label': 'Archived code' }),
+                select({ required: true, disabled: true, 'aria-label': 'Archived status' }, option({ value: 'draft' }, 'Draft')),
+                input({ type: 'checkbox', required: true, disabled: true, checked: false, 'aria-label': 'Archived consent' }),
+                input({ required: true, value: '', 'aria-label': 'Live code' }),
+            ),
+            { structName: 'DisabledValidationStateScreen' },
+        );
+
+        expect(compose).toContain('contentDescription = "Archived code"; stateDescription = "Required, Disabled"');
+        expect(compose).toContain('contentDescription = "Archived status"; stateDescription = "Required, Disabled"');
+        expect(compose).toContain('contentDescription = "Archived consent"; stateDescription = "Required, Disabled, Unchecked"');
+        expect(compose).toContain('contentDescription = "Live code"; stateDescription = "Required, Invalid"');
+        expect(compose).not.toContain('contentDescription = "Archived code"; stateDescription = "Required, Invalid"');
+        expect(compose).not.toContain('contentDescription = "Archived status"; stateDescription = "Required, Invalid"');
+
+        expect(swiftui).toContain('.accessibilityLabel("Archived code")');
+        expect(swiftui).toContain('.accessibilityLabel("Archived status")');
+        expect(swiftui).toContain('.accessibilityLabel("Archived consent")');
+        expect((swiftui.match(/\.accessibilityValue\("Required, Disabled"\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect(swiftui).toContain('.accessibilityValue("Required, Disabled, Unchecked")');
+        expect(swiftui).toContain('.accessibilityValue("Required, Invalid")');
+    });
+
+    it('maps validation pseudo-class selectors into native output automatically', () => {
+        styles.addClass('validation-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.validation-stack', 'select:invalid', {
+            color: '#ff3300',
+            textTransform: 'uppercase',
+        });
+        styles.child('.validation-stack', 'select:valid', {
+            textTransform: 'uppercase',
+        });
+        styles.child('.validation-stack', 'select:optional', {
+            textDecoration: 'underline',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'validation-stack' },
+                select(
+                    { required: true },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+                select(
+                    option({ value: 'ready', selected: true }, 'Ready'),
+                    option({ value: 'hold' }, 'Hold'),
+                ),
+            ),
+            { functionName: 'ValidationPseudoScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'validation-stack' },
+                select(
+                    { required: true },
+                    option({ value: 'draft' }, 'Draft'),
+                    option({ value: 'published' }, 'Published'),
+                ),
+                select(
+                    option({ value: 'ready', selected: true }, 'Ready'),
+                    option({ value: 'hold' }, 'Hold'),
+                ),
+            ),
+            { structName: 'ValidationPseudoScreen' },
+        );
+
+        expect(compose).toContain('Text(text = "Select".uppercase(), color = Color(red = 1f, green = 0.2f, blue = 0f, alpha = 1f))');
+        expect(compose).toContain('Text(text = "Ready".uppercase(), textDecoration = TextDecoration.Underline)');
+
+        expect(swiftui).toContain('Text("Select")');
+        expect(swiftui).toContain('.foregroundStyle(Color(red: 1, green: 0.2, blue: 0, opacity: 1))');
+        expect(swiftui).toContain('Text("Ready")');
+        expect(swiftui).toContain('.underline()');
+    });
+
+    it('maps text input edit-state pseudo-class selectors into native output automatically', () => {
+        styles.addClass('edit-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.edit-stack', 'input:placeholder-shown', {
+            textDecoration: 'underline',
+        });
+        styles.child('.edit-stack', 'input:read-only', {
+            background: '#f5f1ea',
+        });
+        styles.child('.edit-stack', 'textarea:read-write', {
+            border: '2px solid #d56e43',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'edit-stack' },
+                input({ value: '', placeholder: 'Search' }),
+                input({ value: 'Locked', readOnly: true }),
+                textarea({ value: 'Draft' }),
+            ),
+            { functionName: 'EditPseudoScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'edit-stack' },
+                input({ value: '', placeholder: 'Search' }),
+                input({ value: 'Locked', readOnly: true }),
+                textarea({ value: 'Draft' }),
+            ),
+            { structName: 'EditPseudoScreen' },
+        );
+
+        expect(compose).toContain('textStyle = androidx.compose.ui.text.TextStyle(textDecoration = TextDecoration.Underline)');
+        expect(compose).toContain('Modifier.background(Color(red = 0.961f, green = 0.945f, blue = 0.918f, alpha = 1f))');
+        expect(compose).toContain('Modifier.border(2.dp, Color(red = 0.835f, green = 0.431f, blue = 0.263f, alpha = 1f))');
+
+        expect(swiftui).toContain('TextField("Search", text: $textFieldValue0)');
+        expect(swiftui).toContain('.underline()');
+        expect(swiftui).toContain('.background(Color(red: 0.961, green: 0.945, blue: 0.918, opacity: 1))');
+        expect(swiftui).toContain('.overlay(RoundedRectangle(cornerRadius: 0).stroke(Color(red: 0.835, green: 0.431, blue: 0.263, opacity: 1), lineWidth: 2))');
+    });
+
+    it('maps focus-within and empty pseudo-class selectors into native output automatically', () => {
+        styles.addClass('runtime-state-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.runtime-state-stack', '.focus-shell:focus-within', {
+            border: '2px solid #d56e43',
+        });
+        styles.child('.runtime-state-stack', '.empty-shell:empty', {
+            background: '#f5f1ea',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'runtime-state-stack' },
+                div({ className: 'focus-shell' }, input({ value: 'Locked', autoFocus: true })),
+                div({ className: 'empty-shell' }),
+                div({ className: 'empty-shell' }, span('Filled')),
+            ),
+            { functionName: 'RuntimePseudoScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'runtime-state-stack' },
+                div({ className: 'focus-shell' }, input({ value: 'Locked', autoFocus: true })),
+                div({ className: 'empty-shell' }),
+                div({ className: 'empty-shell' }, span('Filled')),
+            ),
+            { structName: 'RuntimePseudoScreen' },
+        );
+
+        expect((compose.match(/border\(2\.dp, Color\(red = 0\.835f, green = 0\.431f, blue = 0\.263f, alpha = 1f\)\)/g) ?? []).length).toBe(1);
+        expect((compose.match(/background\(Color\(red = 0\.961f, green = 0\.945f, blue = 0\.918f, alpha = 1f\)\)/g) ?? []).length).toBe(1);
+
+        expect((swiftui.match(/stroke\(Color\(red: 0\.835, green: 0\.431, blue: 0\.263, opacity: 1\), lineWidth: 2\)/g) ?? []).length).toBe(1);
+        expect((swiftui.match(/\.background\(Color\(red: 0\.961, green: 0\.945, blue: 0\.918, opacity: 1\)\)/g) ?? []).length).toBe(1);
+    });
+
+    it('maps explicit focus and focus-visible selectors onto practical focusable native elements', () => {
+        styles.addClass('focusable-state-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.focusable-state-stack', 'button:focus', {
+            border: '2px solid #d56e43',
+        });
+        styles.child('.focusable-state-stack', 'a:focus-visible', {
+            textDecoration: 'underline',
+        });
+        styles.child('.focusable-state-stack', 'div:focus', {
+            background: '#f5f1ea',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'focusable-state-stack' },
+                button({ focused: true }, 'Save draft'),
+                a({ href: 'https://elit.dev/docs', focused: true }, 'Docs link'),
+                div({ tabIndex: 0, focused: true }, 'Focusable panel'),
+            ),
+            { functionName: 'FocusablePseudoScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'focusable-state-stack' },
+                button({ focused: true }, 'Save draft'),
+                a({ href: 'https://elit.dev/docs', focused: true }, 'Docs link'),
+                div({ tabIndex: 0, focused: true }, 'Focusable panel'),
+            ),
+            { structName: 'FocusablePseudoScreen' },
+        );
+
+        expect(compose).toContain('border(2.dp, Color(red = 0.835f, green = 0.431f, blue = 0.263f, alpha = 1f))');
+        expect(compose).toContain('Text(text = "Docs link", textDecoration = TextDecoration.Underline)');
+        expect(compose).toContain('background(Color(red = 0.961f, green = 0.945f, blue = 0.918f, alpha = 1f))');
+
+        expect(swiftui).toContain('.overlay(RoundedRectangle(cornerRadius: 0).stroke(Color(red: 0.835, green: 0.431, blue: 0.263, opacity: 1), lineWidth: 2))');
+        expect(swiftui).toContain('.underline()');
+        expect(swiftui).toContain('.background(Color(red: 0.961, green: 0.945, blue: 0.918, opacity: 1))');
+    });
+
+    it('maps enabled and explicit active selectors onto practical native state signals', () => {
+        styles.addClass('interactive-state-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.interactive-state-stack', 'button:enabled', {
+            border: '2px solid #d56e43',
+        });
+        styles.child('.interactive-state-stack', '.toggle-chip:active', {
+            background: '#f5f1ea',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'interactive-state-stack' },
+                button('Save draft'),
+                button({ disabled: true }, 'Disabled action'),
+                div({ className: 'toggle-chip', role: 'button', 'aria-label': 'Mute preview', 'aria-pressed': true }, 'Muted'),
+            ),
+            { functionName: 'InteractivePseudoScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'interactive-state-stack' },
+                button('Save draft'),
+                button({ disabled: true }, 'Disabled action'),
+                div({ className: 'toggle-chip', role: 'button', 'aria-label': 'Mute preview', 'aria-pressed': true }, 'Muted'),
+            ),
+            { structName: 'InteractivePseudoScreen' },
+        );
+
+        expect((compose.match(/border\(2\.dp, Color\(red = 0\.835f, green = 0\.431f, blue = 0\.263f, alpha = 1f\)\)/g) ?? []).length).toBe(1);
+        expect(compose).toContain('background(Color(red = 0.961f, green = 0.945f, blue = 0.918f, alpha = 1f))');
+        expect(compose).toContain('stateDescription = "Pressed"');
+
+        expect((swiftui.match(/stroke\(Color\(red: 0\.835, green: 0\.431, blue: 0\.263, opacity: 1\), lineWidth: 2\)/g) ?? []).length).toBe(1);
+        expect(swiftui).toContain('.background(Color(red: 0.961, green: 0.945, blue: 0.918, opacity: 1))');
+        expect(swiftui).toContain('.accessibilityValue("Pressed")');
+    });
+
+    it('maps runtime active button and link styles onto native press-state output', () => {
+        styles.addClass('runtime-active-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+        });
+        styles.child('.runtime-active-stack', 'button:active', {
+            background: '#f5f1ea',
+        });
+        styles.child('.runtime-active-stack', 'a:active', {
+            textDecoration: 'underline',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'runtime-active-stack' },
+                button('Save draft'),
+                a({ href: 'https://elit.dev/docs' }, 'Docs'),
+            ),
+            { functionName: 'RuntimeActiveScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'runtime-active-stack' },
+                button('Save draft'),
+                a({ href: 'https://elit.dev/docs' }, 'Docs'),
+            ),
+            { structName: 'RuntimeActiveScreen' },
+        );
+
+        expect((compose.match(/MutableInteractionSource\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((compose.match(/collectIsPressedAsState\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect(compose).toContain('background(Color(red = 0.961f, green = 0.945f, blue = 0.918f, alpha = 1f))');
+        expect(compose).toContain('Text(text = "Docs", textDecoration = TextDecoration.Underline)');
+
+        expect(swiftui).toContain('@GestureState private var interactionPressed0 = false');
+        expect(swiftui).toContain('@GestureState private var interactionPressed1 = false');
+        expect(swiftui).toContain('.simultaneousGesture(DragGesture(minimumDistance: 0).updating($interactionPressed0) { _, state, _ in');
+        expect(swiftui).toContain('.simultaneousGesture(DragGesture(minimumDistance: 0).updating($interactionPressed1) { _, state, _ in');
+        expect(swiftui).toContain('.background(Color(red: 0.961, green: 0.945, blue: 0.918, opacity: 1))');
+        expect(swiftui).toContain('.underline()');
+    });
+
+    it('maps practical role and aria accessibility semantics into native output', () => {
+        const compose = renderAndroidCompose(
+            div(
+                div({ role: 'button', 'aria-label': 'Open settings', 'aria-description': 'Opens preferences', 'aria-selected': true }, 'Settings'),
+                div({ role: 'checkbox', 'aria-label': 'Beta access', 'aria-checked': false, 'aria-disabled': true }),
+                h2({ role: 'heading', 'aria-label': 'Account heading' }, 'Account'),
+            ),
+            { functionName: 'AriaRoleScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                div({ role: 'button', 'aria-label': 'Open settings', 'aria-description': 'Opens preferences', 'aria-selected': true }, 'Settings'),
+                div({ role: 'checkbox', 'aria-label': 'Beta access', 'aria-checked': false, 'aria-disabled': true }),
+                h2({ role: 'heading', 'aria-label': 'Account heading' }, 'Account'),
+            ),
+            { structName: 'AriaRoleScreen' },
+        );
+
+        expect(compose).toContain('role = Role.Button');
+        expect(compose).toContain('contentDescription = "Open settings"');
+        expect(compose).toContain('selected = true');
+        expect(compose).toContain('stateDescription = "Opens preferences, Selected"');
+        expect(compose).toContain('role = Role.Checkbox');
+        expect(compose).toContain('stateDescription = "Disabled, Unchecked"');
+        expect(compose).toContain('disabled()');
+        expect(compose).toContain('heading()');
+
+        expect(swiftui).toContain('.accessibilityLabel("Open settings")');
+        expect(swiftui).toContain('.accessibilityHint("Opens preferences")');
+        expect(swiftui).toContain('.accessibilityValue("Selected")');
+        expect(swiftui).toContain('.accessibilityAddTraits(.isButton)');
+        expect(swiftui).toContain('.accessibilityAddTraits(.isSelected)');
+        expect(swiftui).toContain('.accessibilityLabel("Beta access")');
+        expect(swiftui).toContain('.accessibilityValue("Disabled, Unchecked")');
+        expect(swiftui).toContain('.accessibilityAddTraits(.isHeader)');
     });
 
     it('renders Compose bridge helpers for universal action metadata', () => {
@@ -496,6 +1801,38 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('.background(LinearGradient(colors: [Color(red: 0.149, green: 0.098, blue: 0.078, opacity: 1), Color(red: 0, green: 0, blue: 0, opacity: 0)], startPoint: .topLeading, endPoint: .bottomTrailing))');
     });
 
+    it('parses practical CSS Color 4 functions into native surfaces', () => {
+        const compose = renderAndroidCompose(
+            div(
+                div({ style: { backgroundColor: 'lab(55% 40 30 / 75%)', padding: '12px' } }, span('Lab surface')),
+                div({ style: { border: '2px solid lch(72% 60 38)', padding: '12px' } }, span('Lch border')),
+                span({ style: { color: 'oklab(62% 0.12 0.08)' } }, 'Oklab tone'),
+                span({ style: { color: 'oklch(74% 0.18 32)' } }, 'Oklch tone'),
+            ),
+            { functionName: 'ColorFourScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                div({ style: { backgroundColor: 'lab(55% 40 30 / 75%)', padding: '12px' } }, span('Lab surface')),
+                div({ style: { border: '2px solid lch(72% 60 38)', padding: '12px' } }, span('Lch border')),
+                span({ style: { color: 'oklab(62% 0.12 0.08)' } }, 'Oklab tone'),
+                span({ style: { color: 'oklch(74% 0.18 32)' } }, 'Oklch tone'),
+            ),
+            { structName: 'ColorFourScreen' },
+        );
+
+        expect(compose).toContain('background(Color(red = 0.792f, green = 0.396f, blue = 0.322f, alpha = 0.75f))');
+        expect(compose).toContain('border(2.dp, Color(red = 1f, green = 0.541f, blue = 0.439f, alpha = 1f))');
+        expect(compose).toContain('Text(text = "Oklab tone", color = Color(red = 0.808f, green = 0.38f, blue = 0.286f, alpha = 1f))');
+        expect(compose).toContain('Text(text = "Oklch tone", color = Color(red = 1f, green = 0.471f, blue = 0.369f, alpha = 1f))');
+
+        expect(swiftui).toContain('.background(Color(red: 0.792, green: 0.396, blue: 0.322, opacity: 0.75))');
+        expect(swiftui).toContain('.overlay(RoundedRectangle(cornerRadius: 0).stroke(Color(red: 1, green: 0.541, blue: 0.439, opacity: 1), lineWidth: 2))');
+        expect(swiftui).toContain('.foregroundStyle(Color(red: 0.808, green: 0.38, blue: 0.286, opacity: 1))');
+        expect(swiftui).toContain('.foregroundStyle(Color(red: 1, green: 0.471, blue: 0.369, opacity: 1))');
+    });
+
     it('maps uniform border longhands into native output', () => {
         styles.addClass('longhand-card', {
             borderWidth: '2px',
@@ -736,6 +2073,42 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('HStack(alignment: .center, spacing: 12) {');
         expect(swiftui).toContain('.background(LinearGradient(colors: [Color(');
         expect(swiftui).toContain('.font(.system(size: 17, weight: .bold))');
+    });
+
+    it('maps multiple box shadows and skips inset-only fallback shadows in native output', () => {
+        styles.addClass('stacked-shadow-card', {
+            padding: '16px',
+            borderRadius: '24px',
+            background: '#fff',
+            boxShadow: '0 4px 12px rgba(38, 25, 20, 0.12), 0 18px 44px rgba(102, 61, 35, 0.18)',
+        });
+        styles.addClass('inset-shadow-card', {
+            padding: '16px',
+            borderRadius: '24px',
+            background: '#fff',
+            boxShadow: 'inset 0 1px 2px rgba(38, 25, 20, 0.12), 0 10px 24px rgba(102, 61, 35, 0.15)',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                div({ className: 'stacked-shadow-card' }, span('Layered shadow')),
+                div({ className: 'inset-shadow-card' }, span('Inset fallback')),
+            ),
+            { functionName: 'MultiShadowScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                div({ className: 'stacked-shadow-card' }, span('Layered shadow')),
+                div({ className: 'inset-shadow-card' }, span('Inset fallback')),
+            ),
+            { structName: 'MultiShadowScreen' },
+        );
+
+        expect((compose.match(/shadow\(elevation = /g) ?? []).length).toBe(3);
+        expect((swiftui.match(/\.shadow\(color:/g) ?? []).length).toBe(3);
+        expect(swiftui).toContain('.shadow(color: Color(red: 0.149, green: 0.098, blue: 0.078, opacity: 0.12), radius: 6, x: 0, y: 4)');
+        expect(swiftui).toContain('.shadow(color: Color(red: 0.4, green: 0.239, blue: 0.137, opacity: 0.18), radius: 22, x: 0, y: 18)');
     });
 
     it('maps descendant selectors with class ancestry into native output automatically', () => {
@@ -1415,7 +2788,7 @@ describe('native target foundation', () => {
         );
 
         expect(compose).toContain('Column(modifier = Modifier.widthIn(max = 280.dp).padding(12.dp))');
-        expect(compose).toContain('modifier = Modifier.border(2.dp, Color(');
+        expect(compose).toContain('modifier = Modifier.focusRequester(textFieldFocusRequester0).border(2.dp, Color(');
 
         expect(swiftui).toContain('.padding(12)');
         expect(swiftui).toContain('.frame(maxWidth: 280)');
@@ -3045,6 +4418,1385 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .leading)');
         expect(swiftui).toContain('.layoutPriority(1.2)');
         expect(swiftui).toContain('.layoutPriority(0.8)');
+    });
+
+    it('maps practical fixed and clamped grid columns into native output', () => {
+        styles.addClass('clamped-columns-grid', {
+            display: 'grid',
+            gridTemplateColumns: '120px minmax(96px, 180px) fit-content(140px) 1fr',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'clamped-columns-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { functionName: 'ClampedColumnsGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'clamped-columns-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { structName: 'ClampedColumnsGridScreen' },
+        );
+
+        expect(compose).toContain('Row(modifier = Modifier, horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.width(120.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.widthIn(min = 96.dp, max = 180.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.widthIn(max = 140.dp))');
+        expect(compose).toContain('Box(modifier = Modifier.weight(1f).fillMaxWidth())');
+
+        expect(swiftui).toContain('HStack(alignment: .top, spacing: 12) {');
+        expect(swiftui).toContain('.frame(width: 120, alignment: .leading)');
+        expect(swiftui).toContain('.frame(minWidth: 96, maxWidth: 180, alignment: .leading)');
+        expect(swiftui).toContain('.frame(maxWidth: 140, alignment: .leading)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, alignment: .leading)');
+        expect(swiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('maps practical implicit auto-column clamps into native output', () => {
+        styles.addClass('auto-columns-clamp-grid', {
+            display: 'grid',
+            gridTemplateColumns: '120px',
+            gridTemplateRows: 'auto auto',
+            gridAutoFlow: 'column',
+            gridAutoColumns: 'fit-content(140px)',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'auto-columns-clamp-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { functionName: 'AutoColumnsClampGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'auto-columns-clamp-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { structName: 'AutoColumnsClampGridScreen' },
+        );
+
+        expect((compose.match(/Box\(modifier = Modifier\.width\(120\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((compose.match(/Box\(modifier = Modifier\.widthIn\(max = 140\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+
+        expect((swiftui.match(/\.frame\(width: 120, alignment: \.leading\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((swiftui.match(/\.frame\(maxWidth: 140, alignment: \.leading\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('maps practical intrinsic column keywords into native output', () => {
+        styles.addClass('intrinsic-columns-grid', {
+            display: 'grid',
+            gridTemplateColumns: 'min-content max-content',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'intrinsic-columns-grid' },
+                div(span('ID')),
+                input({ value: 'Primary field' }),
+                div(span('Ref')),
+                input({ value: 'Secondary field' }),
+            ),
+            { functionName: 'IntrinsicColumnsGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'intrinsic-columns-grid' },
+                div(span('ID')),
+                input({ value: 'Primary field' }),
+                div(span('Ref')),
+                input({ value: 'Secondary field' }),
+            ),
+            { structName: 'IntrinsicColumnsGridScreen' },
+        );
+
+        expect((compose.match(/Box\(modifier = Modifier\.width\(160\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((compose.match(/Box\(modifier = Modifier\.width\(220\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+
+        expect((swiftui.match(/\.frame\(width: 160, alignment: \.leading\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((swiftui.match(/\.frame\(width: 220, alignment: \.leading\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('maps practical spanning width hints across mixed fixed and flexible grid columns', () => {
+        styles.addClass('spanning-columns-grid', {
+            display: 'grid',
+            gridTemplateColumns: '120px fit-content(140px) 1fr',
+            gap: '12px',
+        });
+        styles.addClass('wide-span-card', {
+            gridColumn: '1 / span 3',
+            width: '380px',
+            background: '#f5f1ea',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'spanning-columns-grid' },
+                div({ className: 'wide-span-card' }, span('Wide summary card')),
+            ),
+            { functionName: 'SpanningColumnsGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'spanning-columns-grid' },
+                div({ className: 'wide-span-card' }, span('Wide summary card')),
+            ),
+            { structName: 'SpanningColumnsGridScreen' },
+        );
+
+        expect(compose).toContain('Box(modifier = Modifier.weight(1f).fillMaxWidth().widthIn(min = 380.dp))');
+            expect(swiftui).toContain('.frame(minWidth: 380, maxWidth: .infinity, alignment: .leading)');
+        expect(swiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('maps practical grid row and column placement into native output', () => {
+        styles.addClass('placed-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 2fr 1fr',
+            gridTemplateRows: 'auto auto',
+            gap: '12px',
+        });
+        styles.addClass('grid-hero', {
+            gridColumn: '2 / span 2',
+            background: '#f5f1ea',
+        });
+        styles.addClass('grid-summary', {
+            gridRow: '2',
+            gridColumn: '1 / span 2',
+            background: '#e3f1ff',
+        });
+        styles.addClass('grid-aside', {
+            gridRow: '2',
+            gridColumn: '3',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'placed-grid' },
+                div({ className: 'grid-summary' }, span('Summary panel')),
+                div({ className: 'grid-hero' }, span('Hero panel')),
+                div({ className: 'grid-aside' }, span('Aside panel')),
+            ),
+            { functionName: 'PlacedGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'placed-grid' },
+                div({ className: 'grid-summary' }, span('Summary panel')),
+                div({ className: 'grid-hero' }, span('Hero panel')),
+                div({ className: 'grid-aside' }, span('Aside panel')),
+            ),
+            { structName: 'PlacedGridScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Hero panel")')).toBeLessThan(compose.indexOf('Text(text = "Summary panel")'));
+        expect((compose.match(/Modifier\.weight\(3f\)\.fillMaxWidth\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((compose.match(/Row\(modifier = Modifier\.fillMaxWidth\(\), horizontalArrangement = Arrangement\.spacedBy\(12\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+
+        expect(swiftui.indexOf('Text("Hero panel")')).toBeLessThan(swiftui.indexOf('Text("Summary panel")'));
+        expect((swiftui.match(/\.layoutPriority\(3\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((swiftui.match(/HStack\(alignment: \.top, spacing: 12\) \{/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('maps practical grid auto-flow dense and column subsets into native output', () => {
+        styles.addClass('dense-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gridAutoFlow: 'row dense',
+            gap: '12px',
+        });
+        styles.addClass('column-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'auto auto',
+            gridAutoFlow: 'column',
+            gap: '12px',
+        });
+        styles.addClass('span-two', {
+            gridColumn: 'span 2',
+        });
+
+        const denseCompose = renderAndroidCompose(
+            div(
+                { className: 'dense-grid' },
+                div({ className: 'span-two' }, span('Hero card')),
+                div({ className: 'span-two' }, span('Metrics card')),
+                div(span('Badge card')),
+            ),
+            { functionName: 'DenseAutoFlowGridScreen' },
+        );
+
+        const denseSwiftui = renderSwiftUI(
+            div(
+                { className: 'dense-grid' },
+                div({ className: 'span-two' }, span('Hero card')),
+                div({ className: 'span-two' }, span('Metrics card')),
+                div(span('Badge card')),
+            ),
+            { structName: 'DenseAutoFlowGridScreen' },
+        );
+
+        const columnCompose = renderAndroidCompose(
+            div(
+                { className: 'column-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { functionName: 'ColumnAutoFlowGridScreen' },
+        );
+
+        const columnSwiftui = renderSwiftUI(
+            div(
+                { className: 'column-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { structName: 'ColumnAutoFlowGridScreen' },
+        );
+
+        expect(denseCompose.indexOf('Text(text = "Hero card")')).toBeLessThan(denseCompose.indexOf('Text(text = "Badge card")'));
+        expect(denseCompose.indexOf('Text(text = "Badge card")')).toBeLessThan(denseCompose.indexOf('Text(text = "Metrics card")'));
+        expect(denseSwiftui.indexOf('Text("Hero card")')).toBeLessThan(denseSwiftui.indexOf('Text("Badge card")'));
+        expect(denseSwiftui.indexOf('Text("Badge card")')).toBeLessThan(denseSwiftui.indexOf('Text("Metrics card")'));
+
+        expect(columnCompose.indexOf('Text(text = "Alpha panel")')).toBeLessThan(columnCompose.indexOf('Text(text = "Gamma panel")'));
+        expect(columnCompose.indexOf('Text(text = "Gamma panel")')).toBeLessThan(columnCompose.indexOf('Text(text = "Beta panel")'));
+        expect(columnCompose.indexOf('Text(text = "Beta panel")')).toBeLessThan(columnCompose.indexOf('Text(text = "Delta panel")'));
+
+        expect(columnSwiftui.indexOf('Text("Alpha panel")')).toBeLessThan(columnSwiftui.indexOf('Text("Gamma panel")'));
+        expect(columnSwiftui.indexOf('Text("Gamma panel")')).toBeLessThan(columnSwiftui.indexOf('Text("Beta panel")'));
+        expect(columnSwiftui.indexOf('Text("Beta panel")')).toBeLessThan(columnSwiftui.indexOf('Text("Delta panel")'));
+    });
+
+    it('maps practical grid auto-rows and auto-columns hints into native output', () => {
+        styles.addClass('auto-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '40px',
+            gridAutoRows: '72px',
+            gap: '12px',
+        });
+        styles.addClass('auto-columns-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+            gridTemplateRows: 'auto auto',
+            gridAutoFlow: 'column',
+            gridAutoColumns: '2fr',
+            gap: '12px',
+        });
+
+        const autoRowsCompose = renderAndroidCompose(
+            div(
+                { className: 'auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+            ),
+            { functionName: 'AutoRowsGridScreen' },
+        );
+
+        const autoRowsSwiftui = renderSwiftUI(
+            div(
+                { className: 'auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+            ),
+            { structName: 'AutoRowsGridScreen' },
+        );
+
+        const autoColumnsCompose = renderAndroidCompose(
+            div(
+                { className: 'auto-columns-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { functionName: 'AutoColumnsGridScreen' },
+        );
+
+        const autoColumnsSwiftui = renderSwiftUI(
+            div(
+                { className: 'auto-columns-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { structName: 'AutoColumnsGridScreen' },
+        );
+
+        expect(autoRowsCompose).toContain('height(40.dp)');
+        expect(autoRowsCompose).toContain('height(72.dp)');
+        expect(autoRowsSwiftui).toContain('.frame(maxWidth: .infinity, height: 40, alignment: .topLeading)');
+        expect(autoRowsSwiftui).toContain('.frame(maxWidth: .infinity, height: 72, alignment: .topLeading)');
+
+        expect((autoColumnsCompose.match(/Modifier\.weight\(2f\)\.fillMaxWidth\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((autoColumnsSwiftui.match(/\.layoutPriority\(2\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('maps practical grid row-track sizing and stretch into native output', () => {
+        styles.addClass('stretch-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'auto auto',
+            gap: '12px',
+            height: '220px',
+            alignContent: 'stretch',
+        });
+        styles.addClass('tracked-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '48px minmax(72px, 1fr)',
+            gap: '12px',
+            height: '240px',
+        });
+
+        const stretchCompose = renderAndroidCompose(
+            div(
+                { className: 'stretch-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { functionName: 'StretchRowsGridScreen' },
+        );
+
+        const stretchSwiftui = renderSwiftUI(
+            div(
+                { className: 'stretch-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { structName: 'StretchRowsGridScreen' },
+        );
+
+        const trackedCompose = renderAndroidCompose(
+            div(
+                { className: 'tracked-rows-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { functionName: 'TrackedRowsGridScreen' },
+        );
+
+        const trackedSwiftui = renderSwiftUI(
+            div(
+                { className: 'tracked-rows-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { structName: 'TrackedRowsGridScreen' },
+        );
+
+        expect(stretchCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(12.dp))');
+        expect((stretchCompose.match(/Row\(modifier = Modifier\.weight\(1f, fill = true\)\.fillMaxWidth\(\), horizontalArrangement = Arrangement\.spacedBy\(12\.dp\)\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+
+        expect((stretchSwiftui.match(/\.frame\(maxWidth: \.infinity, maxHeight: \.infinity, alignment: \.topLeading\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((stretchSwiftui.match(/\.layoutPriority\(1\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+
+        expect(trackedCompose).toContain('Row(modifier = Modifier.height(48.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(trackedCompose).toContain('Row(modifier = Modifier.weight(1f, fill = true).heightIn(min = 72.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+
+        expect(trackedSwiftui).toContain('.frame(maxWidth: .infinity, height: 48, alignment: .topLeading)');
+        expect(trackedSwiftui).toContain('.frame(maxWidth: .infinity, minHeight: 72, maxHeight: .infinity, alignment: .topLeading)');
+        expect(trackedSwiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('keeps grid content packing inert once flexible row tracks consume free space', () => {
+        styles.addClass('weighted-place-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '48px 1fr',
+            gap: '12px',
+            height: '240px',
+            placeContent: 'center',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'weighted-place-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { functionName: 'WeightedPlaceContentScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'weighted-place-grid' },
+                div(span('Alpha panel')),
+                div(span('Beta panel')),
+                div(span('Gamma panel')),
+                div(span('Delta panel')),
+            ),
+            { structName: 'WeightedPlaceContentScreen' },
+        );
+
+        expect(compose).toContain('Column(modifier = Modifier.height(240.dp), verticalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(compose).not.toContain('Alignment.CenterVertically');
+        expect(compose).toContain('Row(modifier = Modifier.weight(1f, fill = true).fillMaxWidth(), horizontalArrangement = Arrangement.Center)');
+
+        expect(swiftui).toContain('VStack(alignment: .leading, spacing: 12) {');
+        expect(swiftui).not.toContain('Spacer(minLength: 0)');
+        expect(swiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('maps practical fit-content rows and spanning height hints into native output', () => {
+        styles.addClass('fit-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'fit-content(56px) fit-content(72px)',
+            gap: '12px',
+        });
+        styles.addClass('spanning-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '48px auto',
+            gap: '12px',
+        });
+        styles.addClass('spanning-card', {
+            gridRow: '1 / span 2',
+            height: '180px',
+            background: '#f5f1ea',
+        });
+        styles.addClass('top-card', {
+            gridColumn: '2 / 3',
+            gridRow: '1 / 2',
+            background: '#fff4e7',
+        });
+        styles.addClass('bottom-card', {
+            gridColumn: '2 / 3',
+            gridRow: '2 / 3',
+            background: '#e3f1ff',
+        });
+
+        const fitCompose = renderAndroidCompose(
+            div(
+                { className: 'fit-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { functionName: 'FitRowsGridScreen' },
+        );
+
+        const fitSwiftui = renderSwiftUI(
+            div(
+                { className: 'fit-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { structName: 'FitRowsGridScreen' },
+        );
+
+        const spanningCompose = renderAndroidCompose(
+            div(
+                { className: 'spanning-rows-grid' },
+                div({ className: 'spanning-card' }, span('Tall span')),
+                div({ className: 'top-card' }, span('Top')),
+                div({ className: 'bottom-card' }, span('Bottom')),
+            ),
+            { functionName: 'SpanningRowsGridScreen' },
+        );
+
+        const spanningSwiftui = renderSwiftUI(
+            div(
+                { className: 'spanning-rows-grid' },
+                div({ className: 'spanning-card' }, span('Tall span')),
+                div({ className: 'top-card' }, span('Top')),
+                div({ className: 'bottom-card' }, span('Bottom')),
+            ),
+            { structName: 'SpanningRowsGridScreen' },
+        );
+
+        expect(fitCompose).toContain('heightIn(max = 56.dp)');
+        expect(fitCompose).toContain('heightIn(max = 72.dp)');
+        expect(fitSwiftui).toContain('.frame(maxWidth: .infinity, maxHeight: 56, alignment: .topLeading)');
+        expect(fitSwiftui).toContain('.frame(maxWidth: .infinity, maxHeight: 72, alignment: .topLeading)');
+
+        expect(spanningCompose).toContain('Row(modifier = Modifier.height(48.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(spanningCompose).toContain('Row(modifier = Modifier.heightIn(min = 120.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+
+        expect(spanningSwiftui).toContain('.frame(maxWidth: .infinity, height: 48, alignment: .topLeading)');
+        expect(spanningSwiftui).toContain('.frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)');
+    });
+
+    it('maps practical clamped minmax row tracks into native output', () => {
+        styles.addClass('clamped-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'minmax(48px, 96px) minmax(auto, 88px)',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'clamped-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { functionName: 'ClampedRowsGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'clamped-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { structName: 'ClampedRowsGridScreen' },
+        );
+
+        expect(compose).toContain('Row(modifier = Modifier.heightIn(min = 48.dp, max = 96.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(compose).toContain('Row(modifier = Modifier.heightIn(max = 88.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, minHeight: 48, maxHeight: 96, alignment: .topLeading)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, maxHeight: 88, alignment: .topLeading)');
+        expect(swiftui).not.toContain('.frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88, alignment: .topLeading)');
+    });
+
+    it('maps practical implicit fit-content and flexible auto row sizing into native output', () => {
+        styles.addClass('fit-auto-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '40px',
+            gridAutoRows: 'fit-content(56px)',
+            gap: '12px',
+        });
+        styles.addClass('flex-auto-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '40px',
+            gridAutoRows: 'minmax(64px, 1fr)',
+            gap: '12px',
+            height: '240px',
+        });
+
+        const fitCompose = renderAndroidCompose(
+            div(
+                { className: 'fit-auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+            ),
+            { functionName: 'FitAutoRowsGridScreen' },
+        );
+
+        const fitSwiftui = renderSwiftUI(
+            div(
+                { className: 'fit-auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+            ),
+            { structName: 'FitAutoRowsGridScreen' },
+        );
+
+        const flexCompose = renderAndroidCompose(
+            div(
+                { className: 'flex-auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { functionName: 'FlexAutoRowsGridScreen' },
+        );
+
+        const flexSwiftui = renderSwiftUI(
+            div(
+                { className: 'flex-auto-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                div(span('Gamma card')),
+                div(span('Delta card')),
+            ),
+            { structName: 'FlexAutoRowsGridScreen' },
+        );
+
+        expect(fitCompose).toContain('Row(modifier = Modifier.heightIn(max = 56.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(fitSwiftui).toContain('.frame(maxWidth: .infinity, maxHeight: 56, alignment: .topLeading)');
+
+        expect(flexCompose).toContain('Row(modifier = Modifier.weight(1f, fill = true).heightIn(min = 64.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(flexSwiftui).toContain('.frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .topLeading)');
+        expect(flexSwiftui).toContain('.layoutPriority(1)');
+    });
+
+    it('maps practical intrinsic row keywords into native output', () => {
+        styles.addClass('intrinsic-rows-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'min-content max-content',
+            gap: '12px',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'intrinsic-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                input({ value: 'Gamma field' }),
+                input({ value: 'Delta field' }),
+            ),
+            { functionName: 'IntrinsicRowsGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'intrinsic-rows-grid' },
+                div(span('Alpha card')),
+                div(span('Beta card')),
+                input({ value: 'Gamma field' }),
+                input({ value: 'Delta field' }),
+            ),
+            { structName: 'IntrinsicRowsGridScreen' },
+        );
+
+        expect(compose).toContain('Row(modifier = Modifier.height(24.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+        expect(compose).toContain('Row(modifier = Modifier.height(44.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp))');
+
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, height: 24, alignment: .topLeading)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, height: 44, alignment: .topLeading)');
+    });
+
+    it('maps practical grid item alignment props into native output', () => {
+        styles.addClass('aligned-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridAutoRows: '80px',
+            gap: '12px',
+            justifyItems: 'center',
+            alignItems: 'end',
+        });
+        styles.addClass('aligned-card', {
+            width: '72px',
+            height: '24px',
+            background: '#f5f1ea',
+        });
+        styles.addClass('self-aligned-card', {
+            justifySelf: 'end',
+            alignSelf: 'start',
+            width: '60px',
+            height: '24px',
+            background: '#e3f1ff',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'aligned-grid' },
+                div({ className: 'aligned-card' }, span('Centered card')),
+                div({ className: 'self-aligned-card' }, span('Override card')),
+            ),
+            { functionName: 'AlignedGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'aligned-grid' },
+                div({ className: 'aligned-card' }, span('Centered card')),
+                div({ className: 'self-aligned-card' }, span('Override card')),
+            ),
+            { structName: 'AlignedGridScreen' },
+        );
+
+        expect(compose).toContain('height(80.dp)');
+        expect(compose).toContain('contentAlignment = Alignment.BottomCenter');
+        expect(compose).toContain('contentAlignment = Alignment.TopEnd');
+        expect(compose).toContain('width(72.dp).height(24.dp)');
+        expect(compose).toContain('width(60.dp).height(24.dp)');
+
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, height: 80, alignment: .topLeading)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)');
+        expect(swiftui).toContain('.frame(width: 72, height: 24)');
+        expect(swiftui).toContain('.frame(width: 60, height: 24)');
+    });
+
+    it('maps place-items and place-self shorthands into native grid output', () => {
+        styles.addClass('place-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridAutoRows: '96px',
+            gap: '12px',
+            placeItems: 'center',
+        });
+        styles.addClass('place-card', {
+            width: '64px',
+            height: '24px',
+            background: '#fff4e7',
+        });
+        styles.addClass('place-self-card', {
+            placeSelf: 'start end',
+            width: '56px',
+            height: '24px',
+            background: '#f5f1ea',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'place-grid' },
+                div({ className: 'place-card' }, span('Centered shorthand')),
+                div({ className: 'place-self-card' }, span('Self shorthand')),
+            ),
+            { functionName: 'PlaceGridScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'place-grid' },
+                div({ className: 'place-card' }, span('Centered shorthand')),
+                div({ className: 'place-self-card' }, span('Self shorthand')),
+            ),
+            { structName: 'PlaceGridScreen' },
+        );
+
+        expect(compose).toContain('height(96.dp)');
+        expect(compose).toContain('contentAlignment = Alignment.Center');
+        expect(compose).toContain('contentAlignment = Alignment.TopEnd');
+
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, height: 96, alignment: .topLeading)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)');
+        expect(swiftui).toContain('.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)');
+    });
+
+    it('maps practical grid-area shorthand into native output', () => {
+        styles.addClass('area-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateRows: 'auto auto',
+            gap: '12px',
+        });
+        styles.addClass('area-hero', {
+            gridArea: '1 / 2 / 3 / 4',
+            background: '#f5f1ea',
+        });
+        styles.addClass('area-summary', {
+            gridArea: '1 / 1 / 2 / 2',
+            background: '#e3f1ff',
+        });
+        styles.addClass('area-aside', {
+            gridArea: '2 / 1 / 3 / 2',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'area-grid' },
+                div({ className: 'area-aside' }, span('Aside area')),
+                div({ className: 'area-hero' }, span('Hero area')),
+                div({ className: 'area-summary' }, span('Summary area')),
+            ),
+            { functionName: 'GridAreaScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'area-grid' },
+                div({ className: 'area-aside' }, span('Aside area')),
+                div({ className: 'area-hero' }, span('Hero area')),
+                div({ className: 'area-summary' }, span('Summary area')),
+            ),
+            { structName: 'GridAreaScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Summary area")')).toBeLessThan(compose.indexOf('Text(text = "Hero area")'));
+        expect(compose.indexOf('Text(text = "Hero area")')).toBeLessThan(compose.indexOf('Text(text = "Aside area")'));
+        expect(compose).toContain('Modifier.weight(2f).fillMaxWidth()');
+
+        expect(swiftui.indexOf('Text("Summary area")')).toBeLessThan(swiftui.indexOf('Text("Hero area")'));
+        expect(swiftui.indexOf('Text("Hero area")')).toBeLessThan(swiftui.indexOf('Text("Aside area")'));
+        expect(swiftui).toContain('.layoutPriority(2)');
+    });
+
+    it('maps practical align-content and place-content into multi-row native output', () => {
+        styles.addClass('aligned-wrap', {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+            height: '220px',
+            alignContent: 'center',
+        });
+        styles.addClass('distributed-wrap', {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+            height: '220px',
+            alignContent: 'space-between',
+        });
+        styles.addClass('around-wrap', {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+            height: '220px',
+            alignContent: 'space-around',
+        });
+        styles.addClass('placed-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridAutoRows: '40px',
+            gap: '12px',
+            height: '220px',
+            placeContent: 'end',
+        });
+        styles.addClass('evenly-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridAutoRows: '40px',
+            gap: '12px',
+            height: '220px',
+            placeContent: 'space-evenly',
+        });
+        styles.addClass('single-row-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '40px',
+            gap: '12px',
+            height: '220px',
+            placeContent: 'center',
+        });
+
+        const wrapCompose = renderAndroidCompose(
+            div(
+                { className: 'aligned-wrap' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { functionName: 'AlignContentScreen' },
+        );
+
+        const wrapSwiftui = renderSwiftUI(
+            div(
+                { className: 'aligned-wrap' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { structName: 'AlignContentScreen' },
+        );
+
+        const distributedCompose = renderAndroidCompose(
+            div(
+                { className: 'distributed-wrap' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { functionName: 'SpaceBetweenAlignContentScreen' },
+        );
+
+        const distributedSwiftui = renderSwiftUI(
+            div(
+                { className: 'distributed-wrap' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { structName: 'SpaceBetweenAlignContentScreen' },
+        );
+
+        const aroundSwiftui = renderSwiftUI(
+            div(
+                { className: 'around-wrap' },
+                button('Record another validation pass'),
+                button('Open the Elit repository'),
+            ),
+            { structName: 'SpaceAroundAlignContentScreen' },
+        );
+
+        const placeCompose = renderAndroidCompose(
+            div(
+                { className: 'placed-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+                div(span('Gamma')),
+                div(span('Delta')),
+            ),
+            { functionName: 'PlaceContentScreen' },
+        );
+
+        const placeSwiftui = renderSwiftUI(
+            div(
+                { className: 'placed-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+                div(span('Gamma')),
+                div(span('Delta')),
+            ),
+            { structName: 'PlaceContentScreen' },
+        );
+
+        const evenlyCompose = renderAndroidCompose(
+            div(
+                { className: 'evenly-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+                div(span('Gamma')),
+                div(span('Delta')),
+            ),
+            { functionName: 'SpaceEvenlyPlaceContentScreen' },
+        );
+
+        const evenlySwiftui = renderSwiftUI(
+            div(
+                { className: 'evenly-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+                div(span('Gamma')),
+                div(span('Delta')),
+            ),
+            { structName: 'SpaceEvenlyPlaceContentScreen' },
+        );
+
+        const singleRowCompose = renderAndroidCompose(
+            div(
+                { className: 'single-row-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+            ),
+            { functionName: 'SingleRowPlaceContentScreen' },
+        );
+
+        const singleRowSwiftui = renderSwiftUI(
+            div(
+                { className: 'single-row-grid' },
+                div(span('Alpha')),
+                div(span('Beta')),
+            ),
+            { structName: 'SingleRowPlaceContentScreen' },
+        );
+
+        expect(wrapCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically))');
+        expect(wrapSwiftui).toContain('VStack(alignment: .leading, spacing: 0) {');
+        expect((wrapSwiftui.match(/Spacer\(minLength: 0\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect(wrapSwiftui).toContain('Spacer(minLength: 12)');
+
+        expect(distributedCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.SpaceBetween)');
+        expect(distributedSwiftui).toContain('VStack(alignment: .leading, spacing: 0) {');
+        expect(distributedSwiftui).toContain('Spacer(minLength: 12)');
+        expect(distributedSwiftui).not.toContain('Spacer(minLength: 0)');
+
+        expect((aroundSwiftui.match(/Spacer\(minLength: 6\)/g) ?? []).length).toBeGreaterThanOrEqual(4);
+
+        expect(placeCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom))');
+        expect(placeSwiftui).toContain('Spacer(minLength: 0)');
+        expect(placeSwiftui).toContain('.frame(height: 220)');
+
+        expect(evenlyCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.SpaceEvenly)');
+        expect((evenlySwiftui.match(/Spacer\(minLength: 12\)/g) ?? []).length).toBeGreaterThanOrEqual(3);
+        expect(evenlySwiftui).toContain('.frame(height: 220)');
+
+        expect(singleRowCompose).toContain('Column(modifier = Modifier.height(220.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically))');
+        expect(singleRowCompose).toContain('Row(modifier = Modifier.height(40.dp).fillMaxWidth(), horizontalArrangement = Arrangement.Center)');
+
+        expect(singleRowSwiftui).toContain('VStack(alignment: .leading, spacing: 0) {');
+        expect((singleRowSwiftui.match(/Spacer\(minLength: 0\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect(singleRowSwiftui).toContain('HStack(alignment: .top, spacing: 12) {');
+        expect(singleRowSwiftui).toContain('.frame(height: 220)');
+    });
+
+    it('maps practical background-image url layers into native output', () => {
+        styles.addClass('background-panel', {
+            width: '240px',
+            height: '140px',
+            borderRadius: '24px',
+            backgroundImage: 'url("https://elit.dev/hero.png")',
+            backgroundSize: 'contain',
+            backgroundPosition: 'top right',
+            backgroundRepeat: 'repeat',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'background-panel' },
+                span('Background image panel'),
+            ),
+            { functionName: 'BackgroundImageScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'background-panel' },
+                span('Background image panel'),
+            ),
+            { structName: 'BackgroundImageScreen' },
+        );
+
+        expect(compose).toContain('ElitBackgroundImage(source = "https://elit.dev/hero.png", backgroundSize = "contain", backgroundPosition = "top-trailing", backgroundRepeat = "repeat", modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)))');
+        expect(compose).toContain('Column(modifier = Modifier.width(240.dp).height(140.dp))');
+
+        expect(swiftui).toContain('.background(alignment: .topLeading) {');
+        expect(swiftui).toContain('elitBackgroundImageSurface(source: "https://elit.dev/hero.png", backgroundSize: "contain", backgroundPosition: "top-trailing", backgroundRepeat: "repeat")');
+        expect(swiftui).toContain('.clipShape(RoundedRectangle(cornerRadius: 24))');
+    });
+
+    it('maps practical named grid-template-areas into native output', () => {
+        styles.addClass('named-area-grid', {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateAreas: '"summary hero hero" "aside hero hero"',
+            gap: '12px',
+        });
+        styles.addClass('named-area-hero', {
+            gridArea: 'hero',
+            background: '#f5f1ea',
+        });
+        styles.addClass('named-area-summary', {
+            gridArea: 'summary',
+            background: '#e3f1ff',
+        });
+        styles.addClass('named-area-aside', {
+            gridArea: 'aside',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'named-area-grid' },
+                div({ className: 'named-area-aside' }, span('Named aside')),
+                div({ className: 'named-area-hero' }, span('Named hero')),
+                div({ className: 'named-area-summary' }, span('Named summary')),
+            ),
+            { functionName: 'NamedGridAreaScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'named-area-grid' },
+                div({ className: 'named-area-aside' }, span('Named aside')),
+                div({ className: 'named-area-hero' }, span('Named hero')),
+                div({ className: 'named-area-summary' }, span('Named summary')),
+            ),
+            { structName: 'NamedGridAreaScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Named summary")')).toBeLessThan(compose.indexOf('Text(text = "Named hero")'));
+        expect(compose.indexOf('Text(text = "Named hero")')).toBeLessThan(compose.indexOf('Text(text = "Named aside")'));
+        expect(compose).toContain('Modifier.weight(2f).fillMaxWidth()');
+
+        expect(swiftui.indexOf('Text("Named summary")')).toBeLessThan(swiftui.indexOf('Text("Named hero")'));
+        expect(swiftui.indexOf('Text("Named hero")')).toBeLessThan(swiftui.indexOf('Text("Named aside")'));
+        expect(swiftui).toContain('.layoutPriority(2)');
+    });
+
+    it('maps practical named grid lines into native output', () => {
+        styles.addClass('named-line-grid', {
+            display: 'grid',
+            gridTemplateColumns: '[summary-start] 1fr [card-start hero-start] 1fr [hero-mid] 1fr [card-end hero-end]',
+            gridTemplateRows: '[top] auto [middle] auto [bottom]',
+            gap: '12px',
+        });
+        styles.addClass('named-line-hero', {
+            gridColumn: 'card-start / card-end',
+            gridRow: 'top / bottom',
+            background: '#f5f1ea',
+        });
+        styles.addClass('named-line-summary', {
+            gridColumnStart: 'summary-start',
+            gridColumnEnd: 'hero-start',
+            gridRowStart: 'top',
+            gridRowEnd: 'middle',
+            background: '#e3f1ff',
+        });
+        styles.addClass('named-line-aside', {
+            gridColumn: 'summary-start / hero-start',
+            gridRow: 'middle / bottom',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'named-line-grid' },
+                div({ className: 'named-line-aside' }, span('Line aside')),
+                div({ className: 'named-line-hero' }, span('Line hero')),
+                div({ className: 'named-line-summary' }, span('Line summary')),
+            ),
+            { functionName: 'NamedGridLineScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'named-line-grid' },
+                div({ className: 'named-line-aside' }, span('Line aside')),
+                div({ className: 'named-line-hero' }, span('Line hero')),
+                div({ className: 'named-line-summary' }, span('Line summary')),
+            ),
+            { structName: 'NamedGridLineScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Line summary")')).toBeLessThan(compose.indexOf('Text(text = "Line hero")'));
+        expect(compose.indexOf('Text(text = "Line hero")')).toBeLessThan(compose.indexOf('Text(text = "Line aside")'));
+        expect(compose).toContain('Modifier.weight(2f).fillMaxWidth()');
+
+        expect(swiftui.indexOf('Text("Line summary")')).toBeLessThan(swiftui.indexOf('Text("Line hero")'));
+        expect(swiftui.indexOf('Text("Line hero")')).toBeLessThan(swiftui.indexOf('Text("Line aside")'));
+        expect(swiftui).toContain('.layoutPriority(2)');
+    });
+
+    it('maps practical repeated named grid-line ordinals into native output', () => {
+        styles.addClass('repeated-line-grid', {
+            display: 'grid',
+            gridTemplateColumns: '[stack] 1fr [stack] 1fr [stack] 1fr [stack]',
+            gridTemplateRows: '[band] auto [band] auto [band]',
+            gap: '12px',
+        });
+        styles.addClass('repeated-line-hero', {
+            gridColumn: 'stack 2 / 4 stack',
+            gridRow: 'band 1 / 3 band',
+            background: '#f5f1ea',
+        });
+        styles.addClass('repeated-line-summary', {
+            gridColumnStart: '1 stack',
+            gridColumnEnd: 'stack 2',
+            gridRowStart: 'band 1',
+            gridRowEnd: '2 band',
+            background: '#e3f1ff',
+        });
+        styles.addClass('repeated-line-aside', {
+            gridColumn: 'stack 1 / stack 2',
+            gridRow: '2 band / band 3',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'repeated-line-grid' },
+                div({ className: 'repeated-line-aside' }, span('Ordinal aside')),
+                div({ className: 'repeated-line-hero' }, span('Ordinal hero')),
+                div({ className: 'repeated-line-summary' }, span('Ordinal summary')),
+            ),
+            { functionName: 'RepeatedNamedGridLineScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'repeated-line-grid' },
+                div({ className: 'repeated-line-aside' }, span('Ordinal aside')),
+                div({ className: 'repeated-line-hero' }, span('Ordinal hero')),
+                div({ className: 'repeated-line-summary' }, span('Ordinal summary')),
+            ),
+            { structName: 'RepeatedNamedGridLineScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Ordinal summary")')).toBeLessThan(compose.indexOf('Text(text = "Ordinal hero")'));
+        expect(compose.indexOf('Text(text = "Ordinal hero")')).toBeLessThan(compose.indexOf('Text(text = "Ordinal aside")'));
+        expect(compose).toContain('Modifier.weight(2f).fillMaxWidth()');
+
+        expect(swiftui.indexOf('Text("Ordinal summary")')).toBeLessThan(swiftui.indexOf('Text("Ordinal hero")'));
+        expect(swiftui.indexOf('Text("Ordinal hero")')).toBeLessThan(swiftui.indexOf('Text("Ordinal aside")'));
+        expect(swiftui).toContain('.layoutPriority(2)');
+    });
+
+    it('maps practical negative grid line indexes and negative named ordinals into native output', () => {
+        styles.addClass('negative-line-grid', {
+            display: 'grid',
+            gridTemplateColumns: '[slot] 1fr [slot] 1fr [slot] 1fr [slot]',
+            gridTemplateRows: '[band] auto [band] auto [band]',
+            gap: '12px',
+        });
+        styles.addClass('negative-line-hero', {
+            gridColumn: 'slot -3 / slot -1',
+            gridRow: 'band -3 / band -1',
+            background: '#f5f1ea',
+        });
+        styles.addClass('negative-line-summary', {
+            gridColumn: '-4 / -3',
+            gridRow: '1 / -2',
+            background: '#e3f1ff',
+        });
+        styles.addClass('negative-line-aside', {
+            gridColumn: '-4 / -3',
+            gridRow: '-2 / -1',
+            background: '#fff4e7',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'negative-line-grid' },
+                div({ className: 'negative-line-aside' }, span('Negative aside')),
+                div({ className: 'negative-line-hero' }, span('Negative hero')),
+                div({ className: 'negative-line-summary' }, span('Negative summary')),
+            ),
+            { functionName: 'NegativeGridLineScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'negative-line-grid' },
+                div({ className: 'negative-line-aside' }, span('Negative aside')),
+                div({ className: 'negative-line-hero' }, span('Negative hero')),
+                div({ className: 'negative-line-summary' }, span('Negative summary')),
+            ),
+            { structName: 'NegativeGridLineScreen' },
+        );
+
+        expect(compose.indexOf('Text(text = "Negative summary")')).toBeLessThan(compose.indexOf('Text(text = "Negative hero")'));
+        expect(compose.indexOf('Text(text = "Negative hero")')).toBeLessThan(compose.indexOf('Text(text = "Negative aside")'));
+        expect(compose).toContain('Modifier.weight(2f).fillMaxWidth()');
+
+        expect(swiftui.indexOf('Text("Negative summary")')).toBeLessThan(swiftui.indexOf('Text("Negative hero")'));
+        expect(swiftui.indexOf('Text("Negative hero")')).toBeLessThan(swiftui.indexOf('Text("Negative aside")'));
+        expect(swiftui).toContain('.layoutPriority(2)');
+    });
+
+    it('parses practical background shorthand and repeat-x into native output', () => {
+        styles.addClass('background-shorthand-panel', {
+            width: '240px',
+            height: '140px',
+            borderRadius: '24px',
+            background: 'url("https://elit.dev/pattern.png") left bottom / 100% 100% repeat-x',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'background-shorthand-panel' },
+                span('Pattern panel'),
+            ),
+            { functionName: 'BackgroundShorthandScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'background-shorthand-panel' },
+                span('Pattern panel'),
+            ),
+            { structName: 'BackgroundShorthandScreen' },
+        );
+
+        expect(compose).toContain('ElitBackgroundImage(source = "https://elit.dev/pattern.png", backgroundSize = "fill", backgroundPosition = "bottom-leading", backgroundRepeat = "repeat-x", modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)))');
+        expect(compose).toContain('if (repeatMode == "repeat-y") android.graphics.Shader.TileMode.CLAMP else android.graphics.Shader.TileMode.REPEAT');
+        expect(compose).toContain('if (repeatMode == "repeat-x") android.graphics.Shader.TileMode.CLAMP else android.graphics.Shader.TileMode.REPEAT');
+
+        expect(swiftui).toContain('elitBackgroundImageSurface(source: "https://elit.dev/pattern.png", backgroundSize: "fill", backgroundPosition: "bottom-leading", backgroundRepeat: "repeat-x")');
+    });
+
+    it('maps practical multiple background shorthand layers into native output', () => {
+        styles.addClass('background-layer-panel', {
+            width: '240px',
+            height: '140px',
+            borderRadius: '24px',
+            background: 'url("https://elit.dev/overlay.png") top right / contain no-repeat, url("https://elit.dev/base.png") left bottom / auto auto repeat-y',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'background-layer-panel' },
+                span('Layered panel'),
+            ),
+            { functionName: 'BackgroundLayerScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'background-layer-panel' },
+                span('Layered panel'),
+            ),
+            { structName: 'BackgroundLayerScreen' },
+        );
+
+        const composeBaseIndex = compose.indexOf('ElitBackgroundImage(source = "https://elit.dev/base.png", backgroundSize = "none", backgroundPosition = "bottom-leading", backgroundRepeat = "repeat-y", modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)))');
+        const composeOverlayIndex = compose.indexOf('ElitBackgroundImage(source = "https://elit.dev/overlay.png", backgroundSize = "contain", backgroundPosition = "top-trailing", modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)))');
+        expect(compose).toContain('Box {');
+        expect(composeBaseIndex).toBeGreaterThanOrEqual(0);
+        expect(composeOverlayIndex).toBeGreaterThanOrEqual(0);
+        expect(composeBaseIndex).toBeLessThan(composeOverlayIndex);
+
+        expect(swiftui).toContain('.background(alignment: .topLeading) {');
+        expect(swiftui).toContain('ZStack {');
+        const swiftBaseIndex = swiftui.indexOf('elitBackgroundImageSurface(source: "https://elit.dev/base.png", backgroundSize: "none", backgroundPosition: "bottom-leading", backgroundRepeat: "repeat-y")');
+        const swiftOverlayIndex = swiftui.indexOf('elitBackgroundImageSurface(source: "https://elit.dev/overlay.png", backgroundSize: "contain", backgroundPosition: "top-trailing")');
+        expect(swiftBaseIndex).toBeGreaterThanOrEqual(0);
+        expect(swiftOverlayIndex).toBeGreaterThanOrEqual(0);
+        expect(swiftBaseIndex).toBeLessThan(swiftOverlayIndex);
+    });
+
+    it('maps practical mixed gradient, image, and color background layers into native output', () => {
+        styles.addClass('background-mixed-panel', {
+            width: '240px',
+            height: '140px',
+            borderRadius: '24px',
+            background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.12)), url("https://elit.dev/base.png") center / cover no-repeat #102030',
+        });
+
+        const compose = renderAndroidCompose(
+            div(
+                { className: 'background-mixed-panel' },
+                span('Mixed panel'),
+            ),
+            { functionName: 'BackgroundMixedScreen' },
+        );
+
+        const swiftui = renderSwiftUI(
+            div(
+                { className: 'background-mixed-panel' },
+                span('Mixed panel'),
+            ),
+            { structName: 'BackgroundMixedScreen' },
+        );
+
+        const composeColorIndex = compose.indexOf('Box(modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)).background(Color(');
+        const composeImageIndex = compose.indexOf('ElitBackgroundImage(source = "https://elit.dev/base.png", modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)))');
+        const composeGradientIndex = compose.indexOf('Box(modifier = Modifier.matchParentSize().clip(RoundedCornerShape(24.dp)).background(brush = Brush.verticalGradient(');
+        expect(composeColorIndex).toBeGreaterThanOrEqual(0);
+        expect(composeImageIndex).toBeGreaterThanOrEqual(0);
+        expect(composeGradientIndex).toBeGreaterThanOrEqual(0);
+        expect(composeColorIndex).toBeLessThan(composeImageIndex);
+        expect(composeImageIndex).toBeLessThan(composeGradientIndex);
+        expect(compose.match(/Brush\.verticalGradient\(colors = listOf\(/g)?.length ?? 0).toBe(1);
+
+        expect(swiftui).toContain('.background(alignment: .topLeading) {');
+        expect(swiftui).toContain('ZStack {');
+        const swiftColorIndex = swiftui.indexOf('Rectangle().fill(Color(');
+        const swiftImageIndex = swiftui.indexOf('elitBackgroundImageSurface(source: "https://elit.dev/base.png")');
+        const swiftGradientIndex = swiftui.indexOf('Rectangle().fill(LinearGradient(colors: [');
+        expect(swiftColorIndex).toBeGreaterThanOrEqual(0);
+        expect(swiftImageIndex).toBeGreaterThanOrEqual(0);
+        expect(swiftGradientIndex).toBeGreaterThanOrEqual(0);
+        expect(swiftColorIndex).toBeLessThan(swiftImageIndex);
+        expect(swiftImageIndex).toBeLessThan(swiftGradientIndex);
+        expect(swiftui.match(/LinearGradient\(colors: \[/g)?.length ?? 0).toBe(1);
     });
 
     it('wraps flex rows into stacked native rows when content exceeds the mobile viewport', () => {

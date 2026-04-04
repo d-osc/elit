@@ -124,16 +124,22 @@ npx elit native generate ir ./src/native-screen.ts --platform android --export s
 
 The entry module should export a VNode tree or a zero-argument function that returns one. By default the CLI auto-detects `default`, `screen`, `app`, `view`, and `root` exports.
 
-For the current native CSS subset, supported style mapping, and parity backlog, see [docs/native-css-support.md](docs/native-css-support.md).
+For the current native CSS subset, supported style mapping, and parity backlog, see [docs/native-css-support.md](docs/native-css-support.md). For element and factory coverage across `elit/el`, see [docs/native-element-support.md](docs/native-element-support.md).
 
 Current scope:
 
 - Reuses existing Elit element syntax and VNode output.
 - Maps common tags into generic native components such as `View`, `Text`, `Button`, `Image`, and `TextInput`.
-- Maps checkbox inputs into native toggle controls and turns absolute `href` links into native URL-opening actions.
+- Maps checkbox inputs into native toggle controls and turns absolute `href` links into native URL-opening or download actions.
+- Maps a practical control-attribute subset too: disabled button/input/select states, read-only text inputs, initial text-input focus, native keyboard or secure-entry handling for common text input types such as `password`, `email`, `number`, `tel`, and `url`, practical text-input constraint validation (`min` / `max` / `step` / `minLength` / `maxLength` / `pattern`), link target/rel/download hints, required single-select empty placeholders, and both static and bound-array native `select[multiple]` checklist flows.
 - Produces serializable IR suitable for future Android/iOS code generators.
 - Can generate Jetpack Compose code for a practical subset of shared mobile UI.
 - Can generate SwiftUI code for the same practical subset.
+- Can render a practical SVG vector subset in native output, including `circle`, `rect`, `path`, `line`, `polyline`, `polygon`, and `ellipse` under supported `svg` roots.
+- Can parse practical SVG path data beyond straight segments, including `C`, `Q`, `S`, `T`, and `A` commands, and approximate them into native curve output.
+- Can render first-pass native WebView and audio/video surfaces when `iframe`/`object`/`embed`/`portal` or `audio`/`video` nodes provide a usable source, including practical accessibility labels, media `muted` handling, and a platform-approximated `controls` / `poster` / `playsinline` video subset, while source-less or unsupported cases stay explicit placeholders.
+- Can map a practical accessibility subset too: explicit `role`, `aria-label`, `aria-description`, and selected/checked/disabled/required/expanded/value-text states now feed generated Compose and SwiftUI accessibility output.
+- Can render a first-pass native `canvas` surface with browser-like intrinsic sizing (`300x150` by default, or explicit `width`/`height` attrs when provided), and it now accepts serializable declarative `drawOps` for shape and path drawing. Browser Canvas 2D and WebGL imperative APIs remain outside the translated surface.
 - Resolves a practical native CSS subset for typography, spacing, gradients, shadows, flex and simple grid layouts, `currentColor`, named colors, and per-side solid, dashed, and dotted borders.
 - Supports native selector matching for tag, class, id, and attribute selectors; sibling combinators; child and type position pseudo-classes; and practical `:not(...)` and `:has(...)` subsets.
 - Can be wired into `elit mobile sync|build|run` through `mobile.native.entry` so generated files land in the mobile scaffold automatically.

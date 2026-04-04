@@ -37,6 +37,20 @@ function isPrimitiveJson(json: any): json is string | number | boolean | null | 
     return json == null || typeof json === 'boolean' || typeof json === 'string' || typeof json === 'number';
 }
 
+function normalizeFormControlValue(value: unknown): string {
+    if (Array.isArray(value)) {
+        return value.map((entry) => String(entry)).join(',');
+    }
+
+    return value == null ? '' : String(value);
+}
+
+function resolveTextareaValue(tagName: string, props: Props): string | undefined {
+    return tagName === 'textarea' && props.value != null
+        ? normalizeFormControlValue(props.value)
+        : undefined;
+}
+
 export class DomNode {
     private elementCache = new WeakMap<Element, boolean>();
 
@@ -72,6 +86,7 @@ export class DomNode {
 
         // Handle VNode
         const { tagName, props, children } = vNode;
+        const textareaValue = resolveTextareaValue(tagName, props);
 
         // Handle fragment (empty tagName) - render children directly to parent
         if (!tagName) {
@@ -132,20 +147,27 @@ export class DomNode {
                     typeof value === 'function' ? value(el as HTMLElement) : (value.current = el as HTMLElement);
                 }, 0);
             }
+            else if (textareaValue !== undefined && key === 'value') {
+                continue;
+            }
             else {
                 el.setAttribute(key, value === true ? '' : String(value));
             }
         }
 
-        const len = children.length;
+        const renderableChildren = textareaValue === undefined ? children : [];
+        const len = renderableChildren.length;
         if (!len) {
+            if (textareaValue !== undefined) {
+                (el as HTMLTextAreaElement).value = textareaValue;
+            }
             parent.appendChild(el);
             return;
         }
 
         const renderChildren = (target: HTMLElement | SVGElement | DocumentFragment) => {
             for (let i = 0; i < len; i++) {
-                const child = children[i];
+                const child = renderableChildren[i];
                 if (shouldSkipChild(child)) continue;
 
                 if (Array.isArray(child)) {
@@ -449,11 +471,12 @@ export class DomNode {
         }
 
         const { tagName, props, children } = resolvedVNode;
+        const textareaValue = resolveTextareaValue(tagName, props);
         const isSelfClosing = this.isSelfClosingTag(tagName);
 
         let html = `${indentStr}<${tagName}`;
 
-        const attrs = this.propsToAttributes(props);
+        const attrs = this.propsToAttributes(props, tagName);
         if (attrs) {
             html += ` ${attrs}`;
         }
@@ -464,6 +487,12 @@ export class DomNode {
         }
 
         html += '>';
+
+        if (textareaValue !== undefined) {
+            html += this.escapeHtml(textareaValue);
+            html += `</${tagName}>${newLine}`;
+            return html;
+        }
 
         if (props.dangerouslySetInnerHTML) {
             html += props.dangerouslySetInnerHTML.__html;
@@ -585,11 +614,11 @@ export class DomNode {
         return selfClosingTags.has(tagName.toLowerCase());
     }
 
-    private propsToAttributes(props: Props): string {
+    private propsToAttributes(props: Props, tagName?: string): string {
         const attrs: string[] = [];
 
         for (const key in props) {
-            if (key === 'children' || key === 'dangerouslySetInnerHTML' || key === 'ref') {
+            if (key === 'children' || key === 'dangerouslySetInnerHTML' || key === 'ref' || (tagName === 'textarea' && key === 'value')) {
                 continue;
             }
 

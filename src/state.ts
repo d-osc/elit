@@ -72,12 +72,17 @@ export const debounce = <T extends any[]>(fn: (...args: T) => void, delay: numbe
     };
 };
 
-export function bindValue<T extends string | number>(state: State<T>): Props {
+export function bindValue<T extends string | number | string[]>(state: State<T>): Props {
     const props = {
         value: state.value,
         onInput: (event: Event) => {
             const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
             if (!target) {
+                return;
+            }
+
+            if (target instanceof HTMLSelectElement && target.multiple) {
+                state.value = Array.from(target.selectedOptions).map((option) => option.value) as T;
                 return;
             }
 

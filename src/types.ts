@@ -22,7 +22,7 @@ export interface Props {
     onChange?: (event: Event) => void;
     onInput?: (event: Event) => void;
     onSubmit?: (event: Event) => void;
-    value?: string | number;
+    value?: string | number | string[];
     checked?: boolean;
 }
 

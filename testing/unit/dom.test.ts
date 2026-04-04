@@ -1,7 +1,7 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
-import { a, div } from '../../src/el';
-import { render } from '../../src/dom';
+import { a, div, textarea } from '../../src/el';
+import { render, renderToString } from '../../src/dom';
 import { createState } from '../../src/state';
 
 class FakeTextNode {
@@ -23,6 +23,7 @@ class FakeElement {
     className = '';
     namespaceURI?: string;
     style: Record<string, string> & { cssText?: string } = {};
+    value = '';
 
     private html = '';
 
@@ -105,6 +106,20 @@ describe('dom renderer props', () => {
         expect(ref.current?.tagName).toBe('a');
     });
 
+    it('sets textarea value through the DOM property', () => {
+        const root = new FakeElement('root');
+
+        render(root as any, div(
+            textarea({ value: 'Preset message' }),
+        ));
+
+        const wrapper = root.children[0] as FakeElement;
+        const field = wrapper.children[0] as FakeElement;
+        expect(field.value).toBe('Preset message');
+        expect(field.getAttribute('value')).toBeNull();
+        expect(field.children).toHaveLength(0);
+    });
+
     it('renders State children as live text nodes', () => {
         const root = new FakeElement('root');
         const label = createState('initial');
@@ -117,5 +132,9 @@ describe('dom renderer props', () => {
 
         label.value = 'updated';
         expect(textNode.textContent).toBe('updated');
+    });
+
+    it('renders textarea values as text content in SSR output', () => {
+        expect(renderToString(textarea({ value: 'Preset message' }))).toBe('<textarea>Preset message</textarea>');
     });
 });
