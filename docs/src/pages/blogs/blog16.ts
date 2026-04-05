@@ -53,7 +53,7 @@ export const blog16: BlogPostDetail = {
       pre(code(...codeBlock(`const { createDevServer, ServerRouter, cors, logger } = require('elit/server');
 
 // Create API router
-    const api = new ServerRouter();
+const api = new ServerRouter();
 api.use(cors());
 api.use(logger());
 
@@ -621,7 +621,7 @@ console.log('WebSocket status:', posts.isConnected());`))),
       pre(code(...codeBlock(`const { createDevServer, ServerRouter, cors, logger } = require('elit/server');
 
 // สร้าง API router
-    const api = new ServerRouter();
+const api = new ServerRouter();
 api.use(cors());
 api.use(logger());
 
