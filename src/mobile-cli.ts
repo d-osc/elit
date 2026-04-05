@@ -8,7 +8,7 @@ import {
     statSync,
     writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, normalize, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { ELIT_CONFIG_FILES, loadConfig, type MobileConfig, type MobileMode, type MobileNativeConfig } from './config';
@@ -994,12 +994,45 @@ function upsertXmlAttribute(tag: string, name: string, value: string): string {
     return `${tag.slice(0, -1)} ${name}='${value}'>`;
 }
 
-function runCommand(command: string, args: string[], cwd: string): void {
-    const result = spawnSync(command, args, {
+// Characters that cmd.exe interprets specially, adapted from the cross-spawn
+// escaping algorithm (MIT): https://github.com/nicolo-ribaudo/cross-spawn
+const WIN_CMD_META = /([()%!^"\`<>&|;, *?])/g;
+
+function escapeWindowsShellArg(value: string): string {
+    // Properly escape embedded quotes and trailing backslashes so the
+    // argument survives cmd.exe's tokenization, then protect every
+    // cmd metacharacter so it cannot change the meaning of the command.
+    const quoted = `"${value
+        .replace(/(\\*)"/, '$1$1\\"')
+        .replace(/(\\*)$/, '$1$1')}"`;
+    return quoted.replace(WIN_CMD_META, '^$1');
+}
+
+function spawnWin32Safe(
+    command: string,
+    args: string[],
+    cwd: string,
+    stdio: 'inherit' | 'pipe',
+): ReturnType<typeof spawnSync> {
+    // Build a fully escaped command line and invoke cmd.exe directly so that
+    // environment-derived path components (GRADLE_HOME, ANDROID_HOME, …)
+    // cannot inject shell commands through metacharacters.
+    const safeCommand = normalize(command).replace(WIN_CMD_META, '^$1');
+    const safeArgs = args.map(escapeWindowsShellArg);
+    const commandLine = `"${[safeCommand, ...safeArgs].join(' ')}"`;
+    const comSpec = process.env.ComSpec || 'cmd.exe';
+    return spawnSync(comSpec, ['/d', '/s', '/c', commandLine], {
         cwd,
-        stdio: 'inherit',
-        shell: process.platform === 'win32' && command !== 'gradlew.bat',
+        stdio,
+        shell: false,
+        windowsVerbatimArguments: true,
     });
+}
+
+function runCommand(command: string, args: string[], cwd: string): void {
+    const result = process.platform === 'win32'
+        ? spawnWin32Safe(command, args, cwd, 'inherit')
+        : spawnSync(command, args, { cwd, stdio: 'inherit', shell: false });
 
     if (typeof result.status === 'number' && result.status !== 0) {
         process.exit(result.status);
