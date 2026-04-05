@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.7] - 2026-04-05
+
 ### Added
 - **Desktop mode split** - Desktop config and CLI now support `hybrid` and `native` modes similar to mobile
   - Added `desktop.mode` plus `desktop.native.entry` config support
@@ -20,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Projects with `desktop.native.entry` default to native desktop mode
   - `--mode native|hybrid` now works for `elit desktop run` and `elit desktop build`
   - Native desktop mode falls back to legacy `desktop.entry` when needed for backward compatibility
+
+### Fixed
+- **Strict TypeScript typecheck compatibility** - The desktop/native toolchain now passes `tsc --noEmit` cleanly on the current TypeScript toolchain
+  - Updated TypeScript module resolution config for modern ESM/bundler behavior
+  - Cleaned up stale native desktop helper typings left behind by the renderer refactor
+  - Aligned desktop auto-render `createWindow()` typing with the shared desktop `WindowOptions` contract
 
 ## [3.4.6] - 2026-04-04
 
