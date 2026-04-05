@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.8] - 2026-04-06
+
+### Changed
+- **Native renderer modularization** - Split the shared native rendering pipeline into focused modules while keeping the public `elit/native` API unchanged
+  - Compose, SwiftUI, IR generation, and native desktop mode still share the same native tree and resolved-style foundation
+  - Native layout, typography, interaction, background, estimation, and render-support logic now live in smaller helper modules, making parity fixes safer to land across outputs
+
+### Documentation
+- **Native foundation README refresh** - Updated the main README to clarify that `elit/native` and native desktop mode build on the same shared native rendering foundation
+
 ## [3.4.7] - 2026-04-05
 
 ### Added

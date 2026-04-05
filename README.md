@@ -74,6 +74,8 @@ Advanced subpaths also exist for lower-level adapters and internals: `elit/http`
 
 Elit now includes a practical native-generation foundation that keeps the existing element syntax and can emit a serializable native tree, Jetpack Compose, and SwiftUI from the same source tree. It is still a CSS-subset renderer rather than a browser-complete Android/iOS engine, but it is already useful for shared mobile UI scaffolds, parity checks, and generated native screens.
 
+That same foundation also feeds native desktop mode: Elit resolves one shared native tree and style/layout model, then emits IR, Compose, SwiftUI, or native desktop output from it. Public `elit/native` APIs stay the same while parity fixes and native CSS-subset improvements can land across outputs together.
+
 ```ts
 import { a, button, div, h1, img, input } from 'elit/el';
 import { renderNativeTree } from 'elit/native';
