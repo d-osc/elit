@@ -155,6 +155,8 @@ export class CreateStyle {
     private supportsRules: SupportsRule[] = [];
     private layerRules: LayerRule[] = [];
     private _layerOrder: string[] = [];
+    private parsedSelectorChainCache = new Map<string, ParsedSimpleSelector[][]>();
+    private nativeTargetNormalizationCache?: WeakMap<StyleSelectorTarget, StyleSelectorTarget>;
 
     constructor(store?: CreateStyleStore) {
         if (!store) {
@@ -478,18 +480,42 @@ export class CreateStyle {
     }
 
     private normalizeTarget(target: StyleSelectorTarget): StyleSelectorTarget {
-        return {
+        const cached = this.nativeTargetNormalizationCache?.get(target);
+        if (cached) {
+            return cached;
+        }
+
+        const normalized: StyleSelectorTarget = {
             ...this.normalizeTargetIdentity(target),
-            previousSiblings: Array.isArray(target.previousSiblings)
-                ? target.previousSiblings.map((sibling) => this.normalizeTarget(sibling))
-                : [],
-            nextSiblings: Array.isArray(target.nextSiblings)
-                ? target.nextSiblings.map((sibling) => this.normalizeTarget(sibling))
-                : [],
-            children: Array.isArray(target.children)
-                ? target.children.map((child) => this.normalizeTarget(child))
-                : [],
+            previousSiblings: [],
+            nextSiblings: [],
+            children: [],
         };
+
+        this.nativeTargetNormalizationCache?.set(target, normalized);
+
+        normalized.previousSiblings = Array.isArray(target.previousSiblings)
+            ? target.previousSiblings.map((sibling) => this.normalizeTarget(sibling))
+            : [];
+        normalized.nextSiblings = Array.isArray(target.nextSiblings)
+            ? target.nextSiblings.map((sibling) => this.normalizeTarget(sibling))
+            : [];
+        normalized.children = Array.isArray(target.children)
+            ? target.children.map((child) => this.normalizeTarget(child))
+            : [];
+
+        return normalized;
+    }
+
+    private withNativeTargetNormalizationCache<T>(callback: () => T): T {
+        const previousCache = this.nativeTargetNormalizationCache;
+        this.nativeTargetNormalizationCache = new WeakMap();
+
+        try {
+            return callback();
+        } finally {
+            this.nativeTargetNormalizationCache = previousCache;
+        }
     }
 
     private splitConditionalClauses(value: string, operator: 'and' | 'or'): string[] {
@@ -916,7 +942,12 @@ export class CreateStyle {
     }
 
     private extractSupportedSelectorChains(selector: string): ParsedSimpleSelector[][] {
-        return this.splitSelectorList(selector)
+        const cached = this.parsedSelectorChainCache.get(selector);
+        if (cached) {
+            return cached;
+        }
+
+        const parsedChains = this.splitSelectorList(selector)
             .map((segment) => segment.trim())
             .map((segment) => {
                 const chain: ParsedSimpleSelector[] = [];
@@ -1019,6 +1050,9 @@ export class CreateStyle {
                     : undefined;
             })
             .filter((segment): segment is ParsedSimpleSelector[] => Array.isArray(segment) && segment.length > 0);
+
+            this.parsedSelectorChainCache.set(selector, parsedChains);
+            return parsedChains;
     }
 
     private matchesAttributeSelector(targetValue: string | undefined, selector: ParsedAttributeSelector): boolean {
@@ -1462,65 +1496,67 @@ export class CreateStyle {
         ancestors: StyleSelectorTarget[] = [],
         options: NativeStyleResolveOptions = {},
     ): Record<string, string | number> {
-        const normalizedTarget = this.normalizeTarget(target);
-        if (!normalizedTarget.tagName && (!normalizedTarget.classNames || normalizedTarget.classNames.length === 0)) {
-            return {};
-        }
-
-        const normalizedAncestors = ancestors.map((ancestor) => this.normalizeTarget(ancestor));
-        const variables = this.getVariables();
-        const resolved: Record<string, string | number> = {};
-
-        const applyRules = (rules: CSSRule[]): void => {
-            for (const rule of rules) {
-                const selectorChains = this.extractSupportedSelectorChains(rule.selector);
-                if (selectorChains.length === 0) {
-                    continue;
-                }
-
-                const matches = selectorChains.some((selectorChain) => this.matchesSelectorChain(normalizedTarget, normalizedAncestors, selectorChain));
-                if (!matches) {
-                    continue;
-                }
-
-                for (const [property, value] of Object.entries(rule.styles)) {
-                    resolved[property] = typeof value === 'string'
-                        ? this.resolveVariableReferences(value, variables)
-                        : value;
-                }
+        return this.withNativeTargetNormalizationCache(() => {
+            const normalizedTarget = this.normalizeTarget(target);
+            if (!normalizedTarget.tagName && (!normalizedTarget.classNames || normalizedTarget.classNames.length === 0)) {
+                return {};
             }
-        };
 
-        for (const layerName of this.getOrderedLayerNames()) {
-            for (const layerRule of this.layerRules) {
-                if (layerRule.name.trim() === layerName) {
-                    applyRules(layerRule.rules);
+            const normalizedAncestors = ancestors.map((ancestor) => this.normalizeTarget(ancestor));
+            const variables = this.getVariables();
+            const resolved: Record<string, string | number> = {};
+
+            const applyRules = (rules: CSSRule[]): void => {
+                for (const rule of rules) {
+                    const selectorChains = this.extractSupportedSelectorChains(rule.selector);
+                    if (selectorChains.length === 0) {
+                        continue;
+                    }
+
+                    const matches = selectorChains.some((selectorChain) => this.matchesSelectorChain(normalizedTarget, normalizedAncestors, selectorChain));
+                    if (!matches) {
+                        continue;
+                    }
+
+                    for (const [property, value] of Object.entries(rule.styles)) {
+                        resolved[property] = typeof value === 'string'
+                            ? this.resolveVariableReferences(value, variables)
+                            : value;
+                    }
                 }
             }
-        }
 
-        applyRules(this.rules);
-
-        for (const supportsRule of this.supportsRules) {
-            if (this.matchesSupportsCondition(supportsRule.condition)) {
-                applyRules(supportsRule.rules);
+            for (const layerName of this.getOrderedLayerNames()) {
+                for (const layerRule of this.layerRules) {
+                    if (layerRule.name.trim() === layerName) {
+                        applyRules(layerRule.rules);
+                    }
+                }
             }
-        }
 
-        for (const containerRule of this.containerRules) {
-            const matchingContainer = this.findMatchingContainerTarget(normalizedAncestors, containerRule.name);
-            if (matchingContainer && this.matchesContainerCondition(containerRule.condition, matchingContainer.containerWidth!)) {
-                applyRules(containerRule.rules);
+            applyRules(this.rules);
+
+            for (const supportsRule of this.supportsRules) {
+                if (this.matchesSupportsCondition(supportsRule.condition)) {
+                    applyRules(supportsRule.rules);
+                }
             }
-        }
 
-        for (const mediaRule of this.mediaRules) {
-            if (this.matchesMediaRule(mediaRule, options)) {
-                applyRules(mediaRule.rules);
+            for (const containerRule of this.containerRules) {
+                const matchingContainer = this.findMatchingContainerTarget(normalizedAncestors, containerRule.name);
+                if (matchingContainer && this.matchesContainerCondition(containerRule.condition, matchingContainer.containerWidth!)) {
+                    applyRules(containerRule.rules);
+                }
             }
-        }
 
-        return resolved;
+            for (const mediaRule of this.mediaRules) {
+                if (this.matchesMediaRule(mediaRule, options)) {
+                    applyRules(mediaRule.rules);
+                }
+            }
+
+            return resolved;
+        });
     }
 
     resolveClassStyles(classNames: string[]): Record<string, string | number> {

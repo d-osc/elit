@@ -9,13 +9,22 @@ import { loadConfig } from './config';
 import { renderAndroidCompose, renderNativeJson, renderSwiftUI, type NativePlatform } from './native';
 import {
     clearCapturedRenderedVNode,
+    clearDesktopRenderOptions,
+    getDesktopRenderOptions,
     getCapturedRenderedVNode,
     restoreRenderRuntimeTarget,
     setRenderRuntimeTarget,
+    type DesktopRenderOptions,
 } from './render-context';
 import type { Child } from './types';
 
 type NativeTarget = 'android' | 'ios' | 'ir';
+export type NativeEntryRuntimeTarget = 'mobile' | 'desktop';
+
+export interface LoadedNativeEntryResult {
+    entry: Child;
+    desktopRenderOptions?: DesktopRenderOptions;
+}
 
 export interface NativeEntryRenderOptions {
     entryPath: string;
@@ -254,15 +263,30 @@ export async function generateNativeEntryOutput(options: NativeEntryRenderOption
 }
 
 export async function loadNativeEntryValue(entryPath: string, exportName?: string): Promise<Child> {
+    const result = await loadNativeEntryResult(entryPath, exportName);
+    return result.entry;
+}
+
+export async function loadNativeEntryResult(
+    entryPath: string,
+    exportName?: string,
+    runtimeTarget: NativeEntryRuntimeTarget = 'mobile',
+): Promise<LoadedNativeEntryResult> {
     const tempFile = await compileNativeEntry(entryPath);
-    const previousTarget = setRenderRuntimeTarget('mobile');
+    const previousTarget = setRenderRuntimeTarget(runtimeTarget);
     clearCapturedRenderedVNode();
+    clearDesktopRenderOptions();
 
     try {
         const moduleRecord = await import(pathToFileURL(tempFile).href) as Record<string, unknown>;
-        return await resolveNativeEntryExport(moduleRecord, exportName);
+        const entry = await resolveNativeEntryExport(moduleRecord, exportName);
+        return {
+            entry,
+            ...(runtimeTarget === 'desktop' ? { desktopRenderOptions: getDesktopRenderOptions() } : {}),
+        };
     } finally {
         restoreRenderRuntimeTarget(previousTarget);
+        clearDesktopRenderOptions();
         safeCleanup(tempFile);
     }
 }

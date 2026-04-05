@@ -1,7 +1,7 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
 import { a, audio, br, button, canvas, div, frag, h1, h2, head, hr, iframe, img, input, li, main, mathMath, mathMi, meta, option, optgroup, p, progress, select, slot, span, svgCircle, svgEllipse, svgLine, svgPath, svgPolygon, svgPolyline, svgRect, svgSvg, table, tbody, td, template, textarea, tr, ul, video } from '../../src/el';
-import { renderAndroidCompose, renderNativeJson, renderNativeTree, renderSwiftUI } from '../../src/native';
+import { renderAndroidCompose, renderMaterializedNativeTree, renderNativeJson, renderNativeTree, renderSwiftUI } from '../../src/native';
 import { bindChecked, bindValue, createState } from '../../src/state';
 import styles from '../../src/style';
 import { createUniversalBridgeProps, createUniversalLinkProps, mergeUniversalProps } from '../../src/universal';
@@ -1448,6 +1448,72 @@ describe('native target foundation', () => {
         expect(swiftui).toContain('.simultaneousGesture(DragGesture(minimumDistance: 0).updating($interactionPressed1) { _, state, _ in');
         expect(swiftui).toContain('.background(Color(red: 0.961, green: 0.945, blue: 0.918, opacity: 1))');
         expect(swiftui).toContain('.underline()');
+    });
+
+    it('materializes desktop runtime pseudo-style variants for generic output', () => {
+        styles.addClass('desktop-runtime-stack', {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+        });
+        styles.child('.desktop-runtime-stack', 'button:hover', {
+            backgroundColor: '#f5f1ea',
+        });
+        styles.child('.desktop-runtime-stack', 'button:active', {
+            backgroundColor: '#eadfd2',
+            borderColor: '#d56e43',
+        });
+        styles.child('.desktop-runtime-stack', 'a:focus-visible', {
+            color: '#d56e43',
+            textDecoration: 'underline',
+        });
+
+        const tree = renderMaterializedNativeTree(
+            div(
+                { className: 'desktop-runtime-stack' },
+                button('Save draft'),
+                a({ href: 'https://elit.dev/docs' }, 'Docs'),
+            ),
+            { platform: 'generic' },
+        );
+
+        const [root] = tree.roots;
+        expect(root.kind).toBe('element');
+        if (root.kind !== 'element') {
+            throw new Error('Expected root element node');
+        }
+
+        const buttonNode = root.children[0];
+        const linkNode = root.children[1];
+
+        expect(buttonNode).toMatchObject({
+            kind: 'element',
+            component: 'Button',
+            props: {
+                desktopStyleVariants: {
+                    hover: {
+                        backgroundColor: '#f5f1ea',
+                    },
+                    active: {
+                        backgroundColor: '#eadfd2',
+                        borderColor: '#d56e43',
+                    },
+                },
+            },
+        });
+
+        expect(linkNode).toMatchObject({
+            kind: 'element',
+            component: 'Link',
+            props: {
+                desktopStyleVariants: {
+                    focus: {
+                        color: '#d56e43',
+                        textDecoration: 'underline',
+                    },
+                },
+            },
+        });
     });
 
     it('maps practical role and aria accessibility semantics into native output', () => {

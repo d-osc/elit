@@ -2869,14 +2869,20 @@ function toNativeNodes(
         delete props.type;
     }
 
-    return [{
+        const nativeNode: NativeElementNode = {
         kind: 'element',
         component: resolvedComponent,
         sourceTag: child.tagName,
         props,
         events,
         children: childNodes,
-    }];
+        };
+
+        if (options.platform === 'generic') {
+            attachDesktopNativeMetadata(nativeNode);
+        }
+
+        return [nativeNode];
 }
 
 export function renderNativeTree(input: Child, options: NativeTransformOptions = {}): NativeTree {
@@ -2897,6 +2903,132 @@ export function renderNativeTree(input: Child, options: NativeTransformOptions =
 
 export function renderNativeJson(input: Child, options: NativeTransformOptions = {}): string {
     return JSON.stringify(renderNativeTree(input, options), null, 2);
+}
+
+const DESKTOP_RUNTIME_PSEUDO_VARIANTS: ReadonlyArray<readonly [string, string[]]> = [
+    ['enabled', ['enabled']],
+    ['readWrite', ['read-write']],
+    ['readOnly', ['read-only']],
+    ['placeholderShown', ['placeholder-shown']],
+    ['valid', ['valid']],
+    ['invalid', ['invalid']],
+    ['checked', ['checked']],
+    ['selected', ['selected']],
+    ['hover', ['hover']],
+    ['focusWithin', ['focus-within']],
+    ['focus', ['focus', 'focus-visible']],
+    ['active', ['active']],
+    ['disabled', ['disabled']],
+];
+
+function isNativePropObject(value: NativePropValue | undefined): value is NativePropObject {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nativePropValuesEqual(left: NativePropValue | undefined, right: NativePropValue | undefined): boolean {
+    if (left === right) {
+        return true;
+    }
+
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+            return false;
+        }
+
+        return left.every((value, index) => nativePropValuesEqual(value, right[index]));
+    }
+
+    if (isNativePropObject(left) && isNativePropObject(right)) {
+        const leftKeys = Object.keys(left);
+        const rightKeys = Object.keys(right);
+        if (leftKeys.length !== rightKeys.length) {
+            return false;
+        }
+
+        return leftKeys.every((key) => nativePropValuesEqual(left[key], right[key]));
+    }
+
+    return false;
+}
+
+function diffNativeStyleVariant(
+    baseStyle: Record<string, NativePropValue> | undefined,
+    variantStyle: Record<string, NativePropValue> | undefined,
+): NativePropObject | undefined {
+    if (!variantStyle) {
+        return undefined;
+    }
+
+    const diff: NativePropObject = {};
+    for (const [key, value] of Object.entries(variantStyle)) {
+        if (!nativePropValuesEqual(baseStyle?.[key], value)) {
+            diff[key] = value;
+        }
+    }
+
+    return Object.keys(diff).length > 0 ? diff : undefined;
+}
+
+function buildDesktopNativeStyleVariants(
+    node: NativeElementNode,
+    baseStyle: Record<string, NativePropValue> | undefined,
+    styleContexts: NativeStyleContextMap,
+    styleResolveOptions: NativeStyleResolveOptions,
+): NativePropObject | undefined {
+    const variants: NativePropObject = {};
+
+    for (const [variantName, pseudoStates] of DESKTOP_RUNTIME_PSEUDO_VARIANTS) {
+        const resolvedVariant = resolveNativePseudoStateVariantStyle(node, styleContexts, styleResolveOptions, [...pseudoStates]);
+        const diff = diffNativeStyleVariant(baseStyle, resolvedVariant);
+        if (diff) {
+            variants[variantName] = diff;
+        }
+    }
+
+    return Object.keys(variants).length > 0 ? variants : undefined;
+}
+
+function cloneNativeNodeWithMaterializedStyle(
+    node: NativeNode,
+    resolvedStyles: NativeResolvedStyleMap,
+    styleContexts: NativeStyleContextMap,
+    styleResolveOptions: NativeStyleResolveOptions,
+    platform: NativePlatform,
+): NativeNode {
+    if (node.kind === 'text') {
+        return { ...node };
+    }
+
+    const resolvedStyle = resolvedStyles.get(node);
+    const desktopStyleVariants = platform === 'generic'
+        ? buildDesktopNativeStyleVariants(node, resolvedStyle, styleContexts, styleResolveOptions)
+        : undefined;
+    return {
+        ...node,
+        props: {
+            ...node.props,
+            ...(resolvedStyle ? { style: resolvedStyle } : {}),
+            ...(desktopStyleVariants ? { desktopStyleVariants } : {}),
+        },
+        children: node.children.map((child) => cloneNativeNodeWithMaterializedStyle(child, resolvedStyles, styleContexts, styleResolveOptions, platform)),
+    };
+}
+
+export function materializeNativeTree(tree: NativeTree, styleResolveOptions = getNativeStyleResolveOptions(tree.platform)): NativeTree {
+    const { resolvedStyles, styleContexts } = buildRootResolvedStyleData(tree.roots, styleResolveOptions);
+
+    return {
+        ...tree,
+        roots: tree.roots.map((node) => cloneNativeNodeWithMaterializedStyle(node, resolvedStyles, styleContexts, styleResolveOptions, tree.platform)),
+    };
+}
+
+export function renderMaterializedNativeTree(input: Child, options: NativeTransformOptions = {}): NativeTree {
+    return materializeNativeTree(renderNativeTree(input, options));
+}
+
+export function renderMaterializedNativeJson(input: Child, options: NativeTransformOptions = {}): string {
+    return JSON.stringify(renderMaterializedNativeTree(input, options), null, 2);
 }
 
 function indent(level: number): string {
@@ -5598,6 +5730,21 @@ function buildNativeCanvasDrawingSpec(node: NativeElementNode): NativeVectorSpec
         intrinsicWidth: canvasSpec.intrinsicWidth,
         intrinsicHeight: canvasSpec.intrinsicHeight,
     };
+}
+
+function attachDesktopNativeMetadata(node: NativeElementNode): void {
+    if (node.component === 'Vector' && node.sourceTag === 'svg') {
+        const vectorSpec = buildNativeVectorSpec(node);
+        if (vectorSpec) {
+            node.props.desktopVectorSpec = vectorSpec as unknown as NativePropObject;
+        }
+        return;
+    }
+
+    if (node.component === 'Canvas') {
+        const canvasSpec = buildNativeCanvasDrawingSpec(node) ?? buildNativeCanvasSpec(node);
+        node.props.desktopCanvasSpec = canvasSpec as unknown as NativePropObject;
+    }
 }
 
 function applyComposeTextTransformExpression(expression: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | undefined): string {

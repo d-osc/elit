@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Desktop mode split** - Desktop config and CLI now support `hybrid` and `native` modes similar to mobile
+  - Added `desktop.mode` plus `desktop.native.entry` config support
+  - Added `elit desktop run` as an explicit run alias beside the shorthand `elit desktop`
+- **True native desktop backend** - Native desktop mode now builds and runs a dedicated desktop renderer instead of only resolving a different entry
+  - Added a separate `elit-desktop-native` Rust binary for native desktop run/build
+  - Native desktop mode now materializes Elit native IR and renders it through the dedicated native desktop runtime
+
+### Changed
+- **Desktop native entry resolution** - Desktop run/build now resolve entries from the active mode
+  - Projects with `desktop.native.entry` default to native desktop mode
+  - `--mode native|hybrid` now works for `elit desktop run` and `elit desktop build`
+  - Native desktop mode falls back to legacy `desktop.entry` when needed for backward compatibility
+
 ## [3.4.6] - 2026-04-04
 
 ### Added

@@ -217,6 +217,7 @@ npx elit build --entry ./src/main.ts --out-dir dist
 npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
+npx elit desktop run --mode native
 npx elit desktop build ./src/main.ts --release
 npx elit mobile init
 npx elit mobile run android
@@ -237,6 +238,7 @@ Useful flags:
 - `elit test --it "saves records"`
 - `elit test --coverage --coverage-reporter text,html`
 - `elit desktop --runtime quickjs|node|bun|deno`
+- `elit desktop run --mode native`
 - `elit desktop build --platform windows|linux|macos --out-dir dist`
 - `elit desktop build --compiler auto|none|esbuild|tsx|tsup`
 - `elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist --icon ./icon.png --permission android.permission.CAMERA`
@@ -260,7 +262,10 @@ Desktop mode notes:
 
 - Cargo is required the first time the native runtime is built.
 - TypeScript entries are transpiled automatically when needed.
-- Set `desktop.entry` in `elit.config.*` when you want `elit desktop` and `elit desktop build` to run without repeating the entry path on every command.
+- Set `desktop.mode` to `hybrid` or `native`. Projects with `desktop.native.entry` default to `native`; projects without it default to `hybrid`.
+- Set `desktop.entry` when you want hybrid desktop commands to omit the positional entry, and set `desktop.native.entry` when you want native desktop commands to do the same.
+- Hybrid desktop mode uses the WebView runtime. Native desktop mode renders Elit native IR in the dedicated native desktop runtime.
+- `elit desktop run` is an explicit alias for the run path; `elit desktop` still works as the shorthand form.
 - Desktop build can prebuild the native runtime even without an entry file.
 - `tsx` compiler mode is Node-only and keeps loading the original source tree instead of bundling it.
 - `tsx` and `tsup` compiler modes require those packages to be installed in the project.
@@ -345,7 +350,11 @@ The config shape is:
     };
   };
   desktop?: {
+    mode?: 'hybrid' | 'native';
     entry?: string;
+    native?: {
+      entry?: string;
+    };
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
     compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
     release?: boolean;
@@ -422,7 +431,10 @@ export default {
     permissions: ['android.permission.INTERNET'],
   },
   desktop: {
-    entry: './src/main.ts',
+    mode: 'native',
+    native: {
+      entry: './src/main.ts',
+    },
     runtime: 'quickjs',
     compiler: 'auto',
     release: false,
@@ -454,7 +466,7 @@ Important details:
 - `dev.clients` is the most flexible setup when you want SSR, API routes, multiple apps, or per-client proxy rules.
 - `preview` supports the same concepts as `dev`: multiple clients, API routes, proxy rules, workers, SSR, and HTTPS.
 - Only `VITE_` variables are exposed to client code during bundling.
-- `desktop` config provides defaults for `elit desktop`, `elit desktop build`, and `elit desktop wapk`. Set `desktop.entry` when you want the run/build commands to omit the positional entry.
+- `desktop` config provides defaults for `elit desktop`, `elit desktop run`, `elit desktop build`, and `elit desktop wapk`. Use `desktop.entry` for hybrid defaults, `desktop.native.entry` for native defaults, and `desktop.mode` to choose which one runs by default.
 - `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
@@ -639,9 +651,21 @@ For production builds, make sure your built HTML points at the production asset 
 
 ## Desktop Mode
 
-Desktop mode runs an Elit entry file inside a native WebView shell.
+Desktop mode now has two backends.
 
-That entry can either call `createWindow(...)` directly or finish with a normal `render(...)` call from a shared UI entry. When Elit desktop mode sees a shared render-only entry, it captures the rendered VNode and auto-opens a native window from it. If `desktop.entry` is configured in `elit.config.*`, you can run `npx elit desktop` or `npx elit desktop build` without passing the entry path again.
+- Hybrid mode runs an Elit entry file inside the existing native WebView shell.
+- Native mode loads a native entry, materializes Elit native IR, and renders it with the dedicated native desktop runtime.
+
+Hybrid entries can call `createWindow(...)` directly or finish with a normal `render(...)` call from a shared UI entry. When Elit desktop hybrid mode sees a shared render-only entry, it captures the rendered VNode and auto-opens a native window from it.
+
+Desktop now follows the same `hybrid | native` split as mobile:
+
+- `desktop.mode: 'hybrid'` uses `desktop.entry`
+- `desktop.mode: 'native'` uses `desktop.native.entry` and falls back to `desktop.entry` for older configs
+
+Use hybrid mode when you want the desktop shell APIs and a browser-style surface. Use native mode when you want the shared Elit tree to render as a real native desktop UI.
+
+If the resolved desktop entry is configured in `elit.config.*`, you can run `npx elit desktop`, `npx elit desktop run`, or `npx elit desktop build` without passing the entry path again.
 
 Example desktop entry:
 
@@ -677,19 +701,20 @@ createWindow({
 Run it:
 
 ```bash
-npx elit desktop ./src/main.ts
+npx elit desktop run --mode native ./src/main.ts
 ```
 
 Build a standalone executable:
 
 ```bash
-npx elit desktop build ./src/main.ts --release
+npx elit desktop build --mode native ./src/main.ts --release
 ```
 
 Desktop notes:
 
 - Runtime choices: `quickjs`, `node`, `bun`, `deno`
 - Transpiler choices: `auto`, `none`, `esbuild`, `tsx`, `tsup`
+- Mode choices: `hybrid`, `native`
 - `tsx` is a Node loader mode, not a bundle mode. Use `esbuild` or `tsup` when you want a relocatable output.
 - Icon input supports `.ico`, `.png`, and `.svg`
 - EXE icon embedding and runtime window icon loading both support SVG now

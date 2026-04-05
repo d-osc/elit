@@ -26,6 +26,10 @@ export default defineConfig({
     desktop: {
         compiler: 'auto',
         entry: './src/web-main.ts',
+        mode: 'native',
+        native: {
+            entry: './src/web-main.ts',
+        },
         outDir: './desktop-dist',
         runtime: 'quickjs',
     },

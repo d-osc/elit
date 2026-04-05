@@ -65,6 +65,7 @@ export interface ElitConfig {
 }
 
 export type MobileMode = 'native' | 'hybrid';
+export type DesktopMode = 'native' | 'hybrid';
 
 export interface MobileConfig {
     /** Project directory for native mobile artifacts */
@@ -127,8 +128,12 @@ export interface MobileNativeIosConfig {
 }
 
 export interface DesktopConfig {
-    /** Desktop entry file used when the CLI command omits <entry> */
+    /** Desktop runtime mode: native prefers desktop.native.entry and hybrid prefers desktop.entry */
+    mode?: DesktopMode;
+    /** Desktop entry file used when the CLI command omits <entry> in hybrid mode */
     entry?: string;
+    /** Optional native desktop entry defaults */
+    native?: DesktopNativeConfig;
     /** Native desktop runtime: quickjs, bun, node, deno */
     runtime?: 'quickjs' | 'bun' | 'node' | 'deno';
     /** Desktop entry compiler: auto, none, esbuild, tsx, tsup */
@@ -162,6 +167,13 @@ export interface DesktopConfig {
         /** Use release desktop runtime binary */
         release?: boolean;
     };
+}
+
+export interface DesktopNativeConfig {
+    /** Elit entry file used when desktop.mode is native or --mode native is passed */
+    entry?: string;
+    /** Explicit export name to read from the desktop native entry module */
+    exportName?: string;
 }
 
 export interface WapkConfig {

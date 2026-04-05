@@ -2,4 +2,18 @@ import { setDesktopRenderOptions } from '../../../src/render-context';
 
 import './web-main';
 
-setDesktopRenderOptions({ autoClose: true });
+const interactionFile = process.env.ELIT_DESKTOP_SMOKE_INTERACTION_FILE;
+const interactionStdout = process.env.ELIT_DESKTOP_SMOKE_STDOUT === '1';
+
+setDesktopRenderOptions({
+	autoClose: true,
+	...((interactionFile || interactionStdout)
+		? {
+			interactionOutput: {
+				emitReady: true,
+				...(interactionFile ? { file: interactionFile } : {}),
+				...(interactionStdout ? { stdout: true } : {}),
+			},
+		}
+		: {}),
+});

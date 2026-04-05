@@ -35,6 +35,18 @@ function createHeroActions(surface: UniversalSurface, state = createUniversalExa
                     payload: { surface: 'desktop' },
                 },
                 {
+                    label: 'Open docs route',
+                    className: 'btn btn-secondary',
+                    route: '/desktop/docs',
+                    payload: { surface: 'desktop', panel: 'docs' },
+                },
+                {
+                    label: 'Back route',
+                    className: 'btn btn-secondary',
+                    action: 'desktop:back',
+                    payload: { surface: 'desktop' },
+                },
+                {
                     label: 'Close window',
                     className: 'btn btn-secondary',
                     action: 'desktop:quit',

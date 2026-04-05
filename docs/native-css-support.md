@@ -23,6 +23,24 @@ It already covers many common app patterns:
 - simple grid-like two-column sections
 - shared styling across hybrid and native mobile flows
 
+## Desktop Native Runtime
+
+Desktop native reuses the same resolved style data but renders it through the egui runtime in [../src/desktop/native_renderer.rs](../src/desktop/native_renderer.rs). Its CSS surface is still narrower than Compose and SwiftUI, but the current runtime now covers the highest-value shared-app styling paths instead of falling back to mostly bare egui widgets.
+
+| Area | Current desktop-native support | Important limit |
+| --- | --- | --- |
+| Containers | `backgroundColor`, flat `background`, `border`, `borderWidth`, `borderColor`, `borderRadius`, `padding`, `margin`, `opacity`, a practical first `boxShadow`, `width`, `minWidth`, `maxWidth`, `minHeight`, `display: flex`, `display: grid`, `flexDirection`, `flexWrap`, `gap`, `alignItems`, `justifyContent`, practical `order` / `zIndex`, `textAlign`-driven alignment, practical positioned offsets, plus nested `overflow: auto` / `overflow: scroll` subset | `boxShadow` is currently a single outer-shadow approximation, auto margins are mainly aimed at constrained-shell centering, positioned layout is still margin-translation based rather than browser-complete, and richer CSS layout semantics still remain partial compared with mobile generation |
+| Buttons | authored text color, font size, font weight, background, border, radius, padding, and practical width or min-size styling now flow into the egui button visuals | Button sizing and text layout still follow egui widget behavior rather than browser metrics |
+| Links | authored text color, font size, font weight, optional framed styling, and practical width or min-size styling now flow into the clickable desktop link surface | Hover and focus text-decoration fidelity is still partial compared with browser links |
+| Runtime pseudo states | generic desktop payloads now carry `desktopStyleVariants` for authored `:hover`, `:active`, `:focus`, `:focus-visible`, `:enabled`, `:disabled`, `:checked`, `:selected`, `:read-only`, `:read-write`, `:placeholder-shown`, `:valid`, and `:invalid` deltas when the authored variant differs from the base style | Buttons, links, text inputs, toggles, sliders, and pickers consume these variants through egui widget visuals, and practical generic container hover/active/focus visuals now also flow through the container frame path, but exact browser runtime focus/press semantics still remain partial |
+| Form controls and surfaces | text inputs, textareas, toggles, sliders, pickers, tables, image surfaces, canvas, vector fallback rendering, plus Windows desktop-native inline WebView or media surfaces through child-webview embedding in the native window | Inputs and pickers now consume practical authored background, border, radius, padding, font, color, and width sizing, but exact browser chrome, clipped inline embed fidelity inside complex scroll or clip stacks, and browser-complete overflow behavior remain partial |
+
+Validation used for the current desktop-native surface:
+
+```bash
+cargo check --lib
+```
+
 ## Supported Well
 
 | Area | Current support | Notes |

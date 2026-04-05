@@ -12,7 +12,7 @@ export interface NativeBindingMetadata<T = unknown> {
     state: State<T>;
 }
 
-export const ELIT_NATIVE_BINDING = Symbol('elit.native.binding');
+export const ELIT_NATIVE_BINDING = Symbol.for('elit.native.binding');
 
 // State management helpers
 export const createState = <T>(initial: T, options?: StateOptions): State<T> =>

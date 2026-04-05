@@ -142,6 +142,7 @@ npx elit build --entry ./src/main.ts --out-dir dist
 npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
+npx elit desktop run --mode native
 npx elit desktop build ./src/main.ts --release
 npx elit mobile init
 npx elit mobile run android
@@ -228,7 +229,11 @@ const configShape = `{
     };
   };
   desktop?: {
+    mode?: 'hybrid' | 'native';
     entry?: string;
+    native?: {
+      entry?: string;
+    };
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
     compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
     release?: boolean;
@@ -307,7 +312,10 @@ export default {
     },
   },
   desktop: {
-    entry: './src/main.ts',
+    mode: 'native',
+    native: {
+      entry: './src/main.ts',
+    },
     runtime: 'quickjs',
     compiler: 'auto',
     release: false,
@@ -512,6 +520,7 @@ const Docs = () =>
               li(code('elit test --file ./testing/unit/database.test.ts')),
               li(code('elit test --coverage --coverage-reporter text,html')),
               li(code('elit desktop --runtime quickjs|node|bun|deno')),
+              li(code('elit desktop run --mode native')),
               li(code('elit desktop build --platform windows|linux|macos --out-dir dist')),
               li(code('elit desktop build --compiler auto|none|esbuild|tsx|tsup')),
               li(code('elit mobile init --app-id com.example.app --app-name "Example App" --web-dir dist --icon ./icon.png --permission android.permission.CAMERA')),
@@ -527,18 +536,20 @@ const Docs = () =>
 
             h2({ id: 'desktop' }, text('Desktop Mode', 'Desktop Mode')),
             p(text(
-              'Desktop mode runs an Elit entry inside a native WebView shell and exposes the desktop APIs from elit/desktop. The entry can either call createWindow(...) directly or finish with a normal render(...) call from a shared UI entry.',
-              'Desktop mode จะรัน entry ของ Elit ภายใน native WebView shell และเปิดใช้ API จาก elit/desktop โดย entry จะเรียก createWindow(...) เองก็ได้ หรือจะจบด้วย render(...) จาก shared UI entry ก็ได้.'
+              'Desktop mode now supports two backends: hybrid uses the WebView shell and desktop APIs from elit/desktop, while native renders Elit native IR in a dedicated native desktop runtime.',
+              'Desktop mode ตอนนี้รองรับสอง backend: hybrid ใช้ WebView shell และ desktop API จาก elit/desktop ส่วน native จะ render Elit native IR ใน native desktop runtime โดยตรง.'
             )),
             codeExample(desktopEntry),
             h4(text('Run and Build', 'สั่งรันและ build')),
-            codeExample(`npx elit desktop ./src/main.ts
-npx elit desktop build ./src/main.ts --release`),
+            codeExample(`npx elit desktop run --mode native ./src/main.ts
+npx elit desktop build --mode native ./src/main.ts --release`),
             ul(
               li(text('Runtime choices: quickjs, node, bun, deno.', 'runtime ที่เลือกได้: quickjs, node, bun, deno.')),
               li(text('Compiler choices: auto, none, esbuild, tsx, tsup.', 'compiler ที่เลือกได้: auto, none, esbuild, tsx, tsup.')),
-              li(text('Set desktop.entry in elit.config.* when you want elit desktop and elit desktop build to run without repeating the entry path.', 'ตั้ง desktop.entry ใน elit.config.* เมื่อต้องการให้ elit desktop และ elit desktop build ทำงานได้โดยไม่ต้องใส่ path entry ซ้ำทุกครั้ง.')),
-              li(text('When a shared entry only calls render(...), desktop mode captures the rendered VNode and auto-opens a native window from it.', 'ถ้า shared entry เรียกเพียง render(...), desktop mode จะ capture VNode ที่ render แล้วเปิด native window ให้อัตโนมัติจากผลลัพธ์นั้น.')),
+              li(text('Desktop mode now supports hybrid and native modes. Projects with desktop.native.entry default to native; otherwise they default to hybrid.', 'desktop mode ตอนนี้รองรับทั้ง hybrid และ native โดยถ้ามี desktop.native.entry จะ default เป็น native ไม่เช่นนั้นจะเป็น hybrid.')),
+              li(text('Use desktop.entry for hybrid defaults and desktop.native.entry for native defaults. elit desktop run is the explicit run alias.', 'ใช้ desktop.entry สำหรับค่า default แบบ hybrid และใช้ desktop.native.entry สำหรับค่า default แบบ native ส่วน elit desktop run คือ alias แบบ explicit ของคำสั่ง run.')),
+              li(text('Hybrid mode uses the WebView runtime. Native mode renders the materialized native tree in the dedicated native desktop runtime.', 'hybrid mode ใช้ WebView runtime เดิม ส่วน native mode จะ render native tree ที่ materialize แล้วใน native desktop runtime โดยตรง.')),
+              li(text('When a shared entry only calls render(...), hybrid desktop mode captures the rendered VNode and auto-opens a native window from it. Native desktop mode reads the shared entry through the native generation path instead.', 'ถ้า shared entry เรียกเพียง render(...), hybrid desktop mode จะ capture VNode ที่ render แล้วเปิด native window ให้อัตโนมัติ ส่วน native desktop mode จะอ่าน shared entry ผ่าน native generation path แทน.')),
               li(text('tsx is a Node loader mode, not a relocatable bundle mode.', 'tsx เป็น Node loader mode ไม่ใช่ bundle mode ที่ย้ายไฟล์ไปที่อื่นได้ง่าย.')),
               li(text('Desktop icon input supports .ico, .png, and .svg.', 'desktop icon รองรับ .ico, .png และ .svg.')),
               li(text('Icon auto-detect checks icon.* and favicon.* in the entry dir, project dir, and sibling public/ folders.', 'ระบบ auto-detect จะหา icon.* และ favicon.* จากโฟลเดอร์ entry, project root และ public/ ที่อยู่ข้างกัน.')),
@@ -585,7 +596,7 @@ npx elit desktop build ./src/main.ts --release`),
               li(text('Only VITE_ variables are injected into client bundles.', 'มีเพียงตัวแปรที่ขึ้นต้นด้วย VITE_ เท่านั้นที่ถูก inject เข้า client bundle.')),
               li(text('Environment files load in this order: .env.{mode}.local, .env.{mode}, .env.local, .env.', 'ไฟล์ env จะถูกโหลดตามลำดับ: .env.{mode}.local, .env.{mode}, .env.local, .env.')),
               li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.')),
-              li(text('desktop config provides defaults for elit desktop, elit desktop build, and elit desktop wapk. Set desktop.entry when you want to omit the positional desktop entry path.', 'desktop config ให้ค่า default กับ elit desktop, elit desktop build และ elit desktop wapk โดยตั้ง desktop.entry ได้เมื่อต้องการละ path ของ desktop entry ออกจากคำสั่ง.')),
+              li(text('desktop config provides defaults for elit desktop, elit desktop run, elit desktop build, and elit desktop wapk. Use desktop.mode to choose native or hybrid, desktop.entry for hybrid defaults, and desktop.native.entry for native defaults.', 'desktop config ให้ค่า default กับ elit desktop, elit desktop run, elit desktop build และ elit desktop wapk โดยใช้ desktop.mode เพื่อเลือก native หรือ hybrid, ใช้ desktop.entry สำหรับ default แบบ hybrid และใช้ desktop.native.entry สำหรับ default แบบ native.')),
               li(text('mobile config provides defaults for elit mobile init, sync, open, run, and build.', 'mobile config ให้ค่า default กับ elit mobile init, sync, open, run และ build.')),
               li(text('Configure WAPK packaging in config.wapk instead of a legacy wapk.config.json file.', 'ตั้งค่า WAPK ที่ config.wapk แทนไฟล์ legacy wapk.config.json.'))
             ),

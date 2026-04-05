@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { build as esbuild } from 'esbuild';
-import { loadConfig, type DesktopConfig } from './config';
+import { loadConfig, type DesktopConfig, type DesktopMode } from './config';
+import { renderMaterializedNativeTree, type NativeTree } from './native';
+import { loadNativeEntryResult } from './native-cli';
+import type { DesktopRenderOptions } from './render-context';
 
 import {
     WAPK_RUNTIMES,
@@ -26,8 +29,10 @@ type DesktopPlatform = keyof typeof PLATFORMS;
 type TsupModule = typeof import('tsup');
 
 interface DesktopRunOptions {
+    mode: DesktopMode;
     runtime: DesktopRuntimeName;
     compiler: DesktopCompilerName;
+    exportName?: string;
     release: boolean;
     entry?: string;
 }
@@ -44,10 +49,44 @@ interface EnsureBinaryOptions {
     entryPath?: string;
 }
 
+interface EnsureNativeBinaryOptions {
+    release: boolean;
+    triple?: string;
+    entryPath?: string;
+}
+
 interface PreparedEntry {
     appName: string;
     entryPath: string;
     cleanupPath?: string;
+}
+
+interface PreparedDesktopNativePayload {
+    appName: string;
+    payloadPath: string;
+    cleanupPath?: string;
+}
+
+interface DesktopNativeWindowOptions {
+    title: string;
+    width: number;
+    height: number;
+    center: boolean;
+    icon?: string;
+    autoClose?: boolean;
+}
+
+interface DesktopNativeInteractionOutput {
+    file?: string;
+    stdout?: boolean;
+    emitReady?: boolean;
+}
+
+interface DesktopNativePayload {
+    window: DesktopNativeWindowOptions;
+    resourceBaseDir?: string;
+    interactionOutput?: DesktopNativeInteractionOutput;
+    tree: NativeTree;
 }
 
 interface DesktopBootstrapEntry {
@@ -73,6 +112,7 @@ const BUILD_FEATURES: Record<DesktopRuntimeName, string[]> = {
     deno: ['runtime-external'],
 };
 const EMBED_MAGIC_V2 = Buffer.from([0x57, 0x41, 0x50, 0x4b, 0x52, 0x54, 0x00, 0x02]);
+const EMBED_NATIVE_MAGIC_V1 = Buffer.from([0x45, 0x4c, 0x49, 0x54, 0x4e, 0x55, 0x49, 0x31]);
 const EMBED_RUNTIME_CODE: Record<DesktopRuntimeName, number> = {
     quickjs: 1,
     bun: 2,
@@ -260,13 +300,18 @@ export async function runDesktopCommand(args: string[]): Promise<void> {
     const config = await loadConfig();
     const desktopConfig = config?.desktop;
 
-    if (args.length === 0 && !desktopConfig?.entry) {
+    if (args.length === 0 && !resolveConfiguredDesktopEntry(getDefaultDesktopMode(desktopConfig), desktopConfig)) {
         printDesktopHelp();
         return;
     }
 
     if (args[0] === 'wapk') {
         await runDesktopWapkCommand(args.slice(1), desktopConfig);
+        return;
+    }
+
+    if (args[0] === 'run') {
+        await runDesktopRuntime(parseDesktopRunArgs(args.slice(1), desktopConfig));
         return;
     }
 
@@ -280,7 +325,9 @@ export async function runDesktopCommand(args: string[]): Promise<void> {
 
 function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRunOptions {
     const options: DesktopRunOptions = {
-        entry: config?.entry,
+        mode: getDefaultDesktopMode(config),
+        entry: undefined,
+        exportName: config?.native?.exportName,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -290,6 +337,15 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
         const arg = args[i];
 
         switch (arg) {
+            case '--mode':
+            case '-m': {
+                const mode = args[++i];
+                if (!mode) {
+                    throw new Error('Missing value for --mode');
+                }
+                options.mode = parseDesktopMode(mode, '--mode');
+                break;
+            }
             case '--runtime':
             case '-r': {
                 const runtime = args[++i] as DesktopRuntimeName | undefined;
@@ -306,6 +362,14 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
                     throw new Error(`Unknown desktop compiler: ${compiler}`);
                 }
                 options.compiler = compiler;
+                break;
+            }
+            case '--export': {
+                const exportName = args[++i];
+                if (!exportName) {
+                    throw new Error('Missing value for --export');
+                }
+                options.exportName = exportName;
                 break;
             }
             case '--release':
@@ -319,8 +383,12 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
         }
     }
 
+    options.entry = options.entry ?? resolveConfiguredDesktopEntry(options.mode, config);
+
     if (!options.entry) {
-        throw new Error('Desktop mode requires an entry file, either from the command line or desktop.entry in elit.config.ts.');
+        throw new Error(
+            `Desktop ${options.mode} mode requires an entry file, either from the command line or ${desktopEntrySourceLabel(options.mode)} in elit.config.ts.`,
+        );
     }
 
     return options;
@@ -328,7 +396,9 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
 
 function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopBuildOptions {
     const options: DesktopBuildOptions = {
-        entry: config?.entry,
+        mode: getDefaultDesktopMode(config),
+        entry: undefined,
+        exportName: config?.native?.exportName,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -340,6 +410,15 @@ function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopB
         const arg = args[i];
 
         switch (arg) {
+            case '--mode':
+            case '-m': {
+                const mode = args[++i];
+                if (!mode) {
+                    throw new Error('Missing value for --mode');
+                }
+                options.mode = parseDesktopMode(mode, '--mode');
+                break;
+            }
             case '--runtime':
             case '-r': {
                 const runtime = args[++i] as DesktopRuntimeName | undefined;
@@ -356,6 +435,14 @@ function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopB
                     throw new Error(`Unknown desktop compiler: ${compiler}`);
                 }
                 options.compiler = compiler;
+                break;
+            }
+            case '--export': {
+                const exportName = args[++i];
+                if (!exportName) {
+                    throw new Error('Missing value for --export');
+                }
+                options.exportName = exportName;
                 break;
             }
             case '--platform':
@@ -387,7 +474,37 @@ function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopB
         }
     }
 
+    options.entry = options.entry ?? resolveConfiguredDesktopEntry(options.mode, config);
+
     return options;
+}
+
+export function parseDesktopMode(value: string, source: string): DesktopMode {
+    if (value === 'native' || value === 'hybrid') {
+        return value;
+    }
+
+    throw new Error(`Invalid ${source}: ${value}. Expected "native" or "hybrid".`);
+}
+
+export function getDefaultDesktopMode(config?: DesktopConfig): DesktopMode {
+    if (config?.mode) {
+        return parseDesktopMode(config.mode, 'desktop.mode');
+    }
+
+    return config?.native?.entry ? 'native' : 'hybrid';
+}
+
+export function resolveConfiguredDesktopEntry(mode: DesktopMode, config?: DesktopConfig): string | undefined {
+    if (mode === 'native') {
+        return config?.native?.entry ?? config?.entry;
+    }
+
+    return config?.entry;
+}
+
+function desktopEntrySourceLabel(mode: DesktopMode): string {
+    return mode === 'native' ? 'desktop.native.entry' : 'desktop.entry';
 }
 
 function printDesktopHelp(): void {
@@ -397,17 +514,20 @@ function printDesktopHelp(): void {
         '',
         'Usage:',
         '  elit desktop [options] [entry]',
+        '  elit desktop run [options] [entry]',
         '  elit desktop wapk [options] <file.wapk>',
         '  elit desktop wapk run [options] <file.wapk>',
         '  elit desktop build [options] [entry]',
         '  elit desktop build [options]',
         '',
         'Run options:',
+        '  -m, --mode <name>        Desktop mode: hybrid, native',
         '  -r, --runtime <name>     Desktop runtime: quickjs, bun, node, deno',
         '  -c, --compiler <name>    Entry transpiler: auto, none, esbuild, tsx, tsup (default: auto)',
         '  --release                Use the release desktop runtime binary',
         '',
         'Build options:',
+        '  -m, --mode <name>        Desktop mode: hybrid, native',
         '  -r, --runtime <name>     Runtime to embed in the app binary',
         '  -c, --compiler <name>    Entry transpiler: auto, none, esbuild, tsx, tsup (default: auto)',
         `  -p, --platform <name>    Target platform (${Object.keys(PLATFORMS).join(', ')})`,
@@ -422,11 +542,13 @@ function printDesktopHelp(): void {
         '',
         'Examples:',
         '  elit desktop src/main.ts',
+        '  elit desktop run --mode native',
         '  elit desktop --runtime node app.ts',
         '  elit desktop wapk app.wapk',
         '  elit desktop wapk run app.wapk --runtime bun',
         '  elit desktop wapk app.wapk --watcher',
         '  elit desktop build src/main.ts',
+        '  elit desktop build --mode native --release',
         '  elit desktop build --runtime bun --release src/main.ts',
         '',
         'Notes:',
@@ -434,7 +556,11 @@ function printDesktopHelp(): void {
         '  - TypeScript and module-style QuickJS entries are transpiled automatically.',
         '  - The tsx compiler is Node-only and keeps loading the original source tree.',
         '  - The tsx and tsup compilers require those packages to be installed.',
-        '  - When [entry] is omitted, Elit falls back to desktop.entry from elit.config.ts.',
+        '  - desktop.mode defaults to "native" when desktop.native.entry exists, otherwise "hybrid".',
+        '  - desktop.entry is used for hybrid mode. desktop.native.entry is used for native mode.',
+        '  - Native mode falls back to desktop.entry when only the legacy desktop.entry is configured.',
+        '  - Hybrid mode uses the WebView desktop runtime. Native mode renders the native IR in the dedicated native desktop runtime.',
+        '  - When [entry] is omitted, Elit falls back to the configured entry for the resolved desktop mode.',
         '  - The build subcommand can be used without an entry to prebuild the native runtime.',
         '  - Desktop WAPK mode expects the packaged entry to start an HTTP app.',
         '  - Use --watcher for faster file change detection (less CPU usage).',
@@ -701,6 +827,11 @@ async function resolveDesktopWapkPort(preferredPort?: number): Promise<number> {
 }
 
 async function runDesktopRuntime(options: DesktopRunOptions): Promise<void> {
+    if (options.mode === 'native') {
+        await runDesktopNativeRuntime(options);
+        return;
+    }
+
     const preparedEntry = await prepareEntry(options.entry!, options.runtime, options.compiler, 'run');
 
     try {
@@ -719,7 +850,30 @@ async function runDesktopRuntime(options: DesktopRunOptions): Promise<void> {
     }
 }
 
+async function runDesktopNativeRuntime(options: DesktopRunOptions): Promise<void> {
+    const preparedPayload = await prepareDesktopNativePayload(options);
+
+    try {
+        const binary = ensureDesktopNativeBinary({
+            release: options.release,
+            entryPath: options.entry,
+        });
+
+        const exitCode = await spawnDesktopProcess(binary, [preparedPayload.payloadPath]);
+        if (exitCode !== 0) {
+            process.exit(exitCode);
+        }
+    } finally {
+        cleanupPreparedDesktopNativePayload(preparedPayload);
+    }
+}
+
 async function buildDesktopBundle(options: DesktopBuildOptions): Promise<void> {
+    if (options.mode === 'native') {
+        await buildDesktopNativeBundle(options);
+        return;
+    }
+
     const triple = options.platform ? PLATFORMS[options.platform] : undefined;
     buildDesktopRuntime({
         runtime: options.runtime,
@@ -763,10 +917,52 @@ async function buildDesktopBundle(options: DesktopBuildOptions): Promise<void> {
     }
 }
 
+async function buildDesktopNativeBundle(options: DesktopBuildOptions): Promise<void> {
+    const triple = options.platform ? PLATFORMS[options.platform] : undefined;
+    buildDesktopNativeRuntime({
+        release: options.release,
+        triple,
+        entryPath: options.entry,
+    });
+    const binary = findDesktopNativeBinary(options.release, triple);
+
+    if (!binary) {
+        throw new Error('Desktop native runtime binary was not found after cargo build completed.');
+    }
+
+    if (!options.entry) {
+        console.log(`Desktop native runtime ready: ${binary}`);
+        return;
+    }
+
+    const preparedPayload = await prepareDesktopNativePayload(options);
+
+    try {
+        const outDir = resolve(options.outDir);
+        const binIsWindows = isWindowsTarget(triple);
+        const outFile = join(outDir, `${preparedPayload.appName}${binIsWindows ? '.exe' : ''}`);
+        const runtimeBytes = readFileSync(binary);
+        const payloadBytes = readFileSync(preparedPayload.payloadPath);
+        const sizeBuffer = Buffer.allocUnsafe(8);
+        sizeBuffer.writeBigUInt64LE(BigInt(payloadBytes.length));
+
+        mkdirSync(outDir, { recursive: true });
+        writeFileSync(outFile, Buffer.concat([runtimeBytes, payloadBytes, sizeBuffer, EMBED_NATIVE_MAGIC_V1]));
+
+        if (!binIsWindows) {
+            chmodSync(outFile, 0o755);
+        }
+
+        console.log(`Desktop native app built: ${outFile}`);
+    } finally {
+        cleanupPreparedDesktopNativePayload(preparedPayload);
+    }
+}
+
 function ensureDesktopBinary(options: EnsureBinaryOptions): string {
     let binary = findDesktopBinary(options.runtime, options.release, options.triple);
 
-    if (!binary) {
+    if (!binary || isDesktopRustBuildStale(binary)) {
         buildDesktopRuntime(options);
         binary = findDesktopBinary(options.runtime, options.release, options.triple);
     }
@@ -778,11 +974,28 @@ function ensureDesktopBinary(options: EnsureBinaryOptions): string {
     return binary;
 }
 
+function ensureDesktopNativeBinary(options: EnsureNativeBinaryOptions): string {
+    let binary = findDesktopNativeBinary(options.release, options.triple);
+
+    if (!binary || isDesktopRustBuildStale(binary)) {
+        buildDesktopNativeRuntime(options);
+        binary = findDesktopNativeBinary(options.release, options.triple);
+    }
+
+    if (!binary) {
+        throw new Error('Desktop native runtime binary was not found after cargo build completed.');
+    }
+
+    return binary;
+}
+
 function buildDesktopRuntime(options: EnsureBinaryOptions): void {
     const args = [
         'build',
         '--manifest-path',
         resolve(PACKAGE_ROOT, 'Cargo.toml'),
+        '--bin',
+        'elit-desktop',
         '--no-default-features',
         '--features',
         BUILD_FEATURES[options.runtime].join(','),
@@ -827,6 +1040,54 @@ function buildDesktopRuntime(options: EnsureBinaryOptions): void {
     }
 }
 
+function buildDesktopNativeRuntime(options: EnsureNativeBinaryOptions): void {
+    const args = [
+        'build',
+        '--manifest-path',
+        resolve(PACKAGE_ROOT, 'Cargo.toml'),
+        '--bin',
+        'elit-desktop-native',
+    ];
+
+    if (options.release) {
+        args.push('--release');
+    }
+
+    if (options.triple) {
+        args.push('--target', options.triple);
+    }
+
+    const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        CARGO_TARGET_DIR: desktopNativeCargoTargetDir(),
+    };
+
+    const iconPath = resolveDesktopIcon(options.entryPath);
+    if (iconPath) {
+        env.ELIT_DESKTOP_EXE_ICON = iconPath;
+        env.WAPK_EXE_ICON = iconPath;
+    }
+
+    const result = spawnSync('cargo', args, {
+        cwd: PACKAGE_ROOT,
+        env,
+        stdio: 'inherit',
+        windowsHide: true,
+    });
+
+    if (result.error) {
+        if ((result.error as NodeJS.ErrnoException).code === 'ENOENT') {
+            throw new Error('Cargo is required for desktop native mode but was not found in PATH.');
+        }
+
+        throw result.error;
+    }
+
+    if (result.status !== 0) {
+        process.exit(result.status ?? 1);
+    }
+}
+
 function findDesktopBinary(runtime: DesktopRuntimeName, release: boolean, triple?: string): string | null {
     const targetDir = desktopCargoTargetDir(runtime);
     const profile = release ? 'release' : 'debug';
@@ -844,8 +1105,69 @@ function findDesktopBinary(runtime: DesktopRuntimeName, release: boolean, triple
     return null;
 }
 
+function findDesktopNativeBinary(release: boolean, triple?: string): string | null {
+    const targetDir = desktopNativeCargoTargetDir();
+    const profile = release ? 'release' : 'debug';
+    const binaryName = isWindowsTarget(triple) ? 'elit-desktop-native.exe' : 'elit-desktop-native';
+    const candidates = triple
+        ? [join(targetDir, triple, profile, binaryName)]
+        : [join(targetDir, profile, binaryName)];
+
+    for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
 function desktopCargoTargetDir(runtime: DesktopRuntimeName): string {
     return resolve(PACKAGE_ROOT, 'target', 'desktop', runtime);
+}
+
+function desktopNativeCargoTargetDir(): string {
+    return resolve(PACKAGE_ROOT, 'target', 'desktop', 'native');
+}
+
+function isDesktopRustBuildStale(binaryPath: string): boolean {
+    if (!existsSync(binaryPath)) {
+        return true;
+    }
+
+    return statSync(binaryPath).mtimeMs < getLatestDesktopRustInputMtime();
+}
+
+let latestDesktopRustInputMtime: number | undefined;
+
+function getLatestDesktopRustInputMtime(): number {
+    if (latestDesktopRustInputMtime !== undefined) {
+        return latestDesktopRustInputMtime;
+    }
+
+    latestDesktopRustInputMtime = Math.max(
+        getPathModifiedTime(resolve(PACKAGE_ROOT, 'Cargo.toml')),
+        getPathModifiedTime(resolve(PACKAGE_ROOT, 'src', 'desktop')),
+    );
+    return latestDesktopRustInputMtime;
+}
+
+function getPathModifiedTime(path: string): number {
+    if (!existsSync(path)) {
+        return 0;
+    }
+
+    const stats = statSync(path);
+    if (!stats.isDirectory()) {
+        return stats.mtimeMs;
+    }
+
+    let latest = stats.mtimeMs;
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+        latest = Math.max(latest, getPathModifiedTime(join(path, entry.name)));
+    }
+
+    return latest;
 }
 
 function resolveDesktopIcon(entryPath?: string): string | undefined {
@@ -880,6 +1202,87 @@ function resolveDesktopIcon(entryPath?: string): string | undefined {
     }
 
     return undefined;
+}
+
+function resolveDesktopNativeWindowIcon(entryPath: string, desktopRenderOptions?: DesktopRenderOptions): string | undefined {
+    const configuredIcon = desktopRenderOptions?.icon;
+    if (configuredIcon) {
+        const candidate = /^(?:[a-z]+:)?[/\\]/i.test(configuredIcon)
+            ? configuredIcon
+            : resolve(dirname(resolve(entryPath)), configuredIcon);
+
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return resolveDesktopIcon(entryPath);
+}
+
+function resolveDesktopNativeWindowOptions(
+    entryPath: string,
+    appName: string,
+    desktopRenderOptions?: DesktopRenderOptions,
+): DesktopNativeWindowOptions {
+    return {
+        title: desktopRenderOptions?.title ?? `${resolveDesktopEntryDisplayName(entryPath, appName)} Desktop`,
+        width: desktopRenderOptions?.width ?? 1080,
+        height: desktopRenderOptions?.height ?? 720,
+        center: desktopRenderOptions?.center ?? true,
+        autoClose: desktopRenderOptions?.autoClose ?? false,
+        ...(resolveDesktopNativeWindowIcon(entryPath, desktopRenderOptions)
+            ? { icon: resolveDesktopNativeWindowIcon(entryPath, desktopRenderOptions) }
+            : {}),
+    };
+}
+
+function resolveDesktopNativeInteractionOutput(
+    entryPath: string,
+    desktopRenderOptions?: DesktopRenderOptions,
+): DesktopNativeInteractionOutput | undefined {
+    const output = desktopRenderOptions?.interactionOutput;
+    if (!output || (!output.file && output.stdout !== true)) {
+        return undefined;
+    }
+
+    const resolvedFile = output.file
+        ? (/^(?:[a-z]+:)?[/\\]/i.test(output.file)
+            ? output.file
+            : resolve(dirname(resolve(entryPath)), output.file))
+        : undefined;
+
+    return {
+        ...(resolvedFile ? { file: resolvedFile } : {}),
+        ...(output.stdout ? { stdout: true } : {}),
+        ...(output.emitReady ? { emitReady: true } : {}),
+    };
+}
+
+async function prepareDesktopNativePayload(options: Pick<DesktopRunOptions, 'entry' | 'exportName'>): Promise<PreparedDesktopNativePayload> {
+    const entryPath = resolve(options.entry!);
+
+    if (!existsSync(entryPath)) {
+        throw new Error(`Desktop native entry not found: ${entryPath}`);
+    }
+
+    const appName = basename(entryPath, extname(entryPath));
+    const loadedEntry = await loadNativeEntryResult(entryPath, options.exportName, 'desktop');
+    const payloadPath = join(dirname(entryPath), `.elit-desktop-native-${appName}-${randomUUID()}.json`);
+    const interactionOutput = resolveDesktopNativeInteractionOutput(entryPath, loadedEntry.desktopRenderOptions);
+    const payload: DesktopNativePayload = {
+        window: resolveDesktopNativeWindowOptions(entryPath, appName, loadedEntry.desktopRenderOptions),
+        resourceBaseDir: dirname(entryPath),
+        ...(interactionOutput ? { interactionOutput } : {}),
+        tree: renderMaterializedNativeTree(loadedEntry.entry, { platform: 'generic' }),
+    };
+
+    writeFileSync(payloadPath, JSON.stringify(payload, null, 2), 'utf8');
+
+    return {
+        appName,
+        payloadPath,
+        cleanupPath: payloadPath,
+    };
 }
 
 async function prepareEntry(
@@ -1131,6 +1534,12 @@ function compileTarget(runtime: DesktopRuntimeName): { extension: string; format
 function cleanupPreparedEntry(entry: PreparedEntry): void {
     if (entry.cleanupPath && existsSync(entry.cleanupPath)) {
         rmSync(entry.cleanupPath, { force: true });
+    }
+}
+
+function cleanupPreparedDesktopNativePayload(payload: PreparedDesktopNativePayload): void {
+    if (payload.cleanupPath && existsSync(payload.cleanupPath)) {
+        rmSync(payload.cleanupPath, { force: true });
     }
 }
 
