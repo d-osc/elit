@@ -3430,13 +3430,15 @@ function toScaledUnitNumber(
     }
 
     const trimmed = value.trim();
-    const functionMatch = trimmed.match(/^([a-z]+)\((.*)\)$/i);
-    if (!functionMatch) {
+    const openParen = trimmed.indexOf('(');
+    if (openParen <= 0 || !trimmed.endsWith(')')) {
         return undefined;
     }
-
-    const functionName = functionMatch[1].toLowerCase();
-    const innerValue = functionMatch[2].trim();
+    const functionName = trimmed.slice(0, openParen).toLowerCase();
+    if (!/^[a-z]+$/.test(functionName)) {
+        return undefined;
+    }
+    const innerValue = trimmed.slice(openParen + 1, -1).trim();
 
     if (functionName === 'calc') {
         return evaluateCssLengthExpression(innerValue, styleResolveOptions);
@@ -6112,17 +6114,32 @@ function parseNativeGridTrackDefinition(value: string): NativeGridTrackDefinitio
 }
 
 function expandRepeatTrackList(value: string): string[] | undefined {
-    const repeatMatch = value.trim().match(/^repeat\(\s*(\d+)\s*,\s*(.+)\)$/i);
-    if (!repeatMatch) {
+    const trimmed = value.trim();
+    if (!trimmed.endsWith(')') || !trimmed.toLowerCase().startsWith('repeat(')) {
         return undefined;
     }
 
-    const count = Number(repeatMatch[1]);
+    const commaIdx = trimmed.indexOf(',', 'repeat('.length);
+    if (commaIdx < 0) {
+        return undefined;
+    }
+
+    const countStr = trimmed.slice('repeat('.length, commaIdx).trim();
+    if (!/^\d+$/.test(countStr)) {
+        return undefined;
+    }
+
+    const count = Number(countStr);
     if (!Number.isFinite(count) || count <= 0) {
         return undefined;
     }
 
-    const innerTracks = splitCssTrackList(repeatMatch[2]);
+    const inner = trimmed.slice(commaIdx + 1, -1).trim();
+    if (!inner) {
+        return undefined;
+    }
+
+    const innerTracks = splitCssTrackList(inner);
     if (innerTracks.length === 0) {
         return undefined;
     }
@@ -6163,7 +6180,7 @@ function parseGridTrackSizeSpec(
         return { intrinsicHeight: true };
     }
 
-    const fitContentMatch = trimmed.match(/^fit-content\((.+)\)$/i);
+    const fitContentMatch = trimmed.match(/^fit-content\(([^()]+)\)$/i);
     if (fitContentMatch) {
         const fitContent = toScaledUnitNumber(fitContentMatch[1].trim(), styleResolveOptions);
         return fitContent !== undefined && fitContent >= 0 ? { maxHeight: fitContent } : undefined;
@@ -6222,7 +6239,7 @@ function parseGridColumnTrackSizeSpec(
         return { intrinsicWidth: true };
     }
 
-    const fitContentMatch = trimmed.match(/^fit-content\((.+)\)$/i);
+    const fitContentMatch = trimmed.match(/^fit-content\(([^()]+)\)$/i);
     if (fitContentMatch) {
         const fitContent = toScaledUnitNumber(fitContentMatch[1].trim(), styleResolveOptions);
         return fitContent !== undefined && fitContent >= 0 ? { maxWidth: fitContent } : undefined;
@@ -7992,12 +8009,12 @@ function parseLinearGradient(value: NativePropValue | undefined, currentColor: N
     if (typeof value !== 'string') return undefined;
 
     const trimmed = value.trim();
-    const gradientMatch = trimmed.match(/^linear-gradient\((.*)\)$/i);
-    if (!gradientMatch) {
+    if (!trimmed.toLowerCase().startsWith('linear-gradient(') || !trimmed.endsWith(')')) {
         return undefined;
     }
+    const gradientInner = trimmed.slice('linear-gradient('.length, -1);
 
-    const segments = splitCssFunctionArguments(gradientMatch[1]).map((segment) => segment.trim()).filter(Boolean);
+    const segments = splitCssFunctionArguments(gradientInner).map((segment) => segment.trim()).filter(Boolean);
     if (segments.length < 2) {
         return undefined;
     }

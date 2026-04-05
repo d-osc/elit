@@ -1030,9 +1030,10 @@ function spawnWin32Safe(
 }
 
 function runCommand(command: string, args: string[], cwd: string): void {
+    const normalizedCommand = normalize(command);
     const result = process.platform === 'win32'
-        ? spawnWin32Safe(command, args, cwd, 'inherit')
-        : spawnSync(command, args, { cwd, stdio: 'inherit', shell: false });
+        ? spawnWin32Safe(normalizedCommand, args, cwd, 'inherit')
+        : spawnSync(normalizedCommand, args, { cwd, stdio: 'inherit', shell: false });
 
     if (typeof result.status === 'number' && result.status !== 0) {
         process.exit(result.status);
