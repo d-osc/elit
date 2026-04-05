@@ -54,7 +54,7 @@ export interface SwiftUIOptions {
     includePreview?: boolean;
 }
 
-type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler' | 'downloadHandler' | 'bridge' | 'webViewSurface' | 'mediaSurface' | 'interactivePressState';
+type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler' | 'downloadHandler' | 'bridge' | 'webViewSurface' | 'mediaSurface' | 'interactivePressState' | 'backgroundImage';
 type NativeResolvedStyleMap = WeakMap<NativeElementNode, Record<string, NativePropValue>>;
 interface NativeStyleContextEntry {
     scope: NativeStyleScope;
@@ -683,12 +683,10 @@ interface NativeBorderValue {
     width?: string;
     color?: NativeColorValue;
     style?: NativeBorderStyleKeyword;
-    style?: NativeBorderStyleKeyword;
     top?: NativeBorderSideValue;
     right?: NativeBorderSideValue;
     bottom?: NativeBorderSideValue;
     left?: NativeBorderSideValue;
-    style?: NativeBorderStyleKeyword;
 }
 
 const DEFAULT_COMPONENT_MAP: Record<string, string> = {
@@ -2084,18 +2082,6 @@ function resolveNativeBackgroundImagePositionValue(rawPosition: string | undefin
     return `${vertical}-${horizontal}` as NativeVideoPosterPosition;
 }
 
-function resolveNativeBackgroundRepeat(style: Record<string, NativePropValue> | undefined): NativeBackgroundRepeat {
-    return resolveNativeBackgroundImagesFromStyle(style)[0]?.repeat ?? 'no-repeat';
-}
-
-function resolveNativeBackgroundImageFit(style: Record<string, NativePropValue> | undefined): NativeVideoPosterFit {
-    return resolveNativeBackgroundImagesFromStyle(style)[0]?.fit ?? 'cover';
-}
-
-function resolveNativeBackgroundImagePosition(style: Record<string, NativePropValue> | undefined): NativeVideoPosterPosition {
-    return resolveNativeBackgroundImagesFromStyle(style)[0]?.position ?? 'center';
-}
-
 function resolveNativeBackgroundLayersFromStyle(
     style: Record<string, NativePropValue> | undefined,
     styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
@@ -2154,9 +2140,12 @@ function resolveNativeBackgroundLayersFromStyle(
         }
     }
 
-    const explicitBackgroundColor = style.backgroundColor !== undefined
-        ? resolveBackgroundColor({ ...style, background: undefined }, styleResolveOptions)
-        : undefined;
+    let explicitBackgroundColor: NativeColorValue | undefined;
+    if (style.backgroundColor !== undefined) {
+        const styleWithoutBackground = { ...style };
+        delete styleWithoutBackground.background;
+        explicitBackgroundColor = resolveBackgroundColor(styleWithoutBackground, styleResolveOptions);
+    }
     const shouldReadBackgroundColorFallback = typeof style.background === 'string'
         && (!style.backgroundImage
             || (!/url\(/i.test(style.background) && !/linear-gradient\(/i.test(style.background) && !style.background.includes(',')));
@@ -2170,32 +2159,6 @@ function resolveNativeBackgroundLayersFromStyle(
     }
 
     return layers;
-}
-
-function resolveNativeBackgroundImagesFromStyle(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): NativeBackgroundImageSpec[] {
-    return resolveNativeBackgroundLayersFromStyle(style, styleResolveOptions)
-        .filter((entry): entry is NativeBackgroundImageSpec => entry.kind === 'image');
-}
-
-function resolveNativeBackgroundImage(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeBackgroundImageSpec | undefined {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    return resolveNativeBackgroundImagesFromStyle(style, styleResolveOptions)[0];
-}
-
-function resolveNativeBackgroundImages(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeBackgroundImageSpec[] {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    return resolveNativeBackgroundImagesFromStyle(style, styleResolveOptions);
 }
 
 function resolveNativeBackgroundLayers(
@@ -3760,10 +3723,6 @@ function buildRootResolvedStyleData(nodes: NativeNode[], options: NativeStyleRes
         resolvedStyles,
         styleContexts,
     };
-}
-
-function buildRootResolvedStyleMap(nodes: NativeNode[], options: NativeStyleResolveOptions): NativeResolvedStyleMap {
-    return buildRootResolvedStyleData(nodes, options).resolvedStyles;
 }
 
 function buildNativeStyleScopeSnapshots(nodes: NativeNode[]): NativeStyleScope[] {
@@ -6181,44 +6140,6 @@ function parseFractionTrackWeight(track: string): number | undefined {
     return minmaxMatch ? Number(minmaxMatch[1]) : undefined;
 }
 
-function resolveGridTrackWeights(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-    columnGap: number,
-): number[] | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-    const viewportWidth = styleResolveOptions.viewportWidth ?? 390;
-    const autoRepeatMatch = trimmed.match(/^repeat\(\s*auto-(?:fit|fill)\s*,\s*minmax\(\s*([^,]+)\s*,\s*([^)]+)\)\s*\)$/i);
-    if (autoRepeatMatch) {
-        const minWidth = toScaledUnitNumber(autoRepeatMatch[1].trim(), styleResolveOptions);
-        if (minWidth === undefined || minWidth <= 0) {
-            return undefined;
-        }
-
-        const columnCount = Math.max(1, Math.floor((viewportWidth + columnGap) / (minWidth + columnGap)));
-        return Array.from({ length: columnCount }, () => 1);
-    }
-
-    const tracks = parseNativeGridTrackDefinition(trimmed)?.tracks ?? [];
-    if (tracks.length === 0) {
-        return undefined;
-    }
-
-    return tracks.map((track) => parseFractionTrackWeight(track) ?? 1);
-}
-
-function parseGridTrackSizeHint(
-    track: string,
-    styleResolveOptions: NativeStyleResolveOptions,
-): number | undefined {
-    const spec = parseGridTrackSizeSpec(track, styleResolveOptions);
-    return spec?.minHeight ?? spec?.height ?? spec?.maxHeight;
-}
-
 function parseGridTrackSizeSpec(
     track: string,
     styleResolveOptions: NativeStyleResolveOptions,
@@ -6337,25 +6258,6 @@ function parseGridColumnTrackSizeSpec(
     return { trackWeight: 1 };
 }
 
-function resolveGridTrackSizeHints(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): Array<number | undefined> | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tracks = parseNativeGridTrackDefinition(value.trim())?.tracks ?? [];
-    if (tracks.length === 0) {
-        return undefined;
-    }
-
-    return tracks.map((track) => {
-        const spec = parseGridTrackSizeSpec(track, styleResolveOptions);
-        return spec?.minHeight ?? spec?.height;
-    });
-}
-
 function resolveGridTrackSizeSpecs(
     value: NativePropValue | undefined,
     styleResolveOptions: NativeStyleResolveOptions,
@@ -6401,23 +6303,6 @@ function resolveGridColumnTrackSizeSpecs(
     }
 
     return tracks.map((track) => parseGridColumnTrackSizeSpec(track, styleResolveOptions));
-}
-
-function resolveGridAutoTrackWeight(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): number {
-    if (typeof value !== 'string') {
-        return 1;
-    }
-
-    const weight = parseFractionTrackWeight(value);
-    if (weight !== undefined && Number.isFinite(weight) && weight > 0) {
-        return weight;
-    }
-
-    const sizeHint = parseGridTrackSizeHint(value, styleResolveOptions);
-    return sizeHint !== undefined && sizeHint > 0 ? Math.max(1, sizeHint / 120) : 1;
 }
 
 function isWrapEnabled(style: Record<string, NativePropValue> | undefined): boolean {
@@ -8229,10 +8114,6 @@ function parseBoxShadowList(value: NativePropValue | undefined, currentColor: Na
         .filter((entry): entry is NativeShadowValue => entry !== undefined);
 }
 
-function parseBoxShadow(value: NativePropValue | undefined, currentColor: NativeColorValue = getDefaultCurrentColor()): NativeShadowValue | undefined {
-    return parseBoxShadowList(value, currentColor)[0];
-}
-
 function toComposeShadowElevation(shadow: NativeShadowValue): string {
     const elevation = Math.max(1, Math.abs(shadow.offsetY), shadow.blur / 4);
     return `${formatFloat(elevation)}.dp`;
@@ -9898,7 +9779,7 @@ function renderComposeChildren(
         context.resolvedStyles,
         context.styleResolveOptions,
     );
-    const parentRowBaselineAlignment = parentFlexLayout === 'Row'
+    const parentRowBaselineAlignment = parentFlexLayout === 'Row' && parentNode
         ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
         : undefined;
     for (const child of orderedNodes) {
@@ -10185,7 +10066,7 @@ function renderComposeChunkedLayout(
     if (layout.kind === 'grid' && layout.rows.length === 1 && !usesSingleRowGridStackAlignment) {
         const [row] = layout.rows;
         const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, buildRowModifier(modifier, row), layout.columnGap, context.styleResolveOptions)}) {`];
-        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + (entry ?? 0), 0) : undefined;
+        const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
@@ -10217,7 +10098,7 @@ function renderComposeChunkedLayout(
 
     const lines = [`${indent(level)}Column(modifier = ${modifier}${outerGap ? `, verticalArrangement = ${outerGap}` : ''}) {`];
     for (const row of layout.rows) {
-        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + (entry ?? 0), 0) : undefined;
+        const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, buildRowModifier('Modifier.fillMaxWidth()', row), layout.columnGap, context.styleResolveOptions)}) {`);
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
@@ -11330,7 +11211,6 @@ function buildSwiftUIModifiers(
         const backgroundColor = resolveBackgroundColor(style, styleResolveOptions);
         const border = resolveNativeBorder(style, (value) => toPointLiteral(value, styleResolveOptions));
         const shadows = parseBoxShadowList(style.boxShadow, resolveStyleCurrentColor(style));
-        const shadow = shadows[0];
         const aspectRatio = resolveAspectRatioValue(style.aspectRatio);
         const opacity = resolveOpacityValue(style.opacity);
         const zIndex = parsePlainNumericValue(style.zIndex);
@@ -11663,7 +11543,7 @@ function renderSwiftChunkedLayout(
     if (layout.kind === 'grid' && layout.rows.length === 1 && !usesSingleRowGridStackAlignment) {
         const [row] = layout.rows;
         const lines = [`${indent(level)}HStack(alignment: ${rowAlignment}, spacing: ${columnSpacing}) {`];
-        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + (entry ?? 0), 0) : undefined;
+        const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
@@ -11715,7 +11595,7 @@ function renderSwiftChunkedLayout(
     }
 
     for (const [rowIndex, row] of layout.rows.entries()) {
-        const totalWeight = row.weights ? row.weights.reduce((sum, entry) => sum + (entry ?? 0), 0) : undefined;
+        const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         lines.push(`${indent(level + 1)}HStack(alignment: ${rowAlignment}, spacing: ${columnSpacing}) {`);
         row.items.forEach((child, index) => {
             const cellAlignment = layout.kind === 'grid'
@@ -11885,7 +11765,7 @@ function renderSwiftUIChildren(
         context.resolvedStyles,
         context.styleResolveOptions,
     );
-    const parentRowBaselineAlignment = parentFlexLayout === 'Row'
+    const parentRowBaselineAlignment = parentFlexLayout === 'Row' && parentNode
         ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
         : undefined;
     for (const child of orderedNodes) {

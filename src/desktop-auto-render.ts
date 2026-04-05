@@ -1,4 +1,5 @@
 import { renderToString } from './dom';
+import type { WindowOptions } from './desktop';
 import {
     clearCapturedRenderedVNode,
     getCapturedRenderedVNode,
@@ -15,7 +16,7 @@ type DesktopAutoRenderGlobals = typeof globalThis & {
     [DESKTOP_RENDER_TRACKED_KEY]?: boolean;
     [DESKTOP_WINDOW_CREATED_KEY]?: boolean;
   [DESKTOP_MESSAGE_HANDLER_KEY]?: boolean;
-    createWindow?: (options: Record<string, unknown>) => void;
+    createWindow?: (options: WindowOptions) => void;
   onMessage?: (handler: (message: string) => void) => void;
   windowQuit?: () => void;
   windowSetTitle?: (title: string) => void;
@@ -120,7 +121,7 @@ export function installDesktopRenderTracking(): void {
     }
 
     const originalCreateWindow = globalScope.createWindow.bind(globalScope);
-    globalScope.createWindow = (options: Record<string, unknown>) => {
+    globalScope.createWindow = (options: WindowOptions) => {
         globalScope[DESKTOP_WINDOW_CREATED_KEY] = true;
         return originalCreateWindow(options);
     };
