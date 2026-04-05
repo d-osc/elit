@@ -895,3 +895,10 @@ export function resolveBackdropBlurRadius(
 ): number | undefined {
     return parseBlurFilterRadius(style.backdropFilter, styleResolveOptions);
 }
+
+export function liftColorAlpha(color: NativeColorValue, delta: number): NativeColorValue {
+    return {
+        ...color,
+        alpha: Math.min(0.96, Math.max(color.alpha, 0) + Math.max(0, delta)),
+    };
+}

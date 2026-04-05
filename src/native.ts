@@ -8,68 +8,179 @@ import type {
     NativeResolvedStyleMap, NativeStyleContextMap,
     NativeStyleScope, NativeRenderHints, NativeChunkedRow,
     NativeGridTrackSizeSpec, NativeGridColumnTrackSizeSpec,
-    NativeVideoPosterFit, NativeVideoPosterPosition, NativeBackgroundRepeat,
-    NativeContentStackAlignment, NativeGridItemAlignment,
-    NativeBackgroundLayerMetadata, NativeBackgroundImageSpec, NativeBackgroundLayerSpec,
-    NativeGridTemplateAreaPlacement, NativeGridTrackDefinition, NativeChunkedLayout, NativeAutoMarginFlags,
+    NativeGridTemplateAreaPlacement, NativeChunkedLayout,
     StateLike, NativeStateValueType, NativeStateDescriptor, NativeBindingReference,
-    NativePickerOption, NativeControlEventExpressionOptions, NativeTransformContext,
+    NativeTransformContext,
     AndroidComposeContext, SwiftUIContext,
-    NativeColorValue, NativeGradientValue,
-    NativeIntrinsicSizeSpec, NativeVectorSpec,
-    NativeBorderStyleKeyword, NativeBorderSideValue, NativeBorderValue,
 } from './native-types';
 import {
-    formatFloat, splitCssFunctionArguments,
-    toDpLiteral, toPointLiteral, toSpLiteral,
+    formatFloat,
+    toDpLiteral, toPointLiteral,
     parsePlainNumericValue, resolveFlexStyleValues,
     resolveOpacityValue, resolveAspectRatioValue,
     resolveAxisReferenceLength, resolveAxisUnitNumber, toAxisDpLiteral, toAxisPointLiteral,
-    shouldClipNativeOverflow, parseCssUnitValue, toScaledUnitNumber,
+    shouldClipNativeOverflow, toScaledUnitNumber,
     getNativeStyleResolveOptions,
 } from './native-units';
 import {
     getDefaultCurrentColor, resolveStyleCurrentColor, normalizeResolvedCurrentTextColor,
-    parseCssColor, parseLinearGradient,
+    parseCssColor,
     toComposeColorLiteral, toSwiftColorLiteral, toComposeBrushLiteral, toSwiftGradientLiteral,
     parseBoxShadowList, toComposeShadowElevation, toSwiftShadowRadius,
     resolveBackdropBlurRadius,
     isFillValue,
 } from './native-color';
+import { resolveNativeDownloadSuggestedName, shouldNativeDownloadLink, isExternalDestination } from './native-link';
 import {
-    buildNativeVectorSpec, buildNativeCanvasSpec, buildNativeCanvasDrawingSpec,
+    resolveNativeObjectFitStyle, resolveNativeObjectPositionStyle,
+    resolveNativeBackgroundLayersFromStyle,
+    resolveBackgroundColor, resolveBackgroundGradient,
+    stripNativeBackgroundPaintStyles,
+} from './native-background';
+import { parseNativeTransform } from './native-transform';
+import {
+    isCheckboxInput, isRangeInput,
+    toNativeBoolean,
+    buildComposeButtonModifier,
+    buildComposeTextInputArgsFromStyle,
+    buildSwiftUIButtonModifiersFromStyle,
+    isNativeDisabled, isNativeEnabled, isNativeChecked, isNativeSelected, isNativeActive, isNativeRequired, isNativeMultiple,
+    isNativeReadOnlyState, isNativePlaceholderShown, isNativeReadWrite, isNativeElementEmpty, isNativeFocusWithin, isNativeInvalid, isNativeValid, isNativeOptional, isNativeReadOnly, isNativePseudoFocused, shouldNativeAutoFocus,
+    isNativeMuted, shouldNativeShowVideoControls, resolveNativeVideoPoster, shouldNativePlayInline, resolveNativeMediaLabel,
+    resolveImageFallbackLabel,
+    buildComposeAccessibilityModifier, buildSwiftAccessibilityModifiers, resolveNativeAccessibilityLabel,
+    resolveNativeTextInputType, resolveNativeRangeMin, resolveNativeRangeMax, resolveNativeRangeInitialValue, resolveNativeStepConstraint, resolveComposeSliderSteps, resolveSwiftKeyboardTypeModifier, shouldDisableNativeTextCapitalization,
+    serializeNativePayload, resolveNativeAction, resolveNativeRoute, buildComposeBridgeInvocation, buildSwiftBridgeInvocation,
+    buildComposeControlEventDispatchInvocation, buildComposeControlEventDispatchStatements, buildSwiftControlEventDispatchInvocation, buildSwiftControlEventDispatchStatements,
+    getNativeBindingReference,
+    resolveNativePickerOptionLabel, resolveNativePickerOptions, resolveNativePickerInitialSelection, resolveNativePickerInitialSelections,
+    resolveNativePickerDisplayLabel, buildComposePickerLabelExpression,
+    resolveNativeProgressFraction, resolveNativeSurfaceSource,
+} from './native-interaction';
+import { escapeKotlinString, quoteKotlinString, escapeSwiftString, quoteSwiftString, flattenTextContent } from './native-strings';
+import {
+    buildNativeVectorSpec, buildNativeCanvasSpec, buildNativeCanvasDrawingSpec, attachDesktopNativeMetadata,
 } from './native-vector';
+import {
+    estimateNodePreferredWidth as estimateResolvedNodePreferredWidth,
+    estimateNodePreferredHeight as estimateResolvedNodePreferredHeight,
+    shouldFillChunkedCellChild,
+    shouldDefaultFillWidthHint as estimateDefaultFillWidthHint,
+} from './native-estimation';
+import {
+    resolveNativeStretchChunkedRows,
+    resolveEffectiveChunkedContentAlignment,
+    buildComposeChunkedRowArguments,
+    buildComposeChunkedTrackModifier,
+    hasNativeGridColumnConstraint,
+    buildComposeGridCellModifier,
+    resolveComposeGridCellContentAlignment,
+    buildComposeChunkedColumnArrangement,
+    shouldRenderNativeBackgroundLayersWithWrapper,
+    buildComposeBackgroundLayerInvocation,
+    appendSwiftUIBackgroundLayers,
+    buildSwiftChunkedRowModifiers,
+    resolveSwiftGridCellFrameAlignment,
+    resolveNativeGridCellFillWidth,
+    buildSwiftGridCellFrameModifier,
+    appendSwiftUIModifiers,
+    appendSwiftUIOverlays,
+} from './native-render-support';
+import {
+    prependComposeModifierCall,
+    buildComposeCanvasSurfaceLines,
+    buildComposeVectorCanvasLines,
+    buildSwiftCanvasSurfaceLines,
+    buildSwiftVectorCanvasLines,
+} from './native-canvas';
+import {
+    createNativeStateDescriptorMap,
+    ensureComposeStateVariable,
+    ensureSwiftStateVariable,
+    toComposeTextValueExpression,
+    toSwiftTextValueExpression,
+    buildComposeStateStringAssignment,
+    buildSwiftStateStringAssignment,
+    buildComposeStateStringArrayToggleAssignment,
+    buildSwiftStringBindingExpression,
+    buildSwiftStateStringArrayToggleBinding,
+    buildSwiftReadOnlyBindingExpression,
+    buildComposeTextExpression,
+    buildSwiftTextExpression,
+    formatNativeNumberLiteral,
+} from './native-state';
+import {
+    resolveNativeBorder,
+    buildComposeSideBorderModifier,
+    buildComposeUniformStyledBorderModifier,
+    buildSwiftSideBorderOverlay,
+    buildSwiftUniformStyledBorderModifier,
+} from './native-border';
+import {
+    resolveDirectionalSpacing,
+    buildComposeMarginPaddingCalls,
+    buildSwiftMarginPaddingModifiers,
+    shouldCenterConstrainedHorizontalAutoMargins,
+    buildComposeAutoMarginCalls,
+    buildSwiftAutoMarginModifiers,
+    estimateHorizontalPadding,
+} from './native-spacing';
+import {
+    parseNativeGridTrackDefinition,
+    parseGridTrackSizeSpec,
+    parseGridColumnTrackSizeSpec,
+    resolveGridTrackSizeSpecs,
+    resolveGridColumnTrackSizeSpecs,
+    isWrapEnabled,
+    isRowFlexLayout,
+    resolveGridTrackCount,
+    resolveNativeGridTemplateAreaPlacements,
+    resolveNativeGridAutoFlow,
+    parseNativeGridLineIndexValue,
+    parseNativeGridSpanValue,
+    resolveNativeGridPlacementValue,
+    resolveNativeGridAreaPlacement,
+    createNativeGridPlaceholderNode,
+} from './native-grid';
+import {
+    resolveSwiftFontDesign,
+    resolveSwiftLineSpacing,
+    resolveTextTransform,
+    buildComposeTextStyleArgsFromStyle,
+    buildComposeLabelTextFromStyle,
+    resolveSwiftTextDecoration,
+    applyTextTransform,
+    resolveSwiftFontWeight,
+    resolveSwiftTextAlign,
+} from './native-typography';
+import {
+    resolveNativeAlignContent,
+    resolvePositionMode,
+    resolveCrossAlignmentKeyword,
+    resolveBaselineAlignmentKeyword,
+    resolveSelfAlignmentKeyword,
+    resolveComposeSelfAlignmentCall,
+    resolveSwiftSelfAlignmentModifier,
+    resolveSwiftColumnAlignment,
+    resolveSwiftRowAlignmentFromStyle,
+    resolveRowBaselineAlignmentValues,
+    resolveNativeGridCellAlignmentFromStyle,
+    resolveComposeLayoutFromStyle,
+    resolveSwiftUILayoutFromStyle,
+    buildComposeLayoutArgumentsFromStyle,
+    buildSwiftUILayoutFromStyle,
+    hasExplicitNativeWidthStyle,
+    hasExplicitNativeHeightStyle,
+    hasNativeTableLayoutSourceTag,
+    resolvePositionInsets,
+    resolveNativeContainerScope,
+} from './native-layout';
 export type {
     NativePlatform, NativePropScalar, NativePropObject, NativePropValue,
     NativeTextNode, NativeElementNode, NativeNode, NativeTree,
     NativeTransformOptions, AndroidComposeOptions, SwiftUIOptions,
     NativeCanvasPoint, NativeCanvasDrawOperation,
 } from './native-types';
-const IMAGE_FALLBACK_STOP_WORDS = new Set([
-    'image',
-    'icon',
-    'public',
-    'assets',
-    'asset',
-    'favicon',
-    'svg',
-    'png',
-    'jpg',
-    'jpeg',
-    'webp',
-]);
-
-
-// Maximum allowed length for a TextInput pattern prop, and a structural guard
-// that rejects patterns with nested quantifiers â€” the primary source of
-// catastrophic (polynomial / exponential) backtracking in NFA-based engines.
-const NATIVE_PATTERN_MAX_LENGTH = 500;
-// Matches a group that contains a + or * quantifier and is itself quantified
-// with + or * â€” e.g. (a+)+, (a|b*)+. Such patterns are the canonical
-// cause of ReDoS when applied to adversarial input.
-const REDOS_NESTED_QUANTIFIER = /\([^()]*[+*][^()]*\)[+*]/;
-
-
 
 const DEFAULT_COMPONENT_MAP: Record<string, string> = {
     html: 'Screen',
@@ -254,35 +365,6 @@ const MATH_SOURCE_TAGS = new Set([
     'msub',
     'msup',
 ]);
-
-const INLINE_DISPLAY_VALUES = new Set(['inline', 'inline-block', 'inline-flex', 'inline-grid']);
-const DEFAULT_BLOCK_FILL_SOURCE_TAGS = new Set([
-    'html',
-    'body',
-    'main',
-    'header',
-    'footer',
-    'nav',
-    'section',
-    'article',
-    'aside',
-    'div',
-    'form',
-    'fieldset',
-    'figure',
-    'details',
-    'dialog',
-    'menu',
-    'ul',
-    'ol',
-    'li',
-    'table',
-    'tbody',
-    'thead',
-    'tfoot',
-    'tr',
-]);
-const FILL_WIDTH_EXCLUDED_COMPONENTS = new Set(['Text', 'Button', 'Link', 'Toggle', 'TextInput', 'Image', 'Media', 'WebView', 'Canvas', 'Vector', 'Math']);
 
 const TEXT_CONTAINER_COMPONENTS = new Set(['Text']);
 
@@ -542,1577 +624,6 @@ function resolveComponent(tagName: string, options: Required<Omit<NativeTransfor
     if (SVG_SOURCE_TAGS.has(tagName)) return 'Vector';
     if (MATH_SOURCE_TAGS.has(tagName)) return 'Math';
     return options.preserveUnknownTags ? tagName : 'View';
-}
-
-function resolveNativeInputTypeValue(sourceTag: string, props: Record<string, NativePropValue>): string | undefined {
-    if (sourceTag === 'textarea') {
-        return 'textarea';
-    }
-
-    if (sourceTag !== 'input') {
-        return undefined;
-    }
-
-    return typeof props.type === 'string' && props.type.trim()
-        ? props.type.trim().toLowerCase()
-        : 'text';
-}
-
-function isCheckboxInput(sourceTag: string, props: Record<string, NativePropValue>): boolean {
-    return resolveNativeInputTypeValue(sourceTag, props) === 'checkbox';
-}
-
-function isRangeInput(sourceTag: string, props: Record<string, NativePropValue>): boolean {
-    return resolveNativeInputTypeValue(sourceTag, props) === 'range';
-}
-
-function isExternalDestination(value: NativePropValue | undefined): value is string {
-    return typeof value === 'string' && /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value);
-}
-
-function toNativeBoolean(value: NativePropValue | undefined): boolean {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        return normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes';
-    }
-    return false;
-}
-
-function isNativeDisabled(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.disabled) || toNativeBoolean(node.props['aria-disabled']);
-}
-
-function isNativeEnabled(node: NativeElementNode): boolean {
-    return (node.component === 'Button' || isNativeFormControl(node)) && !isNativeDisabled(node);
-}
-
-function isNativeChecked(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.checked) || toNativeBoolean(node.props['aria-checked']);
-}
-
-function isNativeSelected(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.selected)
-        || toNativeBoolean(node.props['aria-selected'])
-        || typeof node.props['aria-current'] === 'string';
-}
-
-function hasNativePressedAccessibilityState(node: NativeElementNode): boolean {
-    return node.props['aria-pressed'] !== undefined;
-}
-
-function isNativePressed(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props['aria-pressed'])
-        || toNativeBoolean(node.props.pressed)
-        || toNativeBoolean(node.props.active);
-}
-
-function isNativeActive(node: NativeElementNode): boolean {
-    return !isNativeDisabled(node) && isNativePressed(node);
-}
-
-function isNativeRequired(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.required) || toNativeBoolean(node.props['aria-required']);
-}
-
-function isNativeMultiple(node: NativeElementNode): boolean {
-    return node.component === 'Picker' && toNativeBoolean(node.props.multiple);
-}
-
-function resolveNativeLinkTarget(node: NativeElementNode): string | undefined {
-    return node.component === 'Link' && typeof node.props.target === 'string' && node.props.target.trim()
-        ? node.props.target.trim().toLowerCase()
-        : undefined;
-}
-
-function resolveNativeLinkRelTokens(node: NativeElementNode): string[] {
-    if (node.component !== 'Link' || typeof node.props.rel !== 'string') {
-        return [];
-    }
-
-    return node.props.rel
-        .split(/\s+/)
-        .map((token) => token.trim().toLowerCase())
-        .filter(Boolean);
-}
-
-function canNativeDownloadDestination(destination: string): boolean {
-    return /^https?:/i.test(destination);
-}
-
-function shouldNativeDownloadLink(node: NativeElementNode): boolean {
-    if (node.component !== 'Link' || node.props.download === undefined) {
-        return false;
-    }
-
-    const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
-    return Boolean(destination && canNativeDownloadDestination(destination));
-}
-
-function resolveNativeDownloadSuggestedName(node: NativeElementNode): string | undefined {
-    if (!shouldNativeDownloadLink(node)) {
-        return undefined;
-    }
-
-    if (typeof node.props.download === 'string' && node.props.download.trim()) {
-        return node.props.download.trim();
-    }
-
-    const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
-    if (!destination) {
-        return undefined;
-    }
-
-    const normalized = destination.split(/[?#]/, 1)[0];
-    const segments = normalized.split('/').filter(Boolean);
-    const tail = segments[segments.length - 1];
-    return tail && !tail.includes(':') ? tail : undefined;
-}
-
-function resolveNativeLinkHint(node: NativeElementNode): string | undefined {
-    if (node.component !== 'Link') {
-        return undefined;
-    }
-
-    const parts: string[] = [];
-    const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
-    const target = resolveNativeLinkTarget(node);
-    const relTokens = resolveNativeLinkRelTokens(node);
-
-    if (shouldNativeDownloadLink(node)) {
-        parts.push('Downloads file');
-    }
-
-    if (destination && (isExternalDestination(destination) || target === '_blank' || target === '_system' || relTokens.includes('external'))) {
-        parts.push('Opens externally');
-    }
-
-    return parts.length > 0 ? parts.join(', ') : undefined;
-}
-
-function isNativeFormControl(node: NativeElementNode): boolean {
-    return node.component === 'TextInput' || node.component === 'Toggle' || node.component === 'Picker' || node.component === 'Slider';
-}
-
-function canNativeParticipateInValidation(node: NativeElementNode): boolean {
-    return isNativeFormControl(node) && !isNativeDisabled(node);
-}
-
-function resolveNativeTextInputValue(node: NativeElementNode): string {
-    return typeof node.props.value === 'string' || typeof node.props.value === 'number'
-        ? String(node.props.value)
-        : '';
-}
-
-function parseNativeNonNegativeIntegerConstraint(value: NativePropValue | undefined): number | undefined {
-    const parsed = parsePlainNumericValue(value);
-    return parsed !== undefined && Number.isInteger(parsed) && parsed >= 0
-        ? parsed
-        : undefined;
-}
-
-function resolveNativeTextInputMinLength(node: NativeElementNode): number | undefined {
-    return parseNativeNonNegativeIntegerConstraint(node.props.minLength ?? node.props.minlength);
-}
-
-function resolveNativeTextInputMaxLength(node: NativeElementNode): number | undefined {
-    return parseNativeNonNegativeIntegerConstraint(node.props.maxLength ?? node.props.maxlength);
-}
-
-function resolveNativePatternExpression(node: NativeElementNode): RegExp | undefined {
-    if (node.component !== 'TextInput' || typeof node.props.pattern !== 'string' || !node.props.pattern.trim()) {
-        return undefined;
-    }
-
-    const pattern = node.props.pattern.trim();
-    if (pattern.length > NATIVE_PATTERN_MAX_LENGTH || REDOS_NESTED_QUANTIFIER.test(pattern)) {
-        return undefined;
-    }
-
-    try {
-        return new RegExp(`^(?:${pattern})$`);
-    } catch {
-        return undefined;
-    }
-}
-
-function resolveNativeNumericConstraint(value: NativePropValue | undefined): number | undefined {
-    return parsePlainNumericValue(value);
-}
-
-function resolveNativeStepConstraint(node: NativeElementNode): number | undefined {
-    if (node.props.step === undefined) {
-        return undefined;
-    }
-
-    if (typeof node.props.step === 'string' && node.props.step.trim().toLowerCase() === 'any') {
-        return undefined;
-    }
-
-    const parsed = resolveNativeNumericConstraint(node.props.step);
-    return parsed !== undefined && parsed > 0 ? parsed : undefined;
-}
-
-function supportsNativePatternValidation(node: NativeElementNode): boolean {
-    switch (resolveNativeTextInputType(node)) {
-        case 'text':
-        case 'password':
-        case 'email':
-        case 'tel':
-        case 'url':
-        case 'search':
-            return true;
-        default:
-            return false;
-    }
-}
-
-function isNativeEmailValue(value: string): boolean {
-    return /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(value);
-}
-
-function isNativeUrlValue(value: string): boolean {
-    try {
-        const parsed = new URL(value);
-        return Boolean(parsed.protocol && parsed.hostname);
-    } catch {
-        return false;
-    }
-}
-
-function hasNativeValidationConstraint(node: NativeElementNode): boolean {
-    if (node.props['aria-invalid'] !== undefined) {
-        return true;
-    }
-
-    if (node.component === 'TextInput') {
-        return isNativeRequired(node)
-            || resolveNativeTextInputMinLength(node) !== undefined
-            || resolveNativeTextInputMaxLength(node) !== undefined
-            || resolveNativePatternExpression(node) !== undefined
-            || resolveNativeNumericConstraint(node.props.min) !== undefined
-            || resolveNativeNumericConstraint(node.props.max) !== undefined
-            || resolveNativeStepConstraint(node) !== undefined
-            || resolveNativeTextInputType(node) === 'email'
-            || resolveNativeTextInputType(node) === 'url'
-            || resolveNativeTextInputType(node) === 'number';
-    }
-
-    return isNativeRequired(node);
-}
-
-function isNativeTextInputConstraintInvalid(node: NativeElementNode): boolean {
-    const value = resolveNativeTextInputValue(node);
-    const trimmedValue = value.trim();
-
-    if (isNativeRequired(node) && trimmedValue.length === 0) {
-        return true;
-    }
-
-    if (trimmedValue.length === 0) {
-        return false;
-    }
-
-    const inputType = resolveNativeTextInputType(node);
-    if (inputType === 'email' && !isNativeEmailValue(trimmedValue)) {
-        return true;
-    }
-
-    if (inputType === 'url' && !isNativeUrlValue(trimmedValue)) {
-        return true;
-    }
-
-    const minLength = resolveNativeTextInputMinLength(node);
-    if (minLength !== undefined && value.length < minLength) {
-        return true;
-    }
-
-    const maxLength = resolveNativeTextInputMaxLength(node);
-    if (maxLength !== undefined && value.length > maxLength) {
-        return true;
-    }
-
-    const patternExpression = supportsNativePatternValidation(node)
-        ? resolveNativePatternExpression(node)
-        : undefined;
-    if (patternExpression && !patternExpression.test(value)) {
-        return true;
-    }
-
-    if (inputType === 'number') {
-        const numericValue = Number(trimmedValue);
-        if (!Number.isFinite(numericValue)) {
-            return true;
-        }
-
-        const min = resolveNativeNumericConstraint(node.props.min);
-        if (min !== undefined && numericValue < min) {
-            return true;
-        }
-
-        const max = resolveNativeNumericConstraint(node.props.max);
-        if (max !== undefined && numericValue > max) {
-            return true;
-        }
-
-        const step = resolveNativeStepConstraint(node);
-        if (step !== undefined) {
-            const stepBase = resolveNativeNumericConstraint(node.props.min) ?? 0;
-            const steps = (numericValue - stepBase) / step;
-            if (Math.abs(steps - Math.round(steps)) > 1e-7) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-function isNativePlaceholderShown(node: NativeElementNode): boolean {
-    return node.component === 'TextInput'
-        && typeof node.props.placeholder === 'string'
-        && node.props.placeholder.length > 0
-        && resolveNativeTextInputValue(node).length === 0;
-}
-
-function isNativeReadOnlyState(node: NativeElementNode): boolean {
-    return node.component === 'TextInput' && (isNativeReadOnly(node) || isNativeDisabled(node));
-}
-
-function isNativeReadWrite(node: NativeElementNode): boolean {
-    return node.component === 'TextInput' && !isNativeReadOnlyState(node);
-}
-
-function isNativeElementEmpty(node: NativeElementNode): boolean {
-    return node.children.every((child) => child.kind === 'text' && child.value.length === 0);
-}
-
-function isNativeFocusWithin(node: NativeElementNode): boolean {
-    if (isNativePseudoFocused(node)) {
-        return true;
-    }
-
-    return node.children.some((child) => child.kind === 'element' && isNativeFocusWithin(child));
-}
-
-function isNativeAriaInvalid(node: NativeElementNode): boolean {
-    const value = node.props['aria-invalid'];
-    if (value === undefined || value === null || value === false) {
-        return false;
-    }
-
-    if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        return normalized.length > 0 && normalized !== 'false';
-    }
-
-    return toNativeBoolean(value);
-}
-
-function isNativeInvalid(node: NativeElementNode): boolean {
-    if (isNativeAriaInvalid(node)) {
-        return true;
-    }
-
-    if (!isNativeFormControl(node)) {
-        return false;
-    }
-
-    if (!canNativeParticipateInValidation(node)) {
-        return false;
-    }
-
-    if (node.component === 'TextInput') {
-        return isNativeTextInputConstraintInvalid(node);
-    }
-
-    if (!isNativeRequired(node)) {
-        return false;
-    }
-
-    if (node.component === 'Toggle') {
-        return !isNativeChecked(node);
-    }
-
-    if (node.component === 'Picker') {
-        const options = resolveNativePickerOptions(node);
-        return isNativeMultiple(node)
-            ? resolveNativePickerInitialSelections(node, options).length === 0
-            : resolveNativePickerInitialSelection(node, options).trim().length === 0;
-    }
-
-    return false;
-}
-
-function isNativeValid(node: NativeElementNode): boolean {
-    return canNativeParticipateInValidation(node) && !isNativeInvalid(node);
-}
-
-function isNativeOptional(node: NativeElementNode): boolean {
-    return isNativeFormControl(node) && !isNativeRequired(node);
-}
-
-function isNativeReadOnly(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.readOnly) || toNativeBoolean(node.props.readonly);
-}
-
-function parseNativeTabIndex(node: NativeElementNode): number | undefined {
-    const rawValue = node.props.tabIndex ?? node.props.tabindex;
-    if (typeof rawValue === 'number' && Number.isInteger(rawValue)) {
-        return rawValue;
-    }
-
-    if (typeof rawValue === 'string' && /^-?\d+$/.test(rawValue.trim())) {
-        return Number(rawValue.trim());
-    }
-
-    return undefined;
-}
-
-function hasNativeExplicitFocusSignal(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.autoFocus)
-        || toNativeBoolean(node.props.autofocus)
-        || toNativeBoolean(node.props.focused)
-        || toNativeBoolean(node.props['aria-focused']);
-}
-
-function isNativeFocusableRole(node: NativeElementNode): boolean {
-    const role = typeof node.props.role === 'string'
-        ? node.props.role.trim().toLowerCase()
-        : undefined;
-
-    return role === 'button'
-        || role === 'link'
-        || role === 'checkbox'
-        || role === 'switch'
-        || role === 'tab'
-        || role === 'textbox'
-        || role === 'combobox';
-}
-
-function isNativeFocusableElement(node: NativeElementNode): boolean {
-    if (isNativeDisabled(node)) {
-        return false;
-    }
-
-    const tabIndex = parseNativeTabIndex(node);
-    if (tabIndex !== undefined) {
-        return tabIndex >= 0;
-    }
-
-    if (toNativeBoolean(node.props.contentEditable) || toNativeBoolean(node.props.contenteditable)) {
-        return true;
-    }
-
-    if (node.component === 'TextInput' || node.component === 'Button' || node.component === 'Link' || node.component === 'Toggle' || node.component === 'Picker' || node.component === 'Slider') {
-        return true;
-    }
-
-    return isNativeFocusableRole(node);
-}
-
-function isNativePseudoFocused(node: NativeElementNode): boolean {
-    return hasNativeExplicitFocusSignal(node) && isNativeFocusableElement(node);
-}
-
-function shouldNativeAutoFocus(node: NativeElementNode): boolean {
-    return node.component === 'TextInput' && hasNativeExplicitFocusSignal(node) && !isNativeDisabled(node);
-}
-
-function isNativeMuted(node: NativeElementNode): boolean {
-    return toNativeBoolean(node.props.muted);
-}
-
-function shouldNativeShowVideoControls(node: NativeElementNode): boolean {
-    return node.sourceTag === 'video' && toNativeBoolean(node.props.controls);
-}
-
-function resolveNativeVideoPoster(node: NativeElementNode): string | undefined {
-    return node.sourceTag === 'video' && typeof node.props.poster === 'string' && node.props.poster.trim()
-        ? node.props.poster.trim()
-        : undefined;
-}
-
-function resolveNativeObjectFitStyle(style: Record<string, NativePropValue> | undefined): NativeVideoPosterFit {
-    const rawValue = typeof style?.objectFit === 'string' ? style.objectFit.trim().toLowerCase() : '';
-
-    switch (rawValue) {
-        case 'contain':
-        case 'fill':
-        case 'none':
-        case 'scale-down':
-            return rawValue;
-        default:
-            return 'cover';
-    }
-}
-
-function resolveNativeVideoPosterFit(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeVideoPosterFit {
-    if (node.sourceTag !== 'video') {
-        return 'cover';
-    }
-
-    return resolveNativeObjectFitStyle(getStyleObject(node, resolvedStyles, styleResolveOptions));
-}
-
-function resolveNativeImageFit(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeVideoPosterFit {
-    return resolveNativeObjectFitStyle(getStyleObject(node, resolvedStyles, styleResolveOptions));
-}
-
-function normalizeNativePositionToken(value: string): 'leading' | 'center' | 'trailing' | 'top' | 'bottom' | undefined {
-    const normalized = value.trim().toLowerCase();
-
-    switch (normalized) {
-        case 'left':
-        case '0%':
-            return 'leading';
-        case 'right':
-        case '100%':
-            return 'trailing';
-        case 'top':
-            return 'top';
-        case 'bottom':
-            return 'bottom';
-        case 'center':
-        case '50%':
-            return 'center';
-        default:
-            return undefined;
-    }
-}
-
-function resolveNativeObjectPositionStyle(style: Record<string, NativePropValue> | undefined): NativeVideoPosterPosition {
-    if (typeof style?.objectPosition !== 'string' || !style.objectPosition.trim()) {
-        return 'center';
-    }
-
-    const tokens = style.objectPosition.trim().split(/\s+/).map(normalizeNativePositionToken).filter((value): value is 'leading' | 'center' | 'trailing' | 'top' | 'bottom' => Boolean(value));
-    if (tokens.length === 0) {
-        return 'center';
-    }
-
-    let horizontal: 'leading' | 'center' | 'trailing' = 'center';
-    let vertical: 'top' | 'center' | 'bottom' = 'center';
-
-    for (const token of tokens) {
-        if (token === 'leading' || token === 'trailing') {
-            horizontal = token;
-        } else if (token === 'top' || token === 'bottom') {
-            vertical = token;
-        } else if (tokens.length === 1) {
-            horizontal = 'center';
-            vertical = 'center';
-        }
-    }
-
-    if (horizontal === 'center' && vertical === 'center') {
-        return 'center';
-    }
-
-    if (horizontal === 'center') {
-        return vertical;
-    }
-
-    if (vertical === 'center') {
-        return horizontal;
-    }
-
-    return `${vertical}-${horizontal}` as NativeVideoPosterPosition;
-}
-
-function resolveNativeVideoPosterPosition(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeVideoPosterPosition {
-    if (node.sourceTag !== 'video') {
-        return 'center';
-    }
-
-    return resolveNativeObjectPositionStyle(getStyleObject(node, resolvedStyles, styleResolveOptions));
-}
-
-function resolveNativeImagePosition(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeVideoPosterPosition {
-    return resolveNativeObjectPositionStyle(getStyleObject(node, resolvedStyles, styleResolveOptions));
-}
-
-function resolveNativeContentStackAlignmentKeyword(value: NativePropValue | undefined): NativeContentStackAlignment | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    switch (value.trim().toLowerCase()) {
-        case 'flex-start':
-        case 'start':
-        case 'top':
-            return 'start';
-        case 'center':
-            return 'center';
-        case 'flex-end':
-        case 'end':
-        case 'bottom':
-            return 'end';
-        case 'normal':
-        case 'stretch':
-            return 'stretch';
-        case 'space-between':
-            return 'space-between';
-        case 'space-around':
-            return 'space-around';
-        case 'space-evenly':
-            return 'space-evenly';
-        default:
-            return undefined;
-    }
-}
-
-function resolveNativePlaceContent(
-    value: NativePropValue | undefined,
-): { align?: NativeContentStackAlignment; justify?: string } | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tokens = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) {
-        return undefined;
-    }
-
-    const align = resolveNativeContentStackAlignmentKeyword(tokens[0]);
-    const justify = tokens[1] ?? tokens[0];
-
-    return align || justify
-        ? {
-            ...(align ? { align } : {}),
-            ...(justify ? { justify } : {}),
-        }
-        : undefined;
-}
-
-function resolveNativeAlignContent(style: Record<string, NativePropValue> | undefined): NativeContentStackAlignment | undefined {
-    const direct = resolveNativeContentStackAlignmentKeyword(style?.alignContent);
-    if (direct) {
-        return direct;
-    }
-
-    return resolveNativePlaceContent(style?.placeContent)?.align;
-}
-
-function resolveNativeJustifyContent(style: Record<string, NativePropValue> | undefined): string | undefined {
-    if (!style) {
-        return undefined;
-    }
-
-    if (typeof style.justifyContent === 'string' && style.justifyContent.trim()) {
-        return style.justifyContent.trim().toLowerCase();
-    }
-
-    return resolveNativePlaceContent(style.placeContent)?.justify;
-}
-
-function extractCssUrlValue(value: string): string | undefined {
-    const match = value.match(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s"'()]+))\s*\)/i);
-    const resolved = match?.[1] ?? match?.[2] ?? match?.[3];
-    return resolved?.trim() || undefined;
-}
-
-function extractCssFunctionValue(value: string, functionName: string): string | undefined {
-    const lowerValue = value.toLowerCase();
-    const lowerFunctionName = functionName.toLowerCase();
-    const needle = `${lowerFunctionName}(`;
-    let searchIndex = 0;
-
-    while (searchIndex < value.length) {
-        const matchIndex = lowerValue.indexOf(needle, searchIndex);
-        if (matchIndex < 0) {
-            return undefined;
-        }
-
-        const previousChar = matchIndex > 0 ? lowerValue[matchIndex - 1] : undefined;
-        if (previousChar && /[a-z0-9-]/.test(previousChar)) {
-            searchIndex = matchIndex + lowerFunctionName.length;
-            continue;
-        }
-
-        let depth = 0;
-        for (let index = matchIndex + lowerFunctionName.length; index < value.length; index += 1) {
-            const char = value[index];
-            if (char === '(') {
-                depth += 1;
-            } else if (char === ')' && depth > 0) {
-                depth -= 1;
-                if (depth === 0) {
-                    return value.slice(matchIndex, index + 1);
-                }
-            }
-        }
-
-        return undefined;
-    }
-
-    return undefined;
-}
-
-function stripCssFunctionValue(value: string, functionName: string): string {
-    const functionValue = extractCssFunctionValue(value, functionName);
-    return functionValue ? value.replace(functionValue, ' ') : value;
-}
-
-function splitNativeBackgroundLayers(value: NativePropValue | undefined): string[] {
-    if (typeof value !== 'string' || !value.trim()) {
-        return [];
-    }
-
-    return splitCssFunctionArguments(value)
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-}
-
-function normalizeNativeBackgroundRepeat(value: string | undefined): NativeBackgroundRepeat | undefined {
-    switch (value?.trim().toLowerCase()) {
-        case 'repeat':
-        case 'repeat-x':
-        case 'repeat-y':
-        case 'no-repeat':
-            return value.trim().toLowerCase() as NativeBackgroundRepeat;
-        default:
-            return undefined;
-    }
-}
-
-function normalizeNativeBackgroundPositionValue(rawPosition: string | undefined): string | undefined {
-    if (!rawPosition) {
-        return undefined;
-    }
-
-    const positionTokens = rawPosition
-        .split(/\s+/)
-        .map((token) => token.trim())
-        .filter((token) => normalizeNativePositionToken(token) !== undefined);
-    return positionTokens.length > 0 ? positionTokens.join(' ') : undefined;
-}
-
-function normalizeNativeBackgroundSizeValue(rawSize: string | undefined): string | undefined {
-    const sizeCandidate = rawSize?.trim().toLowerCase();
-    return sizeCandidate?.startsWith('100% 100%')
-        ? '100% 100%'
-        : sizeCandidate?.startsWith('auto auto')
-            ? 'auto auto'
-            : sizeCandidate?.startsWith('scale-down')
-                ? 'scale-down'
-                : sizeCandidate?.match(/^(contain|cover|fill|none|auto)\b/i)?.[1]?.toLowerCase();
-}
-
-function resolveNativeBackgroundColorLayer(
-    color: NativeColorValue | undefined,
-    style: Record<string, NativePropValue>,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeColorValue | undefined {
-    const backdropBlur = color ? resolveBackdropBlurRadius(style, styleResolveOptions) : undefined;
-
-    if (!color || backdropBlur === undefined || color.alpha >= 1) {
-        return color;
-    }
-
-    return liftColorAlpha(color, Math.min(0.14, backdropBlur / 160));
-}
-
-function parseNativeBackgroundLayerMetadata(
-    layer: string,
-    currentColor: NativeColorValue,
-): NativeBackgroundLayerMetadata | undefined {
-    const sourceToken = extractCssFunctionValue(layer, 'url');
-    const gradientToken = extractCssFunctionValue(layer, 'linear-gradient');
-    const source = sourceToken ? extractCssUrlValue(sourceToken) : undefined;
-    const gradient = gradientToken ? parseLinearGradient(gradientToken, currentColor) : undefined;
-
-    let remainder = stripCssFunctionValue(stripCssFunctionValue(layer, 'url'), 'linear-gradient');
-
-    const repeatMatch = remainder.match(/\b(no-repeat|repeat-[xy]|repeat)\b/i);
-    const repeat = normalizeNativeBackgroundRepeat(repeatMatch?.[1]);
-    if (repeatMatch) {
-        remainder = `${remainder.slice(0, repeatMatch.index)} ${remainder.slice((repeatMatch.index ?? 0) + repeatMatch[0].length)}`.trim();
-    }
-
-    const [rawPosition, rawSize] = remainder.split('/', 2).map((s) => s.trim()) as [string, string | undefined];
-    const position = normalizeNativeBackgroundPositionValue(rawPosition);
-    const size = normalizeNativeBackgroundSizeValue(rawSize);
-    const color = parseCssColor(remainder, currentColor);
-
-    if (!source && !gradient && !color) {
-        return undefined;
-    }
-
-    return {
-        ...(source ? { source } : {}),
-        ...(gradient ? { gradient } : {}),
-        ...(color ? { color } : {}),
-        ...(repeat ? { repeat } : {}),
-        ...(size ? { size } : {}),
-        ...(position ? { position } : {}),
-    };
-}
-
-function resolveNativeBackgroundShorthandColor(
-    value: NativePropValue | undefined,
-    currentColor: NativeColorValue,
-): NativeColorValue | undefined {
-    if (typeof value !== 'string' || !value.trim()) {
-        return undefined;
-    }
-
-    let color: NativeColorValue | undefined;
-    for (const layer of splitNativeBackgroundLayers(value)) {
-        color = parseNativeBackgroundLayerMetadata(layer, currentColor)?.color ?? color;
-    }
-
-    return color;
-}
-
-function resolveNativeBackgroundShorthandLayers(
-    value: NativePropValue | undefined,
-    currentColor: NativeColorValue,
-): NativeBackgroundLayerMetadata[] {
-    if (typeof value !== 'string' || !value.trim()) {
-        return [];
-    }
-
-    return splitNativeBackgroundLayers(value)
-        .map((layer) => parseNativeBackgroundLayerMetadata(layer, currentColor))
-        .filter((layer): layer is NativeBackgroundLayerMetadata => Boolean(layer));
-}
-
-function pickNativeBackgroundLayerValue(layers: string[], index: number): string | undefined {
-    if (layers.length === 0) {
-        return undefined;
-    }
-
-    return layers[index % layers.length];
-}
-
-function resolveNativeBackgroundRepeatValue(value: string | undefined): NativeBackgroundRepeat {
-    return normalizeNativeBackgroundRepeat(value) ?? 'no-repeat';
-}
-
-function resolveNativeBackgroundImageFitValue(rawSize: string | undefined, repeat: NativeBackgroundRepeat): NativeVideoPosterFit {
-    const normalizedSize = normalizeNativeBackgroundSizeValue(rawSize) ?? '';
-
-    switch (normalizedSize) {
-        case 'contain':
-        case 'cover':
-        case 'fill':
-        case 'none':
-        case 'scale-down':
-            return normalizedSize;
-        case '100% 100%':
-            return 'fill';
-        case 'auto':
-        case 'auto auto':
-            return repeat !== 'no-repeat' ? 'none' : 'cover';
-        default:
-            return repeat !== 'no-repeat' ? 'none' : 'cover';
-    }
-}
-
-function resolveNativeBackgroundImagePositionValue(rawPosition: string | undefined): NativeVideoPosterPosition {
-    const normalizedPosition = normalizeNativeBackgroundPositionValue(rawPosition);
-    if (!normalizedPosition) {
-        return 'center';
-    }
-
-    const tokens = normalizedPosition.split(/\s+/)
-        .map(normalizeNativePositionToken)
-        .filter((value): value is 'leading' | 'center' | 'trailing' | 'top' | 'bottom' => Boolean(value));
-    if (tokens.length === 0) {
-        return 'center';
-    }
-
-    let horizontal: 'leading' | 'center' | 'trailing' = 'center';
-    let vertical: 'top' | 'center' | 'bottom' = 'center';
-
-    for (const token of tokens) {
-        if (token === 'leading' || token === 'trailing') {
-            horizontal = token;
-        } else if (token === 'top' || token === 'bottom') {
-            vertical = token;
-        } else if (tokens.length === 1) {
-            horizontal = 'center';
-            vertical = 'center';
-        }
-    }
-
-    if (horizontal === 'center' && vertical === 'center') {
-        return 'center';
-    }
-
-    if (horizontal === 'center') {
-        return vertical;
-    }
-
-    if (vertical === 'center') {
-        return horizontal;
-    }
-
-    return `${vertical}-${horizontal}` as NativeVideoPosterPosition;
-}
-
-function resolveNativeBackgroundLayersFromStyle(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): NativeBackgroundLayerSpec[] {
-    if (!style) {
-        return [];
-    }
-
-    const currentColor = resolveStyleCurrentColor(style);
-    const layers: NativeBackgroundLayerSpec[] = [];
-
-    if (typeof style.backgroundImage === 'string' && style.backgroundImage.trim()) {
-        const repeatLayers = splitNativeBackgroundLayers(style.backgroundRepeat);
-        const sizeLayers = splitNativeBackgroundLayers(style.backgroundSize);
-        const positionLayers = splitNativeBackgroundLayers(style.backgroundPosition);
-
-        splitNativeBackgroundLayers(style.backgroundImage).forEach((entry, index) => {
-            const source = extractCssUrlValue(entry);
-            if (!source) {
-                const gradient = parseLinearGradient(entry, currentColor);
-                if (gradient) {
-                    layers.push({ kind: 'gradient', gradient });
-                }
-                return;
-            }
-
-            const repeat = resolveNativeBackgroundRepeatValue(pickNativeBackgroundLayerValue(repeatLayers, index));
-            const size = pickNativeBackgroundLayerValue(sizeLayers, index);
-            const position = pickNativeBackgroundLayerValue(positionLayers, index);
-
-            layers.push({
-                kind: 'image',
-                source,
-                fit: resolveNativeBackgroundImageFitValue(size, repeat),
-                position: resolveNativeBackgroundImagePositionValue(position),
-                repeat,
-            });
-        });
-    } else {
-        for (const layer of resolveNativeBackgroundShorthandLayers(style.background, currentColor)) {
-            if (layer.source) {
-                const repeat = resolveNativeBackgroundRepeatValue(layer.repeat);
-                layers.push({
-                    kind: 'image',
-                    source: layer.source,
-                    fit: resolveNativeBackgroundImageFitValue(layer.size, repeat),
-                    position: resolveNativeBackgroundImagePositionValue(layer.position),
-                    repeat,
-                });
-                continue;
-            }
-
-            if (layer.gradient) {
-                layers.push({ kind: 'gradient', gradient: layer.gradient });
-            }
-        }
-    }
-
-    let explicitBackgroundColor: NativeColorValue | undefined;
-    if (style.backgroundColor !== undefined) {
-        const styleWithoutBackground = { ...style };
-        delete styleWithoutBackground.background;
-        explicitBackgroundColor = resolveBackgroundColor(styleWithoutBackground, styleResolveOptions);
-    }
-    const shouldReadBackgroundColorFallback = typeof style.background === 'string'
-        && (!style.backgroundImage
-            || (!/url\(/i.test(style.background) && !/linear-gradient\(/i.test(style.background) && !style.background.includes(',')));
-    const shorthandBackgroundColor = shouldReadBackgroundColorFallback
-        ? resolveNativeBackgroundColorLayer(resolveNativeBackgroundShorthandColor(style.background, currentColor), style, styleResolveOptions)
-        : undefined;
-    const backgroundColor = explicitBackgroundColor ?? shorthandBackgroundColor;
-
-    if (backgroundColor) {
-        layers.push({ kind: 'color', color: backgroundColor });
-    }
-
-    return layers;
-}
-
-function resolveNativeBackgroundLayers(
-    node: NativeElementNode,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeBackgroundLayerSpec[] {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    return resolveNativeBackgroundLayersFromStyle(style, styleResolveOptions);
-}
-
-function stripNativeBackgroundPaintStyles(style: Record<string, NativePropValue> | undefined): Record<string, NativePropValue> | undefined {
-    if (!style) {
-        return undefined;
-    }
-
-    const nextStyle = { ...style };
-    delete nextStyle.background;
-    delete nextStyle.backgroundColor;
-    delete nextStyle.backgroundImage;
-    delete nextStyle.backgroundRepeat;
-    delete nextStyle.backgroundPosition;
-    delete nextStyle.backgroundSize;
-    return nextStyle;
-}
-
-function shouldNativePlayInline(node: NativeElementNode): boolean {
-    return node.sourceTag === 'video' && (
-        toNativeBoolean(node.props.playsInline)
-        || toNativeBoolean(node.props.playsinline)
-    );
-}
-
-function resolveNativeExplicitAccessibilityLabel(node: NativeElementNode): string | undefined {
-    const explicitLabel = typeof node.props['aria-label'] === 'string' && node.props['aria-label'].trim()
-        ? node.props['aria-label'].trim()
-        : typeof node.props.title === 'string' && node.props.title.trim()
-            ? node.props.title.trim()
-            : undefined;
-
-    if (explicitLabel) {
-        return explicitLabel;
-    }
-
-    if (typeof node.props.alt === 'string' && node.props.alt.trim()) {
-        return node.props.alt.trim();
-    }
-
-    return undefined;
-}
-
-function resolveNativeAccessibilityLabel(node: NativeElementNode): string | undefined {
-    const explicitLabel = resolveNativeExplicitAccessibilityLabel(node);
-
-    if (explicitLabel) {
-        return explicitLabel;
-    }
-
-    if (node.component === 'Picker') {
-        if (typeof node.props.placeholder === 'string' && node.props.placeholder.trim()) {
-            return node.props.placeholder.trim();
-        }
-
-        return isNativeMultiple(node) ? 'Selection list' : 'Select';
-    }
-
-    const textContent = flattenTextContent(node.children).trim();
-    if (textContent) {
-        return textContent;
-    }
-
-    if (typeof node.props.placeholder === 'string' && node.props.placeholder.trim()) {
-        return node.props.placeholder.trim();
-    }
-
-    if (node.component === 'Media') {
-        return resolveNativeMediaLabel(node);
-    }
-
-    if (node.component === 'WebView') {
-        return 'Web content';
-    }
-
-    return undefined;
-}
-
-function resolveNativeAccessibilityHint(node: NativeElementNode): string | undefined {
-    const parts: string[] = [];
-
-    if (typeof node.props['aria-description'] === 'string' && node.props['aria-description'].trim()) {
-        parts.push(node.props['aria-description'].trim());
-    }
-
-    const linkHint = resolveNativeLinkHint(node);
-    if (linkHint) {
-        parts.push(linkHint);
-    }
-
-    return parts.length > 0 ? parts.join(', ') : undefined;
-}
-
-function resolveNativeAccessibilityRole(node: NativeElementNode): 'button' | 'link' | 'checkbox' | 'switch' | 'tab' | 'image' | 'heading' | undefined {
-    const explicitRole = typeof node.props.role === 'string'
-        ? node.props.role.trim().toLowerCase()
-        : undefined;
-
-    switch (explicitRole) {
-        case 'button':
-        case 'link':
-        case 'checkbox':
-        case 'switch':
-        case 'tab':
-        case 'image':
-        case 'heading':
-            return explicitRole;
-        case 'img':
-            return 'image';
-        default:
-            break;
-    }
-
-    return undefined;
-}
-
-function hasExplicitNativeAccessibilitySignal(node: NativeElementNode): boolean {
-    return Boolean(
-        resolveNativeExplicitAccessibilityLabel(node)
-        || resolveNativeAccessibilityHint(node)
-        || resolveNativeLinkHint(node)
-        || (typeof node.props.role === 'string' && node.props.role.trim())
-        || node.props['aria-selected'] !== undefined
-        || node.props['aria-checked'] !== undefined
-        || node.props['aria-pressed'] !== undefined
-        || node.props['aria-disabled'] !== undefined
-        || node.props['aria-expanded'] !== undefined
-        || node.props['aria-invalid'] !== undefined
-        || node.props['aria-current'] !== undefined
-        || node.props['aria-valuetext'] !== undefined
-        || node.props['aria-required'] !== undefined
-        || toNativeBoolean(node.props.required)
-        || isNativeMultiple(node)
-    );
-}
-
-function shouldEmitNativeAccessibilityLabel(node: NativeElementNode): boolean {
-    return hasExplicitNativeAccessibilitySignal(node);
-}
-
-function resolveNativeAccessibilityStateParts(node: NativeElementNode): string[] {
-    const parts: string[] = [];
-    const role = resolveNativeAccessibilityRole(node);
-    const hasSelectedState = node.props['aria-selected'] !== undefined || typeof node.props['aria-current'] === 'string' || role === 'tab';
-    const hasCheckedState = node.component === 'Toggle' || node.props['aria-checked'] !== undefined || role === 'checkbox' || role === 'switch';
-    const hasPressedState = hasNativePressedAccessibilityState(node);
-
-    if (isNativeRequired(node)) {
-        parts.push('Required');
-    }
-
-    if (isNativeInvalid(node)) {
-        parts.push('Invalid');
-    }
-
-    if (!isNativeInvalid(node) && hasNativeValidationConstraint(node) && isNativeValid(node)) {
-        parts.push('Valid');
-    }
-
-    if (isNativeDisabled(node)) {
-        parts.push('Disabled');
-    }
-
-    if (hasSelectedState) {
-        parts.push(isNativeSelected(node) ? 'Selected' : 'Not selected');
-    }
-
-    if (hasCheckedState) {
-        parts.push(isNativeChecked(node) ? 'Checked' : 'Unchecked');
-    }
-
-    if (hasPressedState) {
-        parts.push(isNativePressed(node) ? 'Pressed' : 'Not pressed');
-    }
-
-    if (node.props['aria-expanded'] !== undefined) {
-        parts.push(toNativeBoolean(node.props['aria-expanded']) ? 'Expanded' : 'Collapsed');
-    }
-
-    if (typeof node.props['aria-valuetext'] === 'string' && node.props['aria-valuetext'].trim()) {
-        parts.push(node.props['aria-valuetext'].trim());
-    }
-
-    return [...new Set(parts)];
-}
-
-function resolveComposeAccessibilityRoleExpression(node: NativeElementNode): string | undefined {
-    switch (resolveNativeAccessibilityRole(node)) {
-        case 'button':
-        case 'link':
-            return 'Role.Button';
-        case 'checkbox':
-            return 'Role.Checkbox';
-        case 'switch':
-            return 'Role.Switch';
-        case 'tab':
-            return 'Role.Tab';
-        case 'image':
-            return 'Role.Image';
-        default:
-            return undefined;
-    }
-}
-
-function buildComposeAccessibilityModifier(node: NativeElementNode): string | undefined {
-    if (!hasExplicitNativeAccessibilitySignal(node)) {
-        return undefined;
-    }
-
-    const statements: string[] = [];
-    const label = shouldEmitNativeAccessibilityLabel(node) ? resolveNativeAccessibilityLabel(node) : undefined;
-    const hint = resolveNativeAccessibilityHint(node);
-    const stateParts = resolveNativeAccessibilityStateParts(node);
-    const stateDescription = [hint, ...stateParts].filter((value): value is string => Boolean(value)).join(', ');
-    const roleExpression = resolveComposeAccessibilityRoleExpression(node);
-    const role = resolveNativeAccessibilityRole(node);
-
-    if (label) {
-        statements.push(`contentDescription = ${quoteKotlinString(label)}`);
-    }
-
-    if (roleExpression) {
-        statements.push(`role = ${roleExpression}`);
-    }
-
-    if ((node.props['aria-selected'] !== undefined || typeof node.props['aria-current'] === 'string' || role === 'tab') && isNativeSelected(node)) {
-        statements.push('selected = true');
-    }
-
-    if (stateDescription) {
-        statements.push(`stateDescription = ${quoteKotlinString(stateDescription)}`);
-    }
-
-    if (role === 'heading') {
-        statements.push('heading()');
-    }
-
-    if (node.props['aria-disabled'] !== undefined) {
-        statements.push('disabled()');
-    }
-
-    return statements.length > 0
-        ? `semantics(mergeDescendants = true) { ${statements.join('; ')} }`
-        : undefined;
-}
-
-function buildSwiftAccessibilityModifiers(node: NativeElementNode): string[] {
-    if (!hasExplicitNativeAccessibilitySignal(node)) {
-        return [];
-    }
-
-    const modifiers: string[] = [];
-    const label = shouldEmitNativeAccessibilityLabel(node) ? resolveNativeAccessibilityLabel(node) : undefined;
-    const hint = resolveNativeAccessibilityHint(node);
-    const value = resolveNativeAccessibilityStateParts(node).join(', ');
-    const role = resolveNativeAccessibilityRole(node);
-
-    if (label) {
-        modifiers.push(`.accessibilityLabel(${quoteSwiftString(label)})`);
-    }
-
-    if (hint) {
-        modifiers.push(`.accessibilityHint(${quoteSwiftString(hint)})`);
-    }
-
-    if (value) {
-        modifiers.push(`.accessibilityValue(${quoteSwiftString(value)})`);
-    }
-
-    if (role === 'button') {
-        modifiers.push('.accessibilityAddTraits(.isButton)');
-    } else if (role === 'link') {
-        modifiers.push('.accessibilityAddTraits(.isLink)');
-    } else if (role === 'image') {
-        modifiers.push('.accessibilityAddTraits(.isImage)');
-    } else if (role === 'heading') {
-        modifiers.push('.accessibilityAddTraits(.isHeader)');
-    }
-
-    if ((node.props['aria-selected'] !== undefined || typeof node.props['aria-current'] === 'string' || role === 'tab') && isNativeSelected(node)) {
-        modifiers.push('.accessibilityAddTraits(.isSelected)');
-    }
-
-    return modifiers;
-}
-
-function resolveNativeTextInputType(node: NativeElementNode): 'text' | 'password' | 'email' | 'number' | 'tel' | 'url' | 'search' | 'textarea' {
-    const inputType = resolveNativeInputTypeValue(node.sourceTag, node.props);
-
-    switch (inputType) {
-        case 'password':
-        case 'email':
-        case 'number':
-        case 'tel':
-        case 'url':
-        case 'search':
-            return inputType;
-        default:
-            return 'text';
-    }
-}
-
-function resolveNativeRangeMin(node: NativeElementNode): number {
-    return resolveNativeNumericConstraint(node.props.min) ?? 0;
-}
-
-function resolveNativeRangeMax(node: NativeElementNode): number {
-    const min = resolveNativeRangeMin(node);
-    const max = resolveNativeNumericConstraint(node.props.max);
-    return max !== undefined && max > min ? max : min + 100;
-}
-
-function resolveNativeRangeInitialValue(node: NativeElementNode): number {
-    const min = resolveNativeRangeMin(node);
-    const max = resolveNativeRangeMax(node);
-    const value = resolveNativeNumericConstraint(node.props.value);
-    const candidate = value !== undefined ? value : min;
-    return Math.min(max, Math.max(min, candidate));
-}
-
-function resolveComposeSliderSteps(node: NativeElementNode): number | undefined {
-    const step = resolveNativeStepConstraint(node);
-    if (step === undefined) {
-        return undefined;
-    }
-
-    const intervals = (resolveNativeRangeMax(node) - resolveNativeRangeMin(node)) / step;
-    if (!Number.isFinite(intervals)) {
-        return undefined;
-    }
-
-    const roundedIntervals = Math.round(intervals);
-    if (roundedIntervals < 1 || Math.abs(intervals - roundedIntervals) > 1e-7) {
-        return undefined;
-    }
-
-    return Math.max(0, roundedIntervals - 1);
-}
-
-function resolveComposeKeyboardType(node: NativeElementNode): string | undefined {
-    switch (resolveNativeTextInputType(node)) {
-        case 'email':
-            return 'androidx.compose.ui.text.input.KeyboardType.Email';
-        case 'number':
-            return 'androidx.compose.ui.text.input.KeyboardType.Decimal';
-        case 'password':
-            return 'androidx.compose.ui.text.input.KeyboardType.Password';
-        case 'tel':
-            return 'androidx.compose.ui.text.input.KeyboardType.Phone';
-        case 'url':
-            return 'androidx.compose.ui.text.input.KeyboardType.Uri';
-        case 'search':
-            return 'androidx.compose.ui.text.input.KeyboardType.Text';
-        default:
-            return undefined;
-    }
-}
-
-function resolveSwiftKeyboardTypeModifier(node: NativeElementNode): string | undefined {
-    switch (resolveNativeTextInputType(node)) {
-        case 'email':
-            return '.keyboardType(.emailAddress)';
-        case 'number':
-            return '.keyboardType(.decimalPad)';
-        case 'tel':
-            return '.keyboardType(.phonePad)';
-        case 'url':
-            return '.keyboardType(.URL)';
-        case 'search':
-            return '.keyboardType(.webSearch)';
-        default:
-            return undefined;
-    }
-}
-
-function shouldDisableNativeTextCapitalization(node: NativeElementNode): boolean {
-    const inputType = resolveNativeTextInputType(node);
-    return inputType === 'email' || inputType === 'password' || inputType === 'url';
-}
-
-function serializeNativePayload(value: NativePropValue | undefined): string | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'string') return value;
-    return JSON.stringify(value);
-}
-
-function resolveNativeAction(node: NativeElementNode): string | undefined {
-    return typeof node.props.nativeAction === 'string' && node.props.nativeAction.trim()
-        ? node.props.nativeAction
-        : undefined;
-}
-
-function resolveNativeRoute(node: NativeElementNode): string | undefined {
-    if (typeof node.props.nativeRoute === 'string' && node.props.nativeRoute.trim()) {
-        return node.props.nativeRoute;
-    }
-
-    const destination = typeof node.props.destination === 'string' ? node.props.destination : undefined;
-    if (destination && !isExternalDestination(destination)) {
-        return destination;
-    }
-
-    return undefined;
-}
-
-function buildComposeBridgeInvocation(action?: string, route?: string, payloadJson?: string): string | undefined {
-    const args: string[] = [];
-
-    if (action) args.push(`action = ${quoteKotlinString(action)}`);
-    if (route) args.push(`route = ${quoteKotlinString(route)}`);
-    if (payloadJson) args.push(`payloadJson = ${quoteKotlinString(payloadJson)}`);
-
-    return args.length > 0 ? `ElitNativeBridge.dispatch(${args.join(', ')})` : undefined;
-}
-
-function buildSwiftBridgeInvocation(action?: string, route?: string, payloadJson?: string): string | undefined {
-    const args: string[] = [];
-
-    if (action) args.push(`action: ${quoteSwiftString(action)}`);
-    if (route) args.push(`route: ${quoteSwiftString(route)}`);
-    if (payloadJson) args.push(`payloadJson: ${quoteSwiftString(payloadJson)}`);
-
-    return args.length > 0 ? `ElitNativeBridge.dispatch(${args.join(', ')})` : undefined;
-}
-
-function resolveNativeControlEventInputType(node: NativeElementNode): string | undefined {
-    if (node.component === 'Picker') {
-        return isNativeMultiple(node) ? 'select-multiple' : 'select-one';
-    }
-
-    if (node.component === 'Toggle') {
-        return typeof node.props.type === 'string' && node.props.type.trim()
-            ? node.props.type.trim().toLowerCase()
-            : 'checkbox';
-    }
-
-    if (node.component === 'Slider') {
-        return 'range';
-    }
-
-    return resolveNativeInputTypeValue(node.sourceTag, node.props);
-}
-
-function shouldDispatchNativeControlEvent(node: NativeElementNode, eventName: 'input' | 'change' | 'submit'): boolean {
-    if (!node.events.includes(eventName)) {
-        return false;
-    }
-
-    return !(eventName === 'input' && getNativeBindingReference(node) && node.events.every((candidate) => candidate === 'input'));
-}
-
-function resolveNativeControlEventAction(node: NativeElementNode, eventName: 'input' | 'change' | 'submit'): string {
-    return resolveNativeAction(node) ?? `elit.event.${eventName}`;
-}
-
-function buildComposeControlEventPayloadInvocation(
-    node: NativeElementNode,
-    eventName: 'input' | 'change' | 'submit',
-    options: NativeControlEventExpressionOptions = {},
-): string {
-    const args = [
-        `event = ${quoteKotlinString(eventName)}`,
-        `sourceTag = ${quoteKotlinString(node.sourceTag)}`,
-    ];
-    const inputType = resolveNativeControlEventInputType(node);
-    const detailJson = serializeNativePayload(node.props.nativePayload);
-
-    if (inputType) {
-        args.push(`inputType = ${quoteKotlinString(inputType)}`);
-    }
-    if (options.valueExpression) {
-        args.push(`value = ${options.valueExpression}`);
-    }
-    if (options.valuesExpression) {
-        args.push(`values = ${options.valuesExpression}`);
-    }
-    if (options.checkedExpression) {
-        args.push(`checked = ${options.checkedExpression}`);
-    }
-    if (detailJson) {
-        args.push(`detailJson = ${quoteKotlinString(detailJson)}`);
-    }
-
-    return `ElitNativeBridge.controlEventPayload(${args.join(', ')})`;
-}
-
-function buildComposeControlEventDispatchInvocation(
-    node: NativeElementNode,
-    eventName: 'input' | 'change' | 'submit',
-    options: NativeControlEventExpressionOptions = {},
-): string {
-    return `ElitNativeBridge.dispatch(action = ${quoteKotlinString(resolveNativeControlEventAction(node, eventName))}, payloadJson = ${buildComposeControlEventPayloadInvocation(node, eventName, options)})`;
-}
-
-function buildComposeControlEventDispatchStatements(
-    node: NativeElementNode,
-    options: NativeControlEventExpressionOptions = {},
-): string[] {
-    const statements: string[] = [];
-    if (shouldDispatchNativeControlEvent(node, 'input')) {
-        statements.push(buildComposeControlEventDispatchInvocation(node, 'input', options));
-    }
-    if (shouldDispatchNativeControlEvent(node, 'change')) {
-        statements.push(buildComposeControlEventDispatchInvocation(node, 'change', options));
-    }
-    return statements;
-}
-
-function buildSwiftControlEventPayloadInvocation(
-    node: NativeElementNode,
-    eventName: 'input' | 'change' | 'submit',
-    options: NativeControlEventExpressionOptions = {},
-): string {
-    const args = [
-        `event: ${quoteSwiftString(eventName)}`,
-        `sourceTag: ${quoteSwiftString(node.sourceTag)}`,
-    ];
-    const inputType = resolveNativeControlEventInputType(node);
-    const detailJson = serializeNativePayload(node.props.nativePayload);
-
-    if (inputType) {
-        args.push(`inputType: ${quoteSwiftString(inputType)}`);
-    }
-    if (options.valueExpression) {
-        args.push(`value: ${options.valueExpression}`);
-    }
-    if (options.valuesExpression) {
-        args.push(`values: ${options.valuesExpression}`);
-    }
-    if (options.checkedExpression) {
-        args.push(`checked: ${options.checkedExpression}`);
-    }
-    if (detailJson) {
-        args.push(`detailJson: ${quoteSwiftString(detailJson)}`);
-    }
-
-    return `ElitNativeBridge.controlEventPayload(${args.join(', ')})`;
-}
-
-function buildSwiftControlEventDispatchInvocation(
-    node: NativeElementNode,
-    eventName: 'input' | 'change' | 'submit',
-    options: NativeControlEventExpressionOptions = {},
-): string {
-    return `ElitNativeBridge.dispatch(action: ${quoteSwiftString(resolveNativeControlEventAction(node, eventName))}, payloadJson: ${buildSwiftControlEventPayloadInvocation(node, eventName, options)})`;
-}
-
-function buildSwiftControlEventDispatchStatements(
-    node: NativeElementNode,
-    options: NativeControlEventExpressionOptions = {},
-): string[] {
-    const statements: string[] = [];
-    if (shouldDispatchNativeControlEvent(node, 'input')) {
-        statements.push(buildSwiftControlEventDispatchInvocation(node, 'input', options));
-    }
-    if (shouldDispatchNativeControlEvent(node, 'change')) {
-        statements.push(buildSwiftControlEventDispatchInvocation(node, 'change', options));
-    }
-    return statements;
 }
 
 function wrapTextNodeIfNeeded(node: NativeNode, parentComponent: string, options: Required<Omit<NativeTransformOptions, 'tagMap'>>): NativeNode {
@@ -2385,127 +896,6 @@ function indent(level: number): string {
     return '    '.repeat(level);
 }
 
-function escapeKotlinString(value: string): string {
-    return value
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\$/g, '\\$')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-}
-
-function quoteKotlinString(value: string): string {
-    return `"${escapeKotlinString(value)}"`;
-}
-
-function escapeSwiftString(value: string): string {
-    return value
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-}
-
-function quoteSwiftString(value: string): string {
-    return `"${escapeSwiftString(value)}"`;
-}
-
-function flattenTextContent(nodes: NativeNode[]): string {
-    const parts: string[] = [];
-
-    const walk = (items: NativeNode[]): void => {
-        for (const item of items) {
-            if (item.kind === 'text') {
-                parts.push(item.value);
-                continue;
-            }
-
-            walk(item.children);
-        }
-    };
-
-    walk(nodes);
-    return parts.join('').trim();
-}
-
-function resolveComposeFontFamily(value: NativePropValue | undefined): string | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.toLowerCase();
-    if (normalized.includes('sans-serif') || normalized.includes('sans') || normalized.includes('avenir') || normalized.includes('trebuchet') || normalized.includes('arial')) {
-        return 'FontFamily.SansSerif';
-    }
-    if (normalized.includes('serif') || normalized.includes('georgia') || normalized.includes('times new roman')) {
-        return 'FontFamily.Serif';
-    }
-    if (normalized.includes('monospace') || normalized.includes('courier') || normalized.includes('mono')) {
-        return 'FontFamily.Monospace';
-    }
-    if (normalized.includes('cursive')) {
-        return 'FontFamily.Cursive';
-    }
-
-    return undefined;
-}
-
-function resolveSwiftFontDesign(value: NativePropValue | undefined): string | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.toLowerCase();
-    if (normalized.includes('sans-serif') || normalized.includes('sans') || normalized.includes('avenir') || normalized.includes('trebuchet') || normalized.includes('arial')) {
-        return undefined;
-    }
-    if (normalized.includes('serif') || normalized.includes('georgia') || normalized.includes('times new roman')) {
-        return '.serif';
-    }
-    if (normalized.includes('monospace') || normalized.includes('courier') || normalized.includes('mono')) {
-        return '.monospaced';
-    }
-    if (normalized.includes('rounded')) {
-        return '.rounded';
-    }
-
-    return undefined;
-}
-
-function resolveComposeLineHeight(
-    value: NativePropValue | undefined,
-    fontSize: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string | undefined {
-    const parsed = parseCssUnitValue(value);
-    const baseFontSize = toScaledUnitNumber(fontSize, styleResolveOptions) ?? 16;
-    const lineHeight = parsed?.unit === '' && parsed.value > 0 && parsed.value <= 4
-        ? baseFontSize * parsed.value
-        : toScaledUnitNumber(value, styleResolveOptions);
-
-    return lineHeight !== undefined ? `${formatFloat(lineHeight)}.sp` : undefined;
-}
-
-function resolveSwiftLineSpacing(
-    value: NativePropValue | undefined,
-    fontSize: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string | undefined {
-    const parsed = parseCssUnitValue(value);
-    const baseFontSize = toScaledUnitNumber(fontSize, styleResolveOptions) ?? 17;
-    const lineHeight = parsed?.unit === '' && parsed.value > 0 && parsed.value <= 4
-        ? baseFontSize * parsed.value
-        : toScaledUnitNumber(value, styleResolveOptions);
-    if (lineHeight === undefined) {
-        return undefined;
-    }
-
-    const spacing = lineHeight - baseFontSize;
-    return spacing > 0 ? formatFloat(spacing) : undefined;
-}
-
 function getClassList(node: NativeElementNode): string[] {
     const classList = node.props.classList;
     if (!Array.isArray(classList)) {
@@ -2593,54 +983,6 @@ function createNativeStyleScope(tagName: string): NativeStyleScope {
         attributes: {},
         pseudoStates: [],
     };
-}
-
-function resolveNativeContainerNames(style: Record<string, NativePropValue> | undefined): string[] {
-    if (!style || typeof style.containerName !== 'string') {
-        return [];
-    }
-
-    return style.containerName
-        .split(/\s+/)
-        .map((containerName) => containerName.trim().toLowerCase())
-        .filter((containerName) => containerName.length > 0 && containerName !== 'none');
-}
-
-function resolveNativeContainerWidth(
-    style: Record<string, NativePropValue> | undefined,
-    options: NativeStyleResolveOptions,
-): number | undefined {
-    if (!style) {
-        return undefined;
-    }
-
-    if (isFillValue(style.width)) {
-        return options.viewportWidth ?? 390;
-    }
-
-    return resolveAxisUnitNumber(style.width, 'horizontal', undefined, options)
-        ?? resolveAxisUnitNumber(style.maxWidth, 'horizontal', undefined, options)
-        ?? resolveAxisUnitNumber(style.minWidth, 'horizontal', undefined, options)
-        ?? (options.viewportWidth ?? 390);
-}
-
-function resolveNativeContainerScope(
-    style: Record<string, NativePropValue> | undefined,
-    options: NativeStyleResolveOptions,
-): Pick<NativeStyleScope, 'containerNames' | 'containerWidth' | 'isContainer'> {
-    const containerNames = resolveNativeContainerNames(style);
-    const containerType = typeof style?.containerType === 'string'
-        ? style.containerType.trim().toLowerCase()
-        : undefined;
-    const isContainer = Boolean(containerType && containerType !== 'normal') || containerNames.length > 0;
-
-    return isContainer
-        ? {
-            containerNames,
-            containerWidth: resolveNativeContainerWidth(style, options),
-            isContainer: true,
-        }
-        : {};
 }
 
 function buildGlobalInheritedTextStyles(options: NativeStyleResolveOptions): Record<string, NativePropValue> {
@@ -3251,17 +1593,6 @@ function resolveNativeFlexShrinkTargets(
     return targets;
 }
 
-function resolvePositionMode(value: NativePropValue | undefined): 'relative' | 'absolute' | 'fixed' | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'relative' || normalized === 'absolute' || normalized === 'fixed'
-        ? normalized
-        : undefined;
-}
-
 function isAbsolutelyPositionedNode(
     node: NativeNode,
     resolvedStyles?: NativeResolvedStyleMap,
@@ -3368,1089 +1699,15 @@ function getOrderedNativeChildren(
         .map((entry) => entry.node);
 }
 
-function getNativeBindingReference(node: NativeElementNode): NativeBindingReference | undefined {
-    const binding = node.props.nativeBinding;
-    if (!binding || typeof binding !== 'object' || Array.isArray(binding)) {
-        return undefined;
-    }
-
-    const id = typeof binding.id === 'string' ? binding.id : undefined;
-    const kind = binding.kind === 'value' || binding.kind === 'checked' ? binding.kind : undefined;
-    const valueType = binding.valueType === 'boolean' || binding.valueType === 'number' || binding.valueType === 'string' || binding.valueType === 'string-array'
-        ? binding.valueType
-        : undefined;
-
-    if (!id || !kind || !valueType) {
-        return undefined;
-    }
-
-    return { id, kind, valueType };
-}
-
-function createNativeStateDescriptorMap(tree: NativeTree): Map<string, NativeStateDescriptor> {
-    return new Map((tree.stateDescriptors ?? []).map((descriptor) => [descriptor.id, descriptor]));
-}
-
-function toNativeStateVariableName(id: string): string {
-    const suffix = id.replace(/[^a-zA-Z0-9_]/g, '_');
-    return suffix ? `native${suffix.charAt(0).toUpperCase()}${suffix.slice(1)}` : 'nativeState';
-}
-
-function formatKotlinStringList(values: readonly string[]): string {
-    return values.length > 0
-        ? `listOf(${values.map((value) => quoteKotlinString(String(value))).join(', ')})`
-        : 'emptyList<String>()';
-}
-
-function formatSwiftStringList(values: readonly string[]): string {
-    return `[${values.map((value) => quoteSwiftString(String(value))).join(', ')}]`;
-}
-
-function formatNativeNumberLiteral(value: number): string {
-    const formatted = formatFloat(value);
-    return formatted.includes('.') ? formatted : `${formatted}.0`;
-}
-
-function formatComposeStateInitialValue(descriptor: NativeStateDescriptor): string {
-    if (descriptor.type === 'string-array') {
-        const values = Array.isArray(descriptor.initialValue) ? descriptor.initialValue : [];
-        return formatKotlinStringList(values);
-    }
-
-    if (descriptor.type === 'string') {
-        return quoteKotlinString(String(descriptor.initialValue));
-    }
-
-    if (descriptor.type === 'number') {
-        return formatNativeNumberLiteral(Number(descriptor.initialValue));
-    }
-
-    return String(descriptor.initialValue);
-}
-
-function formatSwiftStateInitialValue(descriptor: NativeStateDescriptor): string {
-    if (descriptor.type === 'string-array') {
-        const values = Array.isArray(descriptor.initialValue) ? descriptor.initialValue : [];
-        return formatSwiftStringList(values);
-    }
-
-    if (descriptor.type === 'string') {
-        return quoteSwiftString(String(descriptor.initialValue));
-    }
-
-    if (descriptor.type === 'number') {
-        return formatNativeNumberLiteral(Number(descriptor.initialValue));
-    }
-
-    return String(descriptor.initialValue);
-}
-
-function ensureComposeStateVariable(context: AndroidComposeContext, stateId: string): { descriptor: NativeStateDescriptor; variableName: string } {
-    const descriptor = context.stateDescriptors.get(stateId);
-    if (!descriptor) {
-        throw new Error(`Unknown native state descriptor: ${stateId}`);
-    }
-
-    const variableName = toNativeStateVariableName(stateId);
-    if (!context.declaredStateIds.has(stateId)) {
-        context.declaredStateIds.add(stateId);
-        context.stateDeclarations.push(`${indent(1)}var ${variableName} by remember { mutableStateOf(${formatComposeStateInitialValue(descriptor)}) }`);
-    }
-
-    return { descriptor, variableName };
-}
-
-function ensureSwiftStateVariable(context: SwiftUIContext, stateId: string): { descriptor: NativeStateDescriptor; variableName: string } {
-    const descriptor = context.stateDescriptors.get(stateId);
-    if (!descriptor) {
-        throw new Error(`Unknown native state descriptor: ${stateId}`);
-    }
-
-    const variableName = toNativeStateVariableName(stateId);
-    if (!context.declaredStateIds.has(stateId)) {
-        context.declaredStateIds.add(stateId);
-        const annotation = descriptor.type === 'string-array'
-            ? ': [String]'
-            : descriptor.type === 'number'
-                ? ': Double'
-                : '';
-        context.stateDeclarations.push(`${indent(1)}@State private var ${variableName}${annotation} = ${formatSwiftStateInitialValue(descriptor)}`);
-    }
-
-    return { descriptor, variableName };
-}
-
-function toComposeTextValueExpression(variableName: string, descriptor: NativeStateDescriptor): string {
-    if (descriptor.type === 'string') {
-        return variableName;
-    }
-
-    if (descriptor.type === 'string-array') {
-        return `${variableName}.joinToString(", ")`;
-    }
-
-    return `${variableName}.toString()`;
-}
-
-function toSwiftTextValueExpression(variableName: string, descriptor: NativeStateDescriptor): string {
-    if (descriptor.type === 'string') {
-        return variableName;
-    }
-
-    if (descriptor.type === 'string-array') {
-        return `${variableName}.joined(separator: ", ")`;
-    }
-
-    return `String(${variableName})`;
-}
-
-function buildComposeStateStringAssignment(variableName: string, descriptor: NativeStateDescriptor, value: string): string {
-    const literal = quoteKotlinString(value);
-
-    if (descriptor.type === 'string-array') {
-        return `${variableName} = listOf(${literal})`;
-    }
-
-    if (descriptor.type === 'number') {
-        return `${variableName} = ${literal}.toDoubleOrNull() ?: ${variableName}`;
-    }
-
-    if (descriptor.type === 'boolean') {
-        return `${variableName} = ${literal}.equals("true", ignoreCase = true)`;
-    }
-
-    return `${variableName} = ${literal}`;
-}
-
-function buildSwiftStateStringAssignment(variableName: string, descriptor: NativeStateDescriptor, valueExpression: string): string {
-    if (descriptor.type === 'string-array') {
-        return `${variableName} = ${valueExpression}.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }`;
-    }
-
-    if (descriptor.type === 'number') {
-        return `if let parsed = Double(${valueExpression}) { ${variableName} = parsed }`;
-    }
-
-    if (descriptor.type === 'boolean') {
-        return `${variableName} = ${valueExpression}.compare("true", options: .caseInsensitive) == .orderedSame`;
-    }
-
-    return `${variableName} = ${valueExpression}`;
-}
-
-function buildComposeStateStringArrayToggleAssignment(variableName: string, value: string, optionValues: readonly string[]): string {
-    const orderedValues = formatKotlinStringList(optionValues);
-    const literal = quoteKotlinString(value);
-    return `${variableName} = ${orderedValues}.filter { candidate -> if (candidate == ${literal}) checked else ${variableName}.contains(candidate) }`;
-}
-
-function buildSwiftStringBindingExpression(
-    variableName: string,
-    descriptor: NativeStateDescriptor,
-    additionalSetterStatements: string[] = [],
-): string {
-    const setterSuffix = additionalSetterStatements.length > 0
-        ? `; ${additionalSetterStatements.join('; ')}`
-        : '';
-
-    if (descriptor.type === 'string') {
-        return additionalSetterStatements.length > 0
-            ? `Binding(get: { ${variableName} }, set: { nextValue in ${variableName} = nextValue${setterSuffix} })`
-            : `$${variableName}`;
-    }
-
-    if (descriptor.type === 'string-array') {
-        return `Binding(get: { ${variableName}.joined(separator: ", ") }, set: { nextValue in ${variableName} = nextValue.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }${setterSuffix} })`;
-    }
-
-    if (descriptor.type === 'number') {
-        return `Binding(get: { String(${variableName}) }, set: { nextValue in if let parsed = Double(nextValue) { ${variableName} = parsed }${setterSuffix} })`;
-    }
-
-    return `Binding(get: { ${variableName} ? "true" : "false" }, set: { nextValue in ${variableName} = nextValue.compare("true", options: .caseInsensitive) == .orderedSame${setterSuffix} })`;
-}
-
-function buildSwiftStateStringArrayToggleBinding(
-    variableName: string,
-    value: string,
-    optionValues: readonly string[],
-    additionalSetterStatements: string[] = [],
-): string {
-    const literal = quoteSwiftString(value);
-    const orderedValues = formatSwiftStringList(optionValues);
-    const setterSuffix = additionalSetterStatements.length > 0
-        ? `; ${additionalSetterStatements.join('; ')}`
-        : '';
-    return `Binding(get: { ${variableName}.contains(${literal}) }, set: { isOn in ${variableName} = ${orderedValues}.filter { option in option == ${literal} ? isOn : ${variableName}.contains(option) }${setterSuffix} })`;
-}
-
-function buildSwiftReadOnlyBindingExpression(valueExpression: string): string {
-    return `Binding(get: { ${valueExpression} }, set: { _ in })`;
-}
-
-function collectNativePickerOptionNodes(nodes: NativeNode[]): NativeElementNode[] {
-    const options: NativeElementNode[] = [];
-
-    for (const node of nodes) {
-        if (node.kind !== 'element') {
-            continue;
-        }
-
-        if (node.component === 'Option') {
-            options.push(node);
-            continue;
-        }
-
-        if (node.sourceTag === 'optgroup') {
-            options.push(...collectNativePickerOptionNodes(node.children));
-        }
-    }
-
-    return options;
-}
-
-function resolveNativePickerOptionLabel(node: NativeElementNode): string {
-    if (typeof node.props.label === 'string' && node.props.label.trim()) {
-        return node.props.label;
-    }
-
-    const textContent = flattenTextContent(node.children).trim();
-    if (textContent) {
-        return textContent;
-    }
-
-    if (typeof node.props.value === 'string' || typeof node.props.value === 'number' || typeof node.props.value === 'boolean') {
-        return String(node.props.value);
-    }
-
-    return 'Option';
-}
-
-function resolveNativePickerOptionValue(node: NativeElementNode): string {
-    if (typeof node.props.value === 'string' || typeof node.props.value === 'number' || typeof node.props.value === 'boolean') {
-        return String(node.props.value);
-    }
-
-    return resolveNativePickerOptionLabel(node);
-}
-
-function resolveNativePickerOptions(node: NativeElementNode): NativePickerOption[] {
-    return collectNativePickerOptionNodes(node.children).map((optionNode) => ({
-        label: resolveNativePickerOptionLabel(optionNode),
-        value: resolveNativePickerOptionValue(optionNode),
-        selected: isNativeSelected(optionNode),
-        disabled: isNativeDisabled(optionNode),
-    }));
-}
-
-function resolveNativePickerInitialSelection(node: NativeElementNode, options: NativePickerOption[]): string {
-    if (isNativeMultiple(node)) {
-        return resolveNativePickerInitialSelections(node, options)[0] ?? '';
-    }
-
-    const explicitValue = typeof node.props.value === 'string' || typeof node.props.value === 'number' || typeof node.props.value === 'boolean'
-        ? String(node.props.value)
-        : undefined;
-
-    if (explicitValue && options.some((option) => option.value === explicitValue)) {
-        return explicitValue;
-    }
-
-    const selectedOption = options.find((option) => option.selected);
-
-    if (selectedOption) {
-        return selectedOption.value;
-    }
-
-    if (isNativeRequired(node)) {
-        return '';
-    }
-
-    return options[0]?.value ?? '';
-}
-
-function resolveNativePickerInitialSelections(node: NativeElementNode, options: NativePickerOption[]): string[] {
-    if (Array.isArray(node.props.value)) {
-        const explicitValues = node.props.value
-            .filter((value): value is string | number | boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
-            .map((value) => String(value));
-
-        return explicitValues.filter((value, index) => explicitValues.indexOf(value) === index && options.some((option) => option.value === value));
-    }
-
-    const explicitValue = typeof node.props.value === 'string' || typeof node.props.value === 'number' || typeof node.props.value === 'boolean'
-        ? String(node.props.value)
-        : undefined;
-
-    if (explicitValue && options.some((option) => option.value === explicitValue)) {
-        return [explicitValue];
-    }
-
-    return options
-        .filter((option) => option.selected)
-        .map((option) => option.value);
-}
-
-function resolveNativeProgressFraction(props: Record<string, NativePropValue>): number | undefined {
-    const value = parsePlainNumericValue(props.value);
-    if (value === undefined) {
-        return undefined;
-    }
-
-    const max = parsePlainNumericValue(props.max);
-    const denominator = max !== undefined && max > 0 ? max : 1;
-    return Math.max(0, Math.min(1, value / denominator));
-}
-
-function hasExplicitNativeWidthStyle(style: Record<string, NativePropValue> | undefined): boolean {
-    return Boolean(style && (style.width !== undefined || style.minWidth !== undefined || style.maxWidth !== undefined));
-}
-
-function hasExplicitNativeHeightStyle(style: Record<string, NativePropValue> | undefined): boolean {
-    return Boolean(style && (style.height !== undefined || style.minHeight !== undefined || style.maxHeight !== undefined));
-}
-
-function hasNativeTableLayoutSourceTag(sourceTag: string | undefined): boolean {
-    return sourceTag === 'table'
-        || sourceTag === 'thead'
-        || sourceTag === 'tbody'
-        || sourceTag === 'tfoot'
-        || sourceTag === 'tr'
-        || sourceTag === 'td'
-        || sourceTag === 'th';
-}
-
-function resolveNativeSurfaceSource(node: NativeElementNode): string | undefined {
-    const source = typeof node.props.source === 'string' && node.props.source.trim()
-        ? node.props.source.trim()
-        : typeof node.props.src === 'string' && node.props.src.trim()
-            ? node.props.src.trim()
-            : typeof node.props.data === 'string' && node.props.data.trim()
-                ? node.props.data.trim()
-                : typeof node.props.destination === 'string' && node.props.destination.trim()
-                    ? node.props.destination.trim()
-                    : undefined;
-
-    return source && source.length > 0 ? source : undefined;
-}
-
-function resolveNativeMediaLabel(node: NativeElementNode): string {
-    const explicitLabel = typeof node.props['aria-label'] === 'string' && node.props['aria-label'].trim()
-        ? node.props['aria-label'].trim()
-        : typeof node.props.title === 'string' && node.props.title.trim()
-            ? node.props.title.trim()
-            : undefined;
-
-    if (explicitLabel) {
-        return explicitLabel;
-    }
-
-    const textContent = flattenTextContent(node.children).trim();
-    if (textContent) {
-        return textContent;
-    }
-
-    return node.sourceTag === 'audio' ? 'Audio' : 'Video';
-}
-
-function attachDesktopNativeMetadata(node: NativeElementNode): void {
-    if (node.component === 'Vector' && node.sourceTag === 'svg') {
-        const vectorSpec = buildNativeVectorSpec(node);
-        if (vectorSpec) {
-            node.props.desktopVectorSpec = vectorSpec as unknown as NativePropObject;
-        }
-        return;
-    }
-
-    if (node.component === 'Canvas') {
-        const canvasSpec = buildNativeCanvasDrawingSpec(node) ?? buildNativeCanvasSpec(node);
-        node.props.desktopCanvasSpec = canvasSpec as unknown as NativePropObject;
-    }
-}
-
-function applyComposeTextTransformExpression(expression: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | undefined): string {
-    if (!transform) {
-        return expression;
-    }
-
-    if (transform === 'uppercase') {
-        return `${expression}.uppercase()`;
-    }
-
-    if (transform === 'lowercase') {
-        return `${expression}.lowercase()`;
-    }
-
-    return `${expression}.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }`;
-}
-
-function applySwiftTextTransformExpression(expression: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | undefined): string {
-    if (!transform) {
-        return expression;
-    }
-
-    if (transform === 'uppercase') {
-        return `${expression}.uppercased()`;
-    }
-
-    if (transform === 'lowercase') {
-        return `${expression}.lowercased()`;
-    }
-
-    return `${expression}.capitalized`;
-}
-
-function buildComposeTextExpression(
-    nodes: NativeNode[],
-    context: AndroidComposeContext,
-    transform?: 'uppercase' | 'lowercase' | 'capitalize',
-): string | undefined {
-    const parts: string[] = [];
-    let hasDynamicPart = false;
-
-    const visit = (items: NativeNode[]): void => {
-        for (const item of items) {
-            if (item.kind === 'text') {
-                if (item.stateId) {
-                    const { descriptor, variableName } = ensureComposeStateVariable(context, item.stateId);
-                    parts.push(toComposeTextValueExpression(variableName, descriptor));
-                    hasDynamicPart = true;
-                } else {
-                    parts.push(quoteKotlinString(item.value));
-                }
-                continue;
-            }
-
-            visit(item.children);
-        }
-    };
-
-    visit(nodes);
-
-    if (parts.length === 0 || !hasDynamicPart) {
-        return undefined;
-    }
-
-    const expression = parts.join(' + ');
-    return applyComposeTextTransformExpression(expression, transform);
-}
-
-function buildSwiftTextExpression(
-    nodes: NativeNode[],
-    context: SwiftUIContext,
-    transform?: 'uppercase' | 'lowercase' | 'capitalize',
-): string | undefined {
-    const parts: string[] = [];
-    let hasDynamicPart = false;
-
-    const visit = (items: NativeNode[]): void => {
-        for (const item of items) {
-            if (item.kind === 'text') {
-                if (item.stateId) {
-                    const { descriptor, variableName } = ensureSwiftStateVariable(context, item.stateId);
-                    parts.push(toSwiftTextValueExpression(variableName, descriptor));
-                    hasDynamicPart = true;
-                } else {
-                    parts.push(quoteSwiftString(item.value));
-                }
-                continue;
-            }
-
-            visit(item.children);
-        }
-    };
-
-    visit(nodes);
-
-    if (parts.length === 0 || !hasDynamicPart) {
-        return undefined;
-    }
-
-    const expression = parts.join(' + ');
-    return applySwiftTextTransformExpression(expression, transform);
-}
-
-function parseSpacingShorthand(
-    value: NativePropValue | undefined,
-    unitParser: (value: NativePropValue | undefined) => string | undefined,
-): { top?: string; right?: string; bottom?: string; left?: string } | undefined {
-    if (value === undefined) return undefined;
-
-    const rawValues = typeof value === 'string'
-        ? value.trim().split(/\s+/).filter(Boolean)
-        : [value];
-
-    if (rawValues.length === 0 || rawValues.length > 4) {
-        return undefined;
-    }
-
-    const parsed = rawValues.map((item) => unitParser(item));
-    if (parsed.some((item) => !item)) {
-        return undefined;
-    }
-
-    const [first, second = first, third = first, fourth = second] = parsed as string[];
-
-    switch (parsed.length) {
-        case 1:
-            return { top: first, right: first, bottom: first, left: first };
-        case 2:
-            return { top: first, right: second, bottom: first, left: second };
-        case 3:
-            return { top: first, right: second, bottom: third, left: second };
-        case 4:
-            return { top: first, right: second, bottom: third, left: fourth };
-        default:
-            return undefined;
-    }
-}
-
-function resolveDirectionalSpacing(
-    style: Record<string, NativePropValue>,
-    prefix: 'padding' | 'margin',
-    unitParser: (value: NativePropValue | undefined) => string | undefined,
-): { top?: string; right?: string; bottom?: string; left?: string } {
-    const shorthand = parseSpacingShorthand(style[prefix], unitParser);
-
-    return {
-        top: shorthand?.top ?? unitParser(style[`${prefix}Top`]),
-        right: shorthand?.right ?? unitParser(style[`${prefix}Right`] ?? style[`${prefix}End`]),
-        bottom: shorthand?.bottom ?? unitParser(style[`${prefix}Bottom`]),
-        left: shorthand?.left ?? unitParser(style[`${prefix}Left`] ?? style[`${prefix}Start`]),
-    };
-}
-
-function toNumericSpacingValue(value: string | undefined): number | undefined {
-    if (value === undefined) {
-        return undefined;
-    }
-
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function resolveNumericDirectionalSpacing(
-    style: Record<string, NativePropValue>,
-    prefix: 'padding' | 'margin',
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): { top?: number; right?: number; bottom?: number; left?: number } {
-    const shorthand = parseSpacingShorthand(style[prefix], (spacingValue) => {
-        const resolved = toScaledUnitNumber(spacingValue, styleResolveOptions);
-        return resolved !== undefined ? String(resolved) : undefined;
-    });
-
-    return {
-        top: toNumericSpacingValue(shorthand?.top) ?? toScaledUnitNumber(style[`${prefix}Top`], styleResolveOptions),
-        right: toNumericSpacingValue(shorthand?.right) ?? toScaledUnitNumber(style[`${prefix}Right`] ?? style[`${prefix}End`], styleResolveOptions),
-        bottom: toNumericSpacingValue(shorthand?.bottom) ?? toScaledUnitNumber(style[`${prefix}Bottom`], styleResolveOptions),
-        left: toNumericSpacingValue(shorthand?.left) ?? toScaledUnitNumber(style[`${prefix}Left`] ?? style[`${prefix}Start`], styleResolveOptions),
-    };
-}
-
-function buildComposeMarginPaddingCalls(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    if (!style) {
-        return [];
-    }
-
-    const spacing = resolveNumericDirectionalSpacing(style, 'margin', styleResolveOptions);
-    const args: string[] = [];
-    if (spacing.top) args.push(`top = ${formatFloat(spacing.top)}.dp`);
-    if (spacing.right) args.push(`end = ${formatFloat(spacing.right)}.dp`);
-    if (spacing.bottom) args.push(`bottom = ${formatFloat(spacing.bottom)}.dp`);
-    if (spacing.left) args.push(`start = ${formatFloat(spacing.left)}.dp`);
-
-    return args.length > 0 ? [`padding(${args.join(', ')})`] : [];
-}
-
-function buildSwiftMarginPaddingModifiers(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    if (!style) {
-        return [];
-    }
-
-    const spacing = resolveNumericDirectionalSpacing(style, 'margin', styleResolveOptions);
-    const modifiers: string[] = [];
-    if (spacing.top) modifiers.push(`.padding(.top, ${formatFloat(spacing.top)})`);
-    if (spacing.right) modifiers.push(`.padding(.trailing, ${formatFloat(spacing.right)})`);
-    if (spacing.bottom) modifiers.push(`.padding(.bottom, ${formatFloat(spacing.bottom)})`);
-    if (spacing.left) modifiers.push(`.padding(.leading, ${formatFloat(spacing.left)})`);
-
-    return modifiers;
-}
-
-function parseAutoMarginFlags(style: Record<string, NativePropValue> | undefined): NativeAutoMarginFlags {
-    const flags: NativeAutoMarginFlags = {
-        top: false,
-        right: false,
-        bottom: false,
-        left: false,
-    };
-
-    if (!style) {
-        return flags;
-    }
-
-    const markValue = (value: NativePropValue | undefined, sides: Array<keyof NativeAutoMarginFlags>): void => {
-        if (typeof value === 'string' && value.trim().toLowerCase() === 'auto') {
-            sides.forEach((side) => {
-                flags[side] = true;
-            });
-        }
-    };
-
-    markValue(style.marginTop, ['top']);
-    markValue(style.marginRight ?? style.marginEnd, ['right']);
-    markValue(style.marginBottom, ['bottom']);
-    markValue(style.marginLeft ?? style.marginStart, ['left']);
-
-    if (typeof style.margin === 'string') {
-        const values = style.margin.trim().split(/\s+/).filter(Boolean);
-        const resolved = [values[0], values[1] ?? values[0], values[2] ?? values[0], values[3] ?? values[1] ?? values[0]];
-        markValue(resolved[0], ['top']);
-        markValue(resolved[1], ['right']);
-        markValue(resolved[2], ['bottom']);
-        markValue(resolved[3], ['left']);
-    }
-
-    return flags;
-}
-
-function hasHorizontalAutoMargins(style: Record<string, NativePropValue> | undefined): boolean {
-    const flags = parseAutoMarginFlags(style);
-    return flags.left && flags.right;
-}
-
-function shouldCenterConstrainedHorizontalAutoMargins(style: Record<string, NativePropValue> | undefined): boolean {
-    if (!style || !hasHorizontalAutoMargins(style)) {
-        return false;
-    }
-
-    if (isFillValue(style.width)) {
-        return false;
-    }
-
-    return style.width !== undefined || style.minWidth !== undefined || style.maxWidth !== undefined;
-}
-
-function buildComposeAutoMarginCalls(style: Record<string, NativePropValue> | undefined): string[] {
-    if (!shouldCenterConstrainedHorizontalAutoMargins(style)) {
-        return [];
-    }
-
-    return ['wrapContentWidth(Alignment.CenterHorizontally)'];
-}
-
-function buildSwiftAutoMarginModifiers(style: Record<string, NativePropValue> | undefined): string[] {
-    if (!hasHorizontalAutoMargins(style)) {
-        return [];
-    }
-
-    return ['.frame(maxWidth: .infinity, alignment: .center)'];
-}
-
-function estimateHorizontalPadding(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): number {
-    if (!style) {
-        return 0;
-    }
-
-    const spacing = resolveNumericDirectionalSpacing(style, 'padding', styleResolveOptions);
-    if (spacing.left !== undefined || spacing.right !== undefined) {
-        return (spacing.left ?? 0) + (spacing.right ?? 0);
-    }
-
-    const horizontal = toScaledUnitNumber(style.paddingHorizontal, styleResolveOptions);
-    if (horizontal !== undefined) {
-        return horizontal * 2;
-    }
-
-    const padding = toScaledUnitNumber(style.padding, styleResolveOptions);
-    return padding !== undefined ? padding * 2 : 0;
-}
-
-function estimateVerticalPadding(
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): number {
-    if (!style) {
-        return 0;
-    }
-
-    const spacing = resolveNumericDirectionalSpacing(style, 'padding', styleResolveOptions);
-    if (spacing.top !== undefined || spacing.bottom !== undefined) {
-        return (spacing.top ?? 0) + (spacing.bottom ?? 0);
-    }
-
-    const vertical = toScaledUnitNumber(style.paddingVertical, styleResolveOptions);
-    if (vertical !== undefined) {
-        return vertical * 2;
-    }
-
-    const padding = toScaledUnitNumber(style.padding, styleResolveOptions);
-    return padding !== undefined ? padding * 2 : 0;
-}
-
-function splitCssTrackList(value: string): string[] {
-    const tracks: string[] = [];
-    let token = '';
-    let functionDepth = 0;
-    let bracketDepth = 0;
-
-    for (const char of value.trim()) {
-        if (char === '(') {
-            functionDepth += 1;
-        } else if (char === ')' && functionDepth > 0) {
-            functionDepth -= 1;
-        } else if (char === '[') {
-            bracketDepth += 1;
-        } else if (char === ']' && bracketDepth > 0) {
-            bracketDepth -= 1;
-        }
-
-        if (/\s/.test(char) && functionDepth === 0 && bracketDepth === 0) {
-            const trimmed = token.trim();
-            if (trimmed) {
-                tracks.push(trimmed);
-                token = '';
-            }
-            continue;
-        }
-
-        token += char;
-    }
-
-    const trailing = token.trim();
-    if (trailing) {
-        tracks.push(trailing);
-    }
-
-    return tracks;
-}
-
-function extractNativeGridLineNames(token: string): string[] | undefined {
-    const trimmed = token.trim();
-    if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
-        return undefined;
-    }
-
-    const names = trimmed.slice(1, -1).trim().split(/\s+/).filter(Boolean);
-    return names.length > 0 ? names : undefined;
-}
-
-function parseNativeGridTrackDefinition(value: string): NativeGridTrackDefinition | undefined {
-    const tokens = expandRepeatTrackList(value.trim()) ?? splitCssTrackList(value.trim());
-    if (tokens.length === 0) {
-        return undefined;
-    }
-
-    const tracks: string[] = [];
-    const lineNames = new Map<string, number[]>();
-    let lineIndex = 1;
-
-    for (const token of tokens) {
-        const names = extractNativeGridLineNames(token);
-        if (names) {
-            for (const name of names) {
-                const normalizedName = name.toLowerCase();
-                const existing = lineNames.get(normalizedName) ?? [];
-                existing.push(lineIndex);
-                lineNames.set(normalizedName, existing);
-            }
-            continue;
-        }
-
-        tracks.push(token);
-        lineIndex += 1;
-    }
-
-    return tracks.length > 0 ? { tracks, lineNames, lineCount: lineIndex } : undefined;
-}
-
-function expandRepeatTrackList(value: string): string[] | undefined {
-    const trimmed = value.trim();
-    if (!trimmed.endsWith(')') || !trimmed.toLowerCase().startsWith('repeat(')) {
-        return undefined;
-    }
-
-    const commaIdx = trimmed.indexOf(',', 'repeat('.length);
-    if (commaIdx < 0) {
-        return undefined;
-    }
-
-    const countStr = trimmed.slice('repeat('.length, commaIdx).trim();
-    if (!/^\d+$/.test(countStr)) {
-        return undefined;
-    }
-
-    const count = Number(countStr);
-    if (!Number.isFinite(count) || count <= 0) {
-        return undefined;
-    }
-
-    const inner = trimmed.slice(commaIdx + 1, -1).trim();
-    if (!inner) {
-        return undefined;
-    }
-
-    const innerTracks = splitCssTrackList(inner);
-    if (innerTracks.length === 0) {
-        return undefined;
-    }
-
-    return Array.from({ length: count }, () => innerTracks).flat();
-}
-
-function parseFractionTrackWeight(track: string): number | undefined {
-    const directMatch = track.trim().match(/^(-?\d+(?:\.\d+)?)fr$/i);
-    if (directMatch) {
-        return Number(directMatch[1]);
-    }
-
-    const minmaxMatch = track.trim().match(/^minmax\([^,()]*,\s*(-?\d+(?:\.\d+)?)fr\s*\)$/i);
-    return minmaxMatch ? Number(minmaxMatch[1]) : undefined;
-}
-
-function parseGridTrackSizeSpec(
-    track: string,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeGridTrackSizeSpec | undefined {
-    const trimmed = track.trim();
-    if (!trimmed) {
-        return undefined;
-    }
-
-    const direct = toScaledUnitNumber(trimmed, styleResolveOptions);
-    if (direct !== undefined && direct >= 0) {
-        return { minHeight: direct, height: direct };
-    }
-
-    const normalized = trimmed.toLowerCase();
-    if (normalized === 'auto') {
-        return { stretchEligible: true };
-    }
-
-    if (normalized === 'min-content' || normalized === 'max-content') {
-        return { intrinsicHeight: true };
-    }
-
-    const fitContentMatch = trimmed.match(/^fit-content\(([^()]+)\)$/i);
-    if (fitContentMatch) {
-        const fitContent = toScaledUnitNumber(fitContentMatch[1].trim(), styleResolveOptions);
-        return fitContent !== undefined && fitContent >= 0 ? { maxHeight: fitContent } : undefined;
-    }
-
-    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),([^,()]+)\)$/i);
-    if (minmaxMatch) {
-        const minToken = minmaxMatch[1].trim();
-        const maxToken = minmaxMatch[2].trim();
-        const normalizedMinToken = minToken.toLowerCase();
-        const normalizedMaxToken = maxToken.toLowerCase();
-        const minTrack = toScaledUnitNumber(minToken, styleResolveOptions);
-        const maxTrack = toScaledUnitNumber(maxToken, styleResolveOptions);
-        const trackWeight = parseFractionTrackWeight(trimmed);
-        const hasFixedTrack = minTrack !== undefined && maxTrack !== undefined && Math.abs(minTrack - maxTrack) < 0.001;
-
-        return {
-            ...(minTrack !== undefined && minTrack >= 0 ? { minHeight: minTrack } : {}),
-            ...((normalizedMinToken === 'min-content' || normalizedMinToken === 'max-content') ? { intrinsicMinHeight: true } : {}),
-            ...(hasFixedTrack && maxTrack !== undefined ? { height: maxTrack } : {}),
-            ...(!hasFixedTrack && maxTrack !== undefined && maxTrack >= 0 ? { maxHeight: maxTrack } : {}),
-            ...((normalizedMaxToken === 'min-content' || normalizedMaxToken === 'max-content') ? { intrinsicMaxHeight: true } : {}),
-            ...(minTrack === undefined && maxTrack === undefined && minToken.toLowerCase() === 'auto' && maxToken.toLowerCase() === 'auto' && trackWeight === undefined ? { stretchEligible: true } : {}),
-            ...(trackWeight !== undefined && Number.isFinite(trackWeight) && trackWeight > 0 ? { trackWeight } : {}),
-        };
-    }
-
-    const directWeight = parseFractionTrackWeight(trimmed);
-    if (directWeight !== undefined && Number.isFinite(directWeight) && directWeight > 0) {
-        return { trackWeight: directWeight };
-    }
-
-    return undefined;
-}
-
-function parseGridColumnTrackSizeSpec(
-    track: string,
-    styleResolveOptions: NativeStyleResolveOptions,
-): NativeGridColumnTrackSizeSpec | undefined {
-    const trimmed = track.trim();
-    if (!trimmed) {
-        return undefined;
-    }
-
-    const direct = toScaledUnitNumber(trimmed, styleResolveOptions);
-    if (direct !== undefined && direct >= 0) {
-        return { minWidth: direct, width: direct };
-    }
-
-    const normalized = trimmed.toLowerCase();
-    if (normalized === 'auto') {
-        return { trackWeight: 1 };
-    }
-
-    if (normalized === 'min-content' || normalized === 'max-content') {
-        return { intrinsicWidth: true };
-    }
-
-    const fitContentMatch = trimmed.match(/^fit-content\(([^()]+)\)$/i);
-    if (fitContentMatch) {
-        const fitContent = toScaledUnitNumber(fitContentMatch[1].trim(), styleResolveOptions);
-        return fitContent !== undefined && fitContent >= 0 ? { maxWidth: fitContent } : undefined;
-    }
-
-    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),([^,()]+)\)$/i);
-    if (minmaxMatch) {
-        const minToken = minmaxMatch[1].trim();
-        const maxToken = minmaxMatch[2].trim();
-        const normalizedMinToken = minToken.toLowerCase();
-        const normalizedMaxToken = maxToken.toLowerCase();
-        const minTrack = toScaledUnitNumber(minToken, styleResolveOptions);
-        const maxTrack = toScaledUnitNumber(maxToken, styleResolveOptions);
-        const trackWeight = parseFractionTrackWeight(trimmed);
-        const hasFixedTrack = minTrack !== undefined && maxTrack !== undefined && Math.abs(minTrack - maxTrack) < 0.001;
-
-        return {
-            ...(minTrack !== undefined && minTrack >= 0 ? { minWidth: minTrack } : {}),
-            ...((normalizedMinToken === 'min-content' || normalizedMinToken === 'max-content') ? { intrinsicMinWidth: true } : {}),
-            ...(hasFixedTrack && maxTrack !== undefined ? { width: maxTrack } : {}),
-            ...(!hasFixedTrack && maxTrack !== undefined && maxTrack >= 0 ? { maxWidth: maxTrack } : {}),
-            ...((normalizedMaxToken === 'min-content' || normalizedMaxToken === 'max-content') ? { intrinsicMaxWidth: true } : {}),
-            ...(minTrack === undefined && maxTrack === undefined && normalizedMinToken === 'auto' && normalizedMaxToken === 'auto' && trackWeight === undefined ? { trackWeight: 1 } : {}),
-            ...(trackWeight !== undefined && Number.isFinite(trackWeight) && trackWeight > 0 ? { trackWeight } : {}),
-        };
-    }
-
-    const directWeight = parseFractionTrackWeight(trimmed);
-    if (directWeight !== undefined && Number.isFinite(directWeight) && directWeight > 0) {
-        return { trackWeight: directWeight };
-    }
-
-    return { trackWeight: 1 };
-}
-
-function resolveGridTrackSizeSpecs(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): Array<NativeGridTrackSizeSpec | undefined> | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tracks = parseNativeGridTrackDefinition(value.trim())?.tracks ?? [];
-    if (tracks.length === 0) {
-        return undefined;
-    }
-
-    return tracks.map((track) => parseGridTrackSizeSpec(track, styleResolveOptions));
-}
-
-function resolveGridColumnTrackSizeSpecs(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-    columnGap: number,
-): Array<NativeGridColumnTrackSizeSpec | undefined> | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-    const viewportWidth = styleResolveOptions.viewportWidth ?? 390;
-    const autoRepeatMatch = trimmed.match(/^repeat\(\s*auto-(?:fit|fill)\s*,\s*(minmax\([^,()]+,[^,()]+\))\s*\)$/i);
-    if (autoRepeatMatch) {
-        const repeatedSpec = parseGridColumnTrackSizeSpec(autoRepeatMatch[1].trim(), styleResolveOptions);
-        const minWidth = repeatedSpec?.width ?? repeatedSpec?.minWidth;
-        if (minWidth === undefined || minWidth <= 0) {
-            return undefined;
-        }
-
-        const columnCount = Math.max(1, Math.floor((viewportWidth + columnGap) / (minWidth + columnGap)));
-        return Array.from({ length: columnCount }, () => repeatedSpec ? { ...repeatedSpec } : { trackWeight: 1 });
-    }
-
-    const tracks = parseNativeGridTrackDefinition(trimmed)?.tracks ?? [];
-    if (tracks.length === 0) {
-        return undefined;
-    }
-
-    return tracks.map((track) => parseGridColumnTrackSizeSpec(track, styleResolveOptions));
-}
-
-function isWrapEnabled(style: Record<string, NativePropValue> | undefined): boolean {
-    if (!style || typeof style.flexWrap !== 'string') {
-        return false;
-    }
-
-    const flexWrap = style.flexWrap.trim().toLowerCase();
-    return flexWrap === 'wrap' || flexWrap === 'wrap-reverse';
-}
-
-function isRowFlexLayout(style: Record<string, NativePropValue> | undefined): boolean {
-    if (!style) {
-        return false;
-    }
-
-    if (typeof style.flexDirection === 'string') {
-        return style.flexDirection.trim().toLowerCase() === 'row';
-    }
-
-    if (typeof style.display !== 'string') {
-        return false;
-    }
-
-    const display = style.display.trim().toLowerCase();
-    return display === 'flex' || display === 'inline-flex';
-}
-
 function estimateNodePreferredWidth(
     node: NativeNode,
     resolvedStyles: NativeResolvedStyleMap | undefined,
     styleResolveOptions: NativeStyleResolveOptions,
 ): number {
-    if (node.kind === 'text') {
-        return Math.max(48, node.value.trim().length * 8);
-    }
-
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    if (style?.width && isFillValue(style.width)) {
-        return styleResolveOptions.viewportWidth ?? 390;
-    }
-
-    const explicitWidth = resolveAxisUnitNumber(style?.width ?? style?.minWidth, 'horizontal', undefined, styleResolveOptions);
-    if (explicitWidth !== undefined && explicitWidth > 0) {
-        return explicitWidth;
-    }
-
-    const fontSize = toScaledUnitNumber(style?.fontSize, styleResolveOptions) ?? 16;
-    const text = flattenTextContent(node.children)
-        || (typeof node.props.placeholder === 'string' ? node.props.placeholder : '');
-    let baseWidth = text
-        ? Math.max(56, text.length * fontSize * (node.component === 'Button' || node.component === 'Link' ? 0.58 : 0.52))
-        : 0;
-
-    switch (node.component) {
-        case 'Button':
-        case 'Link':
-            baseWidth = Math.max(baseWidth, 120);
-            break;
-        case 'TextInput':
-            baseWidth = Math.max(baseWidth, 220);
-            break;
-        case 'Toggle':
-            baseWidth = Math.max(baseWidth, 56);
-            break;
-        default:
-            baseWidth = Math.max(baseWidth, 160);
-            break;
-    }
-
-    return baseWidth + estimateHorizontalPadding(style, styleResolveOptions);
+    const style = node.kind === 'element'
+        ? getStyleObject(node, resolvedStyles, styleResolveOptions)
+        : undefined;
+    return estimateResolvedNodePreferredWidth(node, style, styleResolveOptions);
 }
 
 function estimateNodePreferredHeight(
@@ -4458,316 +1715,10 @@ function estimateNodePreferredHeight(
     resolvedStyles: NativeResolvedStyleMap | undefined,
     styleResolveOptions: NativeStyleResolveOptions,
 ): number | undefined {
-    if (node.kind === 'text') {
-        return undefined;
-    }
-
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    if (style?.height && isFillValue(style.height)) {
-        return undefined;
-    }
-
-    const explicitHeight = resolveAxisUnitNumber(style?.height ?? style?.minHeight, 'vertical', undefined, styleResolveOptions);
-    if (explicitHeight !== undefined && explicitHeight > 0) {
-        return explicitHeight;
-    }
-
-    const fontSize = toScaledUnitNumber(style?.fontSize, styleResolveOptions) ?? 16;
-    const lineHeightValue = parseCssUnitValue(style?.lineHeight);
-    const lineHeight = lineHeightValue?.unit === '' && lineHeightValue.value > 0 && lineHeightValue.value <= 4
-        ? fontSize * lineHeightValue.value
-        : toScaledUnitNumber(style?.lineHeight, styleResolveOptions) ?? (fontSize * 1.2);
-    const text = flattenTextContent(node.children)
-        || (typeof node.props.placeholder === 'string' ? node.props.placeholder : '');
-    const lineCount = text ? text.split(/\r?\n/).length : 0;
-    let baseHeight = lineCount > 0 ? lineHeight * lineCount : 0;
-
-    switch (node.component) {
-        case 'Button':
-        case 'Link':
-            baseHeight = Math.max(baseHeight, 40);
-            break;
-        case 'TextInput':
-            baseHeight = Math.max(baseHeight, 44);
-            break;
-        case 'Toggle':
-            baseHeight = Math.max(baseHeight, 32);
-            break;
-        default:
-            baseHeight = Math.max(baseHeight, 24);
-            break;
-    }
-
-    return baseHeight + estimateVerticalPadding(style, styleResolveOptions);
-}
-
-function createNativeGridPlaceholderNode(): NativeElementNode {
-    return {
-        kind: 'element',
-        component: 'View',
-        sourceTag: 'div',
-        props: {},
-        events: [],
-        children: [],
-    };
-}
-
-function resolveGridTrackCount(value: NativePropValue | undefined): number | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tracks = parseNativeGridTrackDefinition(value.trim())?.tracks ?? [];
-    return tracks.length > 0 ? tracks.length : undefined;
-}
-
-function parseNativeGridTemplateAreas(value: NativePropValue | undefined): string[][] | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const rows = Array.from(value.matchAll(/"([^"]*)"/g))
-        .map((match) => match[1].trim().split(/\s+/).filter(Boolean))
-        .filter((row) => row.length > 0);
-    if (rows.length === 0) {
-        return undefined;
-    }
-
-    const columnCount = rows[0]?.length ?? 0;
-    if (columnCount === 0 || rows.some((row) => row.length !== columnCount)) {
-        return undefined;
-    }
-
-    return rows;
-}
-
-function resolveNativeGridTemplateAreaPlacements(
-    value: NativePropValue | undefined,
-): Map<string, NativeGridTemplateAreaPlacement> | undefined {
-    const rows = parseNativeGridTemplateAreas(value);
-    if (!rows) {
-        return undefined;
-    }
-
-    const bounds = new Map<string, { minRow: number; maxRow: number; minColumn: number; maxColumn: number }>();
-    for (const [rowIndex, row] of rows.entries()) {
-        for (const [columnIndex, areaName] of row.entries()) {
-            if (areaName === '.') {
-                continue;
-            }
-
-            const existing = bounds.get(areaName);
-            if (existing) {
-                existing.minRow = Math.min(existing.minRow, rowIndex);
-                existing.maxRow = Math.max(existing.maxRow, rowIndex);
-                existing.minColumn = Math.min(existing.minColumn, columnIndex);
-                existing.maxColumn = Math.max(existing.maxColumn, columnIndex);
-            } else {
-                bounds.set(areaName, {
-                    minRow: rowIndex,
-                    maxRow: rowIndex,
-                    minColumn: columnIndex,
-                    maxColumn: columnIndex,
-                });
-            }
-        }
-    }
-
-    const placements = new Map<string, NativeGridTemplateAreaPlacement>();
-    for (const [areaName, bound] of bounds.entries()) {
-        let isRectangular = true;
-        for (let rowIndex = bound.minRow; rowIndex <= bound.maxRow && isRectangular; rowIndex += 1) {
-            for (let columnIndex = bound.minColumn; columnIndex <= bound.maxColumn; columnIndex += 1) {
-                if (rows[rowIndex]?.[columnIndex] !== areaName) {
-                    isRectangular = false;
-                    break;
-                }
-            }
-        }
-
-        if (!isRectangular) {
-            continue;
-        }
-
-        placements.set(areaName, {
-            rowPlacement: { start: bound.minRow + 1, span: (bound.maxRow - bound.minRow) + 1 },
-            columnPlacement: { start: bound.minColumn + 1, span: (bound.maxColumn - bound.minColumn) + 1 },
-        });
-    }
-
-    return placements.size > 0 ? placements : undefined;
-}
-
-function resolveNativeGridAutoFlow(value: NativePropValue | undefined): { axis: 'row' | 'column'; dense: boolean } {
-    if (typeof value !== 'string') {
-        return { axis: 'row', dense: false };
-    }
-
-    const tokens = value
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
-
-    return {
-        axis: tokens.includes('column') ? 'column' : 'row',
-        dense: tokens.includes('dense'),
-    };
-}
-
-function parseNativeGridLineIndexValue(
-    value: NativePropValue | undefined,
-    lineNames?: Map<string, number[]>,
-    explicitLineCount?: number,
-): number | undefined {
-    const resolveNumericLine = (lineIndex: number): number | undefined => {
-        if (!Number.isInteger(lineIndex) || lineIndex === 0) {
-            return undefined;
-        }
-
-        if (lineIndex > 0) {
-            return lineIndex;
-        }
-
-        if (explicitLineCount === undefined || explicitLineCount <= 0) {
-            return undefined;
-        }
-
-        const resolvedIndex = explicitLineCount + lineIndex + 1;
-        return resolvedIndex >= 1 && resolvedIndex <= explicitLineCount ? resolvedIndex : undefined;
-    };
-
-    if (typeof value === 'number') {
-        return resolveNumericLine(value);
-    }
-
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const trimmed = value.trim().toLowerCase();
-    if (!trimmed || trimmed === 'auto') {
-        return undefined;
-    }
-
-    const match = trimmed.match(/^(-?\d+)$/);
-    if (match) {
-        return resolveNumericLine(Number(match[1]));
-    }
-
-    const namedLineMatch = trimmed.match(/^([_a-z][-_a-z0-9]*)(?:\s+(-?\d+))?$|^(-?\d+)\s+([_a-z][-_a-z0-9]*)$/i);
-    if (!namedLineMatch) {
-        return undefined;
-    }
-
-    const lineName = (namedLineMatch[1] ?? namedLineMatch[4])?.toLowerCase();
-    const occurrence = Number(namedLineMatch[2] ?? namedLineMatch[3] ?? '1');
-    if (!lineName || !Number.isFinite(occurrence) || occurrence === 0) {
-        return undefined;
-    }
-
-    const namedLines = lineNames?.get(lineName);
-    if (!namedLines || namedLines.length === 0) {
-        return undefined;
-    }
-
-    if (occurrence > 0) {
-        return namedLines.length >= occurrence ? namedLines[occurrence - 1] : undefined;
-    }
-
-    const reverseIndex = namedLines.length + occurrence;
-    return reverseIndex >= 0 ? namedLines[reverseIndex] : undefined;
-}
-
-function parseNativeGridSpanValue(value: NativePropValue | undefined): number | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const match = value.trim().toLowerCase().match(/^span\s+(\d+)$/);
-    return match ? Math.max(1, Number(match[1])) : undefined;
-}
-
-function resolveNativeGridPlacementValue(
-    value: NativePropValue | undefined,
-    lineNames?: Map<string, number[]>,
-    explicitLineCount?: number,
-): { start?: number; span: number } | undefined {
-    const directStart = parseNativeGridLineIndexValue(value, lineNames, explicitLineCount);
-    if (directStart !== undefined) {
-        return { start: directStart, span: 1 };
-    }
-
-    const directSpan = parseNativeGridSpanValue(value);
-    if (directSpan !== undefined) {
-        return { span: directSpan };
-    }
-
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tokens = value.split('/').map((entry) => entry.trim()).filter(Boolean);
-    if (tokens.length === 0) {
-        return undefined;
-    }
-
-    const firstStart = parseNativeGridLineIndexValue(tokens[0], lineNames, explicitLineCount);
-    const firstSpan = parseNativeGridSpanValue(tokens[0]);
-    const secondStart = tokens[1] ? parseNativeGridLineIndexValue(tokens[1], lineNames, explicitLineCount) : undefined;
-    const secondSpan = tokens[1] ? parseNativeGridSpanValue(tokens[1]) : undefined;
-    const start = firstStart ?? secondStart;
-    const span = secondSpan
-        ?? firstSpan
-        ?? (firstStart !== undefined && secondStart !== undefined ? Math.max(1, secondStart - firstStart) : 1);
-
-    return start !== undefined || span !== 1
-        ? { ...(start !== undefined ? { start } : {}), span }
+    const style = node.kind === 'element'
+        ? getStyleObject(node, resolvedStyles, styleResolveOptions)
         : undefined;
-}
-
-function resolveNativeGridAreaPlacement(
-    value: NativePropValue | undefined,
-    rowLineNames?: Map<string, number[]>,
-    columnLineNames?: Map<string, number[]>,
-    rowExplicitLineCount?: number,
-    columnExplicitLineCount?: number,
-): { rowPlacement?: { start?: number; span: number }; columnPlacement?: { start?: number; span: number } } | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tokens = value.split('/').map((entry) => entry.trim()).filter(Boolean);
-    if (tokens.length < 2) {
-        return undefined;
-    }
-
-    const rowStart = parseNativeGridLineIndexValue(tokens[0], rowLineNames, rowExplicitLineCount);
-    const columnStart = parseNativeGridLineIndexValue(tokens[1], columnLineNames, columnExplicitLineCount);
-    const rowEnd = tokens[2] ? parseNativeGridLineIndexValue(tokens[2], rowLineNames, rowExplicitLineCount) : undefined;
-    const rowSpan = tokens[2] ? parseNativeGridSpanValue(tokens[2]) : undefined;
-    const columnEnd = tokens[3] ? parseNativeGridLineIndexValue(tokens[3], columnLineNames, columnExplicitLineCount) : undefined;
-    const columnSpan = tokens[3] ? parseNativeGridSpanValue(tokens[3]) : undefined;
-
-    const rowPlacement = rowStart !== undefined || rowEnd !== undefined || rowSpan !== undefined
-        ? {
-            ...(rowStart !== undefined ? { start: rowStart } : {}),
-            span: rowSpan ?? (rowStart !== undefined && rowEnd !== undefined ? Math.max(1, rowEnd - rowStart) : 1),
-        }
-        : undefined;
-    const columnPlacement = columnStart !== undefined || columnEnd !== undefined || columnSpan !== undefined
-        ? {
-            ...(columnStart !== undefined ? { start: columnStart } : {}),
-            span: columnSpan ?? (columnStart !== undefined && columnEnd !== undefined ? Math.max(1, columnEnd - columnStart) : 1),
-        }
-        : undefined;
-
-    return rowPlacement || columnPlacement
-        ? {
-            ...(rowPlacement ? { rowPlacement } : {}),
-            ...(columnPlacement ? { columnPlacement } : {}),
-        }
-        : undefined;
+    return estimateResolvedNodePreferredHeight(node, style, styleResolveOptions);
 }
 
 function resolveNativeGridChildPlacement(
@@ -5335,25 +2286,6 @@ function chunkNodesIntoGridRows(
     return rows;
 }
 
-function resolveNativeStretchChunkedRows(
-    rows: NativeChunkedRow[],
-    contentAlignment: NativeContentStackAlignment | undefined,
-): NativeChunkedRow[] {
-    if (contentAlignment !== 'stretch') {
-        return rows;
-    }
-
-    return rows.map((row) => row.trackWeight === undefined && row.stretchEligible && row.height === undefined
-        ? { ...row, trackWeight: 1 }
-        : row);
-}
-
-function resolveEffectiveChunkedContentAlignment(layout: NativeChunkedLayout): NativeContentStackAlignment | undefined {
-    return layout.kind === 'grid' && layout.rows.some((row) => row.trackWeight !== undefined)
-        ? undefined
-        : layout.contentAlignment;
-}
-
 function chunkNodesIntoWrappedRows(
     nodes: NativeNode[],
     availableWidth: number,
@@ -5469,1056 +2401,6 @@ function resolveChunkedLayout(
     return undefined;
 }
 
-function shouldFillChunkedCellChild(node: NativeNode): boolean {
-    if (node.kind !== 'element') {
-        return false;
-    }
-
-    return !FILL_WIDTH_EXCLUDED_COMPONENTS.has(node.component);
-}
-
-function hasNativeContainerSpacing(
-    style: Record<string, NativePropValue>,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): boolean {
-    return [
-        style.padding,
-        style.paddingHorizontal,
-        style.paddingVertical,
-        style.paddingTop,
-        style.paddingRight,
-        style.paddingBottom,
-        style.paddingLeft,
-        style.paddingStart,
-        style.paddingEnd,
-        style.gap,
-        style.rowGap,
-        style.columnGap,
-    ].some((value) => toScaledUnitNumber(value, styleResolveOptions) !== undefined);
-}
-
-function hasNativeContainerDecoration(
-    style: Record<string, NativePropValue>,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): boolean {
-    return resolveNativeBackgroundLayersFromStyle(style, styleResolveOptions).length > 0
-        || resolveBackdropBlurRadius(style, styleResolveOptions) !== undefined
-        || resolveNativeBorder(style, (value) => toDpLiteral(value, styleResolveOptions)) !== undefined
-        || parseBoxShadowList(style.boxShadow, resolveStyleCurrentColor(style)).length > 0;
-}
-
-function shouldDefaultFillWidthHint(
-    node: NativeNode,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): boolean {
-    if (node.kind !== 'element' || !shouldFillChunkedCellChild(node)) {
-        return false;
-    }
-
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const display = typeof style?.display === 'string'
-        ? style.display.trim().toLowerCase()
-        : undefined;
-
-    if (display && INLINE_DISPLAY_VALUES.has(display)) {
-        return false;
-    }
-
-    if (display === 'flex' || display === 'grid' || typeof style?.flexDirection === 'string') {
-        return true;
-    }
-
-    if (style && (hasNativeContainerSpacing(style, styleResolveOptions) || hasNativeContainerDecoration(style, styleResolveOptions))) {
-        return true;
-    }
-
-    return DEFAULT_BLOCK_FILL_SOURCE_TAGS.has(node.sourceTag);
-}
-
-function tokenizeImageFallbackWords(value: string): string[] {
-    return value
-        .split(/[^a-zA-Z0-9]+/)
-        .map((token) => token.trim())
-        .filter((token) => token.length > 0)
-        .filter((token) => !/^\d+$/.test(token))
-        .filter((token) => !IMAGE_FALLBACK_STOP_WORDS.has(token.toLowerCase()));
-}
-
-function resolveImageFallbackLabel(source: string, alt?: string): string {
-    const altTokens = alt ? tokenizeImageFallbackWords(alt) : [];
-    const sourceTokens = tokenizeImageFallbackWords(source.replace(/\.[a-z0-9]+$/i, ''));
-    const tokens = altTokens.length > 0 ? altTokens : sourceTokens;
-
-    if (tokens.length === 0) {
-        return 'IMG';
-    }
-
-    if (tokens.length === 1) {
-        return tokens[0]!.slice(0, 2).toUpperCase();
-    }
-
-    const initials = tokens
-        .slice(0, 2)
-        .map((token) => token[0]!.toUpperCase())
-        .join('');
-
-    return initials || 'IMG';
-}
-
-interface NativeTransformValue {
-    translateX?: number;
-    translateY?: number;
-    scaleX?: number;
-    scaleY?: number;
-    rotationDegrees?: number;
-}
-
-function parseCssAngleDegrees(value: string): number | undefined {
-    const trimmed = value.trim().toLowerCase();
-    if (trimmed === '0') {
-        return 0;
-    }
-
-    const match = trimmed.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))deg$/);
-    if (!match) {
-        return undefined;
-    }
-
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseNativeTransform(
-    value: NativePropValue | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): NativeTransformValue | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.toLowerCase() === 'none') {
-        return undefined;
-    }
-
-    const transform: NativeTransformValue = {};
-    const pattern = /(translate[xy]?|scale[xy]?|rotate)\(([^()]*)\)/gi;
-    let matched = false;
-
-    for (const match of trimmed.matchAll(pattern)) {
-        matched = true;
-        const functionName = match[1].toLowerCase();
-        const args = splitCssFunctionArguments(match[2]);
-
-        if (functionName === 'translate') {
-            const x = toScaledUnitNumber(args[0], styleResolveOptions);
-            const y = args[1] ? toScaledUnitNumber(args[1], styleResolveOptions) : 0;
-            if (x !== undefined) {
-                transform.translateX = (transform.translateX ?? 0) + x;
-            }
-            if (y !== undefined) {
-                transform.translateY = (transform.translateY ?? 0) + y;
-            }
-            continue;
-        }
-
-        if (functionName === 'translatex') {
-            const x = toScaledUnitNumber(args[0], styleResolveOptions);
-            if (x !== undefined) {
-                transform.translateX = (transform.translateX ?? 0) + x;
-            }
-            continue;
-        }
-
-        if (functionName === 'translatey') {
-            const y = toScaledUnitNumber(args[0], styleResolveOptions);
-            if (y !== undefined) {
-                transform.translateY = (transform.translateY ?? 0) + y;
-            }
-            continue;
-        }
-
-        if (functionName === 'scale') {
-            const x = parsePlainNumericValue(args[0]);
-            const y = args[1] ? parsePlainNumericValue(args[1]) : x;
-            if (x !== undefined) {
-                transform.scaleX = (transform.scaleX ?? 1) * x;
-            }
-            if (y !== undefined) {
-                transform.scaleY = (transform.scaleY ?? 1) * y;
-            }
-            continue;
-        }
-
-        if (functionName === 'scalex') {
-            const x = parsePlainNumericValue(args[0]);
-            if (x !== undefined) {
-                transform.scaleX = (transform.scaleX ?? 1) * x;
-            }
-            continue;
-        }
-
-        if (functionName === 'scaley') {
-            const y = parsePlainNumericValue(args[0]);
-            if (y !== undefined) {
-                transform.scaleY = (transform.scaleY ?? 1) * y;
-            }
-            continue;
-        }
-
-        if (functionName === 'rotate') {
-            const rotation = parseCssAngleDegrees(args[0] ?? '');
-            if (rotation !== undefined) {
-                transform.rotationDegrees = (transform.rotationDegrees ?? 0) + rotation;
-            }
-        }
-    }
-
-    return matched && Object.keys(transform).length > 0 ? transform : undefined;
-}
-
-function resolveCrossAlignmentKeyword(
-    value: NativePropValue | undefined,
-): 'start' | 'center' | 'end' | 'stretch' | 'baseline' | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    switch (normalized) {
-        case 'flex-start':
-        case 'start':
-        case 'left':
-        case 'top':
-        case 'self-start':
-            return 'start';
-        case 'center':
-            return 'center';
-        case 'flex-end':
-        case 'end':
-        case 'right':
-        case 'bottom':
-        case 'self-end':
-            return 'end';
-        case 'normal':
-        case 'stretch':
-            return 'stretch';
-        case 'baseline':
-        case 'first baseline':
-        case 'last baseline':
-            return 'baseline';
-        default:
-            return undefined;
-    }
-}
-
-function resolveBaselineAlignmentKeyword(value: NativePropValue | undefined): 'first' | 'last' | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'last baseline') {
-        return 'last';
-    }
-
-    if (normalized === 'baseline' || normalized === 'first baseline') {
-        return 'first';
-    }
-
-    return undefined;
-}
-
-function resolveRowBaselineSelfAlignment(
-    nodes: NativeNode[],
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): 'first' | 'last' | undefined {
-    let hasFirstBaseline = false;
-
-    for (const node of nodes) {
-        if (node.kind !== 'element' || node.component !== 'Text') {
-            continue;
-        }
-
-        const baselineAlignment = resolveBaselineAlignmentKeyword(getStyleObject(node, resolvedStyles, styleResolveOptions)?.alignSelf);
-        if (baselineAlignment === 'last') {
-            return 'last';
-        }
-
-        if (baselineAlignment === 'first') {
-            hasFirstBaseline = true;
-        }
-    }
-
-    return hasFirstBaseline ? 'first' : undefined;
-}
-
-function resolveSelfAlignmentKeyword(value: NativePropValue | undefined): 'start' | 'center' | 'end' | 'stretch' | undefined {
-    const alignment = resolveCrossAlignmentKeyword(value);
-    return alignment === 'baseline' ? undefined : alignment;
-}
-
-function resolveComposeSelfAlignmentCall(
-    parentFlexLayout: 'Row' | 'Column' | undefined,
-    style: Record<string, NativePropValue> | undefined,
-): string | undefined {
-    const alignSelf = resolveSelfAlignmentKeyword(style?.alignSelf);
-    if (!alignSelf || !parentFlexLayout) {
-        return undefined;
-    }
-
-    if (alignSelf === 'stretch') {
-        if (parentFlexLayout === 'Row') {
-            return style?.height === undefined && style?.minHeight === undefined && style?.maxHeight === undefined
-                ? 'fillMaxHeight()'
-                : undefined;
-        }
-
-        return style?.width === undefined && style?.minWidth === undefined && style?.maxWidth === undefined
-            ? 'fillMaxWidth()'
-            : undefined;
-    }
-
-    if (parentFlexLayout === 'Row') {
-        switch (alignSelf) {
-            case 'center':
-                return 'align(Alignment.CenterVertically)';
-            case 'end':
-                return 'align(Alignment.Bottom)';
-            default:
-                return 'align(Alignment.Top)';
-        }
-    }
-
-    switch (alignSelf) {
-        case 'center':
-            return 'align(Alignment.CenterHorizontally)';
-        case 'end':
-            return 'align(Alignment.End)';
-        default:
-            return 'align(Alignment.Start)';
-    }
-}
-
-function resolveSwiftSelfAlignmentModifier(
-    parentFlexLayout: 'Row' | 'Column' | undefined,
-    style: Record<string, NativePropValue> | undefined,
-): string | undefined {
-    const alignSelf = resolveSelfAlignmentKeyword(style?.alignSelf);
-    if (!alignSelf || !parentFlexLayout) {
-        return undefined;
-    }
-
-    if (alignSelf === 'stretch') {
-        if (parentFlexLayout === 'Row') {
-            return style?.height === undefined && style?.minHeight === undefined && style?.maxHeight === undefined
-                ? '.frame(maxHeight: .infinity, alignment: .topLeading)'
-                : undefined;
-        }
-
-        return style?.width === undefined && style?.minWidth === undefined && style?.maxWidth === undefined
-            ? '.frame(maxWidth: .infinity, alignment: .leading)'
-            : undefined;
-    }
-
-    if (parentFlexLayout === 'Row') {
-        switch (alignSelf) {
-            case 'center':
-                return '.frame(maxHeight: .infinity, alignment: .center)';
-            case 'end':
-                return '.frame(maxHeight: .infinity, alignment: .bottomLeading)';
-            default:
-                return '.frame(maxHeight: .infinity, alignment: .topLeading)';
-        }
-    }
-
-    switch (alignSelf) {
-        case 'center':
-            return '.frame(maxWidth: .infinity, alignment: .center)';
-        case 'end':
-            return '.frame(maxWidth: .infinity, alignment: .trailing)';
-        default:
-            return '.frame(maxWidth: .infinity, alignment: .leading)';
-    }
-}
-
-function resolveNativeGridItemAlignmentKeyword(value: NativePropValue | undefined): NativeGridItemAlignment | undefined {
-    const alignment = resolveCrossAlignmentKeyword(value);
-    return alignment === 'baseline' ? undefined : alignment;
-}
-
-function resolveNativePlaceAlignment(value: NativePropValue | undefined): { align?: NativeGridItemAlignment; justify?: NativeGridItemAlignment } | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const tokens = value.trim().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) {
-        return undefined;
-    }
-
-    const align = resolveNativeGridItemAlignmentKeyword(tokens[0]);
-    const justify = resolveNativeGridItemAlignmentKeyword(tokens[1] ?? tokens[0]);
-    return align || justify
-        ? {
-            ...(align ? { align } : {}),
-            ...(justify ? { justify } : {}),
-        }
-        : undefined;
-}
-
-function resolveNativeGridItemHorizontalAlignment(
-    style: Record<string, NativePropValue> | undefined,
-    containerStyle: Record<string, NativePropValue> | undefined,
-): NativeGridItemAlignment | undefined {
-    const selfPlaceAlignment = resolveNativePlaceAlignment(style?.placeSelf);
-    const containerPlaceAlignment = resolveNativePlaceAlignment(containerStyle?.placeItems);
-
-    return resolveNativeGridItemAlignmentKeyword(style?.justifySelf)
-        ?? selfPlaceAlignment?.justify
-        ?? resolveNativeGridItemAlignmentKeyword(containerStyle?.justifyItems)
-        ?? containerPlaceAlignment?.justify;
-}
-
-function resolveNativeGridItemVerticalAlignment(
-    style: Record<string, NativePropValue> | undefined,
-    containerStyle: Record<string, NativePropValue> | undefined,
-): NativeGridItemAlignment | undefined {
-    const selfPlaceAlignment = resolveNativePlaceAlignment(style?.placeSelf);
-    const containerPlaceAlignment = resolveNativePlaceAlignment(containerStyle?.placeItems);
-
-    return resolveSelfAlignmentKeyword(style?.alignSelf)
-        ?? selfPlaceAlignment?.align
-        ?? resolveSelfAlignmentKeyword(containerStyle?.alignItems)
-        ?? containerPlaceAlignment?.align;
-}
-
-function resolveNativeGridCellAlignment(
-    node: NativeNode,
-    containerStyle: Record<string, NativePropValue> | undefined,
-    resolvedStyles: NativeResolvedStyleMap | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): { horizontal?: NativeGridItemAlignment; vertical?: NativeGridItemAlignment } {
-    if (node.kind !== 'element') {
-        return {};
-    }
-
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const horizontal = resolveNativeGridItemHorizontalAlignment(style, containerStyle);
-    const vertical = resolveNativeGridItemVerticalAlignment(style, containerStyle);
-
-    return {
-        ...(horizontal ? { horizontal } : {}),
-        ...(vertical ? { vertical } : {}),
-    };
-}
-
-function resolvePositionInsets(
-    style: Record<string, NativePropValue> | undefined,
-    hints: NativeRenderHints | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): { top?: number; right?: number; bottom?: number; left?: number } {
-    return {
-        top: resolveAxisUnitNumber(style?.top, 'vertical', hints, styleResolveOptions),
-        right: resolveAxisUnitNumber(style?.right, 'horizontal', hints, styleResolveOptions),
-        bottom: resolveAxisUnitNumber(style?.bottom, 'vertical', hints, styleResolveOptions),
-        left: resolveAxisUnitNumber(style?.left, 'horizontal', hints, styleResolveOptions),
-    };
-}
-
-function liftColorAlpha(color: NativeColorValue, delta: number): NativeColorValue {
-    return {
-        ...color,
-        alpha: Math.min(0.96, Math.max(color.alpha, 0) + Math.max(0, delta)),
-    };
-}
-
-function resolveBackgroundColor(
-    style: Record<string, NativePropValue>,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): NativeColorValue | undefined {
-    const currentColor = resolveStyleCurrentColor(style);
-    const explicitBackgroundColor = parseCssColor(style.backgroundColor, currentColor);
-    const shorthandBackgroundColor = explicitBackgroundColor ? undefined : resolveNativeBackgroundShorthandColor(style.background, currentColor);
-    return resolveNativeBackgroundColorLayer(explicitBackgroundColor ?? shorthandBackgroundColor, style, styleResolveOptions);
-}
-
-function resolveBackgroundGradient(style: Record<string, NativePropValue>): NativeGradientValue | undefined {
-    return parseLinearGradient(style.background, resolveStyleCurrentColor(style));
-}
-
-function parseBorderValue(
-    value: NativePropValue | undefined,
-    unitParser: (value: NativePropValue | undefined) => string | undefined,
-    currentColor: NativeColorValue,
-): { width?: string; color?: NativeColorValue; style?: NativeBorderStyleKeyword } | undefined {
-    if (typeof value !== 'string') return undefined;
-
-    const widthMatch = value.match(/-?\d+(?:\.\d+)?(?:px|dp|pt)?/i);
-    const width = widthMatch ? unitParser(widthMatch[0]) : undefined;
-    const color = parseCssColor(value, currentColor);
-    const style = parseBorderStyleKeyword(value);
-
-    if (!width && !color && !style) {
-        return undefined;
-    }
-
-    return { width, color, style };
-}
-
-function parseBorderStyleKeyword(value: NativePropValue | undefined): NativeBorderStyleKeyword | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    if (!normalized) {
-        return undefined;
-    }
-
-    if (/(^|\s)(none|hidden)(\s|$)/.test(normalized)) {
-        return 'none';
-    }
-
-    if (/(^|\s)solid(\s|$)/.test(normalized)) {
-        return 'solid';
-    }
-
-    if (/(^|\s)dashed(\s|$)/.test(normalized)) {
-        return 'dashed';
-    }
-
-    if (/(^|\s)dotted(\s|$)/.test(normalized)) {
-        return 'dotted';
-    }
-
-    if (/(^|\s)(double|groove|ridge|inset|outset)(\s|$)/.test(normalized)) {
-        return 'unsupported';
-    }
-
-    return undefined;
-}
-
-function areNativeColorsEqual(left: NativeColorValue | undefined, right: NativeColorValue | undefined): boolean {
-    if (!left || !right) {
-        return left === right;
-    }
-
-    return left.red === right.red
-        && left.green === right.green
-        && left.blue === right.blue
-        && Math.abs(left.alpha - right.alpha) < 0.0001;
-}
-
-function parseNativeBorderNumericWidth(width: string): number {
-    const parsedWidth = Number.parseFloat(width);
-    return Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : 1;
-}
-
-function buildComposeBorderLineCap(style: NativeBorderStyleKeyword | undefined): string {
-    return style === 'dotted'
-        ? 'androidx.compose.ui.graphics.StrokeCap.Round'
-        : 'androidx.compose.ui.graphics.StrokeCap.Square';
-}
-
-function buildComposeBorderJoinInset(side: NativeBorderSideValue | undefined, strokeVariable: string): string {
-    return side ? `${side.width}.toPx() / 2f` : `${strokeVariable} / 2f`;
-}
-
-function buildComposeBorderDashPattern(style: NativeBorderStyleKeyword | undefined, strokeVariable: string): string | undefined {
-    if (style === 'dotted') {
-        return `floatArrayOf(${strokeVariable}, ${strokeVariable} * 1.5f)`;
-    }
-
-    if (style === 'dashed') {
-        return `floatArrayOf(${strokeVariable} * 3f, ${strokeVariable} * 2f)`;
-    }
-
-    return undefined;
-}
-
-function buildSwiftBorderDashPattern(style: NativeBorderStyleKeyword | undefined, widthValue: number): string | undefined {
-    if (style === 'dotted') {
-        return `[${formatFloat(widthValue)}, ${formatFloat(widthValue * 1.5)}]`;
-    }
-
-    if (style === 'dashed') {
-        return `[${formatFloat(widthValue * 3)}, ${formatFloat(widthValue * 2)}]`;
-    }
-
-    return undefined;
-}
-
-function buildSwiftBorderLineCap(style: NativeBorderStyleKeyword | undefined): string {
-    return style === 'dotted' ? '.round' : '.square';
-}
-
-function buildSwiftBorderJoinInset(side: NativeBorderSideValue | undefined, widthValue: number): string {
-    return side ? `CGFloat(${side.width}) / 2` : `CGFloat(${formatFloat(widthValue)}) / 2`;
-}
-
-function resolveNativeBorder(
-    style: Record<string, NativePropValue>,
-    unitParser: (value: NativePropValue | undefined) => string | undefined,
-): NativeBorderValue | undefined {
-    const currentColor = resolveStyleCurrentColor(style);
-    const shorthandBorder = parseBorderValue(style.border, unitParser, currentColor);
-    const globalWidth = unitParser(style.borderWidth) ?? shorthandBorder?.width;
-    const globalColor = parseCssColor(style.borderColor, currentColor) ?? shorthandBorder?.color;
-    const globalStyle = parseBorderStyleKeyword(style.borderStyle) ?? shorthandBorder?.style;
-    const sideKeys = [
-        { shorthand: 'borderTop', width: 'borderTopWidth', color: 'borderTopColor', style: 'borderTopStyle' },
-        { shorthand: 'borderRight', width: 'borderRightWidth', color: 'borderRightColor', style: 'borderRightStyle' },
-        { shorthand: 'borderBottom', width: 'borderBottomWidth', color: 'borderBottomColor', style: 'borderBottomStyle' },
-        { shorthand: 'borderLeft', width: 'borderLeftWidth', color: 'borderLeftColor', style: 'borderLeftStyle' },
-    ] as const;
-    const hasSideSpecificBorder = sideKeys.some((keys) => style[keys.shorthand] !== undefined || style[keys.width] !== undefined || style[keys.color] !== undefined || style[keys.style] !== undefined);
-
-    const isRenderableBorder = (
-        width: string | undefined,
-        color: NativeColorValue | undefined,
-        borderStyle: NativeBorderStyleKeyword | undefined,
-    ): boolean => Boolean(width && color && borderStyle !== 'none' && borderStyle !== 'unsupported');
-
-    if (!hasSideSpecificBorder) {
-        return isRenderableBorder(globalWidth, globalColor, globalStyle)
-            ? { width: globalWidth, color: globalColor, style: globalStyle }
-            : undefined;
-    }
-
-    const resolvedSides = sideKeys.map((keys) => {
-        const sideBorder = parseBorderValue(style[keys.shorthand], unitParser, currentColor);
-        return {
-            width: unitParser(style[keys.width]) ?? sideBorder?.width ?? globalWidth,
-            color: parseCssColor(style[keys.color], currentColor) ?? sideBorder?.color ?? globalColor,
-            style: parseBorderStyleKeyword(style[keys.style]) ?? sideBorder?.style ?? globalStyle,
-        };
-    });
-
-    const [firstSide] = resolvedSides;
-    if (
-        firstSide
-        && isRenderableBorder(firstSide.width, firstSide.color, firstSide.style)
-        && resolvedSides.every((side) => side.width === firstSide.width && areNativeColorsEqual(side.color, firstSide.color) && side.style === firstSide.style)
-    ) {
-        return {
-            width: firstSide.width,
-            color: firstSide.color,
-            style: firstSide.style,
-        };
-    }
-
-    const renderedBorder: NativeBorderValue = {};
-    const sideNames = ['top', 'right', 'bottom', 'left'] as const;
-
-    resolvedSides.forEach((side, index) => {
-        if (isRenderableBorder(side.width, side.color, side.style)) {
-            renderedBorder[sideNames[index]] = {
-                width: side.width!,
-                color: side.color!,
-                style: side.style,
-            };
-        }
-    });
-
-    return renderedBorder.top || renderedBorder.right || renderedBorder.bottom || renderedBorder.left
-        ? renderedBorder
-        : undefined;
-}
-
-function hasNativeSideBorders(border: NativeBorderValue | undefined): boolean {
-    return Boolean(border?.top || border?.right || border?.bottom || border?.left);
-}
-
-function buildComposeSideBorderModifier(border: NativeBorderValue): string | undefined {
-    if (!hasNativeSideBorders(border)) {
-        return undefined;
-    }
-
-    const commands: string[] = [];
-    if (border.top) {
-        commands.push(`val topStroke = ${border.top.width}.toPx()`);
-        const topStartX = buildComposeBorderJoinInset(border.left, 'topStroke');
-        const topEndX = `size.width - (${buildComposeBorderJoinInset(border.right, 'topStroke')})`;
-        const topCap = buildComposeBorderLineCap(border.top.style);
-        const topDashPattern = buildComposeBorderDashPattern(border.top.style, 'topStroke');
-        const topPathEffect = topDashPattern
-            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${topDashPattern})`
-            : '';
-        commands.push(`drawLine(color = ${toComposeColorLiteral(border.top.color)}, start = androidx.compose.ui.geometry.Offset(${topStartX}, topStroke / 2f), end = androidx.compose.ui.geometry.Offset(${topEndX}, topStroke / 2f), strokeWidth = topStroke, cap = ${topCap}${topPathEffect})`);
-    }
-    if (border.right) {
-        commands.push(`val rightStroke = ${border.right.width}.toPx()`);
-        const rightStartY = buildComposeBorderJoinInset(border.top, 'rightStroke');
-        const rightEndY = `size.height - (${buildComposeBorderJoinInset(border.bottom, 'rightStroke')})`;
-        const rightCap = buildComposeBorderLineCap(border.right.style);
-        const rightDashPattern = buildComposeBorderDashPattern(border.right.style, 'rightStroke');
-        const rightPathEffect = rightDashPattern
-            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${rightDashPattern})`
-            : '';
-        commands.push(`drawLine(color = ${toComposeColorLiteral(border.right.color)}, start = androidx.compose.ui.geometry.Offset(size.width - (rightStroke / 2f), ${rightStartY}), end = androidx.compose.ui.geometry.Offset(size.width - (rightStroke / 2f), ${rightEndY}), strokeWidth = rightStroke, cap = ${rightCap}${rightPathEffect})`);
-    }
-    if (border.bottom) {
-        commands.push(`val bottomStroke = ${border.bottom.width}.toPx()`);
-        const bottomStartX = buildComposeBorderJoinInset(border.left, 'bottomStroke');
-        const bottomEndX = `size.width - (${buildComposeBorderJoinInset(border.right, 'bottomStroke')})`;
-        const bottomCap = buildComposeBorderLineCap(border.bottom.style);
-        const bottomDashPattern = buildComposeBorderDashPattern(border.bottom.style, 'bottomStroke');
-        const bottomPathEffect = bottomDashPattern
-            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${bottomDashPattern})`
-            : '';
-        commands.push(`drawLine(color = ${toComposeColorLiteral(border.bottom.color)}, start = androidx.compose.ui.geometry.Offset(${bottomStartX}, size.height - (bottomStroke / 2f)), end = androidx.compose.ui.geometry.Offset(${bottomEndX}, size.height - (bottomStroke / 2f)), strokeWidth = bottomStroke, cap = ${bottomCap}${bottomPathEffect})`);
-    }
-    if (border.left) {
-        commands.push(`val leftStroke = ${border.left.width}.toPx()`);
-        const leftStartY = buildComposeBorderJoinInset(border.top, 'leftStroke');
-        const leftEndY = `size.height - (${buildComposeBorderJoinInset(border.bottom, 'leftStroke')})`;
-        const leftCap = buildComposeBorderLineCap(border.left.style);
-        const leftDashPattern = buildComposeBorderDashPattern(border.left.style, 'leftStroke');
-        const leftPathEffect = leftDashPattern
-            ? `, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(${leftDashPattern})`
-            : '';
-        commands.push(`drawLine(color = ${toComposeColorLiteral(border.left.color)}, start = androidx.compose.ui.geometry.Offset(leftStroke / 2f, ${leftStartY}), end = androidx.compose.ui.geometry.Offset(leftStroke / 2f, ${leftEndY}), strokeWidth = leftStroke, cap = ${leftCap}${leftPathEffect})`);
-    }
-
-    return commands.length > 0 ? `drawBehind { ${commands.join('; ')} }` : undefined;
-}
-
-function buildComposeUniformStyledBorderModifier(border: NativeBorderValue, radius?: string): string | undefined {
-    if (!border.width || !border.color || (border.style !== 'dashed' && border.style !== 'dotted')) {
-        return undefined;
-    }
-
-    const dashPattern = buildComposeBorderDashPattern(border.style, 'strokeWidth');
-    if (!dashPattern) {
-        return undefined;
-    }
-
-    if (radius) {
-        return `drawBehind { val strokeWidth = ${border.width}.toPx(); val dashPattern = ${dashPattern}; val borderRadius = ${radius}.toPx(); drawRoundRect(color = ${toComposeColorLiteral(border.color)}, cornerRadius = androidx.compose.ui.geometry.CornerRadius(borderRadius, borderRadius), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dashPattern))) }`;
-    }
-
-    return `drawBehind { val strokeWidth = ${border.width}.toPx(); val dashPattern = ${dashPattern}; drawRect(color = ${toComposeColorLiteral(border.color)}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dashPattern))) }`;
-}
-
-function buildSwiftSideBorderOverlay(border: NativeBorderValue, radius?: string): string | undefined {
-    if (!hasNativeSideBorders(border)) {
-        return undefined;
-    }
-
-    const sideEntries = [
-        ['top', border.top],
-        ['right', border.right],
-        ['bottom', border.bottom],
-        ['left', border.left],
-    ].filter((entry): entry is ['top' | 'right' | 'bottom' | 'left', NativeBorderSideValue] => Boolean(entry[1]));
-
-    const hasStyledSides = sideEntries.some(([, side]) => side.style === 'dashed' || side.style === 'dotted');
-    if (hasStyledSides) {
-        const overlays = sideEntries.map(([sideName, side]) => {
-            const widthValue = parseNativeBorderNumericWidth(side.width);
-            const dashPattern = buildSwiftBorderDashPattern(side.style, widthValue);
-            const lineCap = buildSwiftBorderLineCap(side.style);
-            const strokeStyle = dashPattern
-                ? `StrokeStyle(lineWidth: ${side.width}, lineCap: ${lineCap}, dash: ${dashPattern})`
-                : `StrokeStyle(lineWidth: ${side.width}, lineCap: ${lineCap})`;
-
-            switch (sideName) {
-                case 'top':
-                    return `Path { path in path.move(to: CGPoint(x: ${buildSwiftBorderJoinInset(border.left, widthValue)}, y: CGFloat(${side.width}) / 2)); path.addLine(to: CGPoint(x: proxy.size.width - (${buildSwiftBorderJoinInset(border.right, widthValue)}), y: CGFloat(${side.width}) / 2)) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
-                case 'right':
-                    return `Path { path in path.move(to: CGPoint(x: proxy.size.width - (CGFloat(${side.width}) / 2), y: ${buildSwiftBorderJoinInset(border.top, widthValue)})); path.addLine(to: CGPoint(x: proxy.size.width - (CGFloat(${side.width}) / 2), y: proxy.size.height - (${buildSwiftBorderJoinInset(border.bottom, widthValue)}))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
-                case 'bottom':
-                    return `Path { path in path.move(to: CGPoint(x: ${buildSwiftBorderJoinInset(border.left, widthValue)}, y: proxy.size.height - (CGFloat(${side.width}) / 2))); path.addLine(to: CGPoint(x: proxy.size.width - (${buildSwiftBorderJoinInset(border.right, widthValue)}), y: proxy.size.height - (CGFloat(${side.width}) / 2))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
-                case 'left':
-                default:
-                    return `Path { path in path.move(to: CGPoint(x: CGFloat(${side.width}) / 2, y: ${buildSwiftBorderJoinInset(border.top, widthValue)})); path.addLine(to: CGPoint(x: CGFloat(${side.width}) / 2, y: proxy.size.height - (${buildSwiftBorderJoinInset(border.bottom, widthValue)}))) }.stroke(${toSwiftColorLiteral(side.color)}, style: ${strokeStyle})`;
-            }
-        });
-
-        const clipModifier = radius ? `.clipShape(RoundedRectangle(cornerRadius: ${radius}))` : '';
-        return `.overlay { GeometryReader { proxy in ZStack { ${overlays.join('; ')} } }${clipModifier} }`;
-    }
-
-    const overlays: string[] = [];
-    if (border.top) {
-        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.top.color)}).frame(height: ${border.top.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)`);
-    }
-    if (border.right) {
-        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.right.color)}).frame(width: ${border.right.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)`);
-    }
-    if (border.bottom) {
-        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.bottom.color)}).frame(height: ${border.bottom.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)`);
-    }
-    if (border.left) {
-        overlays.push(`Rectangle().fill(${toSwiftColorLiteral(border.left.color)}).frame(width: ${border.left.width}).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)`);
-    }
-
-    if (overlays.length === 0) {
-        return undefined;
-    }
-
-    const clipModifier = radius ? `.clipShape(RoundedRectangle(cornerRadius: ${radius}))` : '';
-    return `.overlay { ZStack { ${overlays.join('; ')} }${clipModifier} }`;
-}
-
-function buildSwiftUniformStyledBorderModifier(border: NativeBorderValue, radius?: string): string | undefined {
-    if (!border.width || !border.color || (border.style !== 'dashed' && border.style !== 'dotted')) {
-        return undefined;
-    }
-
-    const widthValue = parseNativeBorderNumericWidth(border.width);
-    const dashPattern = buildSwiftBorderDashPattern(border.style, widthValue);
-    if (!dashPattern) {
-        return undefined;
-    }
-    const shape = radius ? `RoundedRectangle(cornerRadius: ${radius})` : 'Rectangle()';
-    return `.overlay(${shape}.stroke(${toSwiftColorLiteral(border.color)}, style: StrokeStyle(lineWidth: ${border.width}, dash: ${dashPattern})))`;
-}
-
-function resolveTextTransform(value: NativePropValue | undefined): 'uppercase' | 'lowercase' | 'capitalize' | undefined {
-    if (typeof value !== 'string') return undefined;
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'uppercase' || normalized === 'lowercase' || normalized === 'capitalize') {
-        return normalized;
-    }
-
-    return undefined;
-}
-
-function resolveComposeTextDecoration(value: NativePropValue | undefined): string | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    if (normalized.includes('underline') && normalized.includes('line-through')) {
-        return 'TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))';
-    }
-    if (normalized.includes('underline')) {
-        return 'TextDecoration.Underline';
-    }
-    if (normalized.includes('line-through')) {
-        return 'TextDecoration.LineThrough';
-    }
-
-    return undefined;
-}
-
-function resolveSwiftTextDecoration(value: NativePropValue | undefined): { underline: boolean; strikethrough: boolean } | undefined {
-    if (typeof value !== 'string') {
-        return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    const underline = normalized.includes('underline');
-    const strikethrough = normalized.includes('line-through');
-    return underline || strikethrough ? { underline, strikethrough } : undefined;
-}
-
-function applyTextTransform(text: string, transform: 'uppercase' | 'lowercase' | 'capitalize' | undefined): string {
-    if (!transform) return text;
-    if (transform === 'uppercase') return text.toUpperCase();
-    if (transform === 'lowercase') return text.toLowerCase();
-    return text.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
-}
-
-function resolveComposeFontWeight(value: NativePropValue | undefined): string | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return `FontWeight.W${Math.min(900, Math.max(100, Math.round(value / 100) * 100))}`;
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim().toLowerCase();
-        if (/^\d+$/.test(trimmed)) {
-            return `FontWeight.W${Math.min(900, Math.max(100, Math.round(Number(trimmed) / 100) * 100))}`;
-        }
-        if (trimmed === 'bold') return 'FontWeight.Bold';
-        if (trimmed === 'semibold') return 'FontWeight.SemiBold';
-        if (trimmed === 'medium') return 'FontWeight.Medium';
-        if (trimmed === 'normal') return 'FontWeight.Normal';
-    }
-
-    return undefined;
-}
-
-function resolveSwiftFontWeight(value: NativePropValue | undefined): string | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        if (value >= 700) return '.bold';
-        if (value >= 600) return '.semibold';
-        if (value >= 500) return '.medium';
-        return '.regular';
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim().toLowerCase();
-        if (/^\d+$/.test(trimmed)) {
-            return resolveSwiftFontWeight(Number(trimmed));
-        }
-        if (trimmed === 'bold') return '.bold';
-        if (trimmed === 'semibold') return '.semibold';
-        if (trimmed === 'medium') return '.medium';
-        if (trimmed === 'normal') return '.regular';
-    }
-
-    return undefined;
-}
-
-function resolveComposeTextAlign(value: NativePropValue | undefined): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    switch (value.trim().toLowerCase()) {
-        case 'center':
-            return 'TextAlign.Center';
-        case 'right':
-        case 'end':
-            return 'TextAlign.End';
-        case 'left':
-        case 'start':
-            return 'TextAlign.Start';
-        default:
-            return undefined;
-    }
-}
-
-function resolveSwiftTextAlign(value: NativePropValue | undefined): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    switch (value.trim().toLowerCase()) {
-        case 'center':
-            return '.center';
-        case 'right':
-        case 'end':
-            return '.trailing';
-        case 'left':
-        case 'start':
-            return '.leading';
-        default:
-            return undefined;
-    }
-}
-
-function resolveLayoutDirection(style: Record<string, NativePropValue> | undefined): 'Row' | 'Column' | undefined {
-    if (!style) return undefined;
-
-    if (typeof style.flexDirection === 'string') {
-        return style.flexDirection.trim().toLowerCase() === 'row' ? 'Row' : 'Column';
-    }
-
-    if (typeof style.display === 'string') {
-        const display = style.display.trim().toLowerCase();
-        if (display === 'flex' || display === 'inline-flex') {
-            return 'Row';
-        }
-        if (display === 'grid' || display === 'inline-grid') {
-            return 'Column';
-        }
-    }
-
-    return undefined;
-}
-
-function buildComposeArrangement(
-    layout: 'Row' | 'Column',
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-    gapOverride?: string,
-): string | undefined {
-    if (!style) return undefined;
-
-    const justify = resolveNativeJustifyContent(style);
-    const gap = gapOverride ?? toDpLiteral(style.gap ?? (layout === 'Row' ? style.columnGap : style.rowGap) ?? style.gap, styleResolveOptions);
-
-    if (layout === 'Row') {
-        switch (justify) {
-            case 'center': return 'Arrangement.Center';
-            case 'flex-end':
-            case 'end':
-            case 'right':
-                return 'Arrangement.End';
-            case 'space-between': return 'Arrangement.SpaceBetween';
-            case 'space-around': return 'Arrangement.SpaceAround';
-            case 'space-evenly': return 'Arrangement.SpaceEvenly';
-            default:
-                return gap ? `Arrangement.spacedBy(${gap})` : undefined;
-        }
-    }
-
-    switch (justify) {
-        case 'center': return 'Arrangement.Center';
-        case 'flex-end':
-        case 'end':
-        case 'bottom':
-            return 'Arrangement.Bottom';
-        case 'space-between': return 'Arrangement.SpaceBetween';
-        case 'space-around': return 'Arrangement.SpaceAround';
-        case 'space-evenly': return 'Arrangement.SpaceEvenly';
-        default:
-            return gap ? `Arrangement.spacedBy(${gap})` : undefined;
-    }
-}
-
-function buildComposeCrossAlignment(layout: 'Row' | 'Column', style: Record<string, NativePropValue> | undefined): string | undefined {
-    if (!style || typeof style.alignItems !== 'string') return undefined;
-
-    if (layout === 'Row' && resolveBaselineAlignmentKeyword(style.alignItems)) {
-        return undefined;
-    }
-
-    const align = style.alignItems.trim().toLowerCase();
-    if (layout === 'Row') {
-        switch (align) {
-            case 'center': return 'Alignment.CenterVertically';
-            case 'flex-end':
-            case 'end':
-            case 'bottom':
-                return 'Alignment.Bottom';
-            default:
-                return 'Alignment.Top';
-        }
-    }
-
-    switch (align) {
-        case 'center': return 'Alignment.CenterHorizontally';
-        case 'flex-end':
-        case 'end':
-        case 'right':
-            return 'Alignment.End';
-        default:
-            return 'Alignment.Start';
-    }
-}
-
-function buildComposeTextStyleArgs(
-    node: NativeElementNode,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    if (!style) return [];
-
-    const args: string[] = [];
-    const color = parseCssColor(style.color);
-    const fontSize = toSpLiteral(style.fontSize, styleResolveOptions);
-    const fontWeight = resolveComposeFontWeight(style.fontWeight);
-    const fontFamily = resolveComposeFontFamily(style.fontFamily);
-    const letterSpacing = toSpLiteral(style.letterSpacing, styleResolveOptions);
-    const lineHeight = resolveComposeLineHeight(style.lineHeight, style.fontSize, styleResolveOptions);
-    const textAlign = resolveComposeTextAlign(style.textAlign);
-    const textDecoration = resolveComposeTextDecoration(style.textDecoration);
-
-    if (color) args.push(`color = ${toComposeColorLiteral(color)}`);
-    if (fontSize) args.push(`fontSize = ${fontSize}`);
-    if (fontWeight) args.push(`fontWeight = ${fontWeight}`);
-    if (fontFamily) args.push(`fontFamily = ${fontFamily}`);
-    if (letterSpacing) args.push(`letterSpacing = ${letterSpacing}`);
-    if (lineHeight) args.push(`lineHeight = ${lineHeight}`);
-    if (textAlign) args.push(`textAlign = ${textAlign}`);
-    if (textDecoration) args.push(`textDecoration = ${textDecoration}`);
-
-    return args;
-}
-
 function buildComposeLabelText(
     node: NativeElementNode,
     label: string,
@@ -6526,400 +2408,12 @@ function buildComposeLabelText(
     expression?: string,
     styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
 ): string {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const transform = resolveTextTransform(style?.textTransform);
-    const textValue = expression
-        ? applyComposeTextTransformExpression(expression, transform)
-        : quoteKotlinString(applyTextTransform(label, transform));
-    const args = [`text = ${textValue}`, ...buildComposeTextStyleArgs(node, resolvedStyles, styleResolveOptions)];
-    return `Text(${args.join(', ')})`;
-}
-
-function buildComposeTextStyleLiteral(
-    node: NativeElementNode,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string | undefined {
-    const args = buildComposeTextStyleArgs(node, resolvedStyles, styleResolveOptions);
-    return args.length > 0 ? `androidx.compose.ui.text.TextStyle(${args.join(', ')})` : undefined;
-}
-
-function resolveNativePickerDisplayLabel(value: string, options: NativePickerOption[]): string {
-    return options.find((option) => option.value === value)?.label ?? value;
-}
-
-function buildComposePickerLabelExpression(selectionExpression: string, options: NativePickerOption[], placeholder?: string): string {
-    const fallbackLabel = placeholder ? quoteKotlinString(placeholder) : undefined;
-
-    if (options.length === 0 || options.every((option) => option.value === option.label)) {
-        return fallbackLabel
-            ? `if (${selectionExpression}.isEmpty()) ${fallbackLabel} else ${selectionExpression}`
-            : selectionExpression;
-    }
-
-    const branches = options.map((option) => `${quoteKotlinString(option.value)} -> ${quoteKotlinString(option.label)}`).join('; ');
-    return fallbackLabel
-        ? `when (${selectionExpression}) { "" -> ${fallbackLabel}; ${branches}; else -> ${selectionExpression} }`
-        : `when (${selectionExpression}) { ${branches}; else -> ${selectionExpression} }`;
-}
-
-function buildComposeIntrinsicSurfaceModifier(
-    node: NativeElementNode,
-    modifier: string,
-    spec: NativeIntrinsicSizeSpec,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const widthDefined = hasExplicitNativeWidthStyle(style);
-    const heightDefined = hasExplicitNativeHeightStyle(style);
-
-    if (!widthDefined && !heightDefined) {
-        return prependComposeModifierCall(modifier, `size(width = ${formatFloat(spec.intrinsicWidth)}.dp, height = ${formatFloat(spec.intrinsicHeight)}.dp)`);
-    }
-
-    let resolvedModifier = modifier;
-    if (!widthDefined) {
-        resolvedModifier = prependComposeModifierCall(resolvedModifier, `width(${formatFloat(spec.intrinsicWidth)}.dp)`);
-    }
-    if (!heightDefined) {
-        resolvedModifier = prependComposeModifierCall(resolvedModifier, `height(${formatFloat(spec.intrinsicHeight)}.dp)`);
-    }
-
-    return resolvedModifier;
-}
-
-function buildComposeVectorModifier(
-    node: NativeElementNode,
-    modifier: string,
-    spec: NativeVectorSpec,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string {
-    return buildComposeIntrinsicSurfaceModifier(node, modifier, spec, resolvedStyles, styleResolveOptions);
-}
-
-function buildComposeDrawingCanvasLines(
-    spec: NativeVectorSpec,
-    level: number,
-    modifier: string,
-): string[] {
-    const viewport = spec.viewport;
-    const lines = [`${indent(level)}androidx.compose.foundation.Canvas(modifier = ${modifier}) {`];
-    lines.push(`${indent(level + 1)}val viewportWidth = ${formatFloat(viewport.width)}f`);
-    lines.push(`${indent(level + 1)}val viewportHeight = ${formatFloat(viewport.height)}f`);
-    lines.push(`${indent(level + 1)}val scaleX = size.width / viewportWidth`);
-    lines.push(`${indent(level + 1)}val scaleY = size.height / viewportHeight`);
-    lines.push(`${indent(level + 1)}val strokeScale = (scaleX + scaleY) / 2f`);
-
-    let pathIndex = 0;
-    for (const shape of spec.shapes) {
-        if (shape.kind === 'circle') {
-            const radiusExpression = `${formatFloat(shape.r)}f * kotlin.math.min(scaleX, scaleY)`;
-            const centerExpression = `androidx.compose.ui.geometry.Offset(${formatFloat(shape.cx - viewport.minX)}f * scaleX, ${formatFloat(shape.cy - viewport.minY)}f * scaleY)`;
-            if (shape.fill) {
-                lines.push(`${indent(level + 1)}drawCircle(color = ${toComposeColorLiteral(shape.fill)}, radius = ${radiusExpression}, center = ${centerExpression})`);
-            }
-            if (shape.stroke) {
-                lines.push(`${indent(level + 1)}drawCircle(color = ${toComposeColorLiteral(shape.stroke)}, radius = ${radiusExpression}, center = ${centerExpression}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = ${(shape.strokeWidth ?? 1).toString()}f * strokeScale))`);
-            }
-            continue;
-        }
-
-        if (shape.kind === 'ellipse') {
-            const topLeftExpression = `androidx.compose.ui.geometry.Offset(${formatFloat(shape.cx - shape.rx - viewport.minX)}f * scaleX, ${formatFloat(shape.cy - shape.ry - viewport.minY)}f * scaleY)`;
-            const sizeExpression = `androidx.compose.ui.geometry.Size(${formatFloat(shape.rx * 2)}f * scaleX, ${formatFloat(shape.ry * 2)}f * scaleY)`;
-            if (shape.fill) {
-                lines.push(`${indent(level + 1)}drawOval(color = ${toComposeColorLiteral(shape.fill)}, topLeft = ${topLeftExpression}, size = ${sizeExpression})`);
-            }
-            if (shape.stroke) {
-                lines.push(`${indent(level + 1)}drawOval(color = ${toComposeColorLiteral(shape.stroke)}, topLeft = ${topLeftExpression}, size = ${sizeExpression}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = ${(shape.strokeWidth ?? 1).toString()}f * strokeScale))`);
-            }
-            continue;
-        }
-
-        if (shape.kind === 'rect') {
-            const topLeftExpression = `androidx.compose.ui.geometry.Offset(${formatFloat(shape.x - viewport.minX)}f * scaleX, ${formatFloat(shape.y - viewport.minY)}f * scaleY)`;
-            const sizeExpression = `androidx.compose.ui.geometry.Size(${formatFloat(shape.width)}f * scaleX, ${formatFloat(shape.height)}f * scaleY)`;
-            const hasRadius = (shape.rx ?? 0) > 0 || (shape.ry ?? shape.rx ?? 0) > 0;
-            const radiusExpression = `androidx.compose.ui.geometry.CornerRadius(${formatFloat(shape.rx ?? 0)}f * scaleX, ${formatFloat(shape.ry ?? shape.rx ?? 0)}f * scaleY)`;
-            if (shape.fill) {
-                lines.push(`${indent(level + 1)}${hasRadius
-                    ? `drawRoundRect(color = ${toComposeColorLiteral(shape.fill)}, topLeft = ${topLeftExpression}, size = ${sizeExpression}, cornerRadius = ${radiusExpression})`
-                    : `drawRect(color = ${toComposeColorLiteral(shape.fill)}, topLeft = ${topLeftExpression}, size = ${sizeExpression})`}`);
-            }
-            if (shape.stroke) {
-                lines.push(`${indent(level + 1)}${hasRadius
-                    ? `drawRoundRect(color = ${toComposeColorLiteral(shape.stroke)}, topLeft = ${topLeftExpression}, size = ${sizeExpression}, cornerRadius = ${radiusExpression}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = ${(shape.strokeWidth ?? 1).toString()}f * strokeScale))`
-                    : `drawRect(color = ${toComposeColorLiteral(shape.stroke)}, topLeft = ${topLeftExpression}, size = ${sizeExpression}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = ${(shape.strokeWidth ?? 1).toString()}f * strokeScale))`}`);
-            }
-            continue;
-        }
-
-        const pathName = `vectorPath${pathIndex++}`;
-        lines.push(`${indent(level + 1)}val ${pathName} = androidx.compose.ui.graphics.Path().apply {`);
-        for (const command of shape.commands) {
-            if (command.kind === 'close') {
-                lines.push(`${indent(level + 2)}close()`);
-                continue;
-            }
-
-            if (command.kind === 'cubicTo') {
-                lines.push(`${indent(level + 2)}cubicTo(${formatFloat(command.control1X - viewport.minX)}f * scaleX, ${formatFloat(command.control1Y - viewport.minY)}f * scaleY, ${formatFloat(command.control2X - viewport.minX)}f * scaleX, ${formatFloat(command.control2Y - viewport.minY)}f * scaleY, ${formatFloat(command.x - viewport.minX)}f * scaleX, ${formatFloat(command.y - viewport.minY)}f * scaleY)`);
-                continue;
-            }
-
-            lines.push(`${indent(level + 2)}${command.kind}(${formatFloat(command.x - viewport.minX)}f * scaleX, ${formatFloat(command.y - viewport.minY)}f * scaleY)`);
-        }
-        lines.push(`${indent(level + 1)}}`);
-        if (shape.fill) {
-            lines.push(`${indent(level + 1)}drawPath(path = ${pathName}, color = ${toComposeColorLiteral(shape.fill)})`);
-        }
-        if (shape.stroke) {
-            lines.push(`${indent(level + 1)}drawPath(path = ${pathName}, color = ${toComposeColorLiteral(shape.stroke)}, style = androidx.compose.ui.graphics.drawscope.Stroke(width = ${(shape.strokeWidth ?? 1).toString()}f * strokeScale))`);
-        }
-    }
-
-    lines.push(`${indent(level)}}`);
-    return lines;
-}
-
-function buildComposeCanvasSurfaceLines(
-    node: NativeElementNode,
-    level: number,
-    modifier: string,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    const drawingSpec = buildNativeCanvasDrawingSpec(node);
-    const spec = drawingSpec ?? buildNativeCanvasSpec(node);
-    const canvasModifier = buildComposeIntrinsicSurfaceModifier(node, modifier, spec, resolvedStyles, styleResolveOptions);
-    return drawingSpec
-        ? buildComposeDrawingCanvasLines(drawingSpec, level, canvasModifier)
-        : [
-            `${indent(level)}androidx.compose.foundation.Canvas(modifier = ${canvasModifier}) {`,
-            `${indent(level)}}`,
-        ];
-}
-
-function buildComposeVectorCanvasLines(
-    node: NativeElementNode,
-    level: number,
-    modifier: string,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] | undefined {
-    const spec = buildNativeVectorSpec(node);
-    if (!spec) {
-        return undefined;
-    }
-
-    const vectorModifier = buildComposeVectorModifier(node, modifier, spec, resolvedStyles, styleResolveOptions);
-    return buildComposeDrawingCanvasLines(spec, level, vectorModifier);
-}
-
-function buildSwiftIntrinsicSurfaceModifiers(
-    node: NativeElementNode,
-    spec: NativeIntrinsicSizeSpec,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const modifiers = buildSwiftUIModifiers(node, resolvedStyles, {}, styleResolveOptions);
-    const frameArgs: string[] = [];
-    if (!hasExplicitNativeWidthStyle(style)) {
-        frameArgs.push(`width: ${formatFloat(spec.intrinsicWidth)}`);
-    }
-    if (!hasExplicitNativeHeightStyle(style)) {
-        frameArgs.push(`height: ${formatFloat(spec.intrinsicHeight)}`);
-    }
-    if (frameArgs.length > 0) {
-        modifiers.push(`.frame(${frameArgs.join(', ')})`);
-    }
-    return modifiers;
-}
-
-function buildSwiftVectorCanvasModifiers(
-    node: NativeElementNode,
-    spec: NativeVectorSpec,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    return buildSwiftIntrinsicSurfaceModifiers(node, spec, resolvedStyles, styleResolveOptions);
-}
-
-function buildSwiftDrawingCanvasLines(
-    spec: NativeVectorSpec,
-    level: number,
-): string[] {
-    const viewport = spec.viewport;
-    const lines = [`${indent(level)}Canvas { context, size in`];
-    lines.push(`${indent(level + 1)}let viewportWidth = CGFloat(${formatFloat(viewport.width)})`);
-    lines.push(`${indent(level + 1)}let viewportHeight = CGFloat(${formatFloat(viewport.height)})`);
-    lines.push(`${indent(level + 1)}let scaleX = size.width / viewportWidth`);
-    lines.push(`${indent(level + 1)}let scaleY = size.height / viewportHeight`);
-    lines.push(`${indent(level + 1)}let strokeScale = (scaleX + scaleY) / 2`);
-
-    let pathIndex = 0;
-    for (const shape of spec.shapes) {
-        const pathName = `vectorPath${pathIndex++}`;
-        lines.push(`${indent(level + 1)}var ${pathName} = Path()`);
-
-        if (shape.kind === 'circle') {
-            lines.push(`${indent(level + 1)}${pathName}.addEllipse(in: CGRect(x: CGFloat(${formatFloat(shape.cx - shape.r - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(shape.cy - shape.r - viewport.minY)}) * scaleY, width: CGFloat(${formatFloat(shape.r * 2)}) * scaleX, height: CGFloat(${formatFloat(shape.r * 2)}) * scaleY))`);
-        } else if (shape.kind === 'ellipse') {
-            lines.push(`${indent(level + 1)}${pathName}.addEllipse(in: CGRect(x: CGFloat(${formatFloat(shape.cx - shape.rx - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(shape.cy - shape.ry - viewport.minY)}) * scaleY, width: CGFloat(${formatFloat(shape.rx * 2)}) * scaleX, height: CGFloat(${formatFloat(shape.ry * 2)}) * scaleY))`);
-        } else if (shape.kind === 'rect') {
-            if ((shape.rx ?? 0) > 0 || (shape.ry ?? shape.rx ?? 0) > 0) {
-                lines.push(`${indent(level + 1)}${pathName}.addRoundedRect(in: CGRect(x: CGFloat(${formatFloat(shape.x - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(shape.y - viewport.minY)}) * scaleY, width: CGFloat(${formatFloat(shape.width)}) * scaleX, height: CGFloat(${formatFloat(shape.height)}) * scaleY), cornerSize: CGSize(width: CGFloat(${formatFloat(shape.rx ?? 0)}) * scaleX, height: CGFloat(${formatFloat(shape.ry ?? shape.rx ?? 0)}) * scaleY))`);
-            } else {
-                lines.push(`${indent(level + 1)}${pathName}.addRect(CGRect(x: CGFloat(${formatFloat(shape.x - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(shape.y - viewport.minY)}) * scaleY, width: CGFloat(${formatFloat(shape.width)}) * scaleX, height: CGFloat(${formatFloat(shape.height)}) * scaleY))`);
-            }
-        } else {
-            for (const command of shape.commands) {
-                if (command.kind === 'close') {
-                    lines.push(`${indent(level + 1)}${pathName}.closeSubpath()`);
-                    continue;
-                }
-
-                if (command.kind === 'cubicTo') {
-                    lines.push(`${indent(level + 1)}${pathName}.addCurve(to: CGPoint(x: CGFloat(${formatFloat(command.x - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(command.y - viewport.minY)}) * scaleY), control1: CGPoint(x: CGFloat(${formatFloat(command.control1X - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(command.control1Y - viewport.minY)}) * scaleY), control2: CGPoint(x: CGFloat(${formatFloat(command.control2X - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(command.control2Y - viewport.minY)}) * scaleY))`);
-                    continue;
-                }
-
-                lines.push(`${indent(level + 1)}${pathName}.${command.kind === 'moveTo' ? 'move' : 'addLine'}(to: CGPoint(x: CGFloat(${formatFloat(command.x - viewport.minX)}) * scaleX, y: CGFloat(${formatFloat(command.y - viewport.minY)}) * scaleY))`);
-            }
-        }
-
-        if (shape.fill) {
-            lines.push(`${indent(level + 1)}context.fill(${pathName}, with: .color(${toSwiftColorLiteral(shape.fill)}))`);
-        }
-        if (shape.stroke) {
-            lines.push(`${indent(level + 1)}context.stroke(${pathName}, with: .color(${toSwiftColorLiteral(shape.stroke)}), style: StrokeStyle(lineWidth: CGFloat(${formatFloat(shape.strokeWidth ?? 1)}) * strokeScale))`);
-        }
-    }
-
-    lines.push(`${indent(level)}}`);
-    return lines;
-}
-
-function buildSwiftCanvasSurfaceLines(
-    node: NativeElementNode,
-    level: number,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): { lines: string[]; modifiers: string[] } {
-    const drawingSpec = buildNativeCanvasDrawingSpec(node);
-    const spec = drawingSpec ?? buildNativeCanvasSpec(node);
-    return {
-        lines: drawingSpec
-            ? buildSwiftDrawingCanvasLines(drawingSpec, level)
-            : [
-                `${indent(level)}Canvas { _, _ in`,
-                `${indent(level)}}`,
-            ],
-        modifiers: buildSwiftIntrinsicSurfaceModifiers(node, spec, resolvedStyles, styleResolveOptions),
-    };
-}
-
-function buildSwiftVectorCanvasLines(
-    node: NativeElementNode,
-    level: number,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): { lines: string[]; modifiers: string[] } | undefined {
-    const spec = buildNativeVectorSpec(node);
-    if (!spec) {
-        return undefined;
-    }
-
-    return { lines: buildSwiftDrawingCanvasLines(spec, level), modifiers: buildSwiftVectorCanvasModifiers(node, spec, resolvedStyles, styleResolveOptions) };
-}
-
-function prependComposeModifierCall(modifier: string, call: string): string {
-    return modifier === 'Modifier'
-        ? `Modifier.${call}`
-        : modifier.replace(/^Modifier/, `Modifier.${call}`);
-}
-
-function appendComposeModifierCall(modifier: string, call: string): string {
-    return modifier === 'Modifier'
-        ? `Modifier.${call}`
-        : `${modifier}.${call}`;
-}
-
-function buildComposeButtonModifier(
-    modifier: string,
-    onClickExpression?: string,
-    enabled = true,
-    interactionSourceName?: string,
-): string {
-    if (!onClickExpression || !enabled) {
-        return modifier;
-    }
-
-    return prependComposeModifierCall(
-        modifier,
-        interactionSourceName
-            ? `clickable(interactionSource = ${interactionSourceName}, indication = LocalIndication.current) { ${onClickExpression} }`
-            : `clickable { ${onClickExpression} }`,
+    return buildComposeLabelTextFromStyle(
+        label,
+        getStyleObject(node, resolvedStyles, styleResolveOptions),
+        expression,
+        styleResolveOptions,
     );
-}
-
-function buildComposeTextInputArgs(
-    node: NativeElementNode,
-    resolvedStyles?: NativeResolvedStyleMap,
-    submitActionExpression?: string,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    const args: string[] = [];
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    if (style) {
-        const textStyle = buildComposeTextStyleLiteral(node, resolvedStyles, styleResolveOptions);
-        if (textStyle) {
-            args.push(`textStyle = ${textStyle}`);
-        }
-
-        const color = parseCssColor(style.color);
-        if (color) {
-            args.push(`cursorBrush = SolidColor(${toComposeColorLiteral(color)})`);
-        }
-    }
-
-    if (isNativeDisabled(node)) {
-        args.push('enabled = false');
-    }
-
-    if (isNativeReadOnly(node)) {
-        args.push('readOnly = true');
-    }
-
-    const keyboardType = resolveComposeKeyboardType(node);
-    if (keyboardType || submitActionExpression) {
-        const keyboardArgs: string[] = [];
-        if (keyboardType) {
-            keyboardArgs.push(`keyboardType = ${keyboardType}`);
-        }
-        if (submitActionExpression) {
-            keyboardArgs.push('imeAction = androidx.compose.ui.text.input.ImeAction.Done');
-        }
-        args.push(`keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(${keyboardArgs.join(', ')})`);
-    }
-
-    if (submitActionExpression) {
-        args.push(`keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { ${submitActionExpression} })`);
-    }
-
-    if (resolveNativeTextInputType(node) === 'password') {
-        args.push('visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()');
-    }
-
-    args.push(`singleLine = ${node.sourceTag === 'textarea' ? 'false' : 'true'}`);
-    if (node.sourceTag === 'textarea') {
-        args.push('minLines = 4');
-    }
-
-    return args;
 }
 
 function buildComposeModifier(
@@ -7201,7 +2695,13 @@ function renderComposeChildren(
         ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
         : undefined;
     for (const child of orderedNodes) {
-        const shouldDefaultFillCrossAxis = shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions);
+        const shouldDefaultFillCrossAxis = estimateDefaultFillWidthHint(
+            child,
+            child.kind === 'element'
+                ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                : undefined,
+            context.styleResolveOptions,
+        );
         const shouldStretchCrossAxis = shouldStretchFlexChildCrossAxis(
             child,
             parentFlexLayout,
@@ -7234,218 +2734,6 @@ function renderComposeChildren(
     return lines;
 }
 
-function resolveComposeLayout(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): 'Row' | 'Column' {
-    const style = getStyleObject(node, resolvedStyles);
-    const styleLayout = resolveLayoutDirection(style);
-    if (styleLayout) return styleLayout;
-    return node.component === 'Row' || node.component === 'ListItem' ? 'Row' : 'Column';
-}
-
-function buildComposeChunkedRowArguments(
-    style: Record<string, NativePropValue> | undefined,
-    modifier: string,
-    columnGap?: number,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string {
-    const args = [`modifier = ${modifier}`];
-    const arrangement = buildComposeArrangement(
-        'Row',
-        style,
-        styleResolveOptions,
-        columnGap !== undefined ? `${formatFloat(columnGap)}.dp` : undefined,
-    );
-    if (arrangement) {
-        args.push(`horizontalArrangement = ${arrangement}`);
-    }
-
-    const alignment = buildComposeCrossAlignment('Row', style);
-    if (alignment) {
-        args.push(`verticalAlignment = ${alignment}`);
-    }
-
-    return args.join(', ');
-}
-
-function hasNativeGridColumnConstraint(spec: NativeGridColumnTrackSizeSpec | undefined): boolean {
-    return Boolean(spec && (spec.width !== undefined || spec.minWidth !== undefined || spec.maxWidth !== undefined));
-}
-
-function buildComposeGridCellModifier(
-    weight: number | undefined,
-    shouldExpandWidth: boolean,
-    shouldExpandHeight: boolean,
-    columnSize: NativeGridColumnTrackSizeSpec | undefined,
-): string {
-    let modifier = 'Modifier';
-
-    if (weight !== undefined) {
-        modifier = appendComposeModifierCall(modifier, `weight(${formatFloat(weight)}f)`);
-    }
-
-    if (shouldExpandWidth) {
-        modifier = appendComposeModifierCall(modifier, 'fillMaxWidth()');
-    }
-    if (shouldExpandHeight) {
-        modifier = appendComposeModifierCall(modifier, 'fillMaxHeight()');
-    }
-
-    if (columnSize?.width !== undefined) {
-        modifier = appendComposeModifierCall(modifier, `width(${formatFloat(columnSize.width)}.dp)`);
-    } else if (columnSize?.minWidth !== undefined || columnSize?.maxWidth !== undefined) {
-        const widthInArgs: string[] = [];
-        if (columnSize.minWidth !== undefined) {
-            widthInArgs.push(`min = ${formatFloat(columnSize.minWidth)}.dp`);
-        }
-        if (columnSize.maxWidth !== undefined) {
-            widthInArgs.push(`max = ${formatFloat(columnSize.maxWidth)}.dp`);
-        }
-        modifier = appendComposeModifierCall(modifier, `widthIn(${widthInArgs.join(', ')})`);
-    }
-
-    return modifier;
-}
-
-function resolveComposeGridCellContentAlignment(
-    horizontal: NativeGridItemAlignment | undefined,
-    vertical: NativeGridItemAlignment | undefined,
-): string | undefined {
-    const resolvedHorizontal = horizontal && horizontal !== 'stretch' ? horizontal : undefined;
-    const resolvedVertical = vertical && vertical !== 'stretch' ? vertical : undefined;
-    if (!resolvedHorizontal && !resolvedVertical) {
-        return undefined;
-    }
-
-    const horizontalToken = resolvedHorizontal === 'center'
-        ? 'Center'
-        : resolvedHorizontal === 'end'
-            ? 'End'
-            : 'Start';
-    const verticalToken = resolvedVertical === 'center'
-        ? 'Center'
-        : resolvedVertical === 'end'
-            ? 'Bottom'
-            : 'Top';
-
-    return verticalToken === 'Center' && horizontalToken === 'Center'
-        ? 'Alignment.Center'
-        : `Alignment.${verticalToken}${horizontalToken}`;
-}
-
-function buildComposeChunkedColumnArrangement(layout: NativeChunkedLayout): string | undefined {
-    const contentAlignment = resolveEffectiveChunkedContentAlignment(layout);
-    const gap = layout.rowGap !== undefined ? `${formatFloat(layout.rowGap)}.dp` : undefined;
-
-    switch (contentAlignment) {
-        case 'center':
-            return gap ? `Arrangement.spacedBy(${gap}, Alignment.CenterVertically)` : 'Arrangement.Center';
-        case 'end':
-            return gap ? `Arrangement.spacedBy(${gap}, Alignment.Bottom)` : 'Arrangement.Bottom';
-        case 'space-between':
-            return 'Arrangement.SpaceBetween';
-        case 'space-around':
-            return 'Arrangement.SpaceAround';
-        case 'space-evenly':
-            return 'Arrangement.SpaceEvenly';
-        default:
-            return gap ? `Arrangement.spacedBy(${gap})` : undefined;
-    }
-}
-
-function buildComposeBackgroundImageInvocation(spec: NativeBackgroundImageSpec, modifier: string): string {
-    return `ElitBackgroundImage(source = ${quoteKotlinString(spec.source)}${spec.fit !== 'cover' ? `, backgroundSize = ${quoteKotlinString(spec.fit)}` : ''}${spec.position !== 'center' ? `, backgroundPosition = ${quoteKotlinString(spec.position)}` : ''}${spec.repeat !== 'no-repeat' ? `, backgroundRepeat = ${quoteKotlinString(spec.repeat)}` : ''}, modifier = ${modifier})`;
-}
-
-function shouldRenderNativeBackgroundLayersWithWrapper(layers: NativeBackgroundLayerSpec[]): boolean {
-    return layers.length > 1 || layers.some((layer) => layer.kind === 'image');
-}
-
-function buildComposeBackgroundLayerInvocation(layer: NativeBackgroundLayerSpec, modifier: string): string {
-    if (layer.kind === 'image') {
-        return buildComposeBackgroundImageInvocation(layer, modifier);
-    }
-
-    const backgroundCall = layer.kind === 'gradient'
-        ? `background(brush = ${toComposeBrushLiteral(layer.gradient)})`
-        : `background(${toComposeColorLiteral(layer.color)})`;
-    return `Box(modifier = ${appendComposeModifierCall(modifier, backgroundCall)})`;
-}
-
-function resolveSwiftGridCellFrameAlignment(
-    horizontal: NativeGridItemAlignment | undefined,
-    vertical: NativeGridItemAlignment | undefined,
-): string | undefined {
-    const resolvedHorizontal = horizontal && horizontal !== 'stretch' ? horizontal : undefined;
-    const resolvedVertical = vertical && vertical !== 'stretch' ? vertical : undefined;
-    if (!resolvedHorizontal && !resolvedVertical) {
-        return undefined;
-    }
-
-    const horizontalToken = resolvedHorizontal === 'center'
-        ? 'center'
-        : resolvedHorizontal === 'end'
-            ? 'trailing'
-            : 'leading';
-    const verticalToken = resolvedVertical === 'center'
-        ? 'center'
-        : resolvedVertical === 'end'
-            ? 'bottom'
-            : 'top';
-
-    if (verticalToken === 'center') {
-        if (horizontalToken === 'center') {
-            return '.center';
-        }
-
-        return horizontalToken === 'trailing' ? '.trailing' : '.leading';
-    }
-
-    if (horizontalToken === 'center') {
-        return verticalToken === 'bottom' ? '.bottom' : '.top';
-    }
-
-    return `.${verticalToken}${horizontalToken === 'trailing' ? 'Trailing' : 'Leading'}`;
-}
-
-function resolveNativeGridCellFillWidth(defaultFillWidth: boolean, horizontalAlignment: NativeGridItemAlignment | undefined): boolean {
-    if (!horizontalAlignment) {
-        return defaultFillWidth;
-    }
-
-    return horizontalAlignment === 'stretch';
-}
-
-function buildSwiftGridCellFrameModifier(
-    shouldExpandWidth: boolean,
-    shouldExpandHeight: boolean,
-    alignment: string | undefined,
-    columnSize?: NativeGridColumnTrackSizeSpec,
-): string | undefined {
-    const frameArgs: string[] = [];
-    if (columnSize?.width !== undefined) {
-        frameArgs.push(`width: ${formatFloat(columnSize.width)}`);
-    } else {
-        if (columnSize?.minWidth !== undefined) {
-            frameArgs.push(`minWidth: ${formatFloat(columnSize.minWidth)}`);
-        }
-        if (columnSize?.maxWidth !== undefined) {
-            frameArgs.push(`maxWidth: ${formatFloat(columnSize.maxWidth)}`);
-        }
-    }
-    if (shouldExpandWidth) {
-        frameArgs.push('maxWidth: .infinity');
-    }
-    if (shouldExpandHeight) {
-        frameArgs.push('maxHeight: .infinity');
-    }
-    if (alignment) {
-        frameArgs.push(`alignment: ${alignment}`);
-    } else if (frameArgs.length > 0) {
-        frameArgs.push(`alignment: ${shouldExpandHeight ? '.topLeading' : '.leading'}`);
-    }
-
-    return frameArgs.length > 0 ? `.frame(${frameArgs.join(', ')})` : undefined;
-}
-
 function renderComposeChunkedLayout(
     node: NativeElementNode,
     layout: NativeChunkedLayout,
@@ -7461,35 +2749,21 @@ function renderComposeChunkedLayout(
         && layout.rows.length === 1
         && effectiveContentAlignment !== undefined
         && effectiveContentAlignment !== 'start';
-    const buildRowModifier = (baseModifier: string, row: NativeChunkedRow): string => {
-        let modifierWithTrackSizing = baseModifier;
-        if (row.height !== undefined) {
-            modifierWithTrackSizing = prependComposeModifierCall(modifierWithTrackSizing, `height(${formatFloat(row.height)}.dp)`);
-        } else if (row.minHeight !== undefined || row.maxHeight !== undefined) {
-            const heightInArgs: string[] = [];
-            if (row.minHeight !== undefined) {
-                heightInArgs.push(`min = ${formatFloat(row.minHeight)}.dp`);
-            }
-            if (row.maxHeight !== undefined) {
-                heightInArgs.push(`max = ${formatFloat(row.maxHeight)}.dp`);
-            }
-            modifierWithTrackSizing = prependComposeModifierCall(modifierWithTrackSizing, `heightIn(${heightInArgs.join(', ')})`);
-        }
-
-        return row.trackWeight !== undefined
-            ? prependComposeModifierCall(modifierWithTrackSizing, `weight(${formatFloat(row.trackWeight)}f, fill = true)`)
-            : modifierWithTrackSizing;
-    };
 
     if (layout.kind === 'grid' && layout.rows.length === 1 && !usesSingleRowGridStackAlignment) {
         const [row] = layout.rows;
-        const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, buildRowModifier(modifier, row), layout.columnGap, context.styleResolveOptions)}) {`];
+        const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier(modifier, row), layout.columnGap, context.styleResolveOptions)}) {`];
         const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
             const baseFillChild = shouldFillChunkedCellChild(child);
-            const cellAlignment = resolveNativeGridCellAlignment(child, style, context.resolvedStyles, context.styleResolveOptions);
+            const cellAlignment = resolveNativeGridCellAlignmentFromStyle(
+                child.kind === 'element'
+                    ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                    : undefined,
+                style,
+            );
             const fillChild = resolveNativeGridCellFillWidth(baseFillChild, cellAlignment.horizontal);
             const fillHeight = cellAlignment.vertical === 'stretch';
             const shouldExpandCellHeight = cellAlignment.vertical !== undefined;
@@ -7517,13 +2791,18 @@ function renderComposeChunkedLayout(
     const lines = [`${indent(level)}Column(modifier = ${modifier}${outerGap ? `, verticalArrangement = ${outerGap}` : ''}) {`];
     for (const row of layout.rows) {
         const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
-        lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, buildRowModifier('Modifier.fillMaxWidth()', row), layout.columnGap, context.styleResolveOptions)}) {`);
+        lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier('Modifier.fillMaxWidth()', row), layout.columnGap, context.styleResolveOptions)}) {`);
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
             const baseFillChild = layout.kind === 'grid' && shouldFillChunkedCellChild(child);
             const cellAlignment = layout.kind === 'grid'
-                ? resolveNativeGridCellAlignment(child, style, context.resolvedStyles, context.styleResolveOptions)
+                ? resolveNativeGridCellAlignmentFromStyle(
+                    child.kind === 'element'
+                        ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                        : undefined,
+                    style,
+                )
                 : {};
             const fillChild = layout.kind === 'grid'
                 ? resolveNativeGridCellFillWidth(baseFillChild, cellAlignment.horizontal)
@@ -7567,9 +2846,10 @@ function renderComposeContainerContent(
         return renderComposeChunkedLayout(node, chunkedLayout, level, context, modifier, hints);
     }
 
-    const layout = resolveComposeLayout(node, context.resolvedStyles);
+    const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+    const layout = resolveComposeLayoutFromStyle(node.component, style);
     return [
-        `${indent(level)}${layout}(${buildComposeLayoutArguments(node, layout, modifier, context.resolvedStyles, context.styleResolveOptions)}) {`,
+        `${indent(level)}${layout}(${buildComposeLayoutArgumentsFromStyle(layout, modifier, style, context.styleResolveOptions)}) {`,
         ...renderComposeChildren(node.children, level + 1, context, layout, node, hints),
         `${indent(level)}}`,
     ];
@@ -7583,7 +2863,7 @@ function renderComposeContainerBody(
     hints: NativeRenderHints,
 ): string[] {
     const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
-    const backgroundLayers = resolveNativeBackgroundLayers(node, context.resolvedStyles, context.styleResolveOptions);
+    const backgroundLayers = resolveNativeBackgroundLayersFromStyle(style, context.styleResolveOptions);
     if (!shouldRenderNativeBackgroundLayersWithWrapper(backgroundLayers)) {
         return renderComposeContainerContent(node, level, context, modifier, hints);
     }
@@ -7606,29 +2886,6 @@ function renderComposeContainerBody(
         ...renderComposeContainerContent(node, level + 1, context, contentModifier, hints),
         `${indent(level)}}`,
     ];
-}
-
-function buildComposeLayoutArguments(
-    node: NativeElementNode,
-    layout: 'Row' | 'Column',
-    modifier: string,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string {
-    const args = [`modifier = ${modifier}`];
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const arrangement = buildComposeArrangement(layout, style, styleResolveOptions);
-    const alignment = buildComposeCrossAlignment(layout, style);
-
-    if (layout === 'Row') {
-        if (arrangement) args.push(`horizontalArrangement = ${arrangement}`);
-        if (alignment) args.push(`verticalAlignment = ${alignment}`);
-    } else {
-        if (arrangement) args.push(`verticalArrangement = ${arrangement}`);
-        if (alignment) args.push(`horizontalAlignment = ${alignment}`);
-    }
-
-    return args.join(', ');
 }
 
 function renderTextComposable(node: NativeTextNode, level: number, context: AndroidComposeContext): string[] {
@@ -7663,7 +2920,7 @@ function renderComposeNode(
         const staticText = applyTextTransform(flattenTextContent(node.children), resolveTextTransform(style?.textTransform));
         const args = [`text = ${dynamicText ?? quoteKotlinString(staticText)}`];
         if (modifier !== 'Modifier') args.push(`modifier = ${modifier}`);
-        args.push(...buildComposeTextStyleArgs(node, context.resolvedStyles, context.styleResolveOptions));
+        args.push(...buildComposeTextStyleArgsFromStyle(style, context.styleResolveOptions));
         return [...lines, `${indent(level)}Text(${args.join(', ')})`];
     }
 
@@ -7706,6 +2963,7 @@ function renderComposeNode(
         const readOnly = isNativeReadOnly(node);
         const autoFocus = !disabled && shouldNativeAutoFocus(node);
         const focusRequesterName = `textFieldFocusRequester${textFieldId}`;
+        const textInputStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
 
         if (binding?.kind === 'value') {
             const { descriptor, variableName } = ensureComposeStateVariable(context, binding.id);
@@ -7748,13 +3006,18 @@ function renderComposeNode(
         lines.push(`${indent(level + 1)}onValueChange = { nextValue -> ${onValueChange}${textInputEventStatements.length > 0 ? `; ${textInputEventStatements.join('; ')}` : ''} },`);
         lines.push(`${indent(level + 1)}modifier = ${autoFocus ? prependComposeModifierCall(modifier, `focusRequester(${focusRequesterName})`) : modifier},`);
 
-        const textInputArgs = buildComposeTextInputArgs(node, context.resolvedStyles, submitEventStatement, context.styleResolveOptions);
+        const textInputArgs = buildComposeTextInputArgsFromStyle(
+            node,
+            textInputStyle,
+            submitEventStatement,
+            context.styleResolveOptions,
+        );
         textInputArgs.forEach((arg) => {
             lines.push(`${indent(level + 1)}${arg},`);
         });
 
         if (typeof node.props.placeholder === 'string') {
-            const placeholderArgs = buildComposeTextStyleArgs(node, context.resolvedStyles, context.styleResolveOptions)
+            const placeholderArgs = buildComposeTextStyleArgsFromStyle(textInputStyle, context.styleResolveOptions)
                 .filter((arg) => !arg.startsWith('textDecoration = '));
             const placeholder = placeholderArgs.length > 0
                 ? `Text(text = ${quoteKotlinString(node.props.placeholder)}, ${placeholderArgs.join(', ')})`
@@ -8081,8 +3344,9 @@ function renderComposeNode(
         const source = resolveNativeSurfaceSource(node) ?? '';
         const alt = typeof node.props.alt === 'string' ? node.props.alt : undefined;
         const fallbackLabel = resolveImageFallbackLabel(source, alt);
-        const objectFit = resolveNativeImageFit(node, context.resolvedStyles, context.styleResolveOptions);
-        const objectPosition = resolveNativeImagePosition(node, context.resolvedStyles, context.styleResolveOptions);
+        const imageStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+        const objectFit = resolveNativeObjectFitStyle(imageStyle);
+        const objectPosition = resolveNativeObjectPositionStyle(imageStyle);
         lines.push(`${indent(level)}ElitImageSurface(`);
         lines.push(`${indent(level + 1)}source = ${quoteKotlinString(source)},`);
         lines.push(`${indent(level + 1)}label = ${quoteKotlinString(fallbackLabel)},`);
@@ -8099,14 +3363,31 @@ function renderComposeNode(
     }
 
     if (node.component === 'Vector' && node.sourceTag === 'svg') {
-        const vectorLines = buildComposeVectorCanvasLines(node, level, modifier, context.resolvedStyles, context.styleResolveOptions);
-        if (vectorLines) {
-            return [...lines, ...vectorLines];
+        const spec = buildNativeVectorSpec(node);
+        if (spec) {
+            const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+            return [...lines, ...buildComposeVectorCanvasLines(
+                spec,
+                level,
+                modifier,
+                hasExplicitNativeWidthStyle(style),
+                hasExplicitNativeHeightStyle(style),
+            )];
         }
     }
 
     if (node.component === 'Canvas') {
-        return [...lines, ...buildComposeCanvasSurfaceLines(node, level, modifier, context.resolvedStyles, context.styleResolveOptions)];
+        const drawingSpec = buildNativeCanvasDrawingSpec(node);
+        const spec = drawingSpec ?? buildNativeCanvasSpec(node);
+        const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+        return [...lines, ...buildComposeCanvasSurfaceLines(
+            spec,
+            drawingSpec,
+            level,
+            modifier,
+            hasExplicitNativeWidthStyle(style),
+            hasExplicitNativeHeightStyle(style),
+        )];
     }
 
     if (node.component === 'WebView') {
@@ -8127,8 +3408,9 @@ function renderComposeNode(
                 const controls = shouldNativeShowVideoControls(node) ? 'true' : 'false';
                 const poster = resolveNativeVideoPoster(node);
                 const playsInline = shouldNativePlayInline(node) ? 'true' : 'false';
-                const posterFit = resolveNativeVideoPosterFit(node, context.resolvedStyles, context.styleResolveOptions);
-                const posterPosition = resolveNativeVideoPosterPosition(node, context.resolvedStyles, context.styleResolveOptions);
+                const mediaStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+                const posterFit = node.sourceTag === 'video' ? resolveNativeObjectFitStyle(mediaStyle) : 'cover';
+                const posterPosition = node.sourceTag === 'video' ? resolveNativeObjectPositionStyle(mediaStyle) : 'center';
                 return [...lines, `${indent(level)}ElitVideoSurface(source = ${quoteKotlinString(source)}, label = ${quoteKotlinString(mediaLabel)}, autoPlay = ${toNativeBoolean(node.props.autoplay) ? 'true' : 'false'}, loop = ${toNativeBoolean(node.props.loop) ? 'true' : 'false'}, muted = ${muted}, controls = ${controls}, poster = ${poster ? quoteKotlinString(poster) : 'null'}, playsInline = ${playsInline}${posterFit !== 'cover' ? `, posterFit = ${quoteKotlinString(posterFit)}` : ''}${posterPosition !== 'center' ? `, posterPosition = ${quoteKotlinString(posterPosition)}` : ''}, modifier = ${modifier})`];
             }
 
@@ -8792,124 +4074,20 @@ function buildSwiftUIModifiers(
     return modifiers;
 }
 
-function buildSwiftUIButtonModifiers(
-    node: NativeElementNode,
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string[] {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const modifiers = buildSwiftUIModifiers(node, resolvedStyles, {}, styleResolveOptions);
-    const interactiveModifiers = [
-        ...(node.sourceTag === 'button' && isNativeDisabled(node) ? ['.disabled(true)'] : []),
-        ...modifiers,
-    ];
-    return style ? ['.buttonStyle(.plain)', ...interactiveModifiers] : interactiveModifiers;
-}
-
 function resolveSwiftRowAlignment(
     style: Record<string, NativePropValue> | undefined,
     children: NativeNode[] = [],
     resolvedStyles?: NativeResolvedStyleMap,
     styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
 ): string {
-    const baselineAlignment = resolveBaselineAlignmentKeyword(style?.alignItems);
-    if (baselineAlignment === 'last') {
-        return '.lastTextBaseline';
-    }
-
-    if (baselineAlignment === 'first') {
-        return '.firstTextBaseline';
-    }
-
-    const selfBaselineAlignment = resolveRowBaselineSelfAlignment(children, resolvedStyles, styleResolveOptions);
-    if (selfBaselineAlignment === 'last') {
-        return '.lastTextBaseline';
-    }
-
-    if (selfBaselineAlignment === 'first') {
-        return '.firstTextBaseline';
-    }
-
-    const align = typeof style?.alignItems === 'string' ? style.alignItems.trim().toLowerCase() : undefined;
-    return align === 'center'
-        ? '.center'
-        : align === 'flex-end' || align === 'end' || align === 'bottom'
-            ? '.bottom'
-            : '.top';
-}
-
-function resolveSwiftColumnAlignment(style: Record<string, NativePropValue> | undefined): string {
-    const align = typeof style?.alignItems === 'string' ? style.alignItems.trim().toLowerCase() : undefined;
-    return align === 'center'
-        ? '.center'
-        : align === 'flex-end' || align === 'end' || align === 'right'
-            ? '.trailing'
-            : '.leading';
-}
-
-function resolveSwiftUILayout(node: NativeElementNode, resolvedStyles?: NativeResolvedStyleMap): 'HStack' | 'VStack' {
-    const style = getStyleObject(node, resolvedStyles);
-    const styleLayout = resolveLayoutDirection(style);
-    if (styleLayout === 'Row') return 'HStack';
-    return node.component === 'Row' || node.component === 'ListItem' ? 'HStack' : 'VStack';
-}
-
-function buildSwiftUILayout(
-    node: NativeElementNode,
-    layout: 'HStack' | 'VStack',
-    resolvedStyles?: NativeResolvedStyleMap,
-    styleResolveOptions: NativeStyleResolveOptions = getNativeStyleResolveOptions('generic'),
-): string {
-    const style = getStyleObject(node, resolvedStyles, styleResolveOptions);
-    const spacing = toPointLiteral(style?.gap ?? (layout === 'HStack' ? style?.columnGap : style?.rowGap) ?? style?.gap, styleResolveOptions)
-        ?? (hasNativeTableLayoutSourceTag(node.sourceTag) ? '0' : '12');
-
-    if (layout === 'HStack') {
-        return `HStack(alignment: ${resolveSwiftRowAlignment(style, node.children, resolvedStyles, styleResolveOptions)}, spacing: ${spacing})`;
-    }
-
-    return `VStack(alignment: ${resolveSwiftColumnAlignment(style)}, spacing: ${spacing})`;
-}
-
-function buildSwiftBackgroundImageInvocation(spec: NativeBackgroundImageSpec): string {
-    return `elitBackgroundImageSurface(source: ${quoteSwiftString(spec.source)}${spec.fit !== 'cover' ? `, backgroundSize: ${quoteSwiftString(spec.fit)}` : ''}${spec.position !== 'center' ? `, backgroundPosition: ${quoteSwiftString(spec.position)}` : ''}${spec.repeat !== 'no-repeat' ? `, backgroundRepeat: ${quoteSwiftString(spec.repeat)}` : ''})`;
-}
-
-function buildSwiftBackgroundLayerInvocation(layer: NativeBackgroundLayerSpec): string {
-    if (layer.kind === 'image') {
-        return buildSwiftBackgroundImageInvocation(layer);
-    }
-
-    const fillLiteral = layer.kind === 'gradient'
-        ? toSwiftGradientLiteral(layer.gradient)
-        : toSwiftColorLiteral(layer.color);
-    return `Rectangle().fill(${fillLiteral}).frame(maxWidth: .infinity, maxHeight: .infinity)`;
-}
-
-function appendSwiftUIBackgroundLayers(
-    lines: string[],
-    layers: NativeBackgroundLayerSpec[],
-    level: number,
-    style: Record<string, NativePropValue> | undefined,
-    styleResolveOptions: NativeStyleResolveOptions,
-): string[] {
-    const radius = toPointLiteral(style?.borderRadius, styleResolveOptions);
-    const result = [...lines];
-    result.push(`${indent(level + 1)}.background(alignment: .topLeading) {`);
-    if (layers.length > 1) {
-        result.push(`${indent(level + 2)}ZStack {`);
-        for (const layer of [...layers].reverse()) {
-            result.push(`${indent(level + 3)}${buildSwiftBackgroundLayerInvocation(layer)}`);
-        }
-        result.push(`${indent(level + 2)}}`);
-    } else if (layers[0]) {
-        result.push(`${indent(level + 2)}${buildSwiftBackgroundLayerInvocation(layers[0])}`);
-    }
-    if (radius) {
-        result.push(`${indent(level + 3)}.clipShape(RoundedRectangle(cornerRadius: ${radius}))`);
-    }
-    result.push(`${indent(level + 1)}}`);
-    return result;
+    return resolveSwiftRowAlignmentFromStyle(
+        style,
+        resolveRowBaselineAlignmentValues(
+            children.flatMap((child) => child.kind === 'element' && child.component === 'Text'
+                ? [getStyleObject(child, resolvedStyles, styleResolveOptions)?.alignSelf]
+                : []),
+        ),
+    );
 }
 
 function renderSwiftChunkedLayout(
@@ -8929,34 +4107,6 @@ function renderSwiftChunkedLayout(
         && layout.rows.length === 1
         && effectiveContentAlignment !== undefined
         && effectiveContentAlignment !== 'start';
-    const buildRowModifiers = (row: NativeChunkedRow): string[] => {
-        if (row.height === undefined && row.minHeight === undefined && row.maxHeight === undefined && row.trackWeight === undefined) {
-            return [];
-        }
-
-        const frameArgs = ['maxWidth: .infinity'];
-        if (row.height !== undefined) {
-            frameArgs.push(`height: ${formatFloat(row.height)}`);
-        } else {
-            if (row.minHeight !== undefined) {
-                frameArgs.push(`minHeight: ${formatFloat(row.minHeight)}`);
-            }
-            if (row.maxHeight !== undefined) {
-                frameArgs.push(`maxHeight: ${formatFloat(row.maxHeight)}`);
-            }
-        }
-
-        if (row.trackWeight !== undefined && !frameArgs.includes('maxHeight: .infinity')) {
-            frameArgs.push('maxHeight: .infinity');
-        }
-
-        frameArgs.push('alignment: .topLeading');
-
-        return [
-            `.frame(${frameArgs.join(', ')})`,
-            ...(row.trackWeight !== undefined ? [`.layoutPriority(${formatFloat(row.trackWeight)})`] : []),
-        ];
-    };
 
     if (layout.kind === 'grid' && layout.rows.length === 1 && !usesSingleRowGridStackAlignment) {
         const [row] = layout.rows;
@@ -8965,7 +4115,12 @@ function renderSwiftChunkedLayout(
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
-            const cellAlignment = resolveNativeGridCellAlignment(child, style, context.resolvedStyles, context.styleResolveOptions);
+            const cellAlignment = resolveNativeGridCellAlignmentFromStyle(
+                child.kind === 'element'
+                    ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                    : undefined,
+                style,
+            );
             const fillChild = resolveNativeGridCellFillWidth(shouldFillChunkedCellChild(child), cellAlignment.horizontal);
             const fillHeight = cellAlignment.vertical === 'stretch';
             const shouldExpandCellHeight = cellAlignment.vertical !== undefined;
@@ -8993,7 +4148,7 @@ function renderSwiftChunkedLayout(
             }
         });
         lines.push(`${indent(level)}}`);
-        lines.push(...buildRowModifiers(row).map((modifier) => `${indent(level + 1)}${modifier}`));
+        lines.push(...buildSwiftChunkedRowModifiers(row).map((modifier) => `${indent(level + 1)}${modifier}`));
         return lines;
     }
 
@@ -9017,7 +4172,12 @@ function renderSwiftChunkedLayout(
         lines.push(`${indent(level + 1)}HStack(alignment: ${rowAlignment}, spacing: ${columnSpacing}) {`);
         row.items.forEach((child, index) => {
             const cellAlignment = layout.kind === 'grid'
-                ? resolveNativeGridCellAlignment(child, style, context.resolvedStyles, context.styleResolveOptions)
+                ? resolveNativeGridCellAlignmentFromStyle(
+                    child.kind === 'element'
+                        ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                        : undefined,
+                    style,
+                )
                 : {};
             const columnSize = row.columnSizes?.[index];
             const fillChild = layout.kind === 'grid'
@@ -9052,7 +4212,7 @@ function renderSwiftChunkedLayout(
             }
         });
         lines.push(`${indent(level + 1)}}`);
-        lines.push(...buildRowModifiers(row).map((modifier) => `${indent(level + 2)}${modifier}`));
+        lines.push(...buildSwiftChunkedRowModifiers(row).map((modifier) => `${indent(level + 2)}${modifier}`));
         if (usesFlexibleOuterAlignment && rowIndex < layout.rows.length - 1) {
             if (effectiveContentAlignment === 'space-around') {
                 lines.push(`${indent(level + 1)}Spacer(minLength: ${halfRowSpacing})`);
@@ -9074,32 +4234,6 @@ function renderSwiftChunkedLayout(
     return lines;
 }
 
-function appendSwiftUIModifiers(lines: string[], modifiers: string[], level: number): string[] {
-    if (modifiers.length === 0) {
-        return lines;
-    }
-
-    return [
-        ...lines,
-        ...modifiers.map((modifier) => `${indent(level + 1)}${modifier}`),
-    ];
-}
-
-function appendSwiftUIOverlays(lines: string[], overlays: string[][], level: number): string[] {
-    if (overlays.length === 0) {
-        return lines;
-    }
-
-    const result = [...lines];
-    for (const overlayLines of overlays) {
-        result.push(`${indent(level + 1)}.overlay(alignment: .topLeading) {`);
-        result.push(...overlayLines);
-        result.push(`${indent(level + 1)}}`);
-    }
-
-    return result;
-}
-
 function renderSwiftUIContainerBody(
     node: NativeElementNode,
     level: number,
@@ -9108,7 +4242,7 @@ function renderSwiftUIContainerBody(
 ): string[] {
     const contentLines = renderSwiftUIContainerContent(node, level, context, hints);
     const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
-    const backgroundLayers = resolveNativeBackgroundLayers(node, context.resolvedStyles, context.styleResolveOptions);
+    const backgroundLayers = resolveNativeBackgroundLayersFromStyle(style, context.styleResolveOptions);
     const usesBackgroundWrapper = shouldRenderNativeBackgroundLayersWithWrapper(backgroundLayers);
     const lines = usesBackgroundWrapper
         ? appendSwiftUIBackgroundLayers(contentLines, backgroundLayers, level, style, context.styleResolveOptions)
@@ -9142,8 +4276,15 @@ function renderSwiftUIContainerContent(
         return renderSwiftChunkedLayout(node, chunkedLayout, level, context, hints);
     }
 
-    const layoutKind = resolveSwiftUILayout(node, context.resolvedStyles);
-    const layout = buildSwiftUILayout(node, layoutKind, context.resolvedStyles, context.styleResolveOptions);
+    const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+    const layoutKind = resolveSwiftUILayoutFromStyle(node.component, style);
+    const layout = buildSwiftUILayoutFromStyle(
+        layoutKind,
+        node.sourceTag,
+        style,
+        resolveSwiftRowAlignment(style, node.children, context.resolvedStyles, context.styleResolveOptions),
+        context.styleResolveOptions,
+    );
     const lines = [
         `${indent(level)}${layout} {`,
         ...renderSwiftUIChildren(node.children, level + 1, context, layoutKind, node, hints),
@@ -9187,7 +4328,13 @@ function renderSwiftUIChildren(
         ? resolveBaselineAlignmentKeyword(getStyleObject(parentNode, context.resolvedStyles, context.styleResolveOptions)?.alignItems)
         : undefined;
     for (const child of orderedNodes) {
-        const shouldDefaultFillCrossAxis = shouldDefaultFillWidthHint(child, context.resolvedStyles, context.styleResolveOptions);
+        const shouldDefaultFillCrossAxis = estimateDefaultFillWidthHint(
+            child,
+            child.kind === 'element'
+                ? getStyleObject(child, context.resolvedStyles, context.styleResolveOptions)
+                : undefined,
+            context.styleResolveOptions,
+        );
         const shouldStretchCrossAxis = shouldStretchFlexChildCrossAxis(
             child,
             parentFlexLayout,
@@ -9565,7 +4712,15 @@ function renderSwiftUINode(
                         `${indent(level)}}`,
                     ];
 
-            return appendSwiftUIModifiers(lines, buildSwiftUIButtonModifiers(node, resolvedStyles, context.styleResolveOptions), level);
+            return appendSwiftUIModifiers(
+                lines,
+                buildSwiftUIButtonModifiersFromStyle(
+                    node,
+                    buildSwiftUIModifiers(node, resolvedStyles, {}, context.styleResolveOptions),
+                    getStyleObject(node, resolvedStyles, context.styleResolveOptions),
+                ),
+                level,
+            );
         };
         const baseVariantLines = buildButtonLines(context.resolvedStyles);
         const activeVariantLines = activeResolvedStyles ? buildButtonLines(activeResolvedStyles) : baseVariantLines;
@@ -9644,7 +4799,15 @@ function renderSwiftUINode(
                             `${indent(level)}}`,
                         ];
 
-            return appendSwiftUIModifiers(lines, buildSwiftUIButtonModifiers(node, resolvedStyles, context.styleResolveOptions), level);
+            return appendSwiftUIModifiers(
+                lines,
+                buildSwiftUIButtonModifiersFromStyle(
+                    node,
+                    buildSwiftUIModifiers(node, resolvedStyles, {}, context.styleResolveOptions),
+                    getStyleObject(node, resolvedStyles, context.styleResolveOptions),
+                ),
+                level,
+            );
         };
         const baseVariantLines = buildLinkLines(context.resolvedStyles);
         const activeVariantLines = activeResolvedStyles ? buildLinkLines(activeResolvedStyles) : baseVariantLines;
@@ -9684,8 +4847,9 @@ function renderSwiftUINode(
         const source = resolveNativeSurfaceSource(node) ?? '';
         const alt = typeof node.props.alt === 'string' ? node.props.alt : undefined;
         const fallbackLabel = resolveImageFallbackLabel(source, alt);
-        const objectFit = resolveNativeImageFit(node, context.resolvedStyles, context.styleResolveOptions);
-        const objectPosition = resolveNativeImagePosition(node, context.resolvedStyles, context.styleResolveOptions);
+        const imageStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+        const objectFit = resolveNativeObjectFitStyle(imageStyle);
+        const objectPosition = resolveNativeObjectPositionStyle(imageStyle);
         return appendSwiftUIModifiers(
             [
                 ...baseLines,
@@ -9697,14 +4861,32 @@ function renderSwiftUINode(
     }
 
     if (node.component === 'Vector' && node.sourceTag === 'svg') {
-        const vectorCanvas = buildSwiftVectorCanvasLines(node, level, context.resolvedStyles, context.styleResolveOptions);
-        if (vectorCanvas) {
+        const spec = buildNativeVectorSpec(node);
+        if (spec) {
+            const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+            const vectorCanvas = buildSwiftVectorCanvasLines(
+                spec,
+                level,
+                buildSwiftUIModifiers(node, context.resolvedStyles, hints, context.styleResolveOptions),
+                hasExplicitNativeWidthStyle(style),
+                hasExplicitNativeHeightStyle(style),
+            );
             return appendSwiftUIModifiers([...baseLines, ...vectorCanvas.lines], vectorCanvas.modifiers, level);
         }
     }
 
     if (node.component === 'Canvas') {
-        const canvasSurface = buildSwiftCanvasSurfaceLines(node, level, context.resolvedStyles, context.styleResolveOptions);
+        const drawingSpec = buildNativeCanvasDrawingSpec(node);
+        const spec = drawingSpec ?? buildNativeCanvasSpec(node);
+        const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+        const canvasSurface = buildSwiftCanvasSurfaceLines(
+            spec,
+            drawingSpec,
+            level,
+            buildSwiftUIModifiers(node, context.resolvedStyles, hints, context.styleResolveOptions),
+            hasExplicitNativeWidthStyle(style),
+            hasExplicitNativeHeightStyle(style),
+        );
         return appendSwiftUIModifiers([...baseLines, ...canvasSurface.lines], canvasSurface.modifiers, level);
     }
 
@@ -9730,8 +4912,9 @@ function renderSwiftUINode(
             const controls = shouldNativeShowVideoControls(node) ? 'true' : 'false';
             const poster = resolveNativeVideoPoster(node);
             const playsInline = shouldNativePlayInline(node) ? 'true' : 'false';
-            const posterFit = resolveNativeVideoPosterFit(node, context.resolvedStyles, context.styleResolveOptions);
-            const posterPosition = resolveNativeVideoPosterPosition(node, context.resolvedStyles, context.styleResolveOptions);
+            const mediaStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
+            const posterFit = node.sourceTag === 'video' ? resolveNativeObjectFitStyle(mediaStyle) : 'cover';
+            const posterPosition = node.sourceTag === 'video' ? resolveNativeObjectPositionStyle(mediaStyle) : 'center';
             const mediaView = node.sourceTag === 'video'
                 ? `ElitVideoSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(mediaLabel)}, autoPlay: ${toNativeBoolean(node.props.autoplay) ? 'true' : 'false'}, muted: ${muted}, controls: ${controls}, poster: ${poster ? quoteSwiftString(poster) : 'nil'}, playsInline: ${playsInline}${posterFit !== 'cover' ? `, posterFit: ${quoteSwiftString(posterFit)}` : ''}${posterPosition !== 'center' ? `, posterPosition: ${quoteSwiftString(posterPosition)}` : ''})`
                 : `ElitAudioSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(mediaLabel)}, autoPlay: ${toNativeBoolean(node.props.autoplay) ? 'true' : 'false'}, muted: ${muted})`;
@@ -9766,8 +4949,15 @@ function renderSwiftUINode(
         const flowNode: NativeElementNode = flowChildren.length === node.children.length
             ? node
             : { ...node, children: flowChildren };
-        const layoutKind = resolveSwiftUILayout(flowNode, context.resolvedStyles);
-        const layout = buildSwiftUILayout(flowNode, layoutKind, context.resolvedStyles, context.styleResolveOptions);
+        const flowStyle = getStyleObject(flowNode, context.resolvedStyles, context.styleResolveOptions);
+        const layoutKind = resolveSwiftUILayoutFromStyle(flowNode.component, flowStyle);
+        const layout = buildSwiftUILayoutFromStyle(
+            layoutKind,
+            flowNode.sourceTag,
+            flowStyle,
+            resolveSwiftRowAlignment(flowStyle, flowNode.children, context.resolvedStyles, context.styleResolveOptions),
+            context.styleResolveOptions,
+        );
         const contentLines = [
             `${indent(level + 1)}${layout} {`,
             ...renderSwiftUIChildren(flowNode.children, level + 2, context, layoutKind, flowNode, hints),
