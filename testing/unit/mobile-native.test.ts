@@ -3,6 +3,7 @@
 import {
     buildIosXcodebuildArgs,
     getIosBuiltAppPath,
+    isManagedAndroidMainActivitySource,
     pickPreferredIosSimulatorDevice,
     resolveRequestedTarget,
     renderAndroidGeneratedPlaceholderSource,
@@ -27,6 +28,36 @@ describe('mobile native templates', () => {
         expect(source).toContain('AndroidView(');
         expect(source).toContain('appassets.androidplatform.net/assets/public/index.html');
         expect(source).toContain('assetLoader.shouldInterceptRequest(request.url)');
+    });
+
+    it('recognizes managed Android activity sources by exact scaffold URLs only', () => {
+        const managedHttps = [
+            'class MainActivity {',
+            '  fun open() {',
+            '    loadUrl("https://appassets.androidplatform.net/assets/public/index.html")',
+            '  }',
+            '}',
+        ].join('\n');
+        const managedFile = [
+            'class MainActivity {',
+            '  fun open() {',
+            '    loadUrl("file:///android_asset/public/index.html")',
+            '  }',
+            '}',
+        ].join('\n');
+        const maliciousLookalikes = [
+            'loadUrl("https://appassets.androidplatform.net.evil.example/assets/public/index.html")',
+            'loadUrl("https://evil.example/redirect?next=https://appassets.androidplatform.net/assets/public/index.html")',
+            'loadUrl("https://appassets.androidplatform.net/assets/public/index.html?next=https://evil.example")',
+            'loadUrl("https://user@appassets.androidplatform.net/assets/public/index.html")',
+        ];
+
+        expect(isManagedAndroidMainActivitySource(managedHttps)).toBe(true);
+        expect(isManagedAndroidMainActivitySource(managedFile)).toBe(true);
+
+        for (const source of maliciousLookalikes) {
+            expect(isManagedAndroidMainActivitySource(source)).toBe(false);
+        }
     });
 
     it('renders Android runtime config and placeholder screen sources', () => {

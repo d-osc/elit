@@ -22,6 +22,11 @@ const IOS_GENERATED_SCREEN_NAME = 'ElitGeneratedScreen';
 const IOS_PROJECT_NAME = 'ElitMobileApp';
 const IOS_RUNTIME_CONFIG_NAME = 'ElitRuntimeConfig';
 const IOS_DERIVED_DATA_DIR = '.elit-xcode-build';
+const MANAGED_ANDROID_MAIN_ACTIVITY_MARKER = '// ELIT-MOBILE-MAIN-ACTIVITY';
+const MANAGED_ANDROID_MAIN_ACTIVITY_URLS = new Set([
+    'file:///android_asset/public/index.html',
+    'https://appassets.androidplatform.net/assets/public/index.html',
+]);
 
 interface IosSimulatorDevice {
     udid: string;
@@ -1243,7 +1248,7 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
     return [
         `package ${appId}`,
         '',
-        '// ELIT-MOBILE-MAIN-ACTIVITY',
+        MANAGED_ANDROID_MAIN_ACTIVITY_MARKER,
         'import android.annotation.SuppressLint',
         'import android.os.Bundle',
         'import android.webkit.WebResourceRequest',
@@ -1304,6 +1309,61 @@ export function renderAndroidMainActivitySource(appId: string, nativePackageName
         '}',
         '',
     ].filter(Boolean).join('\n');
+}
+
+function parseManagedAndroidActivityUrl(input: string): string | undefined {
+    if (input === 'file:///android_asset/public/index.html') {
+        return input;
+    }
+
+    try {
+        const parsed = new URL(input);
+        if (
+            parsed.protocol === 'https:'
+            && parsed.hostname === 'appassets.androidplatform.net'
+            && parsed.pathname === '/assets/public/index.html'
+            && !parsed.username
+            && !parsed.password
+            && !parsed.port
+            && !parsed.search
+            && !parsed.hash
+        ) {
+            return parsed.toString();
+        }
+    } catch {
+        return undefined;
+    }
+
+    return undefined;
+}
+
+function extractAndroidLoadUrlStrings(source: string): string[] {
+    const urls: string[] = [];
+    const matches = source.matchAll(/\bloadUrl\(\s*(["'])(.*?)\1\s*\)/g);
+
+    for (const match of matches) {
+        const value = match[2];
+        if (value) {
+            urls.push(value);
+        }
+    }
+
+    return urls;
+}
+
+export function isManagedAndroidMainActivitySource(source: string): boolean {
+    if (source.includes(MANAGED_ANDROID_MAIN_ACTIVITY_MARKER)) {
+        return true;
+    }
+
+    for (const value of extractAndroidLoadUrlStrings(source)) {
+        const managedUrl = parseManagedAndroidActivityUrl(value);
+        if (managedUrl && MANAGED_ANDROID_MAIN_ACTIVITY_URLS.has(managedUrl)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 export function renderAndroidRuntimeConfigSource(packageName: string, nativeEnabled: boolean): string {
@@ -1800,7 +1860,7 @@ function ensureManagedAndroidMainActivity(projectRoot: string, appId: string, na
         return true;
     }
 
-    if (current.includes('// ELIT-MOBILE-MAIN-ACTIVITY') || current.includes('file:///android_asset/public/index.html') || current.includes('appassets.androidplatform.net')) {
+    if (isManagedAndroidMainActivitySource(current)) {
         writeFileSync(mainActivityPath, nextContent, 'utf8');
         return true;
     }
