@@ -2169,7 +2169,8 @@ function copyDirectory(sourceDir: string, targetDir: string): void {
 }
 
 function escapeSingleQuote(value: string): string {
-    return value.replace(/'/g, "\\'");
+    // First escape backslashes, then escape single quotes
+    return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function printMobileHelp(): void {
