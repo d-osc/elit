@@ -10,7 +10,7 @@ Welcome to the Elit documentation! 📚
 - **[API Reference](./API.md)** - Complete API documentation
 - **[Comparison Guide](./COMPARISON.md)** - Compare Elit with React, Vue, Svelte
 - **[Migration Guide](./MIGRATION.md)** - Migrate from other frameworks
-- **[Examples](../server/example/)** - Real-world examples and demos
+- **[Examples](../examples/)** - Real-world examples and demos
 
 ## Packages
 
@@ -21,11 +21,12 @@ The core library for building reactive web applications.
 - [API Reference](./API.md)
 - [Bundle: ~10KB gzipped](https://bundlephobia.com/package/elit)
 
-### elit-server
-Development server with HMR, REST API, and real-time features.
+### elit/server
+Development server, routing, middleware, and shared real-time state shipped in the main package.
 
-- [elit-server Documentation](../server/README.md)
-- [Examples](../server/example/README.md)
+- [API Reference](./API.md)
+- [Quick Start Guide](./QUICK_START.md)
+- [Examples](../examples/)
 
 ## Guides
 
@@ -75,7 +76,7 @@ Development server with HMR, REST API, and real-time features.
    - Hydration
    - SEO optimization
 
-9. **[elit-server Integration](./guides/server.md)** *(coming soon)*
+9. **[Server Integration](./guides/server.md)** *(coming soon)*
    - HMR setup
    - REST API
    - Middleware
@@ -83,20 +84,20 @@ Development server with HMR, REST API, and real-time features.
 
 ## Examples
 
-### Basic Examples
-- [Counter](../server/example/hmr-example.html) - Simple reactive counter
-- [Todo App](./examples/todo.md) *(coming soon)* - Full CRUD application
-- [Form Handling](./examples/forms.md) *(coming soon)* - Input validation and submission
+### Project Examples
+- [Correct Config](../examples/correct-config/) - Config-driven web, server, and build defaults
+- [Full Database App](../examples/full-db/) - Full-stack example with database helpers and API routes
+- [Universal App](../examples/universal-app-example/) - Shared web, desktop, and native entry flow
 
-### Advanced Examples
-- [Real-time Chat](../server/example/state-demo.html) - WebSocket chat with shared state
-- [Virtual Scrolling](./examples/virtual-list.md) *(coming soon)* - 100k+ items
-- [Router SPA](./examples/router-spa.md) *(coming soon)* - Single Page Application
+### Platform Examples
+- [Desktop Entry](../examples/desktop-example.ts) - Minimal desktop mode example
+- [Android Native Example](../examples/android-native-example/) - Native Android workflow from Elit UI
+- [WAPK Example](../examples/wapk-example/) - Archive packaging and runtime flow
 
-### Integration Examples
-- [REST API](../server/example/api-example.js) - Full REST API with elit-server
-- [SSR](./examples/ssr.md) *(coming soon)* - Server-side rendering
-- [TypeScript](./examples/typescript.md) *(coming soon)* - Full type safety
+### Utility Examples
+- [Path Utilities](../examples/path-example.ts) - Path helpers and normalization examples
+- [WebSocket Server](../examples/wss-example.ts) - Native WebSocket server usage
+- [Chokidar](../examples/chokidar-example.ts) - File watching integration
 
 ## API Reference
 
@@ -120,9 +121,8 @@ Want to contribute? Check out the [Contributing Guide](../CONTRIBUTING.md)!
 ## Community
 
 - 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 📦 [npm - elit-server](https://www.npmjs.com/package/elit-server)
-- 🐙 [GitHub Repository](https://github.com/oangsa/elit)
-- 🐛 [Issue Tracker](https://github.com/oangsa/elit/issues)
+- 🐙 [GitHub Repository](https://github.com/d-osc/elit)
+- 🐛 [Issue Tracker](https://github.com/d-osc/elit/issues)
 - 💬 Discord Community *(coming soon)*
 
 ## Resources
@@ -146,4 +146,4 @@ Elit is [MIT licensed](../LICENSE).
 
 ---
 
-**Need help?** Open an [issue](https://github.com/oangsa/elit/issues) or start a [discussion](https://github.com/oangsa/elit/discussions)!
+**Need help?** Open an [issue](https://github.com/d-osc/elit/issues) or start a [discussion](https://github.com/d-osc/elit/discussions)!

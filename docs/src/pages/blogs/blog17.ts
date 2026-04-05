@@ -471,7 +471,7 @@ export default TodoApp;
 
       p('Start using HMR today and experience the difference! Simply run ', code('npx elit dev'), ' and try editing your components while your app is running - watch the magic happen. 🔥✨'),
 
-      p('For more information, check out the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit documentation'), '.')
+      p('For more information, check out the ', a({ href: 'https://github.com/d-osc/elit' }, 'Elit documentation'), '.')
     ),
     th: div(
       p('เรียนรู้วิธีใช้ ', strong('Hot Module Replacement (HMR)'), ' กับ dev server ในตัวของ Elit เพื่อประสบการณ์การพัฒนาที่รวดเร็ว ดูการเปลี่ยนแปลงสะท้อนใน browser ', em('โดยไม่ต้อง refresh หน้าเว็บ'), ' - รักษา state ของแอปและเพิ่มความเร็วในการพัฒนาอย่างมาก'),

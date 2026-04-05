@@ -508,7 +508,7 @@ http://localhost:3000/images/logo.png`))),
 });`))),
 
       h2('Complete Example: Todo API'),
-      pre(code(...codeBlock(`const { createDevServer, Router, cors, logger, rateLimit } = require('elit-server');
+      pre(code(...codeBlock(`const { createDevServer, ServerRouter, cors, logger, rateLimit } = require('elit/server');
 
 // In-memory database
 let todos = [
@@ -518,7 +518,7 @@ let todos = [
 let nextId = 3;
 
 // Create router
-const api = new Router();
+const api = new ServerRouter();
 
 // Add middleware
 api.use(cors());
@@ -789,7 +789,7 @@ state.onChange((newValue, oldValue) => {
 
       p('Get started today and experience the fastest way to build full-stack TypeScript applications! 🚀'),
 
-      p('For more information, visit the ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit GitHub repository'), '.')
+      p('For more information, visit the ', a({ href: 'https://github.com/d-osc/elit' }, 'Elit GitHub repository'), '.')
     ),
     th: div(
       p('เรียนรู้ทุกอย่างเกี่ยวกับ ', strong('Elit'), ' - full-stack TypeScript framework ที่สมบูรณ์ คู่มือครบวงจรนี้ครอบคลุม ', em('CLI tools, development server, build system, HMR, REST API, middleware'), ' และการ deploy แบบ production'),
@@ -1339,7 +1339,7 @@ process.once('SIGTERM', shutdown);`))),
 
       p('เริ่มต้นวันนี้และสัมผัสวิธีที่เร็วที่สุดในการสร้าง full-stack TypeScript applications! 🚀'),
 
-      p('สำหรับข้อมูลเพิ่มเติม เยี่ยมชม ', a({ href: 'https://github.com/oangsa/elit' }, 'Elit GitHub repository'), '.')
+      p('สำหรับข้อมูลเพิ่มเติม เยี่ยมชม ', a({ href: 'https://github.com/d-osc/elit' }, 'Elit GitHub repository'), '.')
     )
   }
 };

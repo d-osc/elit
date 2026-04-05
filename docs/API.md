@@ -401,7 +401,7 @@ const link = routerLink(router, { to: '/about' }, 'About Page');
 
 ## Shared State
 
-**Requires elit-server**
+**Requires a server/shared-state backend created from `elit/server`**
 
 ### createSharedState
 
@@ -937,5 +937,5 @@ import type {
 
 For more examples and guides, see:
 - [Quick Start Guide](./QUICK_START.md)
-- [Examples Directory](../server/example/)
+- [Examples Directory](../examples/)
 - [Migration Guide](./MIGRATION.md)

@@ -6,9 +6,6 @@ Get up and running with Elit in 5 minutes! 🚀
 
 ```bash
 npm install elit
-
-# Optional: Development server with HMR
-npm install --save-dev elit-server
 ```
 
 ## Your First Elit App
@@ -61,7 +58,7 @@ dom.render('#app', app);
 ## Start Development Server
 
 ```bash
-npx elit-dev
+npx elit dev
 ```
 
 Your app will open at `http://localhost:3000` with hot module replacement! 🎉
@@ -260,7 +257,7 @@ const App = div(
 ```javascript
 import { createSharedState, reactive } from 'elit';
 
-// Create shared state (auto-connects to elit-server)
+// Create shared state (auto-connects to the Elit shared-state backend)
 const counter = createSharedState('counter', 0);
 const messages = createSharedState('messages', []);
 
@@ -282,7 +279,7 @@ const App = div(
 **Backend (server.js):**
 
 ```javascript
-const { createDevServer } = require('elit-server');
+const { createDevServer } = require('elit/server');
 
 const server = createDevServer({ port: 3000 });
 
@@ -330,12 +327,12 @@ const virtualList = createVirtualList(
 );
 ```
 
-### REST API with elit-server
+### REST API with elit/server
 
 ```javascript
-const { createDevServer, Router, cors, logger } = require('elit-server');
+const { createDevServer, ServerRouter, cors, logger } = require('elit/server');
 
-const api = new Router();
+const api = new ServerRouter();
 api.use(cors());
 api.use(logger());
 
@@ -479,7 +476,7 @@ const view = div(
 ## What's Next?
 
 - 📚 Read the [API Documentation](./API.md)
-- 🎯 Check out [Examples](../server/example/)
+- 🎯 Check out [Examples](../examples/)
 - 🛠️ Build something awesome!
 - 💬 Join the community (coming soon)
 
