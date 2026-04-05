@@ -7799,7 +7799,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         return { red, green, blue, alpha };
     }
 
-    const hslMatch = token.match(/^hsla?\(([^\)]+)\)$/i);
+    const hslMatch = token.match(/^hsla?\(([^()]+)\)$/i);
     if (hslMatch) {
         const parts = parseCssColorFunctionArguments(hslMatch[1]);
         if (parts.length < 3) {
@@ -7820,7 +7820,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         };
     }
 
-    const hwbMatch = token.match(/^hwb\(([^\)]+)\)$/i);
+    const hwbMatch = token.match(/^hwb\(([^()]+)\)$/i);
     if (hwbMatch) {
         const parts = parseCssColorFunctionArguments(hwbMatch[1]);
         if (parts.length < 3) {
@@ -7841,7 +7841,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         };
     }
 
-    const labMatch = token.match(/^lab\(([^\)]+)\)$/i);
+    const labMatch = token.match(/^lab\(([^()]+)\)$/i);
     if (labMatch) {
         const parts = parseCssColorFunctionArguments(labMatch[1]);
         if (parts.length < 3) {
@@ -7859,7 +7859,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         return labToNativeColor(lightness, a, b, alpha);
     }
 
-    const lchMatch = token.match(/^lch\(([^\)]+)\)$/i);
+    const lchMatch = token.match(/^lch\(([^()]+)\)$/i);
     if (lchMatch) {
         const parts = parseCssColorFunctionArguments(lchMatch[1]);
         if (parts.length < 3) {
@@ -7877,7 +7877,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         return lchToNativeColor(lightness, chroma, hue, alpha);
     }
 
-    const oklabMatch = token.match(/^oklab\(([^\)]+)\)$/i);
+    const oklabMatch = token.match(/^oklab\(([^()]+)\)$/i);
     if (oklabMatch) {
         const parts = parseCssColorFunctionArguments(oklabMatch[1]);
         if (parts.length < 3) {
@@ -7895,7 +7895,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         return oklabToNativeColor(lightness, a, b, alpha);
     }
 
-    const oklchMatch = token.match(/^oklch\(([^\)]+)\)$/i);
+    const oklchMatch = token.match(/^oklch\(([^()]+)\)$/i);
     if (oklchMatch) {
         const parts = parseCssColorFunctionArguments(oklchMatch[1]);
         if (parts.length < 3) {
@@ -7913,7 +7913,7 @@ function parseCssColor(value: NativePropValue | undefined, currentColor: NativeC
         return oklchToNativeColor(lightness, chroma, hue, alpha);
     }
 
-    const rgbMatch = token.match(/^rgba?\(([^\)]+)\)$/i);
+    const rgbMatch = token.match(/^rgba?\(([^()]+)\)$/i);
     if (!rgbMatch) return undefined;
 
     const parts = parseCssColorFunctionArguments(rgbMatch[1]);
