@@ -1974,7 +1974,7 @@ function parseNativeBackgroundLayerMetadata(
         remainder = `${remainder.slice(0, repeatMatch.index)} ${remainder.slice((repeatMatch.index ?? 0) + repeatMatch[0].length)}`.trim();
     }
 
-    const [rawPosition, rawSize] = remainder.split(/\s*\/\s*/, 2);
+    const [rawPosition, rawSize] = remainder.split('/', 2).map((s) => s.trim()) as [string, string | undefined];
     const position = normalizeNativeBackgroundPositionValue(rawPosition);
     const size = normalizeNativeBackgroundSizeValue(rawSize);
     const color = parseCssColor(remainder, currentColor);
@@ -3174,7 +3174,7 @@ function parsePlainNumericValue(value: NativePropValue | undefined): number | un
     }
 
     const trimmed = value.trim();
-    if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(trimmed)) {
+    if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)) {
         return undefined;
     }
 
@@ -3192,7 +3192,7 @@ function parseNativeSvgNumber(value: NativePropValue | undefined): number | unde
     }
 
     const trimmed = value.trim();
-    const match = trimmed.match(/^(-?(?:\d+\.?\d*|\.\d+))(?:px)?$/i);
+    const match = trimmed.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))(?:px)?$/i);
     if (!match) {
         return undefined;
     }
@@ -3291,7 +3291,7 @@ function resolveAspectRatioValue(value: NativePropValue | undefined): number | u
         return undefined;
     }
 
-    const ratioMatch = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))\s*\/\s*(-?(?:\d+\.?\d*|\.\d+))$/);
+    const ratioMatch = value.trim().match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))\s*\/\s*(-?(?:\d+(?:\.\d*)?|\.\d+))$/);
     if (!ratioMatch) {
         return undefined;
     }
@@ -3311,7 +3311,7 @@ function parsePercentageValue(value: NativePropValue | undefined): number | unde
         return undefined;
     }
 
-    const match = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))%$/);
+    const match = value.trim().match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))%$/);
     if (!match) {
         return undefined;
     }
@@ -4993,7 +4993,7 @@ function approximateNativeSvgArcAsCubicCurves(
 }
 
 function parseNativeSvgPathData(data: string): NativeVectorPathCommand[] | undefined {
-    const tokens = data.match(/[a-zA-Z]|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi);
+    const tokens = data.match(/[a-zA-Z]|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/gi);
     if (!tokens || tokens.length === 0) {
         return undefined;
     }
@@ -5297,7 +5297,7 @@ function parseNativeSvgPointList(value: NativePropValue | undefined): Array<{ x:
         return undefined;
     }
 
-    const tokens = value.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi);
+    const tokens = value.match(/-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?/gi);
     if (!tokens || tokens.length < 4 || tokens.length % 2 !== 0) {
         return undefined;
     }
@@ -6200,7 +6200,7 @@ function parseGridTrackSizeSpec(
         return fitContent !== undefined && fitContent >= 0 ? { maxHeight: fitContent } : undefined;
     }
 
-    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),\s*([^,()]+)\)$/i);
+    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),([^,()]+)\)$/i);
     if (minmaxMatch) {
         const minToken = minmaxMatch[1].trim();
         const maxToken = minmaxMatch[2].trim();
@@ -6259,7 +6259,7 @@ function parseGridColumnTrackSizeSpec(
         return fitContent !== undefined && fitContent >= 0 ? { maxWidth: fitContent } : undefined;
     }
 
-    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),\s*([^,()]+)\)$/i);
+    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),([^,()]+)\)$/i);
     if (minmaxMatch) {
         const minToken = minmaxMatch[1].trim();
         const maxToken = minmaxMatch[2].trim();
@@ -7544,7 +7544,7 @@ function extractColorToken(value: string): string | undefined {
 }
 
 function parseCssHue(value: string): number | undefined {
-    const match = value.trim().toLowerCase().match(/^(-?(?:\d+\.?\d*|\.\d+))(deg|grad|rad|turn)?$/);
+    const match = value.trim().toLowerCase().match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))(deg|grad|rad|turn)?$/);
     if (!match) {
         return undefined;
     }
@@ -7567,7 +7567,7 @@ function parseCssHue(value: string): number | undefined {
 }
 
 function parseCssPercentageChannel(value: string): number | undefined {
-    const match = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))%$/);
+    const match = value.trim().match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))%$/);
     if (!match) {
         return undefined;
     }
@@ -7634,7 +7634,7 @@ function parseCssColorFunctionArguments(value: string): string[] {
         return splitCssFunctionArguments(trimmed).map((part) => part.trim()).filter(Boolean);
     }
 
-    const alphaSplit = trimmed.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+    const alphaSplit = trimmed.split('/').map((part) => part.trim()).filter(Boolean);
     if (alphaSplit.length === 0 || alphaSplit.length > 2) {
         return [];
     }
@@ -8197,7 +8197,7 @@ function parseCssAngleDegrees(value: string): number | undefined {
         return 0;
     }
 
-    const match = trimmed.match(/^(-?(?:\d+\.?\d*|\.\d+))deg$/);
+    const match = trimmed.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))deg$/);
     if (!match) {
         return undefined;
     }
