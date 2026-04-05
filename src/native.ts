@@ -1382,7 +1382,7 @@ function supportsNativePatternValidation(node: NativeElementNode): boolean {
 }
 
 function isNativeEmailValue(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    return /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(value);
 }
 
 function isNativeUrlValue(value: string): boolean {
@@ -1837,7 +1837,7 @@ function resolveNativeJustifyContent(style: Record<string, NativePropValue> | un
 }
 
 function extractCssUrlValue(value: string): string | undefined {
-    const match = value.match(/url\(\s*(?:"([^"]+)"|'([^']+)'|([^\s\)]+))\s*\)/i);
+    const match = value.match(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s"'()]+))\s*\)/i);
     const resolved = match?.[1] ?? match?.[2] ?? match?.[3];
     return resolved?.trim() || undefined;
 }
@@ -1954,7 +1954,7 @@ function parseNativeBackgroundLayerMetadata(
 
     let remainder = stripCssFunctionValue(stripCssFunctionValue(layer, 'url'), 'linear-gradient');
 
-    const repeatMatch = remainder.match(/\b(no-repeat|repeat-x|repeat-y|repeat)\b/i);
+    const repeatMatch = remainder.match(/\b(no-repeat|repeat-[xy]|repeat)\b/i);
     const repeat = normalizeNativeBackgroundRepeat(repeatMatch?.[1]);
     if (repeatMatch) {
         remainder = `${remainder.slice(0, repeatMatch.index)} ${remainder.slice((repeatMatch.index ?? 0) + repeatMatch[0].length)}`.trim();
@@ -3160,7 +3160,7 @@ function parsePlainNumericValue(value: NativePropValue | undefined): number | un
     }
 
     const trimmed = value.trim();
-    if (!/^-?(?:\d+|\d*\.\d+)$/.test(trimmed)) {
+    if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(trimmed)) {
         return undefined;
     }
 
@@ -3178,7 +3178,7 @@ function parseNativeSvgNumber(value: NativePropValue | undefined): number | unde
     }
 
     const trimmed = value.trim();
-    const match = trimmed.match(/^(-?(?:\d+|\d*\.\d+))(?:px)?$/i);
+    const match = trimmed.match(/^(-?(?:\d+\.?\d*|\.\d+))(?:px)?$/i);
     if (!match) {
         return undefined;
     }
@@ -3277,7 +3277,7 @@ function resolveAspectRatioValue(value: NativePropValue | undefined): number | u
         return undefined;
     }
 
-    const ratioMatch = value.trim().match(/^(-?(?:\d+|\d*\.\d+))\s*\/\s*(-?(?:\d+|\d*\.\d+))$/);
+    const ratioMatch = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))\s*\/\s*(-?(?:\d+\.?\d*|\.\d+))$/);
     if (!ratioMatch) {
         return undefined;
     }
@@ -3297,7 +3297,7 @@ function parsePercentageValue(value: NativePropValue | undefined): number | unde
         return undefined;
     }
 
-    const match = value.trim().match(/^(-?(?:\d+|\d*\.\d+))%$/);
+    const match = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))%$/);
     if (!match) {
         return undefined;
     }
@@ -4977,7 +4977,7 @@ function approximateNativeSvgArcAsCubicCurves(
 }
 
 function parseNativeSvgPathData(data: string): NativeVectorPathCommand[] | undefined {
-    const tokens = data.match(/[a-zA-Z]|[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?/gi);
+    const tokens = data.match(/[a-zA-Z]|[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi);
     if (!tokens || tokens.length === 0) {
         return undefined;
     }
@@ -5281,7 +5281,7 @@ function parseNativeSvgPointList(value: NativePropValue | undefined): Array<{ x:
         return undefined;
     }
 
-    const tokens = value.match(/-?(?:\d+|\d*\.\d+)(?:e[-+]?\d+)?/gi);
+    const tokens = value.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi);
     if (!tokens || tokens.length < 4 || tokens.length % 2 !== 0) {
         return undefined;
     }
@@ -6136,7 +6136,7 @@ function parseFractionTrackWeight(track: string): number | undefined {
         return Number(directMatch[1]);
     }
 
-    const minmaxMatch = track.trim().match(/^minmax\(\s*[^,]+\s*,\s*(-?\d+(?:\.\d+)?)fr\s*\)$/i);
+    const minmaxMatch = track.trim().match(/^minmax\([^,()]*,\s*(-?\d+(?:\.\d+)?)fr\s*\)$/i);
     return minmaxMatch ? Number(minmaxMatch[1]) : undefined;
 }
 
@@ -6169,7 +6169,7 @@ function parseGridTrackSizeSpec(
         return fitContent !== undefined && fitContent >= 0 ? { maxHeight: fitContent } : undefined;
     }
 
-    const minmaxMatch = trimmed.match(/^minmax\((.+),\s*(.+)\)$/i);
+    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),\s*([^,()]+)\)$/i);
     if (minmaxMatch) {
         const minToken = minmaxMatch[1].trim();
         const maxToken = minmaxMatch[2].trim();
@@ -6228,7 +6228,7 @@ function parseGridColumnTrackSizeSpec(
         return fitContent !== undefined && fitContent >= 0 ? { maxWidth: fitContent } : undefined;
     }
 
-    const minmaxMatch = trimmed.match(/^minmax\((.+),\s*(.+)\)$/i);
+    const minmaxMatch = trimmed.match(/^minmax\(([^,()]+),\s*([^,()]+)\)$/i);
     if (minmaxMatch) {
         const minToken = minmaxMatch[1].trim();
         const maxToken = minmaxMatch[2].trim();
@@ -6285,7 +6285,7 @@ function resolveGridColumnTrackSizeSpecs(
 
     const trimmed = value.trim();
     const viewportWidth = styleResolveOptions.viewportWidth ?? 390;
-    const autoRepeatMatch = trimmed.match(/^repeat\(\s*auto-(?:fit|fill)\s*,\s*(minmax\(\s*[^,]+\s*,\s*[^)]+\)\s*)\)$/i);
+    const autoRepeatMatch = trimmed.match(/^repeat\(\s*auto-(?:fit|fill)\s*,\s*(minmax\([^,()]+,[^,()]+\))\s*\)$/i);
     if (autoRepeatMatch) {
         const repeatedSpec = parseGridColumnTrackSizeSpec(autoRepeatMatch[1].trim(), styleResolveOptions);
         const minWidth = repeatedSpec?.width ?? repeatedSpec?.minWidth;
@@ -7465,7 +7465,7 @@ function isFillValue(value: NativePropValue | undefined): boolean {
 
 function extractColorToken(value: string): string | undefined {
     const trimmed = value.trim();
-    const directMatch = trimmed.match(/^((?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^\)]+\)|#[0-9a-fA-F]{3,8}|currentcolor)$/i);
+    const directMatch = trimmed.match(/^((?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^()]+\)|#[0-9a-fA-F]{3,8}|currentcolor)$/i);
     if (directMatch) {
         return directMatch[1];
     }
@@ -7479,14 +7479,18 @@ function extractColorToken(value: string): string | undefined {
         return normalized;
     }
 
-    const embeddedMatch = trimmed.match(/((?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^\)]+\)|#[0-9a-fA-F]{3,8}|currentcolor)/i);
+    const embeddedMatch = trimmed.match(/((?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^()]+\)|#[0-9a-fA-F]{3,8}|currentcolor)/i);
     if (embeddedMatch) {
         return embeddedMatch[1];
     }
 
-    const functionNameMatch = trimmed.match(/([a-z-]+)\(/i);
-    if (functionNameMatch) {
-        const functionName = functionNameMatch[1].toLowerCase();
+    const firstParenIdx = trimmed.indexOf('(');
+    if (firstParenIdx > 0) {
+        let nameStart = firstParenIdx;
+        while (nameStart > 0 && trimmed[nameStart - 1] !== ' ' && trimmed[nameStart - 1] !== '\t') {
+            nameStart--;
+        }
+        const functionName = trimmed.slice(nameStart, firstParenIdx).toLowerCase();
         if (
             functionName !== 'rgb'
             && functionName !== 'rgba'
@@ -7509,7 +7513,7 @@ function extractColorToken(value: string): string | undefined {
 }
 
 function parseCssHue(value: string): number | undefined {
-    const match = value.trim().toLowerCase().match(/^(-?(?:\d+|\d*\.\d+))(deg|grad|rad|turn)?$/);
+    const match = value.trim().toLowerCase().match(/^(-?(?:\d+\.?\d*|\.\d+))(deg|grad|rad|turn)?$/);
     if (!match) {
         return undefined;
     }
@@ -7532,7 +7536,7 @@ function parseCssHue(value: string): number | undefined {
 }
 
 function parseCssPercentageChannel(value: string): number | undefined {
-    const match = value.trim().match(/^(-?(?:\d+|\d*\.\d+))%$/);
+    const match = value.trim().match(/^(-?(?:\d+\.?\d*|\.\d+))%$/);
     if (!match) {
         return undefined;
     }
@@ -8132,7 +8136,7 @@ function parseBlurFilterRadius(
         return undefined;
     }
 
-    const match = value.match(/blur\(\s*([^()]+?)\s*\)/i);
+    const match = value.match(/blur\(([^()]*)\)/i);
     if (!match) {
         return undefined;
     }
@@ -8162,7 +8166,7 @@ function parseCssAngleDegrees(value: string): number | undefined {
         return 0;
     }
 
-    const match = trimmed.match(/^(-?(?:\d+|\d*\.\d+))deg$/);
+    const match = trimmed.match(/^(-?(?:\d+\.?\d*|\.\d+))deg$/);
     if (!match) {
         return undefined;
     }
@@ -8185,7 +8189,7 @@ function parseNativeTransform(
     }
 
     const transform: NativeTransformValue = {};
-    const pattern = /([a-z-]+)\(([^()]*)\)/gi;
+    const pattern = /(translate[xy]?|scale[xy]?|rotate)\(([^()]*)\)/gi;
     let matched = false;
 
     for (const match of trimmed.matchAll(pattern)) {
