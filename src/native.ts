@@ -273,6 +273,15 @@ function createNativeNamedColorMap(colors: Record<string, string>): Record<strin
 
 const CURRENT_COLOR_KEYWORD = 'currentcolor';
 
+// Maximum allowed length for a TextInput pattern prop, and a structural guard
+// that rejects patterns with nested quantifiers — the primary source of
+// catastrophic (polynomial / exponential) backtracking in NFA-based engines.
+const NATIVE_PATTERN_MAX_LENGTH = 500;
+// Matches a group that contains a + or * quantifier and is itself quantified
+// with + or * — e.g. (a+)+, (a|b*)+. Such patterns are the canonical
+// cause of ReDoS when applied to adversarial input.
+const REDOS_NESTED_QUANTIFIER = /\([^()]*[+*][^()]*\)[+*]/;
+
 function cloneNativeColor(color: NativeColorValue | undefined): NativeColorValue | undefined {
     return color ? { ...color } : undefined;
 }
@@ -1343,8 +1352,13 @@ function resolveNativePatternExpression(node: NativeElementNode): RegExp | undef
         return undefined;
     }
 
+    const pattern = node.props.pattern.trim();
+    if (pattern.length > NATIVE_PATTERN_MAX_LENGTH || REDOS_NESTED_QUANTIFIER.test(pattern)) {
+        return undefined;
+    }
+
     try {
-        return new RegExp(`^(?:${node.props.pattern.trim()})$`);
+        return new RegExp(`^(?:${pattern})$`);
     } catch {
         return undefined;
     }
