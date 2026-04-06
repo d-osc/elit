@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.9] - 2026-04-06
+
+### Changed
+- **Desktop native renderer modularization** - Reorganized the Rust desktop-native renderer into focused modules without changing the native desktop payload, CLI surface, or shared `elit/native` foundation
+  - Split widget rendering, content/media surfaces, form controls, interaction dispatch, container rendering, vector drawing, runtime support, and app runtime orchestration into dedicated modules
+  - Keeps desktop-native parity fixes localized while preserving the existing `native_renderer::run(...)` entry flow and shared native tree contract
+
+### Documentation
+- **README native desktop foundation refresh** - Clarified that native desktop mode still runs on the same shared native tree and style/layout model as IR, Compose, and SwiftUI output while its desktop renderer internals are now modularized by concern
+
 ## [3.4.8] - 2026-04-06
 
 ### Changed

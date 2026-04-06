@@ -76,6 +76,8 @@ Elit now includes a practical native-generation foundation that keeps the existi
 
 That same foundation also feeds native desktop mode: Elit resolves one shared native tree and style/layout model, then emits IR, Compose, SwiftUI, or native desktop output from it. Public `elit/native` APIs stay the same while parity fixes and native CSS-subset improvements can land across outputs together.
 
+On the desktop-native backend, renderer responsibilities are now split internally by concern too: widget rendering, content and media surfaces, form controls, container layout, vector drawing, interaction dispatch, runtime support, and app orchestration no longer live in one monolithic renderer file. That does not change the public API, but it makes parity fixes for buttons, inputs, media surfaces, layout, and vector output safer to land across desktop native, IR, Compose, and SwiftUI outputs without forking the shared native tree contract.
+
 ```ts
 import { a, button, div, h1, img, input } from 'elit/el';
 import { renderNativeTree } from 'elit/native';
