@@ -255,12 +255,14 @@ Useful flags:
 - `elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app`
 - `elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview`
 - `elit native generate ir ./src/native-screen.ts --platform android --export screen`
+- `elit wapk pack . --password-env WAPK_PASSWORD`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
-- `elit wapk run ./app.wapk --sync-interval 100 --watcher`
+- `elit wapk run ./app.wapk --password-env WAPK_PASSWORD --sync-interval 100 --watcher`
 - `elit wapk pack . --include-deps`
-- `elit wapk inspect ./app.wapk`
+- `elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD`
 - `elit wapk extract ./app.wapk`
 - `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
+- `elit desktop wapk run ./app.wapk --runtime bun --password-env WAPK_PASSWORD`
 
 Desktop mode notes:
 
@@ -306,8 +308,12 @@ WAPK mode notes:
 - `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>` run packaged apps in desktop mode.
 - During run, the archive is expanded into a temporary work directory and changes are synced back to the same `.wapk` file.
 - Use `--sync-interval <ms>` for polling mode, or `--watcher` / `--use-watcher` for event-driven sync.
-- Configure package metadata in `elit.config.*` under `wapk`.
-- See the full example app at `examples/wapk-example`.
+- Use `--password` or, preferably, `--password-env` when packing, inspecting, extracting, or running a locked archive.
+- `inspect` without credentials still reports whether the archive is locked, but it does not print the archive contents.
+- Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
+- Configure package metadata in `elit.config.*` under `wapk`, and use `wapk.lock` when you want password-protected archives by default.
+- WAPK stays unlocked by default unless `wapk.lock.password`, `wapk.lock.passwordEnv`, `--password`, or `--password-env` is provided.
+- See [docs/wapk.md](docs/wapk.md) for the full archive guide and `examples/wapk-example` for an end-to-end sample.
 
 ## Config File
 
@@ -380,6 +386,10 @@ The config shape is:
     port?: number;
     env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;
+    lock?: {
+      password?: string;
+      passwordEnv?: string;
+    };
   };
 }
 ```
@@ -460,6 +470,9 @@ export default {
     env: {
       NODE_ENV: 'production',
     },
+    lock: {
+      passwordEnv: 'WAPK_PASSWORD',
+    },
   },
 };
 ```
@@ -473,6 +486,7 @@ Important details:
 - `desktop` config provides defaults for `elit desktop`, `elit desktop run`, `elit desktop build`, and `elit desktop wapk`. Use `desktop.entry` for hybrid defaults, `desktop.native.entry` for native defaults, and `desktop.mode` to choose which one runs by default.
 - `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
+- `wapk.lock.passwordEnv` is the safest reusable way to protect archives without putting the password directly into shell history or committed config.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
 
 ## Browser Patterns

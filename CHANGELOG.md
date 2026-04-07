@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-04-08
+
+### Added
+- **Locked WAPK archives** - WAPK packaging can now encrypt archive payloads and require credentials to open them
+  - Added `--password` and `--password-env` support to `elit wapk pack`
+  - Added `wapk.lock.password` and `wapk.lock.passwordEnv` support in `elit.config.*`
+  - Added locked archive support to `elit wapk inspect`, `elit wapk extract`, `elit wapk run`, and `elit desktop wapk run`
+
+### Changed
+- **WAPK archive handling** - Archive inspection and live-sync flows now understand password-protected WAPK files
+  - `inspect` reports whether an archive is locked even when credentials are not provided
+  - Live sync keeps locked archives encrypted when runtime changes are written back into the same `.wapk` file
+  - Desktop WAPK commands now forward password credentials to the packaged runtime flow
+
+### Documentation
+- **README and WAPK guide refresh** - Documented password-protected WAPK packaging, unlock flags, and config-driven lock defaults
+
+### Tests
+- **WAPK lock coverage** - Added unit coverage for password-protected archives, config-driven `passwordEnv` locks, and encrypted live-sync updates
+
 ## [3.4.9] - 2026-04-06
 
 ### Changed
