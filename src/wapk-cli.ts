@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -29,7 +30,32 @@ interface DecodedWapk {
     version: number;
     header: WapkHeader;
     files: WapkFileEntry[];
+    lock?: {
+        password: true;
+    };
 }
+
+export interface WapkCredentialsOptions {
+    password?: string;
+    passwordEnv?: string;
+}
+
+interface ResolvedWapkCredentials {
+    password: string;
+}
+
+interface WapkLockMetadata {
+    cipher: 'aes-256-gcm';
+    kdf: 'scrypt';
+    salt: string;
+    iv: string;
+    tag: string;
+    user?: string;
+}
+
+type ParsedWapkEnvelope =
+    | { version: 1; payload: Buffer }
+    | { version: 2; payload: Buffer; lock: WapkLockMetadata };
 
 export interface WapkLiveSyncController {
     flush: () => void;
@@ -44,6 +70,7 @@ export interface PreparedWapkApp {
     runtime: WapkRuntimeName;
     syncInterval?: number;
     useWatcher?: boolean;
+    lock?: ResolvedWapkCredentials;
 }
 
 interface WapkProjectConfig {
@@ -55,10 +82,13 @@ interface WapkProjectConfig {
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
+    lock?: WapkCredentialsOptions;
 }
 
 const WAPK_MAGIC = Buffer.from('WAPK');
-const WAPK_VERSION = 1;
+const WAPK_UNLOCKED_VERSION = 1;
+const WAPK_LOCKED_VERSION = 2;
+const WAPK_VERSION = WAPK_LOCKED_VERSION;
 const DEFAULT_WAPK_PORT = 3000;
 const DEFAULT_IGNORE = [
     'node_modules',
@@ -75,6 +105,13 @@ const DEFAULT_IGNORE = [
 
 export const WAPK_RUNTIMES: WapkRuntimeName[] = ['node', 'bun', 'deno'];
 const RUNTIME_SYNC_IGNORE = new Set(['node_modules', '.git']);
+const WAPK_CIPHER = 'aes-256-gcm';
+const WAPK_KDF = 'scrypt';
+const WAPK_KEY_LENGTH = 32;
+const WAPK_SALT_LENGTH = 16;
+const WAPK_IV_LENGTH = 12;
+const WAPK_AUTH_TAG_LENGTH = 16;
+const WAPK_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -108,6 +145,15 @@ function normalizePort(value: unknown): number | undefined {
     return Math.trunc(port);
 }
 
+function normalizeNonEmptyString(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeStringMap(value: unknown): Record<string, string> | undefined {
     if (!isRecord(value)) {
         return undefined;
@@ -129,6 +175,26 @@ function normalizeDesktopConfig(value: unknown): Record<string, unknown> | undef
     return isRecord(value) ? { ...value } : undefined;
 }
 
+function normalizeWapkLockConfig(value: unknown): WapkCredentialsOptions | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const password = typeof value.password === 'string' && value.password.length > 0
+        ? value.password
+        : undefined;
+    const passwordEnv = normalizeNonEmptyString(value.passwordEnv);
+
+    if (!password && !passwordEnv) {
+        return undefined;
+    }
+
+    return {
+        password,
+        passwordEnv,
+    };
+}
+
 function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
     if (!isRecord(value)) {
         return {};
@@ -143,6 +209,7 @@ function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
         port: normalizePort(value.port),
         env: normalizeStringMap(value.env),
         desktop: normalizeDesktopConfig(value.desktop),
+        lock: normalizeWapkLockConfig(value.lock),
     };
 }
 
@@ -235,6 +302,194 @@ function readJsonFile(filePath: string): Record<string, unknown> | undefined {
     return parsed;
 }
 
+function hasCredentialInput(value: WapkCredentialsOptions | undefined): boolean {
+    return Boolean(
+        (typeof value?.password === 'string' && value.password.length > 0)
+        || normalizeNonEmptyString(value?.passwordEnv),
+    );
+}
+
+function resolvePasswordFromInput(
+    value: WapkCredentialsOptions | undefined,
+    context: string,
+): string | undefined {
+    if (!value) {
+        return undefined;
+    }
+
+    if (typeof value.password === 'string' && value.password.length > 0) {
+        return value.password;
+    }
+
+    const passwordEnv = normalizeNonEmptyString(value.passwordEnv);
+    if (!passwordEnv) {
+        return undefined;
+    }
+
+    const password = process.env[passwordEnv];
+    if (typeof password !== 'string' || password.length === 0) {
+        throw new Error(`${context} requires environment variable "${passwordEnv}" to be set.`);
+    }
+
+    return password;
+}
+
+function resolvePackLockCredentials(
+    configLock: WapkCredentialsOptions | undefined,
+    overrideLock: WapkCredentialsOptions | undefined,
+): ResolvedWapkCredentials | undefined {
+    const password = resolvePasswordFromInput(overrideLock, 'WAPK lock')
+        ?? resolvePasswordFromInput(configLock, 'WAPK lock');
+    const shouldLock = hasCredentialInput(configLock) || hasCredentialInput(overrideLock);
+
+    if (!shouldLock) {
+        return undefined;
+    }
+
+    if (!password) {
+        throw new Error('WAPK lock requires a password. Provide --password, --password-env, or config.wapk.lock.password/passwordEnv.');
+    }
+
+    return { password };
+}
+
+function resolveArchiveCredentials(
+    value: WapkCredentialsOptions | undefined,
+): ResolvedWapkCredentials | undefined {
+    if (!hasCredentialInput(value)) {
+        return undefined;
+    }
+
+    const password = resolvePasswordFromInput(value, 'WAPK archive');
+    if (!password) {
+        throw new Error('WAPK archive is password-protected. Provide --password or --password-env to unlock it.');
+    }
+
+    return { password };
+}
+
+function buildWapkAuthData(legacyUser?: string): Buffer {
+    return Buffer.from(legacyUser ? `WAPK:${legacyUser}` : 'WAPK', 'utf8');
+}
+
+function encryptWapkPayload(payload: Buffer, lock: ResolvedWapkCredentials): { metadata: WapkLockMetadata; payload: Buffer } {
+    const salt = randomBytes(WAPK_SALT_LENGTH);
+    const iv = randomBytes(WAPK_IV_LENGTH);
+    const key = scryptSync(lock.password, salt, WAPK_KEY_LENGTH, WAPK_SCRYPT_OPTIONS);
+    const cipher = createCipheriv(WAPK_CIPHER, key, iv);
+    cipher.setAAD(buildWapkAuthData());
+
+    const encryptedPayload = Buffer.concat([cipher.update(payload), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    return {
+        metadata: {
+            cipher: WAPK_CIPHER,
+            kdf: WAPK_KDF,
+            salt: salt.toString('base64'),
+            iv: iv.toString('base64'),
+            tag: tag.toString('base64'),
+        },
+        payload: encryptedPayload,
+    };
+}
+
+function decodeLockBuffer(value: string, expectedLength: number, field: string): Buffer {
+    const buffer = Buffer.from(value, 'base64');
+    if (buffer.length !== expectedLength) {
+        throw new Error(`Invalid WAPK file: bad ${field}.`);
+    }
+    return buffer;
+}
+
+function decryptWapkPayload(payload: Buffer, lock: WapkLockMetadata, credentials: ResolvedWapkCredentials): Buffer {
+    const salt = decodeLockBuffer(lock.salt, WAPK_SALT_LENGTH, 'lock salt');
+    const iv = decodeLockBuffer(lock.iv, WAPK_IV_LENGTH, 'lock iv');
+    const tag = decodeLockBuffer(lock.tag, WAPK_AUTH_TAG_LENGTH, 'lock auth tag');
+    const key = scryptSync(credentials.password, salt, WAPK_KEY_LENGTH, WAPK_SCRYPT_OPTIONS);
+    const decipher = createDecipheriv(WAPK_CIPHER, key, iv);
+    decipher.setAAD(buildWapkAuthData(lock.user));
+    decipher.setAuthTag(tag);
+
+    try {
+        return Buffer.concat([decipher.update(payload), decipher.final()]);
+    } catch {
+        throw new Error('Invalid WAPK credentials.');
+    }
+}
+
+function parseWapkLockMetadata(rawMetadata: unknown): WapkLockMetadata {
+    if (!isRecord(rawMetadata)) {
+        throw new Error('Invalid WAPK file: lock metadata must be an object.');
+    }
+
+    if (rawMetadata.cipher !== WAPK_CIPHER) {
+        throw new Error(`Unsupported WAPK cipher: ${String(rawMetadata.cipher)}`);
+    }
+
+    if (rawMetadata.kdf !== WAPK_KDF) {
+        throw new Error(`Unsupported WAPK KDF: ${String(rawMetadata.kdf)}`);
+    }
+
+    if (typeof rawMetadata.salt !== 'string' || typeof rawMetadata.iv !== 'string' || typeof rawMetadata.tag !== 'string') {
+        throw new Error('Invalid WAPK file: lock metadata is incomplete.');
+    }
+
+    return {
+        cipher: WAPK_CIPHER,
+        kdf: WAPK_KDF,
+        salt: rawMetadata.salt,
+        iv: rawMetadata.iv,
+        tag: rawMetadata.tag,
+        user: normalizeNonEmptyString(rawMetadata.user),
+    };
+}
+
+function parseWapkEnvelope(buffer: Buffer): ParsedWapkEnvelope {
+    let offset = 0;
+
+    ensureBufferRange(buffer, offset, 4, 'magic');
+    if (!buffer.slice(offset, offset + 4).equals(WAPK_MAGIC)) {
+        throw new Error('Invalid WAPK file: bad magic bytes.');
+    }
+    offset += 4;
+
+    ensureBufferRange(buffer, offset, 2, 'version');
+    const version = buffer.readUInt16LE(offset);
+    offset += 2;
+    if (version > WAPK_VERSION) {
+        throw new Error(`Unsupported WAPK version: ${version}`);
+    }
+
+    if (version === WAPK_UNLOCKED_VERSION) {
+        return {
+            version: WAPK_UNLOCKED_VERSION,
+            payload: buffer.subarray(offset),
+        };
+    }
+
+    ensureBufferRange(buffer, offset, 4, 'lock metadata length');
+    const metadataLength = buffer.readUInt32LE(offset);
+    offset += 4;
+
+    ensureBufferRange(buffer, offset, metadataLength, 'lock metadata');
+    const metadata = JSON.parse(buffer.slice(offset, offset + metadataLength).toString('utf8'));
+    offset += metadataLength;
+
+    ensureBufferRange(buffer, offset, 4, 'encrypted payload length');
+    const payloadLength = buffer.readUInt32LE(offset);
+    offset += 4;
+
+    ensureBufferRange(buffer, offset, payloadLength, 'encrypted payload');
+    const payload = buffer.slice(offset, offset + payloadLength);
+
+    return {
+        version: WAPK_LOCKED_VERSION,
+        payload,
+        lock: parseWapkLockMetadata(metadata),
+    };
+}
+
 async function readWapkProjectConfig(directory: string): Promise<WapkProjectConfig> {
     const packageJsonPath = join(directory, 'package.json');
     const elitConfig = await loadConfig(directory);
@@ -279,6 +534,7 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
         port: elitWapkConfig.port,
         env: elitWapkConfig.env,
         desktop: elitWapkConfig.desktop,
+        lock: elitWapkConfig.lock,
     };
 }
 
@@ -347,9 +603,9 @@ function collectFiles(directory: string, baseDirectory: string, ignorePatterns: 
     return files;
 }
 
-function encodeWapk(header: WapkHeader, files: readonly WapkFileEntry[]): Buffer {
+function encodeWapkPayload(header: WapkHeader, files: readonly WapkFileEntry[]): Buffer {
     const headerBuffer = Buffer.from(JSON.stringify(header, null, 2), 'utf8');
-    let totalSize = 4 + 2 + 4 + headerBuffer.length + 4;
+    let totalSize = 4 + headerBuffer.length + 4;
 
     for (const file of files) {
         const pathBuffer = Buffer.from(file.path, 'utf8');
@@ -358,12 +614,6 @@ function encodeWapk(header: WapkHeader, files: readonly WapkFileEntry[]): Buffer
 
     const buffer = Buffer.allocUnsafe(totalSize);
     let offset = 0;
-
-    WAPK_MAGIC.copy(buffer, offset);
-    offset += WAPK_MAGIC.length;
-
-    buffer.writeUInt16LE(WAPK_VERSION, offset);
-    offset += 2;
 
     buffer.writeUInt32LE(headerBuffer.length, offset);
     offset += 4;
@@ -390,21 +640,46 @@ function encodeWapk(header: WapkHeader, files: readonly WapkFileEntry[]): Buffer
     return buffer;
 }
 
-function decodeWapk(buffer: Buffer): DecodedWapk {
+function encodeWapk(header: WapkHeader, files: readonly WapkFileEntry[], lock?: ResolvedWapkCredentials): Buffer {
+    const payload = encodeWapkPayload(header, files);
+
+    if (!lock) {
+        const buffer = Buffer.allocUnsafe(WAPK_MAGIC.length + 2 + payload.length);
+        let offset = 0;
+
+        WAPK_MAGIC.copy(buffer, offset);
+        offset += WAPK_MAGIC.length;
+        buffer.writeUInt16LE(WAPK_UNLOCKED_VERSION, offset);
+        offset += 2;
+        payload.copy(buffer, offset);
+
+        return buffer;
+    }
+
+    const encrypted = encryptWapkPayload(payload, lock);
+    const metadataBuffer = Buffer.from(JSON.stringify(encrypted.metadata), 'utf8');
+    const buffer = Buffer.allocUnsafe(
+        WAPK_MAGIC.length + 2 + 4 + metadataBuffer.length + 4 + encrypted.payload.length,
+    );
     let offset = 0;
 
-    ensureBufferRange(buffer, offset, 4, 'magic');
-    if (!buffer.slice(offset, offset + 4).equals(WAPK_MAGIC)) {
-        throw new Error('Invalid WAPK file: bad magic bytes.');
-    }
-    offset += 4;
-
-    ensureBufferRange(buffer, offset, 2, 'version');
-    const version = buffer.readUInt16LE(offset);
+    WAPK_MAGIC.copy(buffer, offset);
+    offset += WAPK_MAGIC.length;
+    buffer.writeUInt16LE(WAPK_LOCKED_VERSION, offset);
     offset += 2;
-    if (version > WAPK_VERSION) {
-        throw new Error(`Unsupported WAPK version: ${version}`);
-    }
+    buffer.writeUInt32LE(metadataBuffer.length, offset);
+    offset += 4;
+    metadataBuffer.copy(buffer, offset);
+    offset += metadataBuffer.length;
+    buffer.writeUInt32LE(encrypted.payload.length, offset);
+    offset += 4;
+    encrypted.payload.copy(buffer, offset);
+
+    return buffer;
+}
+
+function decodeWapkPayload(buffer: Buffer): Omit<DecodedWapk, 'version' | 'lock'> {
+    let offset = 0;
 
     ensureBufferRange(buffer, offset, 4, 'header length');
     const headerLength = buffer.readUInt32LE(offset);
@@ -459,7 +734,29 @@ function decodeWapk(buffer: Buffer): DecodedWapk {
         files.push({ path: pathValue, content, mode });
     }
 
-    return { version, header, files };
+    return { header, files };
+}
+
+function decodeWapk(buffer: Buffer, options: WapkCredentialsOptions = {}): DecodedWapk {
+    const envelope = parseWapkEnvelope(buffer);
+
+    if (envelope.version === WAPK_UNLOCKED_VERSION) {
+        return {
+            version: envelope.version,
+            ...decodeWapkPayload(envelope.payload),
+        };
+    }
+
+    const credentials = resolveArchiveCredentials(options);
+    if (!credentials) {
+        throw new Error('WAPK archive is password-protected. Provide --password or --password-env to unlock it.');
+    }
+
+    return {
+        version: envelope.version,
+        ...decodeWapkPayload(decryptWapkPayload(envelope.payload, envelope.lock, credentials)),
+        lock: { password: true },
+    };
 }
 
 function formatSize(bytes: number): string {
@@ -519,12 +816,17 @@ function collectRuntimeSyncFiles(directory: string): WapkFileEntry[] {
         .sort((left, right) => left.path.localeCompare(right.path));
 }
 
-function writeWapkArchiveFromMemory(archivePath: string, header: WapkHeader, files: readonly WapkFileEntry[]): void {
+function writeWapkArchiveFromMemory(
+    archivePath: string,
+    header: WapkHeader,
+    files: readonly WapkFileEntry[],
+    lock?: ResolvedWapkCredentials,
+): void {
     const updatedHeader: WapkHeader = {
         ...header,
         createdAt: new Date().toISOString(),
     };
-    writeFileSync(archivePath, encodeWapk(updatedHeader, files));
+    writeFileSync(archivePath, encodeWapk(updatedHeader, files, lock));
 }
 
 export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncController {
@@ -541,7 +843,7 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
         }
 
         memoryFiles = nextFiles;
-        writeWapkArchiveFromMemory(prepared.archivePath, prepared.header, memoryFiles);
+        writeWapkArchiveFromMemory(prepared.archivePath, prepared.header, memoryFiles, prepared.lock);
     };
 
     if (prepared.useWatcher) {
@@ -551,9 +853,9 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
         });
 
         const stop = (): void => {
+            flush();
             stopped = true;
             watcher.close();
-            flush();
         };
 
         return { flush, stop };
@@ -564,9 +866,9 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
     timer.unref?.();
 
     const stop = (): void => {
+        flush();
         stopped = true;
         clearInterval(timer);
-        flush();
     };
 
     return { flush, stop };
@@ -681,18 +983,18 @@ export function resolveWapkRuntimeExecutable(runtime: WapkRuntimeName): string {
     return executable;
 }
 
-export function readWapkArchive(wapkPath: string): DecodedWapk {
+export function readWapkArchive(wapkPath: string, options: WapkCredentialsOptions = {}): DecodedWapk {
     const archivePath = resolve(wapkPath);
     if (!existsSync(archivePath)) {
         throw new Error(`WAPK file not found: ${archivePath}`);
     }
 
-    return decodeWapk(readFileSync(archivePath));
+    return decodeWapk(readFileSync(archivePath), options);
 }
 
 export async function packWapkDirectory(
     directory: string,
-    options: { includeDeps?: boolean; outputPath?: string } = {},
+    options: WapkCredentialsOptions & { includeDeps?: boolean; outputPath?: string } = {},
 ): Promise<string> {
     const sourceDirectory = resolve(directory);
     if (!existsSync(sourceDirectory) || !statSync(sourceDirectory).isDirectory()) {
@@ -700,6 +1002,7 @@ export async function packWapkDirectory(
     }
 
     const config = await readWapkProjectConfig(sourceDirectory);
+    const lock = resolvePackLockCredentials(config.lock, options);
     const userIgnore = readIgnorePatterns(sourceDirectory);
     const ignorePatterns = options.includeDeps
         ? [...DEFAULT_IGNORE.filter((pattern) => pattern !== 'node_modules'), ...userIgnore]
@@ -721,18 +1024,25 @@ export async function packWapkDirectory(
     console.log(`Packing: ${config.name}@${config.version}`);
     console.log(`Runtime: ${config.runtime}`);
     console.log(`Entry:   ${config.entry}`);
+    if (lock) {
+        console.log('Lock:    enabled');
+    }
     if (options.includeDeps) {
         console.log('Deps:    included');
     }
     console.log(`Files:   ${files.length}`);
 
-    writeFileSync(outputPath, encodeWapk(header, files));
+    writeFileSync(outputPath, encodeWapk(header, files, lock));
     console.log(`Output:  ${outputPath}`);
     return outputPath;
 }
 
-export function extractWapkArchive(wapkPath: string, outputDir = '.'): string {
-    const archive = readWapkArchive(wapkPath);
+export function extractWapkArchive(
+    wapkPath: string,
+    outputDir = '.',
+    options: WapkCredentialsOptions = {},
+): string {
+    const archive = readWapkArchive(wapkPath, options);
     const destinationRoot = resolve(outputDir);
     const extractDirectory = join(destinationRoot, sanitizePackageName(archive.header.name));
 
@@ -742,13 +1052,21 @@ export function extractWapkArchive(wapkPath: string, outputDir = '.'): string {
     return extractDirectory;
 }
 
-export function prepareWapkApp(wapkPath: string, options: { runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } = {}): PreparedWapkApp {
+export function prepareWapkApp(
+    wapkPath: string,
+    options: WapkCredentialsOptions & { runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } = {},
+): PreparedWapkApp {
     const archivePath = resolve(wapkPath);
     if (!existsSync(archivePath)) {
         throw new Error(`WAPK file not found: ${archivePath}`);
     }
 
-    const decoded = decodeWapk(readFileSync(archivePath));
+    const buffer = readFileSync(archivePath);
+    const envelope = parseWapkEnvelope(buffer);
+    const lock = envelope.version === WAPK_LOCKED_VERSION
+        ? resolveArchiveCredentials(options)
+        : undefined;
+    const decoded = decodeWapk(buffer, options);
     const runtime = options.runtime ?? decoded.header.runtime;
     const workDir = mkdtempSync(join(tmpdir(), 'elit-wapk-'));
     extractFiles(decoded.files, workDir);
@@ -769,6 +1087,7 @@ export function prepareWapkApp(wapkPath: string, options: { runtime?: WapkRuntim
         runtime,
         syncInterval: options.syncInterval,
         useWatcher: options.useWatcher,
+        lock,
     };
 }
 
@@ -818,15 +1137,26 @@ export async function runPreparedWapkApp(prepared: PreparedWapkApp): Promise<num
     }
 }
 
-function inspectWapkArchive(wapkPath: string): void {
+function inspectWapkArchive(wapkPath: string, options: WapkCredentialsOptions = {}): void {
     const archivePath = resolve(wapkPath);
     const buffer = readFileSync(archivePath);
-    const decoded = decodeWapk(buffer);
-    const totalContentSize = decoded.files.reduce((total, file) => total + file.content.length, 0);
+    const envelope = parseWapkEnvelope(buffer);
 
     console.log(`WAPK:     ${basename(archivePath)}`);
     console.log(`Size:     ${formatSize(buffer.length)}`);
-    console.log(`Version:  ${decoded.version}`);
+    console.log(`Version:  ${envelope.version}`);
+    console.log(`Locked:   ${envelope.version === WAPK_LOCKED_VERSION ? 'yes' : 'no'}`);
+
+    if (envelope.version === WAPK_LOCKED_VERSION) {
+        if (!hasCredentialInput(options)) {
+            console.log('Status:   credentials required to inspect contents');
+            return;
+        }
+    }
+
+    const decoded = decodeWapk(buffer, options);
+    const totalContentSize = decoded.files.reduce((total, file) => total + file.content.length, 0);
+
     console.log(`Name:     ${decoded.header.name}`);
     console.log(`App:      ${decoded.header.version}`);
     console.log(`Runtime:  ${decoded.header.runtime}`);
@@ -861,6 +1191,7 @@ function printWapkHelp(): void {
         '  elit wapk run <file.wapk> --sync-interval 100',
         '  elit wapk run <file.wapk> --watcher',
         '  elit wapk pack [directory]',
+        '  elit wapk pack [directory] --password-env WAPK_PASSWORD',
         '  elit wapk pack [directory] --include-deps',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
@@ -870,36 +1201,76 @@ function printWapkHelp(): void {
         '  --sync-interval <ms>         Polling interval for live sync (ms, default 300)',
         '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
         '  --include-deps               Include node_modules in the archive',
+        '  --password <value>           Password for locking or unlocking the archive',
+        '  --password-env <name>        Read the password from an environment variable',
         '  -h, --help                   Show this help',
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
         '  - Run mode keeps files in RAM and syncs changes back to the .wapk file.',
+        '  - Locked archives require the same password for run/extract/inspect.',
+        '  - Archives stay unlocked by default unless a password is provided.',
         '  - Use --watcher for faster file change detection (less CPU usage).',
         '  - Runtime commands use node, bun, or deno from PATH.',
     ].join('\n'));
 }
 
-function expectSinglePositional(args: string[], usage: string): string {
-    const positional = args.filter((arg) => !arg.startsWith('-'));
-    if (positional.length !== 1) {
-        throw new Error(usage);
+function readRequiredOptionValue(args: string[], index: number, option: string): string {
+    const value = args[index];
+    if (value === undefined) {
+        throw new Error(`${option} requires a value.`);
     }
-    return positional[0];
+    return value;
 }
 
-function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } {
+function parseArchiveAccessArgs(args: string[], usage: string): { file: string } & WapkCredentialsOptions {
+    let file: string | undefined;
+    let password: string | undefined;
+    let passwordEnv: string | undefined;
+
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
+
+        switch (arg) {
+            case '--password':
+                password = readRequiredOptionValue(args, ++index, '--password');
+                break;
+            case '--password-env':
+                passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
+                break;
+            default:
+                if (arg.startsWith('-')) {
+                    throw new Error(`Unknown WAPK option: ${arg}`);
+                }
+                if (file) {
+                    throw new Error(usage);
+                }
+                file = arg;
+                break;
+        }
+    }
+
+    if (!file) {
+        throw new Error(usage);
+    }
+
+    return { file, password, passwordEnv };
+}
+
+function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } & WapkCredentialsOptions {
     let file: string | undefined;
     let runtime: WapkRuntimeName | undefined;
     let syncInterval: number | undefined;
     let useWatcher = false;
+    let password: string | undefined;
+    let passwordEnv: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
         switch (arg) {
             case '--runtime':
             case '-r': {
-                const value = normalizeRuntime(args[++index]);
+                const value = normalizeRuntime(readRequiredOptionValue(args, ++index, arg));
                 if (!value) {
                     throw new Error(`Unknown WAPK runtime: ${args[index]}`);
                 }
@@ -907,7 +1278,7 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
                 break;
             }
             case '--sync-interval': {
-                const value = parseInt(args[++index], 10);
+                const value = parseInt(readRequiredOptionValue(args, ++index, '--sync-interval'), 10);
                 if (Number.isNaN(value) || value < 50) {
                     throw new Error('--sync-interval must be a number >= 50 (milliseconds)');
                 }
@@ -919,6 +1290,12 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
                 useWatcher = true;
                 break;
             }
+            case '--password':
+                password = readRequiredOptionValue(args, ++index, '--password');
+                break;
+            case '--password-env':
+                passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
+                break;
             default:
                 if (arg.startsWith('-')) {
                     throw new Error(`Unknown WAPK option: ${arg}`);
@@ -935,16 +1312,30 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
         throw new Error('Usage: elit wapk run <file.wapk>');
     }
 
-    return { file, runtime, syncInterval, useWatcher };
+    return { file, runtime, syncInterval, useWatcher, password, passwordEnv };
 }
 
-function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } {
+function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
     let directory = '.';
     let includeDeps = false;
+    let password: string | undefined;
+    let passwordEnv: string | undefined;
 
-    for (const arg of args) {
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
+
         if (arg === '--include-deps') {
             includeDeps = true;
+            continue;
+        }
+
+        if (arg === '--password') {
+            password = readRequiredOptionValue(args, ++index, '--password');
+            continue;
+        }
+
+        if (arg === '--password-env') {
+            passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
             continue;
         }
 
@@ -959,7 +1350,7 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
         directory = arg;
     }
 
-    return { directory, includeDeps };
+    return { directory, includeDeps, password, passwordEnv };
 }
 
 export async function runWapkCommand(args: string[]): Promise<void> {
@@ -970,17 +1361,23 @@ export async function runWapkCommand(args: string[]): Promise<void> {
 
     if (args[0] === 'pack') {
         const options = parsePackArgs(args.slice(1));
-        await packWapkDirectory(options.directory, { includeDeps: options.includeDeps });
+        await packWapkDirectory(options.directory, {
+            includeDeps: options.includeDeps,
+            password: options.password,
+            passwordEnv: options.passwordEnv,
+        });
         return;
     }
 
     if (args[0] === 'inspect') {
-        inspectWapkArchive(expectSinglePositional(args.slice(1), 'Usage: elit wapk inspect <file.wapk>'));
+        const options = parseArchiveAccessArgs(args.slice(1), 'Usage: elit wapk inspect <file.wapk>');
+        inspectWapkArchive(options.file, options);
         return;
     }
 
     if (args[0] === 'extract') {
-        extractWapkArchive(expectSinglePositional(args.slice(1), 'Usage: elit wapk extract <file.wapk>'));
+        const options = parseArchiveAccessArgs(args.slice(1), 'Usage: elit wapk extract <file.wapk>');
+        extractWapkArchive(options.file, '.', options);
         return;
     }
 
@@ -989,6 +1386,8 @@ export async function runWapkCommand(args: string[]): Promise<void> {
         runtime: runOptions.runtime,
         syncInterval: runOptions.syncInterval,
         useWatcher: runOptions.useWatcher,
+        password: runOptions.password,
+        passwordEnv: runOptions.passwordEnv,
     });
     const exitCode = await runPreparedWapkApp(prepared);
     if (exitCode !== 0) {

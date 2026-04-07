@@ -8,20 +8,32 @@ WAPK is an application archive format for packaging and running Elit apps as a s
 # Package current directory
 npx elit wapk pack .
 
+# Package as a locked archive
+npx elit wapk pack . --password-env WAPK_PASSWORD
+
 # Package with dependencies included
 npx elit wapk pack . --include-deps
 
 # Inspect archive metadata and files
 npx elit wapk inspect ./app.wapk
 
+# Inspect a locked archive
+npx elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD
+
 # Extract archive contents
 npx elit wapk extract ./app.wapk
+
+# Extract a locked archive
+npx elit wapk extract ./app.wapk --password-env WAPK_PASSWORD
 
 # Run archive (default behavior)
 npx elit wapk ./app.wapk
 
 # Explicit run command
 npx elit wapk run ./app.wapk
+
+# Run a locked archive
+npx elit wapk run ./app.wapk --password-env WAPK_PASSWORD
 
 # Runtime override
 npx elit wapk ./app.wapk --runtime node
@@ -56,6 +68,32 @@ npx elit wapk run ./app.wapk --sync-interval 100
 npx elit wapk run ./app.wapk --watcher
 ```
 
+## Locked Archives
+
+WAPK can encrypt the archive payload and require a password to open it.
+
+Recommended flow:
+
+```bash
+# Set the password once in your shell
+export WAPK_PASSWORD="super-secret"
+
+# Create a locked archive
+npx elit wapk pack . --password-env WAPK_PASSWORD
+
+# Open the archive later
+npx elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk extract ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk run ./app.wapk --password-env WAPK_PASSWORD
+```
+
+Notes:
+
+- `--password` works, but `--password-env` is safer because it avoids shell history and process-list exposure.
+- `inspect` without credentials still shows whether the archive is locked.
+- Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
+- WAPK stays unlocked by default unless you provide `lock.password` or `lock.passwordEnv`.
+
 ## Config via elit.config.*
 
 WAPK package metadata is read from `wapk` in `elit.config.*`.
@@ -78,8 +116,9 @@ export default {
     version: '1.0.0',
     runtime: 'bun',
     entry: 'src/server.ts',
-    include: ['public/**'],
-    exclude: ['**/*.log'],
+    lock: {
+      passwordEnv: 'WAPK_PASSWORD',
+    },
   },
 };
 ```

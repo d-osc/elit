@@ -176,6 +176,13 @@ export interface DesktopNativeConfig {
     exportName?: string;
 }
 
+export interface WapkLockConfig {
+    /** Plain-text password used to encrypt the archive (prefer passwordEnv for real projects) */
+    password?: string;
+    /** Environment variable name that contains the archive password */
+    passwordEnv?: string;
+}
+
 export interface WapkConfig {
     name?: string;
     version?: string;
@@ -186,6 +193,7 @@ export interface WapkConfig {
     port?: number;
     env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;
+    lock?: WapkLockConfig;
 }
 
 /**

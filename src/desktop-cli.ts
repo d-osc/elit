@@ -100,6 +100,8 @@ interface DesktopWapkRunOptions {
     file: string;
     syncInterval?: number;
     useWatcher?: boolean;
+    password?: string;
+    passwordEnv?: string;
 }
 
 const PACKAGE_ROOT = resolve(__dirname, '..');
@@ -538,6 +540,8 @@ function printDesktopHelp(): void {
         '  -r, --runtime <name>     Packaged app runtime: node, bun, deno',
         '  --sync-interval <ms>     Polling interval for live sync (ms, default 300)',
         '  --watcher, --use-watcher Use event-driven file watcher instead of polling',
+        '  --password <value>       Password used to unlock a protected archive',
+        '  --password-env <name>    Read the unlock password from an environment variable',
         '  --release                Use the release desktop runtime binary',
         '',
         'Examples:',
@@ -578,6 +582,8 @@ async function runDesktopWapkCommand(args: string[], config?: DesktopConfig): Pr
         runtime: options.runtime,
         syncInterval: options.syncInterval,
         useWatcher: options.useWatcher,
+        password: options.password,
+        passwordEnv: options.passwordEnv,
     });
     const preparedEntry = await createDesktopWapkEntry(preparedApp);
     const liveSync = createWapkLiveSync(preparedApp);
@@ -627,7 +633,7 @@ function parseDesktopWapkRunArgs(args: string[], config?: DesktopConfig['wapk'])
                 options.release = true;
                 break;
             case '--sync-interval': {
-                const value = parseInt(normalizedArgs[++i], 10);
+                const value = parseInt(normalizedArgs[++i] ?? '', 10);
                 if (Number.isNaN(value) || value < 50) {
                     throw new Error('--sync-interval must be a number >= 50 (milliseconds)');
                 }
@@ -639,6 +645,18 @@ function parseDesktopWapkRunArgs(args: string[], config?: DesktopConfig['wapk'])
                 options.useWatcher = true;
                 break;
             }
+            case '--password':
+                options.password = normalizedArgs[++i];
+                if (!options.password) {
+                    throw new Error('--password requires a value.');
+                }
+                break;
+            case '--password-env':
+                options.passwordEnv = normalizedArgs[++i];
+                if (!options.passwordEnv) {
+                    throw new Error('--password-env requires a value.');
+                }
+                break;
             default:
                 if (arg.startsWith('-')) {
                     throw new Error(`Unknown desktop WAPK option: ${arg}`);
