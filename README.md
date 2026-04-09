@@ -9,7 +9,7 @@ The package is split by runtime. Browser-facing APIs live in `elit` and the clie
 If you are generating or editing code for Elit, follow these rules first:
 
 - Use `elit` or the client subpaths for browser UI code.
-- Use `elit/server` for HTTP routes, middleware, dev server, preview server, and server-side shared state.
+- Use `elit/server` for HTTP routes, WebSocket endpoints, middleware, dev server, preview server, and server-side shared state.
 - Use `elit/desktop` only inside `elit desktop ...` runtime. Those APIs are injected by the native desktop runtime and are not normal browser globals.
 - Use `elit/build` for programmatic bundling.
 - Use `elit/database` for the VM-backed file database helpers.
@@ -62,7 +62,7 @@ Use this table as the import map for generated code.
 | `elit/state` | Reactive state and render helpers | `createState`, `computed`, `reactive`, `text`, `bindValue`, `bindChecked`, `createSharedState` |
 | `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
 | `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
-| `elit/server` | HTTP router, dev server, middleware, shared server state | `ServerRouter`, `createDevServer`, `cors`, `logger`, `rateLimit`, `compress`, `security`, `StateManager` |
+| `elit/server` | HTTP router, dev server, middleware, WebSocket endpoints, shared server state | `ServerRouter`, `createDevServer`, `cors`, `logger`, `rateLimit`, `compress`, `security`, `StateManager` |
 | `elit/build` | Programmatic build API | `build` |
 | `elit/desktop` | Native desktop window APIs | `createWindow`, `createWindowServer`, `onMessage`, `windowQuit`, `windowSetTitle`, `windowEval` |
 | `elit/database` | VM-backed file database | `Database`, `create`, `read`, `save`, `update`, `rename`, `remove` |
@@ -645,6 +645,49 @@ const server = createDevServer({
 console.log(server.url);
 ```
 
+### Custom WebSocket Endpoints
+
+Server:
+
+```ts
+import { createDevServer } from 'elit/server';
+
+const server = createDevServer({
+  root: '.',
+  open: false,
+  ws: [
+    {
+      path: '/ws',
+      handler: ({ ws, query }) => {
+        ws.send(JSON.stringify({ type: 'connected', room: query.room || 'general' }));
+
+        ws.on('message', (message) => {
+          ws.send(message.toString());
+        });
+      },
+    },
+  ],
+});
+```
+
+Client:
+
+```ts
+const socket = new WebSocket(`ws://${location.host}/ws?room=general`);
+
+socket.addEventListener('message', (event) => {
+  console.log(event.data);
+});
+
+socket.send('hello');
+```
+
+Notes:
+
+- Use `dev.ws` or `preview.ws` for global endpoints.
+- Use `clients[].ws` when each client should expose its own endpoint under its `basePath`.
+- Do not use `/__elit_ws`; Elit reserves that path for internal HMR and shared-state traffic.
+
 ### Shared State Between Server and Client
 
 Client:
@@ -825,6 +868,16 @@ npx elit test --coverage --coverage-reporter text,html
 ```
 
 The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-reporter` for advanced use, but most users should stay on the CLI.
+
+## Changelog
+
+Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
+
+Highlights in `v3.5.1`:
+
+- Added first-class custom WebSocket endpoints for `dev`, `preview`, and `clients[]` config.
+- Moved internal HMR and shared-state traffic to `/__elit_ws` so custom endpoints do not collide with Elit internals.
+- Tightened cross-runtime WebSocket path matching so root endpoints no longer swallow every upgrade request.
 
 ## Good Defaults For Generated Code
 

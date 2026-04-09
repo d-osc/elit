@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-04-09
+
+### Added
+- **Configurable WebSocket endpoints for dev and preview** - `dev.ws`, `preview.ws`, and `clients[].ws` can now register custom WebSocket upgrade handlers
+  - Endpoint handlers receive `{ ws, req, path, query, headers }`
+  - Client-specific endpoints are automatically prefixed with that client's `basePath`
+  - Works alongside the existing REST router, proxy, SSR, and shared-state flows
+
+### Changed
+- **Internal WebSocket routing split** - Elit now keeps HMR and built-in shared state traffic on a reserved internal path
+  - Internal HMR and shared-state traffic now uses `/__elit_ws`
+  - `createSharedState()` defaults to that internal path and rewrites bare host-only WebSocket URLs to it
+  - Prevents custom WebSocket endpoints from colliding with HMR connections
+- **Cross-runtime WebSocket path matching** - Upgrade matching now uses exact pathnames instead of treating `/` as a wildcard
+  - Query strings are ignored for route matching while remaining available in endpoint context
+  - Bun upgrade routing now matches the request pathname cleanly before handing the socket to the selected server
+
+### Documentation
+- **README WebSocket refresh** - Added config examples, server usage patterns, changelog summary, and reserved-path guidance for custom WebSocket endpoints
+
+### Tests
+- **WebSocket endpoint coverage** - Added unit coverage for query-aware path matching and shared-state internal WebSocket URL resolution
+
 ## [3.5.0] - 2026-04-08
 
 ### Added
