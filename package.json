@@ -1,6 +1,6 @@
 {
   "name": "elit",
-  "version": "3.5.2",
+  "version": "3.5.3",
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -143,6 +143,11 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.mjs",
       "require": "./dist/types.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.mjs",
+      "require": "./dist/cli.js"
     }
   },
   "scripts": {
