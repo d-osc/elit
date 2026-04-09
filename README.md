@@ -255,14 +255,14 @@ Useful flags:
 - `elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app`
 - `elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview`
 - `elit native generate ir ./src/native-screen.ts --platform android --export screen`
-- `elit wapk pack . --password-env WAPK_PASSWORD`
+- `elit wapk pack . --password secret-123`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
-- `elit wapk run ./app.wapk --password-env WAPK_PASSWORD --sync-interval 100 --watcher`
+- `elit wapk run ./app.wapk --password secret-123 --sync-interval 100 --watcher`
 - `elit wapk pack . --include-deps`
-- `elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD`
+- `elit wapk inspect ./app.wapk --password secret-123`
 - `elit wapk extract ./app.wapk`
 - `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
-- `elit desktop wapk run ./app.wapk --runtime bun --password-env WAPK_PASSWORD`
+- `elit desktop wapk run ./app.wapk --runtime bun --password secret-123`
 
 Desktop mode notes:
 
@@ -308,11 +308,11 @@ WAPK mode notes:
 - `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>` run packaged apps in desktop mode.
 - During run, the archive is expanded into a temporary work directory and changes are synced back to the same `.wapk` file.
 - Use `--sync-interval <ms>` for polling mode, or `--watcher` / `--use-watcher` for event-driven sync.
-- Use `--password` or, preferably, `--password-env` when packing, inspecting, extracting, or running a locked archive.
+- Use `--password` when packing, inspecting, extracting, or running a locked archive.
 - `inspect` without credentials still reports whether the archive is locked, but it does not print the archive contents.
 - Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
 - Configure package metadata in `elit.config.*` under `wapk`, and use `wapk.lock` when you want password-protected archives by default.
-- WAPK stays unlocked by default unless `wapk.lock.password`, `wapk.lock.passwordEnv`, `--password`, or `--password-env` is provided.
+- WAPK stays unlocked by default unless `wapk.lock.password` or `--password` is provided.
 - See [docs/wapk.md](docs/wapk.md) for the full archive guide and `examples/wapk-example` for an end-to-end sample.
 
 ## Config File
@@ -388,7 +388,6 @@ The config shape is:
     desktop?: Record<string, unknown>;
     lock?: {
       password?: string;
-      passwordEnv?: string;
     };
   };
 }
@@ -490,7 +489,7 @@ export default {
       NODE_ENV: 'production',
     },
     lock: {
-      passwordEnv: 'WAPK_PASSWORD',
+      password: 'secret-123',
     },
   },
 };
@@ -511,7 +510,7 @@ Important details:
 - `desktop` config provides defaults for `elit desktop`, `elit desktop run`, `elit desktop build`, and `elit desktop wapk`. Use `desktop.entry` for hybrid defaults, `desktop.native.entry` for native defaults, and `desktop.mode` to choose which one runs by default.
 - `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
-- `wapk.lock.passwordEnv` is the safest reusable way to protect archives without putting the password directly into shell history or committed config.
+- `wapk.lock.password` is the config-level default for locked archives. Use `--password` when you want to supply unlock credentials at command time instead of writing them into config.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
 
 ## Browser Patterns
@@ -873,11 +872,11 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.5.1`:
+Highlights in `v3.5.2`:
 
-- Added first-class custom WebSocket endpoints for `dev`, `preview`, and `clients[]` config.
-- Moved internal HMR and shared-state traffic to `/__elit_ws` so custom endpoints do not collide with Elit internals.
-- Tightened cross-runtime WebSocket path matching so root endpoints no longer swallow every upgrade request.
+- Simplified WAPK locking to password-only credentials across config, CLI, and helper APIs.
+- `wapk.lock` now accepts only `password` in `elit.config.*`.
+- `elit wapk` and `elit desktop wapk` now accept only `--password` when opening locked archives.
 
 ## Good Defaults For Generated Code
 

@@ -1,149 +1,92 @@
 # Elit Documentation
 
-Welcome to the Elit documentation! 📚
+Welcome to the Elit documentation.
 
-## Getting Started
+## Start Here
 
-- **[Quick Start Guide](./QUICK_START.md)** - Get up and running in 5 minutes
-- **[Native CSS Support](./native-css-support.md)** - Current Compose, SwiftUI, and desktop native CSS subset, limits, and priority backlog
-- **[WAPK Guide](./wapk.md)** - Package, inspect, run, and sync `.wapk` archives
-- **[API Reference](./API.md)** - Complete API documentation
-- **[Comparison Guide](./COMPARISON.md)** - Compare Elit with React, Vue, Svelte
-- **[Migration Guide](./MIGRATION.md)** - Migrate from other frameworks
-- **[Examples](../examples/)** - Real-world examples and demos
+- [QUICK_START.md](./QUICK_START.md) - Fastest path to a working Elit app
+- [API.md](./API.md) - Core API reference for DOM, state, router, server, and config APIs
+- [CONFIG.md](./CONFIG.md) - Config file reference for dev, preview, build, desktop, mobile, and WAPK
+- [CLI.md](./CLI.md) - Current CLI command reference
+- [server.md](./server.md) - Routing, middleware, shared state, and config-driven WebSocket endpoints
+- [native-css-support.md](./native-css-support.md) - Native CSS support matrix and current gaps
+- [wapk.md](./wapk.md) - WAPK packaging, locking, inspection, and runtime sync
+- [COMPARISON.md](./COMPARISON.md) - Compare Elit with React, Vue, and Svelte
+- [MIGRATION.md](./MIGRATION.md) - Migration notes and compatibility guidance
 
-## Packages
+## Package Docs
 
-### elit
-The core library for building reactive web applications.
+### App And Server Packages
 
-- [Installation & Usage](../README.md#installation)
-- [API Reference](./API.md)
-- [Bundle: ~10KB gzipped](https://bundlephobia.com/package/elit)
+- [API.md](./API.md) - Core Elit runtime API reference
+- [server.md](./server.md) - `elit/server` guide
+- [ws.md](./ws.md) - `elit/ws` low-level WebSocket client and server docs
+- [wss.md](./wss.md) - `elit/wss` secure WebSocket docs
 
-### elit/server
-Development server, routing, middleware, and shared real-time state shipped in the main package.
+### Cross-Runtime Utility Packages
 
-- [API Reference](./API.md)
-- [Quick Start Guide](./QUICK_START.md)
-- [Examples](../examples/)
+- [http.md](./http.md) - `elit/http` server and client primitives
+- [https.md](./https.md) - `elit/https` TLS server and client primitives
+- [fs.md](./fs.md) - `elit/fs` file system helpers
+- [path.md](./path.md) - `elit/path` utilities
+- [mime-types.md](./mime-types.md) - MIME lookup helpers
+- [chokidar.md](./chokidar.md) - File watching adapter
 
-## Guides
+## Workflow Guides
 
-### Core Concepts
-
-1. **[Elements & VNodes](./guides/elements.md)** *(coming soon)*
-   - Creating elements
-   - Props and children
-   - VNode structure
-
-2. **[Reactive State](./guides/state.md)** *(coming soon)*
-   - createState
-   - computed values
-   - effects and subscriptions
-
-3. **[Reactive Rendering](./guides/reactive.md)** *(coming soon)*
-   - reactive()
-   - Two-way binding
-   - Performance optimization
-
-4. **[Routing](./guides/routing.md)** *(coming soon)*
-   - Setting up routes
-   - Navigation guards
-   - Route parameters
-
-5. **[Shared State](./guides/shared-state.md)** *(coming soon)*
-   - Real-time synchronization
-   - Backend integration
-   - Multi-client sync
-
-### Advanced Topics
-
-6. **[CSS-in-JS](./guides/styling.md)** *(coming soon)*
-   - CreateStyle API
-   - Pseudo-classes
-   - Media queries
-   - Animations
-
-7. **[Performance](./guides/performance.md)** *(coming soon)*
-   - Virtual scrolling
-   - Batch rendering
-   - Chunked rendering
-   - Throttling & debouncing
-
-8. **[Server-Side Rendering](./guides/ssr.md)** *(coming soon)*
-   - renderToString
-   - Hydration
-   - SEO optimization
-
-9. **[Server Integration](./guides/server.md)** *(coming soon)*
-   - HMR setup
-   - REST API
-   - Middleware
-   - WebSocket
+- [server.md](./server.md) - REST routes, middleware, proxying, SSR, shared state, and WebSocket endpoints
+- [CONFIG.md](./CONFIG.md) - Full config shape and environment loading rules
+- [CLI.md](./CLI.md) - Command-line workflows and config-first usage
+- [wapk.md](./wapk.md) - Packaging and locked archive workflows
+- [native-css-support.md](./native-css-support.md) - Native styling constraints for Compose, SwiftUI, and desktop native renderers
 
 ## Examples
 
 ### Project Examples
+
 - [Correct Config](../examples/correct-config/) - Config-driven web, server, and build defaults
 - [Full Database App](../examples/full-db/) - Full-stack example with database helpers and API routes
 - [Universal App](../examples/universal-app-example/) - Shared web, desktop, and native entry flow
 
 ### Platform Examples
+
 - [Desktop Entry](../examples/desktop-example.ts) - Minimal desktop mode example
 - [Android Native Example](../examples/android-native-example/) - Native Android workflow from Elit UI
 - [WAPK Example](../examples/wapk-example/) - Archive packaging and runtime flow
 
 ### Utility Examples
+
 - [Path Utilities](../examples/path-example.ts) - Path helpers and normalization examples
-- [WebSocket Server](../examples/wss-example.ts) - Native WebSocket server usage
+- [WebSocket Secure Server](../examples/wss-example.ts) - Native WebSocket server usage
 - [Chokidar](../examples/chokidar-example.ts) - File watching integration
 
-## API Reference
+## Key Topics
 
-### Core
-- [Elements](./API.md#elements) - Element factory functions
-- [State](./API.md#state-management) - Reactive state management
-- [Reactive](./API.md#reactive-rendering) - Reactive rendering
-- [Router](./API.md#router) - Client-side routing
+### Core Runtime
 
-### Advanced
-- [Shared State](./API.md#shared-state) - Real-time state sync
-- [CSS-in-JS](./API.md#css-in-js) - Styling system
-- [Performance](./API.md#performance) - Performance utilities
-- [SSR](./API.md#ssr) - Server-side rendering
-- [DOM Utils](./API.md#dom-utilities) - DOM helper functions
+- [Elements](./API.md#elements)
+- [State Management](./API.md#state-management)
+- [Reactive Rendering](./API.md#reactive-rendering)
+- [Router](./API.md#router)
+- [SSR & Rendering](./API.md#ssr--rendering)
 
-## Contributing
+### Server And Tooling
 
-Want to contribute? Check out the [Contributing Guide](../CONTRIBUTING.md)!
-
-## Community
-
-- 📦 [npm - elit](https://www.npmjs.com/package/elit)
-- 🐙 [GitHub Repository](https://github.com/d-osc/elit)
-- 🐛 [Issue Tracker](https://github.com/d-osc/elit/issues)
-- 💬 Discord Community *(coming soon)*
+- [server.md](./server.md) - `ServerRouter`, middleware, shared state, and WebSocket endpoints
+- [CONFIG.md](./CONFIG.md) - `defineConfig`, config loading, env loading, and option branches
+- [CLI.md](./CLI.md) - `dev`, `build`, `preview`, `test`, `desktop`, `mobile`, `native`, and `wapk`
 
 ## Resources
 
-### Comparison & Motivation
-- [Why Elit?](../README.md#why-elit)
-- [Comparison with Other Libraries](../README.md#comparison-with-other-libraries)
-- [Bundle Size & Performance](../README.md#bundle-size--performance)
+- [README Installation](../README.md#installation)
+- [README Examples](../README.md#examples)
+- [CHANGELOG](../CHANGELOG.md)
+- [CONTRIBUTING](../CONTRIBUTING.md)
+- [LICENSE](../LICENSE)
 
-### Recipes
-- [Common Patterns](./QUICK_START.md#common-patterns) - Reusable code patterns
-- [Tips & Best Practices](./QUICK_START.md#tips--best-practices)
+## Community
 
-## Version History
+- [npm - elit](https://www.npmjs.com/package/elit)
+- [GitHub Repository](https://github.com/d-osc/elit)
+- [Issue Tracker](https://github.com/d-osc/elit/issues)
 
-See [CHANGELOG](../README.md#changelog) for version history and updates.
-
-## License
-
-Elit is [MIT licensed](../LICENSE).
-
----
-
-**Need help?** Open an [issue](https://github.com/d-osc/elit/issues) or start a [discussion](https://github.com/d-osc/elit/discussions)!

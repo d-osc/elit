@@ -4,6 +4,8 @@ Complete API documentation for Elit library.
 
 ## Table of Contents
 
+- [Server & Tooling Docs](#server--tooling-docs)
+- [Low-Level Package Docs](#low-level-package-docs)
 - [DomNode Core](#domnode-core)
 - [Elements](#elements)
 - [State Management](#state-management)
@@ -17,6 +19,29 @@ Complete API documentation for Elit library.
 - [DOM Utilities](#dom-utilities)
 - [Head Management](#head-management)
 - [Browser Global](#browser-global)
+
+---
+
+## Server & Tooling Docs
+
+This page focuses on the core runtime API surface. For the server, config, and CLI workflows that sit around it, use these companion docs:
+
+- [server.md](./server.md) for `ServerRouter`, middleware, shared state, and config-driven WebSocket endpoints
+- [CONFIG.md](./CONFIG.md) for `defineConfig`, config file loading, environment loading, and platform-specific config branches
+- [CLI.md](./CLI.md) for `dev`, `build`, `preview`, `test`, `desktop`, `mobile`, `native`, and `wapk`
+
+## Low-Level Package Docs
+
+These pages cover the cross-runtime subpath packages that back many higher-level Elit features:
+
+- [ws.md](./ws.md)
+- [wss.md](./wss.md)
+- [http.md](./http.md)
+- [https.md](./https.md)
+- [fs.md](./fs.md)
+- [path.md](./path.md)
+- [mime-types.md](./mime-types.md)
+- [chokidar.md](./chokidar.md)
 
 ---
 

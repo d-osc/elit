@@ -177,10 +177,8 @@ export interface DesktopNativeConfig {
 }
 
 export interface WapkLockConfig {
-    /** Plain-text password used to encrypt the archive (prefer passwordEnv for real projects) */
+    /** Plain-text password used to encrypt the archive */
     password?: string;
-    /** Environment variable name that contains the archive password */
-    passwordEnv?: string;
 }
 
 export interface WapkConfig {

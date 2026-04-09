@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.2] - 2026-04-10
+
+### Changed
+- **WAPK lock credential simplification** - WAPK locking now uses password-only credentials across config, CLI, and helper APIs
+  - `wapk.lock` accepts only `password` in `elit.config.*`
+  - `elit wapk` and `elit desktop wapk` now accept only `--password` for locked archives
+  - `WapkCredentialsOptions` now accepts only `password`
+
+### Documentation
+- **README WAPK credential refresh** - Updated command examples, config notes, and release summary to match the password-only WAPK lock flow
+
+### Tests
+- **WAPK lock coverage refresh** - Updated config-driven unit coverage to lock archives with `wapk.lock.password`
+
 ## [3.5.1] - 2026-04-09
 
 ### Added

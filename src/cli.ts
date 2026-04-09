@@ -126,7 +126,7 @@ async function main() {
     }
 }
 
-async function runDev(args: string[]) {
+export async function runDev(args: string[]) {
     const cliOptions = parseDevArgs(args);
     const cwd = process.cwd();
 
@@ -181,7 +181,7 @@ async function runDev(args: string[]) {
     });
 }
 
-async function runBuild(args: string[]) {
+export async function runBuild(args: string[]) {
     const cliOptions = parseBuildArgs(args);
     const config = await loadConfig();
 
@@ -242,7 +242,7 @@ async function runBuild(args: string[]) {
     }
 }
 
-async function runPreview(args: string[]) {
+export async function runPreview(args: string[]) {
     const cliOptions = parsePreviewArgs(args);
     const config = await loadConfig();
 
@@ -328,7 +328,7 @@ async function runPreview(args: string[]) {
     setupShutdownHandlers(() => devServer.close());
 }
 
-async function runTest(args: string[]) {
+export async function runTest(args: string[]) {
     const cliOptions = parseTestArgs(args);
     const config = await loadConfig();
 
@@ -376,7 +376,7 @@ async function runTest(args: string[]) {
     }
 }
 
-async function runDesktop(args: string[]) {
+export async function runDesktop(args: string[]) {
     try {
         await runDesktopCommand(args);
     } catch (error) {
@@ -385,7 +385,7 @@ async function runDesktop(args: string[]) {
     }
 }
 
-async function runMobile(args: string[]) {
+export async function runMobile(args: string[]) {
   try {
     await runMobileCommand(args);
   } catch (error) {
@@ -394,7 +394,7 @@ async function runMobile(args: string[]) {
   }
 }
 
-async function runNative(args: string[]) {
+export async function runNative(args: string[]) {
     try {
         await runNativeCommand(args);
     } catch (error) {
@@ -403,7 +403,7 @@ async function runNative(args: string[]) {
     }
 }
 
-  async function runWapk(args: string[]) {
+export async function runWapk(args: string[]) {
     try {
       await runWapkCommand(args);
     } catch (error) {

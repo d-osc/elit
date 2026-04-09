@@ -64,10 +64,10 @@ const moduleMap = [
   {
     importPath: 'elit/server',
     use: {
-      en: 'HTTP router, dev server, middleware, and shared server state',
-      th: 'HTTP router, dev server, middleware และ shared state ฝั่ง server'
+      en: 'HTTP router, dev and preview server, middleware, WebSocket endpoints, and shared server state',
+      th: 'HTTP router, dev และ preview server, middleware, WebSocket endpoints และ shared state ฝั่ง server'
     },
-    exports: 'ServerRouter, createDevServer, cors, logger, rateLimit, compress, security, StateManager'
+    exports: 'ServerRouter, createDevServer, cors, logger, rateLimit, compress, security, StateManager, SharedState'
   },
   {
     importPath: 'elit/build',
@@ -218,7 +218,9 @@ const configShape = `{
       entry?: string;
       exportName?: string;
       android?: {
+        enabled?: boolean;
         packageName?: string;
+        output?: string;
         functionName?: string;
       };
       ios?: {
@@ -233,6 +235,7 @@ const configShape = `{
     entry?: string;
     native?: {
       entry?: string;
+      exportName?: string;
     };
     runtime?: 'quickjs' | 'node' | 'bun' | 'deno';
     compiler?: 'auto' | 'none' | 'esbuild' | 'tsx' | 'tsup';
@@ -250,11 +253,15 @@ const configShape = `{
     name?: string;
     version?: string;
     runtime?: 'node' | 'bun' | 'deno';
+    engine?: string;
     entry?: string;
     scripts?: Record<string, string>;
     port?: number;
     env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;
+    lock?: {
+      password?: string;
+    };
   };
 }`;
 
@@ -378,6 +385,41 @@ const server = createDevServer({
 console.log(server.url);
 
 await server.close();`;
+
+const serverWebSocketExample = `export default {
+  dev: {
+    port: 3000,
+    root: '.',
+    ws: [
+      {
+        path: '/ws',
+        handler: ({ ws, path, query }) => {
+          ws.send(JSON.stringify({
+            type: 'connected',
+            path,
+            room: query.room || 'general',
+          }));
+
+          ws.on('message', (message) => {
+            ws.send(message.toString());
+          });
+        },
+      },
+    ],
+    clients: [
+      {
+        root: './admin',
+        basePath: '/admin',
+        ws: [
+          {
+            path: '/events',
+            handler: ({ ws }) => ws.send('admin ready'),
+          },
+        ],
+      },
+    ],
+  },
+};`;
 
 const styleExample = `import { CreateStyle } from 'elit/style';
 
@@ -613,6 +655,7 @@ npx elit desktop build --mode native ./src/main.ts --release`),
               li(text('Only VITE_ variables are injected into client bundles.', 'มีเพียงตัวแปรที่ขึ้นต้นด้วย VITE_ เท่านั้นที่ถูก inject เข้า client bundle.')),
               li(text('Environment files load in this order: .env.{mode}.local, .env.{mode}, .env.local, .env.', 'ไฟล์ env จะถูกโหลดตามลำดับ: .env.{mode}.local, .env.{mode}, .env.local, .env.')),
               li(text('Use dev.clients when you need SSR, API routes, or multiple apps on one server.', 'ใช้ dev.clients เมื่อต้องการ SSR, API routes หรือหลายแอปบน server เดียว.')),
+              li(text('Use dev.ws or preview.ws for exact-match WebSocket upgrade paths. Client-specific clients[].ws entries are automatically prefixed with basePath.', 'ใช้ dev.ws หรือ preview.ws เมื่อต้องการ WebSocket upgrade path แบบ exact match และ clients[].ws จะถูกเติม basePath ให้อัตโนมัติ.')),
               li(text('desktop config provides defaults for elit desktop, elit desktop run, elit desktop build, and elit desktop wapk. Use desktop.mode to choose native or hybrid, desktop.entry for hybrid defaults, and desktop.native.entry for native defaults.', 'desktop config ให้ค่า default กับ elit desktop, elit desktop run, elit desktop build และ elit desktop wapk โดยใช้ desktop.mode เพื่อเลือก native หรือ hybrid, ใช้ desktop.entry สำหรับ default แบบ hybrid และใช้ desktop.native.entry สำหรับ default แบบ native.')),
               li(text('mobile config provides defaults for elit mobile init, sync, open, run, and build.', 'mobile config ให้ค่า default กับ elit mobile init, sync, open, run และ build.')),
               li(text('Configure WAPK packaging in config.wapk instead of a legacy wapk.config.json file.', 'ตั้งค่า WAPK ที่ config.wapk แทนไฟล์ legacy wapk.config.json.'))
@@ -627,9 +670,14 @@ npx elit desktop build --mode native ./src/main.ts --release`),
             codeExample(serverRouterExample),
             h3(text('Programmatic Dev Server', 'Programmatic Dev Server')),
             codeExample(devServerExample),
+            h3(text('WebSocket Endpoints', 'WebSocket Endpoints')),
+            codeExample(serverWebSocketExample),
             ul(
               li(text('ServerRouter accepts both ctx-style handlers and Express-style req/res handlers.', 'ServerRouter รองรับทั้ง handler แบบ ctx และแบบ Express-style req/res.')),
-              li(text('createSharedState on the client pairs with server.state.create(...) on the server.', 'createSharedState ฝั่ง client ใช้งานคู่กับ server.state.create(...) ฝั่ง server.'))
+              li(text('createSharedState on the client pairs with server.state.create(...) on the server.', 'createSharedState ฝั่ง client ใช้งานคู่กับ server.state.create(...) ฝั่ง server.')),
+              li(text('WebSocket endpoint matching is exact on pathname. Query strings are exposed in the handler but do not affect matching.', 'การ match ของ WebSocket endpoint เป็นแบบ exact ตาม pathname โดย query string จะถูกส่งให้ handler แต่ไม่ถูกใช้ตัดสินการ match.')),
+              li(text('Client-specific WebSocket endpoints inherit the client basePath, so /admin plus /events becomes /admin/events.', 'WebSocket endpoint ที่อยู่ใน client จะ inherit basePath ของ client เช่น /admin รวมกับ /events จะกลายเป็น /admin/events.')),
+              li(text('The internal path /__elit_ws is reserved for HMR and shared state and should not be reused.', 'path ภายใน /__elit_ws ถูกสงวนไว้สำหรับ HMR และ shared state จึงไม่ควรนำไปใช้ซ้ำ.'))
             ),
 
             h2({ id: 'styling' }, text('Styling', 'Styling')),

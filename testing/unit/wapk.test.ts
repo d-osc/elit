@@ -212,12 +212,10 @@ describe('wapk helpers', () => {
         }
     });
 
-    it('reads lock settings from elit.config.json via passwordEnv', async () => {
+    it('reads lock settings from elit.config.json via password', async () => {
         const dir = createTempDir();
-        const previousPassword = process.env.TEST_WAPK_PASSWORD;
 
         try {
-            process.env.TEST_WAPK_PASSWORD = 'env-secret';
             fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
             fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
                 wapk: {
@@ -226,7 +224,7 @@ describe('wapk helpers', () => {
                     runtime: 'node',
                     entry: 'src/main.js',
                     lock: {
-                        passwordEnv: 'TEST_WAPK_PASSWORD',
+                        password: 'config-secret',
                     },
                 },
             }, null, 2));
@@ -236,18 +234,13 @@ describe('wapk helpers', () => {
                 outputPath: path.join(dir, 'config-locked.wapk'),
             });
             const archive = readWapkArchive(archivePath, {
-                passwordEnv: 'TEST_WAPK_PASSWORD',
+                password: 'config-secret',
             });
 
             expect(archive.version).toBe(2);
             expect(archive.header.name).toBe('config-lock-app');
             expect(archive.lock).toMatchObject({ password: true });
         } finally {
-            if (previousPassword === undefined) {
-                delete process.env.TEST_WAPK_PASSWORD;
-            } else {
-                process.env.TEST_WAPK_PASSWORD = previousPassword;
-            }
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });

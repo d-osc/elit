@@ -9,7 +9,7 @@ WAPK is an application archive format for packaging and running Elit apps as a s
 npx elit wapk pack .
 
 # Package as a locked archive
-npx elit wapk pack . --password-env WAPK_PASSWORD
+npx elit wapk pack . --password secret-123
 
 # Package with dependencies included
 npx elit wapk pack . --include-deps
@@ -18,13 +18,13 @@ npx elit wapk pack . --include-deps
 npx elit wapk inspect ./app.wapk
 
 # Inspect a locked archive
-npx elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk inspect ./app.wapk --password secret-123
 
 # Extract archive contents
 npx elit wapk extract ./app.wapk
 
 # Extract a locked archive
-npx elit wapk extract ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk extract ./app.wapk --password secret-123
 
 # Run archive (default behavior)
 npx elit wapk ./app.wapk
@@ -33,7 +33,7 @@ npx elit wapk ./app.wapk
 npx elit wapk run ./app.wapk
 
 # Run a locked archive
-npx elit wapk run ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk run ./app.wapk --password secret-123
 
 # Runtime override
 npx elit wapk ./app.wapk --runtime node
@@ -75,24 +75,20 @@ WAPK can encrypt the archive payload and require a password to open it.
 Recommended flow:
 
 ```bash
-# Set the password once in your shell
-export WAPK_PASSWORD="super-secret"
-
 # Create a locked archive
-npx elit wapk pack . --password-env WAPK_PASSWORD
+npx elit wapk pack . --password super-secret
 
 # Open the archive later
-npx elit wapk inspect ./app.wapk --password-env WAPK_PASSWORD
-npx elit wapk extract ./app.wapk --password-env WAPK_PASSWORD
-npx elit wapk run ./app.wapk --password-env WAPK_PASSWORD
+npx elit wapk inspect ./app.wapk --password super-secret
+npx elit wapk extract ./app.wapk --password super-secret
+npx elit wapk run ./app.wapk --password super-secret
 ```
 
 Notes:
 
-- `--password` works, but `--password-env` is safer because it avoids shell history and process-list exposure.
 - `inspect` without credentials still shows whether the archive is locked.
 - Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
-- WAPK stays unlocked by default unless you provide `lock.password` or `lock.passwordEnv`.
+- WAPK stays unlocked by default unless you provide `lock.password` or `--password`.
 
 ## Config via elit.config.*
 
@@ -117,7 +113,7 @@ export default {
     runtime: 'bun',
     entry: 'src/server.ts',
     lock: {
-      passwordEnv: 'WAPK_PASSWORD',
+      password: 'secret-123',
     },
   },
 };

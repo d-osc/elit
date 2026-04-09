@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
-import { loadConfig } from './config';
+import { loadConfig, type WapkLockConfig } from './config';
 
 export type WapkRuntimeName = 'node' | 'bun' | 'deno';
 
@@ -37,7 +37,6 @@ interface DecodedWapk {
 
 export interface WapkCredentialsOptions {
     password?: string;
-    passwordEnv?: string;
 }
 
 interface ResolvedWapkCredentials {
@@ -82,7 +81,7 @@ interface WapkProjectConfig {
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
-    lock?: WapkCredentialsOptions;
+    lock?: WapkLockConfig;
 }
 
 const WAPK_MAGIC = Buffer.from('WAPK');
@@ -175,23 +174,19 @@ function normalizeDesktopConfig(value: unknown): Record<string, unknown> | undef
     return isRecord(value) ? { ...value } : undefined;
 }
 
-function normalizeWapkLockConfig(value: unknown): WapkCredentialsOptions | undefined {
+function normalizeWapkLockConfig(value: unknown): WapkLockConfig | undefined {
     if (!isRecord(value)) {
         return undefined;
     }
 
-    const password = typeof value.password === 'string' && value.password.length > 0
-        ? value.password
-        : undefined;
-    const passwordEnv = normalizeNonEmptyString(value.passwordEnv);
+    const password = normalizeNonEmptyString(value.password);
 
-    if (!password && !passwordEnv) {
+    if (!password) {
         return undefined;
     }
 
     return {
         password,
-        passwordEnv,
     };
 }
 
@@ -303,15 +298,11 @@ function readJsonFile(filePath: string): Record<string, unknown> | undefined {
 }
 
 function hasCredentialInput(value: WapkCredentialsOptions | undefined): boolean {
-    return Boolean(
-        (typeof value?.password === 'string' && value.password.length > 0)
-        || normalizeNonEmptyString(value?.passwordEnv),
-    );
+    return Boolean(typeof value?.password === 'string' && value.password.length > 0);
 }
 
 function resolvePasswordFromInput(
     value: WapkCredentialsOptions | undefined,
-    context: string,
 ): string | undefined {
     if (!value) {
         return undefined;
@@ -321,33 +312,24 @@ function resolvePasswordFromInput(
         return value.password;
     }
 
-    const passwordEnv = normalizeNonEmptyString(value.passwordEnv);
-    if (!passwordEnv) {
-        return undefined;
-    }
-
-    const password = process.env[passwordEnv];
-    if (typeof password !== 'string' || password.length === 0) {
-        throw new Error(`${context} requires environment variable "${passwordEnv}" to be set.`);
-    }
-
-    return password;
+    return undefined;
 }
 
 function resolvePackLockCredentials(
-    configLock: WapkCredentialsOptions | undefined,
+    configLock: WapkLockConfig | undefined,
     overrideLock: WapkCredentialsOptions | undefined,
 ): ResolvedWapkCredentials | undefined {
-    const password = resolvePasswordFromInput(overrideLock, 'WAPK lock')
-        ?? resolvePasswordFromInput(configLock, 'WAPK lock');
-    const shouldLock = hasCredentialInput(configLock) || hasCredentialInput(overrideLock);
+    const configPassword = normalizeNonEmptyString(configLock?.password);
+    const password = resolvePasswordFromInput(overrideLock)
+        ?? configPassword;
+    const shouldLock = Boolean(configPassword) || hasCredentialInput(overrideLock);
 
     if (!shouldLock) {
         return undefined;
     }
 
     if (!password) {
-        throw new Error('WAPK lock requires a password. Provide --password, --password-env, or config.wapk.lock.password/passwordEnv.');
+        throw new Error('WAPK lock requires a password. Provide --password or config.wapk.lock.password.');
     }
 
     return { password };
@@ -360,9 +342,9 @@ function resolveArchiveCredentials(
         return undefined;
     }
 
-    const password = resolvePasswordFromInput(value, 'WAPK archive');
+    const password = resolvePasswordFromInput(value);
     if (!password) {
-        throw new Error('WAPK archive is password-protected. Provide --password or --password-env to unlock it.');
+        throw new Error('WAPK archive is password-protected. Provide --password to unlock it.');
     }
 
     return { password };
@@ -749,7 +731,7 @@ function decodeWapk(buffer: Buffer, options: WapkCredentialsOptions = {}): Decod
 
     const credentials = resolveArchiveCredentials(options);
     if (!credentials) {
-        throw new Error('WAPK archive is password-protected. Provide --password or --password-env to unlock it.');
+        throw new Error('WAPK archive is password-protected. Provide --password to unlock it.');
     }
 
     return {
@@ -1191,7 +1173,7 @@ function printWapkHelp(): void {
         '  elit wapk run <file.wapk> --sync-interval 100',
         '  elit wapk run <file.wapk> --watcher',
         '  elit wapk pack [directory]',
-        '  elit wapk pack [directory] --password-env WAPK_PASSWORD',
+        '  elit wapk pack [directory] --password secret-123',
         '  elit wapk pack [directory] --include-deps',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
@@ -1202,7 +1184,6 @@ function printWapkHelp(): void {
         '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
         '  --include-deps               Include node_modules in the archive',
         '  --password <value>           Password for locking or unlocking the archive',
-        '  --password-env <name>        Read the password from an environment variable',
         '  -h, --help                   Show this help',
         '',
         'Notes:',
@@ -1226,7 +1207,6 @@ function readRequiredOptionValue(args: string[], index: number, option: string):
 function parseArchiveAccessArgs(args: string[], usage: string): { file: string } & WapkCredentialsOptions {
     let file: string | undefined;
     let password: string | undefined;
-    let passwordEnv: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
@@ -1234,9 +1214,6 @@ function parseArchiveAccessArgs(args: string[], usage: string): { file: string }
         switch (arg) {
             case '--password':
                 password = readRequiredOptionValue(args, ++index, '--password');
-                break;
-            case '--password-env':
-                passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
                 break;
             default:
                 if (arg.startsWith('-')) {
@@ -1254,7 +1231,7 @@ function parseArchiveAccessArgs(args: string[], usage: string): { file: string }
         throw new Error(usage);
     }
 
-    return { file, password, passwordEnv };
+    return { file, password };
 }
 
 function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } & WapkCredentialsOptions {
@@ -1263,7 +1240,6 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
     let syncInterval: number | undefined;
     let useWatcher = false;
     let password: string | undefined;
-    let passwordEnv: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
@@ -1293,9 +1269,6 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
             case '--password':
                 password = readRequiredOptionValue(args, ++index, '--password');
                 break;
-            case '--password-env':
-                passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
-                break;
             default:
                 if (arg.startsWith('-')) {
                     throw new Error(`Unknown WAPK option: ${arg}`);
@@ -1312,14 +1285,13 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
         throw new Error('Usage: elit wapk run <file.wapk>');
     }
 
-    return { file, runtime, syncInterval, useWatcher, password, passwordEnv };
+    return { file, runtime, syncInterval, useWatcher, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
     let directory = '.';
     let includeDeps = false;
     let password: string | undefined;
-    let passwordEnv: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
         const arg = args[index];
@@ -1334,11 +1306,6 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
             continue;
         }
 
-        if (arg === '--password-env') {
-            passwordEnv = readRequiredOptionValue(args, ++index, '--password-env');
-            continue;
-        }
-
         if (arg.startsWith('-')) {
             throw new Error(`Unknown WAPK option: ${arg}`);
         }
@@ -1350,7 +1317,7 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
         directory = arg;
     }
 
-    return { directory, includeDeps, password, passwordEnv };
+    return { directory, includeDeps, password };
 }
 
 export async function runWapkCommand(args: string[]): Promise<void> {
@@ -1364,7 +1331,6 @@ export async function runWapkCommand(args: string[]): Promise<void> {
         await packWapkDirectory(options.directory, {
             includeDeps: options.includeDeps,
             password: options.password,
-            passwordEnv: options.passwordEnv,
         });
         return;
     }
@@ -1387,7 +1353,6 @@ export async function runWapkCommand(args: string[]): Promise<void> {
         syncInterval: runOptions.syncInterval,
         useWatcher: runOptions.useWatcher,
         password: runOptions.password,
-        passwordEnv: runOptions.passwordEnv,
     });
     const exitCode = await runPreparedWapkApp(prepared);
     if (exitCode !== 0) {
