@@ -8,13 +8,13 @@
 
 import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from './http';
 import { request as httpsRequest } from './https';
-import { WebSocketServer, WebSocket, ReadyState } from './ws';
+import { WebSocketServer, WebSocket, ReadyState, CLOSE_CODES } from './ws';
 import { watch } from './chokidar';
 import { readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
 import { isBun, isDeno } from './runtime';
-import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig } from './types';
+import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig, WebSocketEndpointConfig } from './types';
 import { dom } from './dom';
 
 // ===== Router =====
@@ -418,9 +418,11 @@ const createElitImportMap = async (rootDir: string, basePath: string = '', mode:
   return `<script type="importmap">${JSON.stringify({ imports: allImports }, null, 2)}</script>`;
 };
 
+const ELIT_INTERNAL_WS_PATH = '/__elit_ws';
+
 // Helper function to generate HMR script (reused in serveFile and serveSSR)
-const createHMRScript = (port: number, wsPath: string): string =>
-  `<script>(function(){let ws;let retries=0;let maxRetries=5;function connect(){ws=new WebSocket('ws://'+window.location.hostname+':${port}${wsPath}');ws.onopen=()=>{console.log('[Elit HMR] Connected');retries=0};ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{if(retries<maxRetries){retries++;setTimeout(connect,1000*retries)}else if(retries===maxRetries){console.log('[Elit HMR] Connection closed. Start dev server to reconnect.')}};ws.onerror=()=>{ws.close()}}connect()})();</script>`;
+const createHMRScript = (port: number): string =>
+  `<script>(function(){let ws;let retries=0;let maxRetries=5;const protocol=window.location.protocol==='https:'?'wss://':'ws://';function connect(){ws=new WebSocket(protocol+window.location.hostname+':${port}${ELIT_INTERNAL_WS_PATH}');ws.onopen=()=>{console.log('[Elit HMR] Connected');retries=0};ws.onmessage=(e)=>{const d=JSON.parse(e.data);if(d.type==='update'){console.log('[Elit HMR] File updated:',d.path);window.location.reload()}else if(d.type==='reload'){console.log('[Elit HMR] Reloading...');window.location.reload()}else if(d.type==='error')console.error('[Elit HMR] Error:',d.error)};ws.onclose=()=>{if(retries<maxRetries){retries++;setTimeout(connect,1000*retries)}else if(retries===maxRetries){console.log('[Elit HMR] Connection closed. Start dev server to reconnect.')}};ws.onerror=()=>{ws.close()}}connect()})();</script>`;
 
 // Helper function to rewrite relative paths with basePath (reused in serveFile and serveSSR)
 const rewriteRelativePaths = (html: string, basePath: string): string => {
@@ -433,6 +435,79 @@ const rewriteRelativePaths = (html: string, basePath: string): string => {
 
 // Helper function to normalize basePath (reused in serveFile and serveSSR)
 const normalizeBasePath = (basePath?: string): string => basePath && basePath !== '/' ? basePath : '';
+
+const normalizeWebSocketPath = (path: string): string => {
+  let normalizedPath = path.trim();
+
+  if (!normalizedPath) {
+    return '/';
+  }
+
+  if (!normalizedPath.startsWith('/')) {
+    normalizedPath = `/${normalizedPath}`;
+  }
+
+  if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
+    normalizedPath = normalizedPath.slice(0, -1);
+  }
+
+  return normalizedPath;
+};
+
+const getRequestPath = (url: string): string => {
+  const [pathname = '/'] = url.split('?');
+  return pathname || '/';
+};
+
+const parseRequestQuery = (url: string): Record<string, string> => {
+  const query: Record<string, string> = {};
+  const queryString = url.split('?')[1];
+
+  if (!queryString) {
+    return query;
+  }
+
+  for (const entry of queryString.split('&')) {
+    if (!entry) {
+      continue;
+    }
+
+    const [rawKey, rawValue = ''] = entry.split('=');
+
+    if (!rawKey) {
+      continue;
+    }
+
+    query[decodeURIComponent(rawKey)] = decodeURIComponent(rawValue);
+  }
+
+  return query;
+};
+
+interface NormalizedWebSocketEndpoint {
+  path: string;
+  handler: WebSocketEndpointConfig['handler'];
+}
+
+const normalizeWebSocketEndpoints = (endpoints: WebSocketEndpointConfig[] | undefined, basePath: string = ''): NormalizedWebSocketEndpoint[] => {
+  const normalizedBasePath = normalizeBasePath(basePath);
+
+  return (endpoints || []).map(endpoint => {
+    const normalizedPath = normalizeWebSocketPath(endpoint.path);
+    const fullPath = !normalizedBasePath
+      ? normalizedPath
+      : normalizedPath === normalizedBasePath || normalizedPath.startsWith(`${normalizedBasePath}/`)
+        ? normalizedPath
+        : normalizedPath === '/'
+          ? normalizedBasePath
+          : `${normalizedBasePath}${normalizedPath}`;
+
+    return {
+      path: fullPath,
+      handler: endpoint.handler
+    };
+  });
+};
 
 const requestAcceptsGzip = (acceptEncoding: string | string[] | undefined): boolean => {
   if (Array.isArray(acceptEncoding)) {
@@ -1143,7 +1218,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'ws'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -1161,6 +1236,7 @@ interface NormalizedClient {
   index?: string;
   ssr?: () => Child | string;
   api?: ServerRouter;
+  ws: NormalizedWebSocketEndpoint[];
   proxyHandler?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
   mode: 'dev' | 'preview';
 }
@@ -1176,7 +1252,12 @@ export function createDevServer(options: DevServerOptions): DevServer {
   }
 
   // Normalize clients configuration - support both new API (clients array) and legacy API (root/basePath)
-  const clientsToNormalize = config.clients?.length ? config.clients : config.root ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, mode: config.mode }] : null;
+  const usesClientArray = Boolean(config.clients?.length);
+  const clientsToNormalize = usesClientArray
+    ? config.clients!
+    : config.root
+      ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, ws: config.ws, mode: config.mode }]
+      : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
   const normalizedClients: NormalizedClient[] = clientsToNormalize.map(client => {
@@ -1204,10 +1285,27 @@ export function createDevServer(options: DevServerOptions): DevServer {
       index: indexPath,
       ssr: client.ssr,
       api: client.api,
+      ws: normalizeWebSocketEndpoints(client.ws, basePath),
       proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined,
       mode: client.mode || 'dev'
     };
   });
+
+  const globalWebSocketEndpoints = usesClientArray ? normalizeWebSocketEndpoints(config.ws) : [];
+  const normalizedWebSocketEndpoints = [...normalizedClients.flatMap(client => client.ws), ...globalWebSocketEndpoints];
+  const seenWebSocketPaths = new Set<string>();
+
+  for (const endpoint of normalizedWebSocketEndpoints) {
+    if (endpoint.path === ELIT_INTERNAL_WS_PATH) {
+      throw new Error(`WebSocket path "${ELIT_INTERNAL_WS_PATH}" is reserved for Elit internals`);
+    }
+
+    if (seenWebSocketPaths.has(endpoint.path)) {
+      throw new Error(`Duplicate WebSocket endpoint path: ${endpoint.path}`);
+    }
+
+    seenWebSocketPaths.add(endpoint.path);
+  }
 
   // Create global proxy handler if proxy config exists
   const globalProxyHandler = config.proxy ? createProxyHandler(config.proxy) : null;
@@ -1647,8 +1745,7 @@ export default css;
 
       // Inject HMR client and import map for HTML files
       if (ext === '.html') {
-        const wsPath = normalizeBasePath(client.basePath);
-        const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port, wsPath) : '';
+        const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port) : '';
         let html = content.toString();
 
         // If SSR is configured, extract and inject styles from SSR
@@ -1781,7 +1878,7 @@ export default css;
       html = rewriteRelativePaths(html, basePath);
 
       // Inject HMR script (dev mode only)
-      const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port, basePath) : '';
+      const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port) : '';
 
       // Inject import map in head, HMR script in body
       const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
@@ -1806,65 +1903,95 @@ export default css;
     }
   }
 
-  // WebSocket Server for HMR - only in dev mode (not needed for preview)
-  let wss: any = null;
-  if (config.mode !== 'preview') {
-    wss = new WebSocketServer({ server });
+  // Internal WebSocket server for HMR messages and shared state sync.
+  const wss = new WebSocketServer({ server, path: ELIT_INTERNAL_WS_PATH });
+  const webSocketServers: WebSocketServer[] = [wss];
+
+  if (config.logging) {
+    console.log(`[WebSocket] Internal server initialized at ${ELIT_INTERNAL_WS_PATH}`);
+  }
+
+  wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    wsClients.add(ws);
+
+    const message: HMRMessage = { type: 'connected', timestamp: Date.now() };
+    ws.send(JSON.stringify(message));
 
     if (config.logging) {
-      console.log('[HMR] WebSocket server initialized');
+      console.log('[WebSocket] Internal client connected from', req.socket.remoteAddress);
     }
 
-    wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-      wsClients.add(ws);
+    // Handle incoming messages
+    ws.on('message', (data: string) => {
+      try {
+        const msg = JSON.parse(data.toString());
 
-      const message: HMRMessage = { type: 'connected', timestamp: Date.now() };
-      ws.send(JSON.stringify(message));
-
-      if (config.logging) {
-        console.log('[HMR] Client connected from', req.socket.remoteAddress);
-      }
-
-      // Handle incoming messages
-      ws.on('message', (data: string) => {
-        try {
-          const msg = JSON.parse(data.toString());
-
-          // Handle state subscription
-          if (msg.type === 'state:subscribe') {
-            stateManager.subscribe(msg.key, ws);
-            if (config.logging) {
-              console.log(`[State] Client subscribed to "${msg.key}"`);
-            }
-          }
-
-          // Handle state unsubscribe
-          else if (msg.type === 'state:unsubscribe') {
-            stateManager.unsubscribe(msg.key, ws);
-            if (config.logging) {
-              console.log(`[State] Client unsubscribed from "${msg.key}"`);
-            }
-          }
-
-          // Handle state change from client
-          else if (msg.type === 'state:change') {
-            stateManager.handleStateChange(msg.key, msg.value);
-            if (config.logging) {
-              console.log(`[State] Client updated "${msg.key}"`);
-            }
-          }
-        } catch (error) {
+        // Handle state subscription
+        if (msg.type === 'state:subscribe') {
+          stateManager.subscribe(msg.key, ws);
           if (config.logging) {
-            console.error('[WebSocket] Message parse error:', error);
+            console.log(`[State] Client subscribed to "${msg.key}"`);
           }
         }
-      });
 
-      ws.on('close', () => {
-        wsClients.delete(ws);
-        stateManager.unsubscribeAll(ws);
+        // Handle state unsubscribe
+        else if (msg.type === 'state:unsubscribe') {
+          stateManager.unsubscribe(msg.key, ws);
+          if (config.logging) {
+            console.log(`[State] Client unsubscribed from "${msg.key}"`);
+          }
+        }
+
+        // Handle state change from client
+        else if (msg.type === 'state:change') {
+          stateManager.handleStateChange(msg.key, msg.value);
+          if (config.logging) {
+            console.log(`[State] Client updated "${msg.key}"`);
+          }
+        }
+      } catch (error) {
         if (config.logging) {
-          console.log('[HMR] Client disconnected');
+          console.error('[WebSocket] Message parse error:', error);
+        }
+      }
+    });
+
+    ws.on('close', () => {
+      wsClients.delete(ws);
+      stateManager.unsubscribeAll(ws);
+      if (config.logging) {
+        console.log('[WebSocket] Internal client disconnected');
+      }
+    });
+  });
+
+  for (const endpoint of normalizedWebSocketEndpoints) {
+    const endpointServer = new WebSocketServer({ server, path: endpoint.path });
+    webSocketServers.push(endpointServer);
+
+    if (config.logging) {
+      console.log(`[WebSocket] Endpoint ready at ${endpoint.path}`);
+    }
+
+    endpointServer.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      const requestUrl = req.url || endpoint.path;
+      const ctx = {
+        ws,
+        req,
+        path: getRequestPath(requestUrl),
+        query: parseRequestQuery(requestUrl),
+        headers: req.headers as Record<string, string | string[] | undefined>
+      };
+
+      void Promise.resolve(endpoint.handler(ctx)).catch((error) => {
+        if (config.logging) {
+          console.error(`[WebSocket] Endpoint error at ${endpoint.path}:`, error);
+        }
+
+        try {
+          ws.close(CLOSE_CODES.INTERNAL_ERROR, 'Internal Server Error');
+        } catch {
+          // Ignore close errors while reporting endpoint failures.
         }
       });
     });
@@ -1966,9 +2093,8 @@ export default css;
     isClosing = true;
     if (config.logging) console.log('\n[Server] Shutting down...');
     if (watcher) await watcher.close();
-    if (wss) {
-      wss.close();
-      wsClients.forEach(client => client.close());
+    if (webSocketServers.length > 0) {
+      webSocketServers.forEach(wsServer => wsServer.close());
       wsClients.clear();
     }
     return new Promise<void>((resolve) => {

@@ -298,6 +298,11 @@ async function runPreview(args: string[]) {
         options.api = mergedOptions.api;
     }
 
+    // Add WebSocket endpoints if configured
+    if (mergedOptions.ws && mergedOptions.ws.length > 0) {
+      options.ws = mergedOptions.ws;
+    }
+
     // Add HTTPS if configured
     if (mergedOptions.https) {
         options.https = mergedOptions.https;
@@ -642,6 +647,7 @@ Preview Options:
 Note: Preview mode has full feature parity with dev mode:
       - Single root and multi-client configurations (use clients[] in config)
       - REST API endpoints (use api option in config)
+  - WebSocket endpoints (use ws option in config)
       - Proxy forwarding and Web Workers
       - HTTPS support, custom middleware, and SSR
 
@@ -711,6 +717,18 @@ API Configuration:
   Priority:
     1. Client-specific API routes are matched first (defined in clients[].api)
     2. Global API routes are matched second (defined in dev.api or preview.api)
+
+WebSocket Configuration:
+  Configure WebSocket endpoints per client or globally.
+  Supports both global configuration and client-specific configuration.
+
+  Options:
+    - path: Upgrade path to match (required, e.g., '/ws', '/chat')
+    - handler: Connection handler invoked with { ws, req, path, query, headers }
+
+  Priority:
+    1. Client-specific endpoints are prefixed with the client's basePath (defined in clients[].ws)
+    2. Global endpoints listen exactly as configured (defined in dev.ws or preview.ws)
 
 Examples:
   elit dev

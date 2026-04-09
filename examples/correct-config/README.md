@@ -47,7 +47,13 @@ export default {
       root: '.',
       basePath: '',
       ssr: () => client,  // SSR template function
-      api: server         // ServerRouter instance
+      api: server,        // ServerRouter instance
+      ws: [{
+        path: '/ws',
+        handler: ({ ws }) => {
+          ws.on('message', (message) => ws.send(message.toString()));
+        }
+      }]
     }]
   },
   build: [{
@@ -398,18 +404,36 @@ export default {
         root: './app1',
         basePath: '/app1',
         ssr: () => app1Client,
-        api: app1Server
+        api: app1Server,
+        ws: [
+          {
+            path: '/ws',
+            handler: ({ ws }) => {
+              ws.on('message', (message) => ws.send(`[app1] ${message.toString()}`));
+            }
+          }
+        ]
       },
       {
         root: './app2',
         basePath: '/app2',
         ssr: () => app2Client,
-        api: app2Server
+        api: app2Server,
+        ws: [
+          {
+            path: '/ws',
+            handler: ({ ws }) => {
+              ws.on('message', (message) => ws.send(`[app2] ${message.toString()}`));
+            }
+          }
+        ]
       }
     ]
   }
 };
 ```
+
+Each client-specific `ws` path is prefixed with that client's `basePath`, so the endpoints above are available at `/app1/ws` and `/app2/ws`. Avoid `/__elit_ws`, because Elit reserves it for internal HMR and shared-state traffic.
 
 Visit:
 - `http://localhost:3003/app1/` - App 1 with its own SSR and API

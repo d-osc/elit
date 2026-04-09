@@ -273,6 +273,15 @@ export default {
         basePath: '',
         ssr: () => documentShell,
         api,
+        ws: [
+          {
+            path: '/ws',
+            handler: ({ ws, query }) => {
+              ws.send(JSON.stringify({ type: 'connected', room: query.room || 'general' }));
+              ws.on('message', (message) => ws.send(message.toString()));
+            },
+          },
+        ],
       },
     ],
   },
@@ -292,6 +301,14 @@ export default {
     root: './dist',
     index: './index.html',
     port: 4173,
+    ws: [
+      {
+        path: '/ws',
+        handler: ({ ws }) => {
+          ws.on('message', (message) => ws.send(message.toString()));
+        },
+      },
+    ],
   },
   test: {
     include: ['testing/unit/**/*.test.ts'],

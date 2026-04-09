@@ -11,7 +11,13 @@ export default {
       root: '.',
       basePath: '',
       ssr: () => client,
-      api: server
+      api: server,
+      ws: [{
+        path: '/ws',
+        handler: ({ ws }) => {
+          ws.on('message', (message) => ws.send(message.toString()));
+        }
+      }]
     }]
   },
   build: [{
@@ -33,6 +39,12 @@ export default {
     logging: true,
     root: './dist',
     basePath: '',
-    index: './index.html'
+    index: './index.html',
+    ws: [{
+      path: '/ws',
+      handler: ({ ws }) => {
+        ws.on('message', (message) => ws.send(message.toString()));
+      }
+    }]
   }
 };

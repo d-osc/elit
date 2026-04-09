@@ -13,6 +13,7 @@ export interface NativeBindingMetadata<T = unknown> {
 }
 
 export const ELIT_NATIVE_BINDING = Symbol.for('elit.native.binding');
+const ELIT_INTERNAL_WS_PATH = '/__elit_ws';
 
 // State management helpers
 export const createState = <T>(initial: T, options?: StateOptions): State<T> =>
@@ -136,6 +137,29 @@ interface StateMessage {
     timestamp?: number;
 }
 
+function resolveSharedStateWebSocketUrl(wsUrl?: string): string {
+    const protocol = typeof location !== 'undefined' && location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const origin = typeof location !== 'undefined' ? `${protocol}//${location.host}` : `${protocol}//localhost`;
+
+    if (!wsUrl) {
+        return `${origin}${ELIT_INTERNAL_WS_PATH}`;
+    }
+
+    if (/^wss?:\/\//i.test(wsUrl)) {
+        const parsedUrl = new URL(wsUrl);
+        if (!parsedUrl.pathname || parsedUrl.pathname === '/') {
+            parsedUrl.pathname = ELIT_INTERNAL_WS_PATH;
+        }
+        return parsedUrl.toString();
+    }
+
+    if (wsUrl.startsWith('/')) {
+        return `${origin}${wsUrl}`;
+    }
+
+    return wsUrl;
+}
+
 /**
  * Shared State - syncs with elit-server
  */
@@ -202,7 +226,7 @@ export class SharedState<T = any> {
     private connect(): void {
         if (typeof window === 'undefined') return;
 
-        const url = this.wsUrl || `ws://${location.host}`;
+        const url = resolveSharedStateWebSocketUrl(this.wsUrl);
         this.ws = new WebSocket(url);
 
         this.ws.addEventListener('open', () => {

@@ -1145,6 +1145,7 @@ const prodConfig = mergeConfig(baseConfig, {
     proxy?: ProxyConfig[];
     worker?: WorkerConfig[];
     api?: ServerRouter;
+    ws?: WebSocketEndpointConfig[];
     middleware?: Middleware[];
     clients?: ClientConfig[];
   };
@@ -1154,6 +1155,7 @@ const prodConfig = mergeConfig(baseConfig, {
     root?: string;
     basePath?: string;
     open?: boolean;
+    ws?: WebSocketEndpointConfig[];
   };
 }`
     }

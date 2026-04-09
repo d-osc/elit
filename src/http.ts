@@ -488,12 +488,13 @@ export class Server extends EventEmitter {
         fetch: (req: Request) => {
           // Fast path: Create minimal context object to avoid wrapper classes
           const urlObj = new URL(req.url);
-          const pathname = urlObj.pathname + urlObj.search;
+          const pathname = urlObj.pathname;
+          const requestUrl = urlObj.pathname + urlObj.search;
 
           const upgradeHeader = req.headers.get('upgrade');
           if (upgradeHeader && upgradeHeader.toLowerCase() === 'websocket') {
             const matchingWebSocketServer = Array.from(this._bunWebSocketServers).find((wsServer: any) => {
-              return !wsServer.path || wsServer.path === '/' || wsServer.path === pathname;
+              return !wsServer.path || wsServer.path === pathname;
             });
 
             if (!matchingWebSocketServer) {
@@ -510,7 +511,7 @@ export class Server extends EventEmitter {
                 wsServer: matchingWebSocketServer,
                 request: {
                   method: req.method,
-                  url: pathname,
+                  url: requestUrl,
                   headers: requestHeaders,
                   socket: { remoteAddress: undefined },
                 },
@@ -534,7 +535,7 @@ export class Server extends EventEmitter {
           // Minimal IncomingMessage-compatible object (object literal is faster than class)
           const incomingMessage: any = {
             method: req.method,
-            url: pathname,
+            url: requestUrl,
             headers: req.headers,
             httpVersion: '1.1',
             rawHeaders: [],

@@ -76,6 +76,30 @@ import type { WebSocketServer } from 'ws';
 // Forward declarations to avoid circular dependency
 export type Router = import('./server').ServerRouter;
 export type StateManager = import('./server').StateManager;
+export type WebSocketConnection = import('./ws').WebSocket;
+export type WebSocketRequest = import('./http').IncomingMessage;
+
+export interface WebSocketEndpointContext {
+    /** Accepted WebSocket connection */
+    ws: WebSocketConnection;
+    /** Upgrade request metadata */
+    req: WebSocketRequest;
+    /** Matched request path without query string */
+    path: string;
+    /** Parsed query string values */
+    query: Record<string, string>;
+    /** Request headers */
+    headers: Record<string, string | string[] | undefined>;
+}
+
+export type WebSocketEndpointHandler = (ctx: WebSocketEndpointContext) => void | Promise<void>;
+
+export interface WebSocketEndpointConfig {
+    /** Path to listen for WebSocket upgrades (e.g., '/ws', '/chat') */
+    path: string;
+    /** Connection handler invoked after a successful WebSocket upgrade */
+    handler: WebSocketEndpointHandler;
+}
 
 export interface ClientConfig {
     /** Root directory to serve files from */
@@ -96,6 +120,8 @@ export interface ClientConfig {
     worker?: WorkerConfig[];
     /** API router for REST endpoints specific to this client */
     api?: Router;
+    /** WebSocket endpoints specific to this client */
+    ws?: WebSocketEndpointConfig[];
     /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
     mode?: 'dev' | 'preview';
 }
@@ -153,6 +179,8 @@ export interface DevServerOptions {
     logging?: boolean;
     /** API router for REST endpoints */
     api?: Router;
+    /** WebSocket endpoints */
+    ws?: WebSocketEndpointConfig[];
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
     /** Proxy configuration for API requests */
@@ -259,6 +287,8 @@ export interface PreviewOptions {
     logging?: boolean;
     /** API router for REST endpoints */
     api?: Router;
+    /** WebSocket endpoints */
+    ws?: WebSocketEndpointConfig[];
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
     /** Proxy configuration for API requests */

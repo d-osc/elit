@@ -412,6 +412,17 @@ export default {
         basePath: '',
         ssr: () => documentShell,
         api,
+        ws: [
+          {
+            path: '/ws',
+            handler: ({ ws, query }) => {
+              ws.send(JSON.stringify({ type: 'connected', room: query.room || 'general' }));
+              ws.on('message', (message) => {
+                ws.send(message.toString());
+              });
+            },
+          },
+        ],
       },
     ],
   },
@@ -431,6 +442,14 @@ export default {
     root: './dist',
     index: './index.html',
     port: 4173,
+    ws: [
+      {
+        path: '/ws',
+        handler: ({ ws }) => {
+          ws.on('message', (message) => ws.send(message.toString()));
+        },
+      },
+    ],
   },
   test: {
     include: ['testing/unit/**/*.test.ts'],
@@ -476,6 +495,12 @@ export default {
   },
 };
 ```
+
+Notes:
+
+- `dev.ws` and `preview.ws` register global WebSocket endpoints.
+- `clients[].ws` registers client-specific endpoints and prefixes each path with that client's `basePath`.
+- The internal Elit HMR and shared-state socket uses `/__elit_ws`, so do not reuse that path for custom endpoints.
 
 Important details:
 

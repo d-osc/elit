@@ -106,6 +106,11 @@ function createNativeWebSocket(url: string, protocols?: string[]): any {
   return new globalThis.WebSocket(url, protocols);
 }
 
+function getRequestPath(url?: string): string {
+  const [pathname = '/'] = (url || '/').split('?');
+  return pathname || '/';
+}
+
 /**
  * WebSocket class - Pure implementation
  */
@@ -228,7 +233,7 @@ export class WebSocket extends EventEmitter {
 export class WebSocketServer extends EventEmitter {
   public clients: Set<WebSocket> = new Set();
   public options: ServerOptions;
-  public path: string;
+  public path?: string;
 
   private _httpServer: any;
   private _ownsHttpServer: boolean = false;
@@ -236,7 +241,7 @@ export class WebSocketServer extends EventEmitter {
   constructor(options?: ServerOptions, callback?: () => void) {
     super();
     this.options = options || {};
-    this.path = options?.path || '/';
+    this.path = options?.path;
 
     if (runtime === 'node') {
       // Node.js - create HTTP server with WebSocket upgrade
@@ -270,8 +275,10 @@ export class WebSocketServer extends EventEmitter {
 
   private _setupUpgradeHandler(): void {
     this._httpServer.on('upgrade', (request: any, socket: any, head: Buffer) => {
-      console.log('[WebSocket] Upgrade request:', request.url, 'Expected:', this.path);
-      if (this.path && this.path !== '/' && request.url !== this.path) {
+      const requestPath = getRequestPath(request.url);
+
+      console.log('[WebSocket] Upgrade request:', requestPath, 'Expected:', this.path || '(any)');
+      if (this.path && requestPath !== this.path) {
         console.log('[WebSocket] Path mismatch, ignoring');
         return;
       }
@@ -597,7 +604,7 @@ export class WebSocketServer extends EventEmitter {
    * Check if server should handle request
    */
   shouldHandle(request: IncomingMessage): boolean {
-    if (this.path && request.url !== this.path) {
+    if (this.path && getRequestPath(request.url) !== this.path) {
       return false;
     }
     return true;
