@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ## [3.5.4] - 2026-04-10
 
 ### Added
@@ -16,12 +17,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `elit pm save` / `elit pm resurrect` to persist and restore the managed app list
   - Added watch mode, HTTP health checks, `restartPolicy`, and `minUptime` for richer supervision behavior
   - Added `pm.apps[]`, `pm.dataDir`, and `pm.dumpFile` support in `elit.config.*`
+  - **Direct Google Drive WAPK archives** - WAPK run flows can now read and write archives through the Google Drive API without a local `.wapk` file
+  - Added `gdrive://<fileId>` archive sources and `--google-drive-file-id`, `--google-drive-token-env`, `--google-drive-access-token`, and `--google-drive-shared-drive` CLI support
+  - Added `config.wapk.run.googleDrive` plus config-driven default archive startup for `elit wapk` and `elit wapk run`
+  - Added two-way sync against remote archive sources so WAPK runtime changes can push back to Drive and pull remote archive updates into the extracted workdir
+- **PM support for remote WAPK apps** - `elit pm` can now manage Google Drive-backed WAPK runtimes in addition to local `.wapk` files
+  - Added `elit pm start --wapk gdrive://<fileId>` and `elit pm start --google-drive-file-id <fileId>` flows
+  - Added `pm.apps[].wapkRun` so PM-managed WAPK apps can forward Google Drive auth hints and inner WAPK sync settings like `syncInterval`, `watcher`, `watchArchive`, and `archiveSyncInterval`
+  - Added an example project under `examples/wapk-google-drive-example` covering direct PM startup and config-driven PM startup for Google Drive WAPK apps
+
+### Changed
+- **WAPK live-sync architecture** - WAPK runtime sync now targets abstract archive sources instead of only local files
+  - `prepareWapkApp(...)` and live-sync flush/stop flows are now async so local files and Google Drive archives share the same runtime path
+  - Added separate archive read-sync tuning via `--archive-watch`, `--no-archive-watch`, and `--archive-sync-interval <ms>`
+  - Desktop WAPK command paths and runtime docs were updated to match the source-agnostic live-sync flow
+
+### Fixed
+- **Code scanning shell-hardening fixes** - Tightened command construction in PM and mobile CLI flows to address shell-command injection findings
+  - PM command previews now quote only safe segments while still preserving readable previews
+  - Windows mobile command handling no longer builds shell execution from unsafe environment-derived values
 
 ### Documentation
 - **CLI and config reference refresh** - Documented process-manager workflows in the README and docs command/config guides
+- **Google Drive WAPK and PM guide refresh** - Updated README, CLI guide, config guide, WAPK guide, and example docs for direct Google Drive runtime flows and PM-managed WAPK workflows
+
+### Tests
+- **Google Drive WAPK coverage** - Added mocked Google Drive WAPK runtime coverage plus opt-in real Google Drive integration coverage
+  - Added WAPK tests for remote pull sync, remote push sync, and config-driven Google Drive startup
+  - Added PM helper coverage for remote WAPK source parsing and forwarded WAPK run options
 
 ### Validation
 - **PM smoke validation** - Verified background start, list, logs, stop, and delete flow against the built CLI
+- **Focused runtime validation** - Verified the recent WAPK and PM changes with typecheck, build, and targeted runtime checks
+  - `npm run typecheck`
+  - `bun run build`
+  - Mocked Google Drive WAPK runtime validation for pull/push sync and config-driven execution
+  - Bun-based PM smoke validation covering remote WAPK source parsing, config resolution, and forwarded command arguments
 
 ## [3.5.2] - 2026-04-10
 
