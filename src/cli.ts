@@ -637,12 +637,14 @@ Native Options:
   elit native generate ... --export <name>  Select a specific module export
 
 WAPK Options:
-  elit wapk <file.wapk>                     Run a packaged app
-  elit wapk run <file.wapk>                 Run a packaged app
+  elit wapk [file.wapk]                     Run a packaged app or the configured default archive
+  elit wapk gdrive://<fileId>               Run a packaged app directly from Google Drive
+  elit wapk run [file.wapk]                 Run a packaged app or the configured default archive
+  elit wapk run --google-drive-file-id <id> Run a packaged app directly from Google Drive
   elit wapk pack [directory]                Pack a directory into a .wapk archive
   elit wapk inspect <file.wapk>             Inspect a .wapk archive
   elit wapk extract <file.wapk>             Extract a .wapk archive
-  elit wapk --runtime node|bun|deno <file>  Override the packaged runtime
+  elit wapk --runtime node|bun|deno [file]  Override the packaged runtime
 
 PM Options:
   elit pm start --script "npm start" -n my-app   Start a shell command in the background

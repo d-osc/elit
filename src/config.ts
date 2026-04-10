@@ -246,6 +246,39 @@ export interface WapkLockConfig {
     password?: string;
 }
 
+export interface WapkLiveSyncConfig {
+    /** Polling interval for live sync writes back into the archive */
+    syncInterval?: number;
+    /** Use event-driven file watching for local workdir changes */
+    useWatcher?: boolean;
+    /** Pull archive changes back into the temp workdir */
+    watchArchive?: boolean;
+    /** Polling interval for reading external archive changes */
+    archiveSyncInterval?: number;
+}
+
+export interface WapkGoogleDriveConfig {
+    /** Google Drive file id for the remote .wapk archive */
+    fileId?: string;
+    /** OAuth access token used for Google Drive API calls */
+    accessToken?: string;
+    /** Environment variable name that contains the OAuth access token */
+    accessTokenEnv?: string;
+    /** Include supportsAllDrives=true when accessing shared drive files */
+    supportsAllDrives?: boolean;
+}
+
+export interface WapkRunConfig extends WapkLiveSyncConfig {
+    /** Default archive file used by elit wapk run when no file argument is provided */
+    file?: string;
+    /** Remote Google Drive archive used by elit wapk run */
+    googleDrive?: WapkGoogleDriveConfig;
+    /** Default runtime override used by elit wapk run */
+    runtime?: 'node' | 'bun' | 'deno';
+    /** Default password used to unlock a locked archive at runtime */
+    password?: string;
+}
+
 export interface WapkConfig {
     name?: string;
     version?: string;
@@ -257,6 +290,7 @@ export interface WapkConfig {
     env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;
     lock?: WapkLockConfig;
+    run?: WapkRunConfig;
 }
 
 /**

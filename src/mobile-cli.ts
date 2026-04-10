@@ -1019,50 +1019,6 @@ function upsertXmlAttribute(tag: string, name: string, value: string): string {
     return `${tag.slice(0, -1)} ${name}='${value}'>`;
 }
 
-const WIN_CMD_META_CHARS = new Set(['(', ')', '%', '!', '^', '"', '<', '>', '&', '|']);
-
-function escapeWindowsCmdMetacharacters(value: string): string {
-    let escaped = '';
-    for (const character of value) {
-        escaped += WIN_CMD_META_CHARS.has(character) ? `^${character}` : character;
-    }
-
-    return escaped;
-}
-
-function quoteWindowsCmdToken(value: string): string {
-    let quoted = '"';
-    let backslashCount = 0;
-
-    for (const character of value) {
-        if (character === '\\') {
-            backslashCount += 1;
-            continue;
-        }
-
-        if (character === '"') {
-            quoted += '\\'.repeat((backslashCount * 2) + 1);
-            quoted += '"';
-            backslashCount = 0;
-            continue;
-        }
-
-        if (backslashCount > 0) {
-            quoted += '\\'.repeat(backslashCount);
-            backslashCount = 0;
-        }
-
-        quoted += character;
-    }
-
-    if (backslashCount > 0) {
-        quoted += '\\'.repeat(backslashCount * 2);
-    }
-
-    quoted += '"';
-    return escapeWindowsCmdMetacharacters(quoted);
-}
-
 function prependCommandPath(pathEntry: string): NodeJS.ProcessEnv {
     const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
     const currentPath = process.env[pathKey];

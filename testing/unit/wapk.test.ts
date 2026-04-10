@@ -1,9 +1,10 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive } from '../../src/wapk-cli';
+import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runWapkCommand } from '../../src/wapk-cli';
 
 function createTempDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'elit-wapk-'));
@@ -19,6 +20,75 @@ function createTempWapkProject(): string {
     }, null, 2));
     fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("hello");\n');
     return dir;
+}
+
+function createGoogleDriveFetchMock(initialBuffer: Buffer, fileId = 'drive-file-id') {
+    const originalFetch = global.fetch;
+    let remoteBuffer = Buffer.from(initialBuffer);
+    let revision = 0;
+
+    const createMetadata = () => ({
+        id: fileId,
+        name: 'remote-app.wapk',
+        modifiedTime: new Date(1710000000000 + revision).toISOString(),
+        size: String(remoteBuffer.length),
+        md5Checksum: createHash('md5').update(remoteBuffer).digest('hex'),
+    });
+
+    const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload), {
+        headers: { 'content-type': 'application/json' },
+    });
+
+    global.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === 'string'
+            ? input
+            : input instanceof URL
+                ? input.toString()
+                : input.url;
+
+        if (!url.includes(`/files/${fileId}`)) {
+            throw new Error(`Unexpected Google Drive URL: ${url}`);
+        }
+
+        const method = init?.method ?? 'GET';
+        if (method === 'GET') {
+            if (url.includes('alt=media')) {
+                return new Response(remoteBuffer, {
+                    headers: { 'content-type': 'application/octet-stream' },
+                });
+            }
+
+            return jsonResponse(createMetadata());
+        }
+
+        if (method === 'PATCH') {
+            const body = init?.body;
+            if (!body) {
+                throw new Error('Google Drive upload body was missing.');
+            }
+
+            remoteBuffer = Buffer.isBuffer(body)
+                ? Buffer.from(body)
+                : Buffer.from(await new Response(body).arrayBuffer());
+            revision += 1;
+            return jsonResponse(createMetadata());
+        }
+
+        throw new Error(`Unexpected Google Drive method: ${method}`);
+    }) as typeof fetch;
+
+    return {
+        getBuffer(): Buffer {
+            return Buffer.from(remoteBuffer);
+        },
+        setBuffer(buffer: Buffer): void {
+            remoteBuffer = Buffer.from(buffer);
+            revision += 1;
+        },
+        restore(): void {
+            global.fetch = originalFetch;
+        },
+    };
 }
 
 describe('wapk helpers', () => {
@@ -251,7 +321,7 @@ describe('wapk helpers', () => {
             await packWapkDirectory(dir, { outputPath: path.join(dir, 'test.wapk') });
             
             // Prepare with custom sync interval
-            const prepared = prepareWapkApp(path.join(dir, 'test.wapk'), { syncInterval: 100 });
+            const prepared = await prepareWapkApp(path.join(dir, 'test.wapk'), { syncInterval: 100 });
             expect(prepared.syncInterval).toBe(100);
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
@@ -267,7 +337,7 @@ describe('wapk helpers', () => {
             });
             
             // Prepare with watcher enabled
-            const prepared = prepareWapkApp(archivePath, {
+            const prepared = await prepareWapkApp(archivePath, {
                 useWatcher: true,
                 password: 'watcher-password',
             });
@@ -281,8 +351,8 @@ describe('wapk helpers', () => {
             fs.writeFileSync(path.join(prepared.workDir, 'test-file.txt'), 'hello');
 
             // Force an archive flush so the encrypted archive is updated deterministically.
-            liveSync.flush();
-            liveSync.stop();
+            await liveSync.flush();
+            await liveSync.stop();
 
             // Verify archive was updated
             const finalArchive = readWapkArchive(archivePath, {
@@ -290,6 +360,161 @@ describe('wapk helpers', () => {
             });
             expect(finalArchive.files.some((file) => file.path === 'test-file.txt')).toBe(true);
         } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('pulls external archive changes back into the working directory for cloud-synced archives', async () => {
+        const dir = createTempWapkProject();
+        try {
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'shared.wapk'),
+            });
+
+            const prepared = await prepareWapkApp(archivePath, {
+                syncInterval: 100,
+                watchArchive: true,
+            });
+            const liveSync = createWapkLiveSync(prepared);
+
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("updated-from-drive");\n');
+            await packWapkDirectory(dir, {
+                outputPath: archivePath,
+            });
+
+            await liveSync.flush();
+
+            expect(fs.readFileSync(path.join(prepared.workDir, 'src', 'index.js'), 'utf8')).toBe('console.log("updated-from-drive");\n');
+
+            await liveSync.stop();
+            fs.rmSync(prepared.workDir, { recursive: true, force: true });
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs the configured default archive from elit.config.json', async () => {
+        const dir = createTempDir();
+        const archivePath = path.join(dir, 'shared', 'google-drive-app.wapk');
+        const markerPath = path.join(dir, 'ran.txt');
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.mkdirSync(path.dirname(archivePath), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'config-run-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: 'src/index.js',
+                    env: {
+                        ELIT_WAPK_MARK: markerPath,
+                    },
+                    run: {
+                        file: './shared/google-drive-app.wapk',
+                        watchArchive: true,
+                        syncInterval: 75,
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(
+                path.join(dir, 'src', 'index.js'),
+                'require("node:fs").writeFileSync(process.env.ELIT_WAPK_MARK, "configured-run");\n',
+            );
+
+            await packWapkDirectory(dir, {
+                outputPath: archivePath,
+            });
+
+            await runWapkCommand([], dir);
+
+            expect(fs.readFileSync(markerPath, 'utf8')).toBe('configured-run');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('syncs a WAPK archive directly with Google Drive without a local archive file', async () => {
+        const dir = createTempWapkProject();
+        const tempArchivePath = path.join(dir, 'seed.wapk');
+        let driveMock: ReturnType<typeof createGoogleDriveFetchMock> | undefined;
+
+        try {
+            await packWapkDirectory(dir, { outputPath: tempArchivePath });
+            driveMock = createGoogleDriveFetchMock(fs.readFileSync(tempArchivePath));
+
+            const prepared = await prepareWapkApp('gdrive://drive-file-id', {
+                googleDrive: {
+                    fileId: 'drive-file-id',
+                    accessToken: 'token-123',
+                },
+                syncInterval: 100,
+                watchArchive: true,
+            });
+            const liveSync = createWapkLiveSync(prepared);
+
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("updated-from-google-drive");\n');
+            await packWapkDirectory(dir, { outputPath: tempArchivePath });
+            driveMock.setBuffer(fs.readFileSync(tempArchivePath));
+
+            await liveSync.flush();
+            expect(fs.readFileSync(path.join(prepared.workDir, 'src', 'index.js'), 'utf8')).toBe('console.log("updated-from-google-drive");\n');
+
+            fs.writeFileSync(path.join(prepared.workDir, 'remote-write.txt'), 'hello-drive');
+            await liveSync.flush();
+            await liveSync.stop();
+
+            fs.writeFileSync(tempArchivePath, driveMock.getBuffer());
+            const syncedArchive = readWapkArchive(tempArchivePath);
+            expect(syncedArchive.files.some((file) => file.path === 'remote-write.txt')).toBe(true);
+
+            fs.rmSync(prepared.workDir, { recursive: true, force: true });
+        } finally {
+            driveMock?.restore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs the configured Google Drive archive from elit.config.json', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed.wapk');
+        const markerPath = path.join(dir, 'ran-remote.txt');
+        let driveMock: ReturnType<typeof createGoogleDriveFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'remote-config-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: 'src/index.js',
+                    env: {
+                        ELIT_WAPK_MARK: markerPath,
+                    },
+                    run: {
+                        googleDrive: {
+                            fileId: 'drive-file-id',
+                            accessToken: 'token-456',
+                        },
+                        watchArchive: true,
+                        syncInterval: 75,
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(
+                path.join(dir, 'src', 'index.js'),
+                'require("node:fs").writeFileSync(process.env.ELIT_WAPK_MARK, "configured-google-drive-run");\n',
+            );
+
+            await packWapkDirectory(dir, { outputPath: seedArchivePath });
+            driveMock = createGoogleDriveFetchMock(fs.readFileSync(seedArchivePath));
+
+            await runWapkCommand([], dir);
+
+            expect(fs.readFileSync(markerPath, 'utf8')).toBe('configured-google-drive-run');
+        } finally {
+            driveMock?.restore();
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });

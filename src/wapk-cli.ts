@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
-import { loadConfig, type WapkLockConfig } from './config';
+import { loadConfig, type WapkGoogleDriveConfig, type WapkLockConfig, type WapkRunConfig } from './config';
 
 export type WapkRuntimeName = 'node' | 'bun' | 'deno';
 
@@ -43,6 +43,27 @@ interface ResolvedWapkCredentials {
     password: string;
 }
 
+interface ResolvedWapkGoogleDriveConfig {
+    fileId: string;
+    accessToken: string;
+    accessTokenEnv?: string;
+    supportsAllDrives?: boolean;
+}
+
+interface WapkArchiveSnapshot {
+    buffer: Buffer;
+    signature?: string;
+    label?: string;
+}
+
+interface WapkArchiveHandle {
+    identifier: string;
+    label: string;
+    readSnapshot: () => Promise<WapkArchiveSnapshot>;
+    getSignature: () => Promise<string | undefined>;
+    writeBuffer: (buffer: Buffer) => Promise<WapkArchiveSnapshot>;
+}
+
 interface WapkLockMetadata {
     cipher: 'aes-256-gcm';
     kdf: 'scrypt';
@@ -57,18 +78,23 @@ type ParsedWapkEnvelope =
     | { version: 2; payload: Buffer; lock: WapkLockMetadata };
 
 export interface WapkLiveSyncController {
-    flush: () => void;
-    stop: () => void;
+    flush: () => Promise<void>;
+    stop: () => Promise<void>;
 }
 
 export interface PreparedWapkApp {
     archivePath: string;
+    archiveLabel: string;
+    archiveHandle: WapkArchiveHandle;
+    archiveSignature?: string;
     workDir: string;
     entryPath: string;
     header: WapkHeader;
     runtime: WapkRuntimeName;
     syncInterval?: number;
     useWatcher?: boolean;
+    watchArchive?: boolean;
+    archiveSyncInterval?: number;
     lock?: ResolvedWapkCredentials;
 }
 
@@ -111,6 +137,7 @@ const WAPK_SALT_LENGTH = 16;
 const WAPK_IV_LENGTH = 12;
 const WAPK_AUTH_TAG_LENGTH = 16;
 const WAPK_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 } as const;
+const DEFAULT_GOOGLE_DRIVE_TOKEN_ENV = 'GOOGLE_DRIVE_ACCESS_TOKEN';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -206,6 +233,61 @@ function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
         desktop: normalizeDesktopConfig(value.desktop),
         lock: normalizeWapkLockConfig(value.lock),
     };
+}
+
+function normalizeWapkGoogleDriveConfig(value: unknown): WapkGoogleDriveConfig | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const normalized: WapkGoogleDriveConfig = {
+        fileId: normalizeNonEmptyString(value.fileId),
+        accessToken: normalizeNonEmptyString(value.accessToken),
+        accessTokenEnv: normalizeNonEmptyString(value.accessTokenEnv),
+        supportsAllDrives: normalizeBoolean(value.supportsAllDrives),
+    };
+
+    return Object.values(normalized).some((entry) => entry !== undefined)
+        ? normalized
+        : undefined;
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined;
+}
+
+function normalizeSyncInterval(value: unknown): number | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    const interval = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(interval) || interval < 50) {
+        return undefined;
+    }
+
+    return Math.trunc(interval);
+}
+
+function normalizeWapkRunConfig(value: unknown): WapkRunConfig | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const normalized: WapkRunConfig = {
+        file: normalizeNonEmptyString(value.file),
+        googleDrive: normalizeWapkGoogleDriveConfig(value.googleDrive),
+        runtime: normalizeRuntime(value.runtime),
+        syncInterval: normalizeSyncInterval(value.syncInterval),
+        useWatcher: normalizeBoolean(value.useWatcher),
+        watchArchive: normalizeBoolean(value.watchArchive),
+        archiveSyncInterval: normalizeSyncInterval(value.archiveSyncInterval),
+        password: normalizeNonEmptyString(value.password),
+    };
+
+    return Object.values(normalized).some((entry) => entry !== undefined)
+        ? normalized
+        : undefined;
 }
 
 function sanitizePackageName(name: string): string {
@@ -789,8 +871,11 @@ function extractFiles(files: readonly WapkFileEntry[], destination: string): voi
 }
 
 function collectRuntimeSyncFiles(directory: string): WapkFileEntry[] {
-    const files = collectFiles(directory, directory, []);
-    return files
+    return filterRuntimeSyncFiles(collectFiles(directory, directory, []));
+}
+
+function filterRuntimeSyncFiles(files: readonly WapkFileEntry[]): WapkFileEntry[] {
+    return [...files]
         .filter((file) => {
             const firstPart = file.path.split('/')[0] ?? '';
             return !RUNTIME_SYNC_IGNORE.has(firstPart);
@@ -798,59 +883,461 @@ function collectRuntimeSyncFiles(directory: string): WapkFileEntry[] {
         .sort((left, right) => left.path.localeCompare(right.path));
 }
 
-function writeWapkArchiveFromMemory(
-    archivePath: string,
+function getLocalArchiveSignature(archivePath: string): string | undefined {
+    try {
+        const stats = statSync(archivePath);
+        return `${stats.size}:${stats.mtimeMs}`;
+    } catch {
+        return undefined;
+    }
+}
+
+function createGoogleDriveArchiveSignature(metadata: {
+    modifiedTime?: string;
+    size?: string;
+    md5Checksum?: string;
+}): string | undefined {
+    const signature = [metadata.modifiedTime, metadata.size, metadata.md5Checksum]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+        .join(':');
+
+    return signature.length > 0 ? signature : undefined;
+}
+
+async function readResponseMessage(response: Response): Promise<string> {
+    try {
+        const text = (await response.text()).trim();
+        return text.length > 0 ? text.slice(0, 400) : response.statusText;
+    } catch {
+        return response.statusText;
+    }
+}
+
+function buildGoogleDriveFileUrl(
+    fileId: string,
+    params: Record<string, string | boolean | undefined>,
+): string {
+    const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`);
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined) {
+            continue;
+        }
+
+        url.searchParams.set(key, typeof value === 'boolean' ? String(value) : value);
+    }
+
+    return url.toString();
+}
+
+function buildGoogleDriveUploadUrl(
+    fileId: string,
+    params: Record<string, string | boolean | undefined>,
+): string {
+    const url = new URL(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}`);
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined) {
+            continue;
+        }
+
+        url.searchParams.set(key, typeof value === 'boolean' ? String(value) : value);
+    }
+
+    return url.toString();
+}
+
+async function fetchGoogleDriveMetadata(config: ResolvedWapkGoogleDriveConfig): Promise<{
+    name?: string;
+    modifiedTime?: string;
+    size?: string;
+    md5Checksum?: string;
+}> {
+    const response = await fetch(buildGoogleDriveFileUrl(config.fileId, {
+        fields: 'id,name,modifiedTime,size,md5Checksum',
+        supportsAllDrives: config.supportsAllDrives,
+    }), {
+        headers: {
+            Authorization: `Bearer ${config.accessToken}`,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Google Drive metadata request failed (${response.status}): ${await readResponseMessage(response)}`);
+    }
+
+    const payload = await response.json();
+    return {
+        name: normalizeNonEmptyString(payload?.name),
+        modifiedTime: normalizeNonEmptyString(payload?.modifiedTime),
+        size: normalizeNonEmptyString(payload?.size),
+        md5Checksum: normalizeNonEmptyString(payload?.md5Checksum),
+    };
+}
+
+async function downloadGoogleDriveArchive(config: ResolvedWapkGoogleDriveConfig): Promise<WapkArchiveSnapshot> {
+    const metadata = await fetchGoogleDriveMetadata(config);
+    const response = await fetch(buildGoogleDriveFileUrl(config.fileId, {
+        alt: 'media',
+        supportsAllDrives: config.supportsAllDrives,
+    }), {
+        headers: {
+            Authorization: `Bearer ${config.accessToken}`,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Google Drive download failed (${response.status}): ${await readResponseMessage(response)}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+        buffer: Buffer.from(arrayBuffer),
+        signature: createGoogleDriveArchiveSignature(metadata),
+        label: metadata.name ?? `Google Drive:${config.fileId}`,
+    };
+}
+
+async function uploadGoogleDriveArchive(
+    config: ResolvedWapkGoogleDriveConfig,
+    buffer: Buffer,
+): Promise<WapkArchiveSnapshot> {
+    const response = await fetch(buildGoogleDriveUploadUrl(config.fileId, {
+        uploadType: 'media',
+        fields: 'id,name,modifiedTime,size,md5Checksum',
+        supportsAllDrives: config.supportsAllDrives,
+    }), {
+        method: 'PATCH',
+        headers: {
+            Authorization: `Bearer ${config.accessToken}`,
+            'Content-Type': 'application/octet-stream',
+        },
+        body: new Uint8Array(buffer),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Google Drive upload failed (${response.status}): ${await readResponseMessage(response)}`);
+    }
+
+    const payload = await response.json();
+    const metadata = {
+        name: normalizeNonEmptyString(payload?.name),
+        modifiedTime: normalizeNonEmptyString(payload?.modifiedTime),
+        size: normalizeNonEmptyString(payload?.size),
+        md5Checksum: normalizeNonEmptyString(payload?.md5Checksum),
+    };
+
+    return {
+        buffer,
+        signature: createGoogleDriveArchiveSignature(metadata),
+        label: metadata.name ?? `Google Drive:${config.fileId}`,
+    };
+}
+
+function resolveGoogleDriveAccessToken(config: WapkGoogleDriveConfig | undefined): string {
+    const explicitToken = normalizeNonEmptyString(config?.accessToken);
+    const configuredEnvName = normalizeNonEmptyString(config?.accessTokenEnv);
+    const configuredEnvToken = configuredEnvName
+        ? normalizeNonEmptyString(process.env[configuredEnvName])
+        : undefined;
+    const defaultEnvToken = normalizeNonEmptyString(process.env[DEFAULT_GOOGLE_DRIVE_TOKEN_ENV]);
+
+    const token = explicitToken ?? configuredEnvToken ?? defaultEnvToken;
+    if (token) {
+        return token;
+    }
+
+    if (configuredEnvName) {
+        throw new Error(`Google Drive access token not found in environment variable ${configuredEnvName}.`);
+    }
+
+    throw new Error(`Google Drive access token is required. Provide googleDrive.accessToken, googleDrive.accessTokenEnv, or set ${DEFAULT_GOOGLE_DRIVE_TOKEN_ENV}.`);
+}
+
+function parseGoogleDriveArchiveSpecifier(value: string): string | undefined {
+    const match = value.match(/^(?:gdrive|google-drive):\/\/(.+)$/i);
+    if (!match) {
+        return undefined;
+    }
+
+    const fileId = match[1]?.trim();
+    return fileId && fileId.length > 0 ? fileId : undefined;
+}
+
+function resolveGoogleDriveConfig(
+    archiveSpecifier: string,
+    googleDrive?: WapkGoogleDriveConfig,
+): ResolvedWapkGoogleDriveConfig | undefined {
+    const fileId = normalizeNonEmptyString(googleDrive?.fileId) ?? parseGoogleDriveArchiveSpecifier(archiveSpecifier);
+    if (!fileId) {
+        return undefined;
+    }
+
+    return {
+        fileId,
+        accessToken: resolveGoogleDriveAccessToken(googleDrive),
+        accessTokenEnv: normalizeNonEmptyString(googleDrive?.accessTokenEnv),
+        supportsAllDrives: googleDrive?.supportsAllDrives ?? false,
+    };
+}
+
+function createLocalArchiveHandle(archivePath: string): WapkArchiveHandle {
+    const resolvedArchivePath = resolve(archivePath);
+
+    const readLocalBuffer = (): Buffer => {
+        if (!existsSync(resolvedArchivePath)) {
+            throw new Error(`WAPK file not found: ${resolvedArchivePath}`);
+        }
+
+        return readFileSync(resolvedArchivePath);
+    };
+
+    return {
+        identifier: resolvedArchivePath,
+        label: basename(resolvedArchivePath),
+        readSnapshot: async () => ({
+            buffer: readLocalBuffer(),
+            signature: getLocalArchiveSignature(resolvedArchivePath),
+            label: basename(resolvedArchivePath),
+        }),
+        getSignature: async () => getLocalArchiveSignature(resolvedArchivePath),
+        writeBuffer: async (buffer) => {
+            writeFileSync(resolvedArchivePath, buffer);
+            return {
+                buffer,
+                signature: getLocalArchiveSignature(resolvedArchivePath),
+                label: basename(resolvedArchivePath),
+            };
+        },
+    };
+}
+
+function createGoogleDriveArchiveHandle(config: ResolvedWapkGoogleDriveConfig): WapkArchiveHandle {
+    const identifier = `gdrive://${config.fileId}`;
+    const label = `Google Drive:${config.fileId}`;
+
+    return {
+        identifier,
+        label,
+        readSnapshot: async () => downloadGoogleDriveArchive(config),
+        getSignature: async () => createGoogleDriveArchiveSignature(await fetchGoogleDriveMetadata(config)),
+        writeBuffer: async (buffer) => uploadGoogleDriveArchive(config, buffer),
+    };
+}
+
+function resolveArchiveHandle(archiveSpecifier: string, googleDrive?: WapkGoogleDriveConfig): WapkArchiveHandle {
+    const googleDriveConfig = resolveGoogleDriveConfig(archiveSpecifier, googleDrive);
+    if (googleDriveConfig) {
+        return createGoogleDriveArchiveHandle(googleDriveConfig);
+    }
+
+    return createLocalArchiveHandle(archiveSpecifier);
+}
+
+async function writeWapkArchiveFromMemory(
+    archiveHandle: WapkArchiveHandle,
     header: WapkHeader,
     files: readonly WapkFileEntry[],
     lock?: ResolvedWapkCredentials,
-): void {
+): Promise<{ header: WapkHeader; signature?: string; label: string }> {
     const updatedHeader: WapkHeader = {
         ...header,
         createdAt: new Date().toISOString(),
     };
-    writeFileSync(archivePath, encodeWapk(updatedHeader, files, lock));
+    const snapshot = await archiveHandle.writeBuffer(encodeWapk(updatedHeader, files, lock));
+    return {
+        header: updatedHeader,
+        signature: snapshot.signature,
+        label: snapshot.label ?? archiveHandle.label,
+    };
+}
+
+function removeEmptyParentDirectories(directory: string, rootDir: string): void {
+    let currentDir = directory;
+
+    while (true) {
+        const relativeDir = relative(rootDir, currentDir);
+        if (!relativeDir || relativeDir.startsWith('..') || isAbsolute(relativeDir)) {
+            return;
+        }
+
+        try {
+            if (readdirSync(currentDir).length > 0) {
+                return;
+            }
+
+            rmSync(currentDir, { recursive: false, force: true });
+        } catch {
+            return;
+        }
+
+        currentDir = dirname(currentDir);
+    }
+}
+
+function applyArchiveFilesToWorkDir(directory: string, files: readonly WapkFileEntry[]): void {
+    const existingFiles = collectRuntimeSyncFiles(directory);
+    const nextPaths = new Set(files.map((file) => file.path));
+
+    for (const file of existingFiles) {
+        if (nextPaths.has(file.path)) {
+            continue;
+        }
+
+        const filePath = join(directory, ...file.path.split('/'));
+        rmSync(filePath, { force: true });
+        removeEmptyParentDirectories(dirname(filePath), directory);
+    }
+
+    extractFiles(files, directory);
+}
+
+async function readArchiveRuntimeState(
+    archiveHandle: WapkArchiveHandle,
+    lock?: ResolvedWapkCredentials,
+): Promise<{ header: WapkHeader; files: WapkFileEntry[]; signature?: string; label: string }> {
+    const snapshot = await archiveHandle.readSnapshot();
+    const decoded = decodeWapk(snapshot.buffer, lock ? { password: lock.password } : {});
+
+    return {
+        header: decoded.header,
+        files: filterRuntimeSyncFiles(decoded.files),
+        signature: snapshot.signature,
+        label: snapshot.label ?? archiveHandle.label,
+    };
 }
 
 export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncController {
     let memoryFiles = collectRuntimeSyncFiles(prepared.workDir);
     const syncInterval = prepared.syncInterval ?? 300;
+    const archiveSyncInterval = prepared.archiveSyncInterval ?? syncInterval;
+    const watchArchive = prepared.watchArchive ?? true;
+    let currentHeader = prepared.header;
+    let currentArchiveLabel = prepared.archiveLabel;
     let stopped = false;
+    let lastArchiveSignature = prepared.archiveSignature;
+    let lastArchivePollAt = 0;
+    let pendingOperation = Promise.resolve();
 
-    const flush = (): void => {
-        if (stopped) return;
+    const reportSyncError = (error: unknown): void => {
+        console.warn(
+            `[wapk] Sync error for ${currentArchiveLabel}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    };
 
-        const nextFiles = collectRuntimeSyncFiles(prepared.workDir);
-        if (filesEqual(memoryFiles, nextFiles)) {
-            return;
+    const pullArchiveChanges = async (): Promise<boolean> => {
+        if (!watchArchive) {
+            return false;
         }
 
-        memoryFiles = nextFiles;
-        writeWapkArchiveFromMemory(prepared.archivePath, prepared.header, memoryFiles, prepared.lock);
+        const archiveSignature = await prepared.archiveHandle.getSignature();
+        if (!archiveSignature || archiveSignature === lastArchiveSignature) {
+            return false;
+        }
+
+        try {
+            const archiveState = await readArchiveRuntimeState(prepared.archiveHandle, prepared.lock);
+            lastArchiveSignature = archiveState.signature ?? archiveSignature;
+            currentHeader = archiveState.header;
+            currentArchiveLabel = archiveState.label;
+
+            if (filesEqual(memoryFiles, archiveState.files)) {
+                return false;
+            }
+
+            applyArchiveFilesToWorkDir(prepared.workDir, archiveState.files);
+            memoryFiles = archiveState.files;
+            return true;
+        } catch (error) {
+            console.warn(
+                `[wapk] Failed to pull external archive changes from ${currentArchiveLabel}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return false;
+        }
+    };
+
+    const flush = (): Promise<void> => {
+        pendingOperation = pendingOperation
+            .catch(() => undefined)
+            .then(async () => {
+                if (stopped) return;
+
+                const nextFiles = collectRuntimeSyncFiles(prepared.workDir);
+                const localDirty = !filesEqual(memoryFiles, nextFiles);
+                const now = Date.now();
+                const shouldPollArchive = watchArchive && (lastArchivePollAt === 0 || now - lastArchivePollAt >= archiveSyncInterval);
+
+                if (!localDirty && shouldPollArchive) {
+                    lastArchivePollAt = now;
+                    await pullArchiveChanges();
+                    return;
+                }
+
+                if (!localDirty) {
+                    return;
+                }
+
+                if (shouldPollArchive) {
+                    lastArchivePollAt = now;
+                    const archiveSignature = await prepared.archiveHandle.getSignature();
+                    if (archiveSignature && archiveSignature !== lastArchiveSignature) {
+                        console.warn(
+                            `[wapk] Both the workdir and ${currentArchiveLabel} changed; writing local workdir changes back to the archive.`,
+                        );
+                    }
+                }
+
+                memoryFiles = nextFiles;
+                const writeResult = await writeWapkArchiveFromMemory(prepared.archiveHandle, currentHeader, memoryFiles, prepared.lock);
+                currentHeader = writeResult.header;
+                currentArchiveLabel = writeResult.label;
+                lastArchiveSignature = writeResult.signature ?? await prepared.archiveHandle.getSignature();
+            });
+
+        return pendingOperation;
+    };
+
+    const scheduleFlush = (): void => {
+        void flush().catch(reportSyncError);
     };
 
     if (prepared.useWatcher) {
         // Event-driven file watcher mode
         const watcher = watch(prepared.workDir, { recursive: true }, () => {
-            flush();
+            scheduleFlush();
         });
 
-        const stop = (): void => {
-            flush();
-            stopped = true;
+        const archiveTimer = watchArchive
+            ? setInterval(() => {
+                scheduleFlush();
+            }, archiveSyncInterval)
+            : undefined;
+        archiveTimer?.unref?.();
+
+        const stop = async (): Promise<void> => {
+            if (stopped) return pendingOperation;
+
             watcher.close();
+            if (archiveTimer) {
+                clearInterval(archiveTimer);
+            }
+            await flush();
+            stopped = true;
+            await pendingOperation;
         };
 
         return { flush, stop };
     }
 
     // Polling mode (default)
-    const timer = setInterval(flush, syncInterval);
+    const timer = setInterval(scheduleFlush, watchArchive ? Math.min(syncInterval, archiveSyncInterval) : syncInterval);
     timer.unref?.();
 
-    const stop = (): void => {
-        flush();
-        stopped = true;
+    const stop = async (): Promise<void> => {
+        if (stopped) return;
+
         clearInterval(timer);
+        await flush();
+        stopped = true;
+        await pendingOperation;
     };
 
     return { flush, stop };
@@ -1034,16 +1521,21 @@ export function extractWapkArchive(
     return extractDirectory;
 }
 
-export function prepareWapkApp(
+export async function prepareWapkApp(
     wapkPath: string,
-    options: WapkCredentialsOptions & { runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } = {},
-): PreparedWapkApp {
-    const archivePath = resolve(wapkPath);
-    if (!existsSync(archivePath)) {
-        throw new Error(`WAPK file not found: ${archivePath}`);
-    }
-
-    const buffer = readFileSync(archivePath);
+    options: WapkCredentialsOptions & {
+        runtime?: WapkRuntimeName;
+        syncInterval?: number;
+        useWatcher?: boolean;
+        watchArchive?: boolean;
+        archiveSyncInterval?: number;
+        googleDrive?: WapkGoogleDriveConfig;
+    } = {},
+): Promise<PreparedWapkApp> {
+    const archiveHandle = resolveArchiveHandle(wapkPath, options.googleDrive);
+    const archivePath = archiveHandle.identifier;
+    const snapshot = await archiveHandle.readSnapshot();
+    const buffer = snapshot.buffer;
     const envelope = parseWapkEnvelope(buffer);
     const lock = envelope.version === WAPK_LOCKED_VERSION
         ? resolveArchiveCredentials(options)
@@ -1063,12 +1555,17 @@ export function prepareWapkApp(
 
     return {
         archivePath,
+        archiveLabel: snapshot.label ?? archiveHandle.label,
+        archiveHandle,
+        archiveSignature: snapshot.signature,
         workDir,
         entryPath,
         header: decoded.header,
         runtime,
         syncInterval: options.syncInterval,
         useWatcher: options.useWatcher,
+        watchArchive: options.watchArchive,
+        archiveSyncInterval: options.archiveSyncInterval,
         lock,
     };
 }
@@ -1114,7 +1611,7 @@ export async function runPreparedWapkApp(prepared: PreparedWapkApp): Promise<num
     } finally {
         process.off('SIGINT', onSigInt);
         process.off('SIGTERM', onSigTerm);
-        sync.stop();
+        await sync.stop();
         rmSync(prepared.workDir, { recursive: true, force: true });
     }
 }
@@ -1167,11 +1664,13 @@ function printWapkHelp(): void {
         'WAPK packaging for Elit',
         '',
         'Usage:',
-        '  elit wapk <file.wapk>',
-        '  elit wapk run <file.wapk>',
-        '  elit wapk run <file.wapk> --runtime node|bun|deno',
-        '  elit wapk run <file.wapk> --sync-interval 100',
-        '  elit wapk run <file.wapk> --watcher',
+        '  elit wapk [file.wapk]',
+        '  elit wapk gdrive://<fileId>',
+        '  elit wapk run [file.wapk]',
+        '  elit wapk run --google-drive-file-id <fileId> --google-drive-token-env <env>',
+        '  elit wapk run [file.wapk] --runtime node|bun|deno',
+        '  elit wapk run [file.wapk] --sync-interval 100',
+        '  elit wapk run [file.wapk] --watcher',
         '  elit wapk pack [directory]',
         '  elit wapk pack [directory] --password secret-123',
         '  elit wapk pack [directory] --include-deps',
@@ -1182,13 +1681,21 @@ function printWapkHelp(): void {
         '  -r, --runtime <name>         Runtime override: node, bun, deno',
         '  --sync-interval <ms>         Polling interval for live sync (ms, default 300)',
         '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
+        '  --archive-watch              Pull external archive changes back into the temp workdir',
+        '  --no-archive-watch           Disable external archive read sync',
+        '  --google-drive-file-id <id>  Run a remote .wapk directly from Google Drive',
+        '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
+        '  --google-drive-access-token <value>  OAuth token for Google Drive API calls',
+        '  --google-drive-shared-drive  Include supportsAllDrives=true for shared drives',
         '  --include-deps               Include node_modules in the archive',
         '  --password <value>           Password for locking or unlocking the archive',
         '  -h, --help                   Show this help',
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
-        '  - Run mode keeps files in RAM and syncs changes back to the .wapk file.',
+        '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
+        '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',
+        '  - Google Drive mode talks to the Drive API directly; no local archive file is required.',
         '  - Locked archives require the same password for run/extract/inspect.',
         '  - Archives stay unlocked by default unless a password is provided.',
         '  - Use --watcher for faster file change detection (less CPU usage).',
@@ -1234,11 +1741,20 @@ function parseArchiveAccessArgs(args: string[], usage: string): { file: string }
     return { file, password };
 }
 
-function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName; syncInterval?: number; useWatcher?: boolean } & WapkCredentialsOptions {
+function parseRunArgs(args: string[]): {
+    file?: string;
+    googleDrive?: WapkGoogleDriveConfig;
+    runtime?: WapkRuntimeName;
+    syncInterval?: number;
+    useWatcher?: boolean;
+    watchArchive?: boolean;
+} & WapkCredentialsOptions {
     let file: string | undefined;
+    let googleDrive: WapkGoogleDriveConfig | undefined;
     let runtime: WapkRuntimeName | undefined;
     let syncInterval: number | undefined;
-    let useWatcher = false;
+    let useWatcher: boolean | undefined;
+    let watchArchive: boolean | undefined;
     let password: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
@@ -1266,6 +1782,42 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
                 useWatcher = true;
                 break;
             }
+            case '--archive-watch': {
+                watchArchive = true;
+                break;
+            }
+            case '--no-archive-watch': {
+                watchArchive = false;
+                break;
+            }
+            case '--google-drive-file-id': {
+                googleDrive = {
+                    ...googleDrive,
+                    fileId: readRequiredOptionValue(args, ++index, '--google-drive-file-id'),
+                };
+                break;
+            }
+            case '--google-drive-token-env': {
+                googleDrive = {
+                    ...googleDrive,
+                    accessTokenEnv: readRequiredOptionValue(args, ++index, '--google-drive-token-env'),
+                };
+                break;
+            }
+            case '--google-drive-access-token': {
+                googleDrive = {
+                    ...googleDrive,
+                    accessToken: readRequiredOptionValue(args, ++index, '--google-drive-access-token'),
+                };
+                break;
+            }
+            case '--google-drive-shared-drive': {
+                googleDrive = {
+                    ...googleDrive,
+                    supportsAllDrives: true,
+                };
+                break;
+            }
             case '--password':
                 password = readRequiredOptionValue(args, ++index, '--password');
                 break;
@@ -1281,11 +1833,7 @@ function parseRunArgs(args: string[]): { file: string; runtime?: WapkRuntimeName
         }
     }
 
-    if (!file) {
-        throw new Error('Usage: elit wapk run <file.wapk>');
-    }
-
-    return { file, runtime, syncInterval, useWatcher, password };
+    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
@@ -1320,8 +1868,98 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
     return { directory, includeDeps, password };
 }
 
-export async function runWapkCommand(args: string[]): Promise<void> {
-    if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+async function readConfiguredWapkRunDefaults(cwd: string): Promise<WapkRunConfig | undefined> {
+    const config = await loadConfig(cwd);
+    const runConfig = normalizeWapkRunConfig(config?.wapk?.run);
+    const fallbackPassword = normalizeNonEmptyString(config?.wapk?.lock?.password);
+
+    if (!runConfig) {
+        return fallbackPassword ? { password: fallbackPassword } : undefined;
+    }
+
+    if (!runConfig.password && fallbackPassword) {
+        runConfig.password = fallbackPassword;
+    }
+
+    if (runConfig.file && runConfig.googleDrive?.fileId) {
+        throw new Error('config.wapk.run.file and config.wapk.run.googleDrive.fileId are mutually exclusive.');
+    }
+
+    return runConfig;
+}
+
+function mergeGoogleDriveRunConfig(
+    cliConfig: WapkGoogleDriveConfig | undefined,
+    defaultConfig: WapkGoogleDriveConfig | undefined,
+): WapkGoogleDriveConfig | undefined {
+    if (!cliConfig && !defaultConfig) {
+        return undefined;
+    }
+
+    const merged: WapkGoogleDriveConfig = {
+        fileId: normalizeNonEmptyString(cliConfig?.fileId) ?? normalizeNonEmptyString(defaultConfig?.fileId),
+        accessToken: normalizeNonEmptyString(cliConfig?.accessToken) ?? normalizeNonEmptyString(defaultConfig?.accessToken),
+        accessTokenEnv: normalizeNonEmptyString(cliConfig?.accessTokenEnv) ?? normalizeNonEmptyString(defaultConfig?.accessTokenEnv),
+        supportsAllDrives: cliConfig?.supportsAllDrives ?? defaultConfig?.supportsAllDrives,
+    };
+
+    return Object.values(merged).some((entry) => entry !== undefined)
+        ? merged
+        : undefined;
+}
+
+function resolveConfiguredWapkRunOptions(
+    options: ReturnType<typeof parseRunArgs>,
+    defaults: WapkRunConfig | undefined,
+): {
+    file?: string;
+    googleDrive?: WapkGoogleDriveConfig;
+    runtime?: WapkRuntimeName;
+    syncInterval?: number;
+    useWatcher?: boolean;
+    watchArchive?: boolean;
+    archiveSyncInterval?: number;
+    password?: string;
+} {
+    return {
+        file: options.file ?? defaults?.file,
+        googleDrive: mergeGoogleDriveRunConfig(options.googleDrive, defaults?.googleDrive),
+        runtime: options.runtime ?? defaults?.runtime,
+        syncInterval: options.syncInterval ?? defaults?.syncInterval,
+        useWatcher: options.useWatcher ?? defaults?.useWatcher,
+        watchArchive: options.watchArchive ?? defaults?.watchArchive,
+        archiveSyncInterval: defaults?.archiveSyncInterval,
+        password: options.password ?? defaults?.password,
+    };
+}
+
+function resolveRunArchivePath(file: string, cwd: string): string {
+    return isAbsolute(file) ? file : resolve(cwd, file);
+}
+
+function resolveRunArchiveSpecifier(
+    file: string | undefined,
+    googleDrive: WapkGoogleDriveConfig | undefined,
+    cwd: string,
+): string | undefined {
+    const googleDriveFileId = normalizeNonEmptyString(googleDrive?.fileId);
+    if (googleDriveFileId) {
+        if (file && !parseGoogleDriveArchiveSpecifier(file)) {
+            throw new Error('WAPK run cannot use both a local archive file and googleDrive.fileId at the same time.');
+        }
+
+        return `gdrive://${googleDriveFileId}`;
+    }
+
+    if (!file) {
+        return undefined;
+    }
+
+    return parseGoogleDriveArchiveSpecifier(file) ? file : resolveRunArchivePath(file, cwd);
+}
+
+export async function runWapkCommand(args: string[], cwd: string = process.cwd()): Promise<void> {
+    if (args.includes('--help') || args.includes('-h')) {
         printWapkHelp();
         return;
     }
@@ -1347,11 +1985,28 @@ export async function runWapkCommand(args: string[]): Promise<void> {
         return;
     }
 
-    const runOptions = args[0] === 'run' ? parseRunArgs(args.slice(1)) : parseRunArgs(args);
-    const prepared = prepareWapkApp(runOptions.file, {
+    const parsedRunOptions = args[0] === 'run' ? parseRunArgs(args.slice(1)) : parseRunArgs(args);
+    const configuredRunDefaults = await readConfiguredWapkRunDefaults(cwd);
+    const runOptions = resolveConfiguredWapkRunOptions(parsedRunOptions, configuredRunDefaults);
+
+    const archiveSpecifier = resolveRunArchiveSpecifier(runOptions.file, runOptions.googleDrive, cwd);
+
+    if (!archiveSpecifier) {
+        if (args.length === 0) {
+            printWapkHelp();
+            return;
+        }
+
+        throw new Error('Usage: elit wapk run <file.wapk>');
+    }
+
+    const prepared = await prepareWapkApp(archiveSpecifier, {
+        googleDrive: runOptions.googleDrive,
         runtime: runOptions.runtime,
         syncInterval: runOptions.syncInterval,
         useWatcher: runOptions.useWatcher,
+        watchArchive: runOptions.watchArchive,
+        archiveSyncInterval: runOptions.archiveSyncInterval,
         password: runOptions.password,
     });
     const exitCode = await runPreparedWapkApp(prepared);

@@ -273,12 +273,29 @@ wapk: {
   lock: {
     password: 'secret-123',
   },
+  run: {
+    googleDrive: {
+      fileId: '1AbCdEfGhIjKlMnOp',
+      accessTokenEnv: 'GOOGLE_DRIVE_ACCESS_TOKEN',
+      supportsAllDrives: true,
+    },
+    runtime: 'bun',
+    syncInterval: 150,
+    useWatcher: true,
+    watchArchive: true,
+    archiveSyncInterval: 150,
+  },
 }
 ```
 
 Notes:
 
 - `lock.password` stores a plain-text password.
+- `wapk.run.file` lets `elit wapk` or `elit wapk run` start a default archive without passing a file path each time.
+- `wapk.run.googleDrive` lets WAPK talk to the Google Drive API directly, so the archive does not need to exist as a local file.
+- `wapk.run.watchArchive` keeps the temp workdir in sync with external archive updates from the archive source, including Google Drive.
+- `wapk.run.googleDrive.accessTokenEnv` is the recommended way to provide the OAuth token; Elit also falls back to the `GOOGLE_DRIVE_ACCESS_TOKEN` environment variable.
+- `wapk.run.password` can override the archive password used at runtime; when it is omitted, Elit falls back to `wapk.lock.password`.
 - `desktop` metadata can also be embedded under `wapk.desktop` when desktop shell behavior needs extra data.
 
 ## Full Example

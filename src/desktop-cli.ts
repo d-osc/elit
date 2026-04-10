@@ -576,7 +576,7 @@ async function runDesktopWapkCommand(args: string[], config?: DesktopConfig): Pr
     }
 
     const options = parseDesktopWapkRunArgs(args, config?.wapk);
-    const preparedApp = prepareWapkApp(options.file, {
+    const preparedApp = await prepareWapkApp(options.file, {
         runtime: options.runtime,
         syncInterval: options.syncInterval,
         useWatcher: options.useWatcher,
@@ -597,7 +597,7 @@ async function runDesktopWapkCommand(args: string[], config?: DesktopConfig): Pr
             process.exit(exitCode);
         }
     } finally {
-        liveSync.stop();
+        await liveSync.stop();
         rmSync(preparedApp.workDir, { recursive: true, force: true });
         cleanupPreparedEntry(preparedEntry);
     }

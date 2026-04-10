@@ -158,6 +158,7 @@
     "test:run": "elit test --run",
     "test:coverage": "elit test --coverage",
     "test:e2e": "elit test --e2e",
+    "test:wapk:google-drive": "elit test --run --file ./testing/unit/wapk.google-drive.integration.test.ts",
     "benchmark": "node benchmark/server-benchmark.js",
     "benchmark:router": "node benchmark/router-benchmark.js",
     "docs:dev": "npm run --prefix docs dev",

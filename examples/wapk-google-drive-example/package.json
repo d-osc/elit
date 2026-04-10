@@ -1,0 +1,17 @@
+{
+  "name": "@elit/wapk-google-drive-example",
+  "version": "1.0.0",
+  "description": "Example Elit app configured to run a WAPK archive directly from Google Drive",
+  "type": "module",
+  "scripts": {
+    "pack": "elit wapk pack .",
+    "run": "elit wapk"
+  },
+  "keywords": [
+    "elit",
+    "wapk",
+    "google-drive",
+    "example"
+  ],
+  "license": "MIT"
+}

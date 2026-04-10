@@ -197,7 +197,11 @@ Archive packaging and runtime commands.
 Forms:
 
 - `elit wapk <file.wapk>`
+- `elit wapk gdrive://<fileId>`
 - `elit wapk run <file.wapk>`
+- `elit wapk run --google-drive-file-id <fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN`
+- `elit wapk`
+- `elit wapk run`
 - `elit wapk pack [directory]`
 - `elit wapk inspect <file.wapk>`
 - `elit wapk extract <file.wapk>`
@@ -207,6 +211,11 @@ Useful options:
 - `--runtime node|bun|deno`
 - `--sync-interval <ms>`
 - `--watcher`
+- `--archive-watch`
+- `--no-archive-watch`
+- `--google-drive-file-id <id>`
+- `--google-drive-token-env <env>`
+- `--google-drive-access-token <token>`
 - `--include-deps` on `pack`
 
 ## Config-First Workflow
@@ -218,6 +227,7 @@ The CLI gets more useful when you store defaults in `elit.config.*`.
 - `mobile` reads `config.mobile` defaults for cwd, app id, icon, permissions, and native generation.
 - `pm` reads `config.pm.dataDir`, `config.pm.dumpFile`, and `config.pm.apps[]` for process manager defaults.
 - `wapk` reads `config.wapk` for runtime, entry, scripts, env, and archive locking.
+- `wapk` also reads `config.wapk.run` for a default archive source plus live-sync behavior, including direct Google Drive API access without a local archive file.
 
 ## Practical Examples
 
