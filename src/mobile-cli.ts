@@ -684,10 +684,11 @@ function commandExists(command: string, cwd: string): boolean {
     return result.status === 0;
 }
 
-function resolveCommandPath(command: string, cwd: string): string | undefined {
+function resolveCommandPath(command: string, cwd: string, env?: NodeJS.ProcessEnv): string | undefined {
     const checker = process.platform === 'win32' ? 'where' : 'which';
     const result = spawnSync(checker, [command], {
         cwd,
+        env,
         encoding: 'utf8',
         shell: false,
     });
@@ -773,14 +774,17 @@ function runGradle(cwd: string, args: string[]): void {
     const env = gradleCommand.prependPath ? prependCommandPath(gradleCommand.prependPath) : undefined;
 
     if (process.platform === 'win32' && gradleCommand.useWindowsBatchShell) {
-        runWindowsBatchCommand(gradleCommand.command, args, androidRoot, env);
+        const shellCommand = gradleCommand.batchCommandPath
+            ?? resolveCommandPath(gradleCommand.command, androidRoot, env)
+            ?? gradleCommand.command;
+        runWindowsBatchCommand(shellCommand, args, androidRoot);
         return;
     }
 
     runCommand(gradleCommand.command, args, androidRoot, env);
 }
 
-function resolveGradleCommand(cwd: string): { command: string; details: string; prependPath?: string; useWindowsBatchShell?: boolean } | undefined {
+function resolveGradleCommand(cwd: string): { command: string; details: string; batchCommandPath?: string; prependPath?: string; useWindowsBatchShell?: boolean } | undefined {
     const androidRoot = join(cwd, 'android');
     const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const wrapperPath = join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
@@ -788,6 +792,7 @@ function resolveGradleCommand(cwd: string): { command: string; details: string; 
     if (existsSync(wrapperPath)) {
         return {
             command: wrapper,
+            batchCommandPath: wrapperPath,
             details: 'Using project gradle wrapper.',
             useWindowsBatchShell: process.platform === 'win32',
         };
@@ -796,6 +801,9 @@ function resolveGradleCommand(cwd: string): { command: string; details: string; 
     if (commandExists('gradle', androidRoot)) {
         return {
             command: 'gradle',
+            batchCommandPath: process.platform === 'win32'
+                ? resolveCommandPath('gradle', androidRoot) ?? 'gradle'
+                : undefined,
             details: 'Using Gradle from PATH.',
             useWindowsBatchShell: process.platform === 'win32',
         };
@@ -806,10 +814,16 @@ function resolveGradleCommand(cwd: string): { command: string; details: string; 
         return undefined;
     }
 
+    const prependPath = process.platform === 'win32' ? dirname(fallbackGradle) : undefined;
+    const fallbackEnv = prependPath ? prependCommandPath(prependPath) : undefined;
+
     return {
         command: process.platform === 'win32' ? 'gradle' : fallbackGradle,
+        batchCommandPath: process.platform === 'win32'
+            ? resolveCommandPath('gradle', androidRoot, fallbackEnv) ?? undefined
+            : undefined,
         details: `Using fallback Gradle at ${fallbackGradle}.`,
-        prependPath: process.platform === 'win32' ? dirname(fallbackGradle) : undefined,
+        prependPath,
         useWindowsBatchShell: process.platform === 'win32',
     };
 }
@@ -1062,12 +1076,11 @@ function prependCommandPath(pathEntry: string): NodeJS.ProcessEnv {
     };
 }
 
-function runWindowsBatchCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
+function runWindowsBatchCommand(command: string, args: string[], cwd: string): void {
     const commandToken = quoteWindowsCmdToken(normalize(command));
     const argTokens = args.map(quoteWindowsCmdToken);
     const result = spawnSync('cmd.exe', ['/d', '/s', '/c', commandToken, ...argTokens], {
         cwd,
-        env,
         stdio: 'inherit',
         shell: false,
         windowsVerbatimArguments: true,
