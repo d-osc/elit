@@ -1077,13 +1077,10 @@ function prependCommandPath(pathEntry: string): NodeJS.ProcessEnv {
 }
 
 function runWindowsBatchCommand(command: string, args: string[], cwd: string): void {
-    const commandToken = quoteWindowsCmdToken(normalize(command));
-    const argTokens = args.map(quoteWindowsCmdToken);
-    const result = spawnSync('cmd.exe', ['/d', '/s', '/c', commandToken, ...argTokens], {
+    const result = spawnSync(normalize(command), args, {
         cwd,
         stdio: 'inherit',
         shell: false,
-        windowsVerbatimArguments: true,
     });
 
     if (typeof result.status === 'number' && result.status !== 0) {
