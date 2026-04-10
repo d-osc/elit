@@ -1,0 +1,8 @@
+dist/*.map
+dist/*.ts.map
+dist/*.js.map
+dist/*.mjs.map
+dist/*.cjs.map
+dist/*.d.ts.map
+src/**/*.test.ts
+src/**/*.spec.ts
