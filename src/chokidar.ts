@@ -8,6 +8,8 @@
  */
 
 import { EventEmitter } from 'events';
+import { existsSync, statSync } from './fs';
+import { dirname } from './path';
 import { runtime } from './runtime';
 
 /**
@@ -278,18 +280,41 @@ export class FSWatcher extends EventEmitter {
  * e.g., 'src/**\/*.ts' -> 'src', '**\/*.ts' -> '.'
  */
 function getBaseDirectory(pattern: string): string {
+  const normalizedPattern = normalizePath(pattern);
+
   // Remove glob patterns to get the base directory
-  const parts = pattern.split(/[\\\/]/);
+  const parts = normalizedPattern.split(/[\\\/]/);
   let baseDir = '';
+  let sawGlob = false;
 
   for (const part of parts) {
     if (part.includes('*') || part.includes('?')) {
+      sawGlob = true;
       break;
     }
     baseDir = baseDir ? `${baseDir}/${part}` : part;
   }
 
-  return baseDir || '.';
+  if (sawGlob) {
+    return baseDir || '.';
+  }
+
+  if (normalizedPattern && existsSync(normalizedPattern)) {
+    try {
+      return statSync(normalizedPattern).isDirectory()
+        ? normalizedPattern
+        : normalizePath(dirname(normalizedPattern)) || '.';
+    } catch {
+      return normalizePath(dirname(normalizedPattern)) || '.';
+    }
+  }
+
+  const lastSegment = parts[parts.length - 1] || '';
+  if (lastSegment.includes('.') && !lastSegment.startsWith('.')) {
+    return normalizePath(dirname(normalizedPattern)) || '.';
+  }
+
+  return normalizedPattern || '.';
 }
 
 /**
@@ -298,6 +323,7 @@ function getBaseDirectory(pattern: string): string {
 function matchesPattern(filePath: string, pattern: string): boolean {
   // Simple glob matching - convert pattern to regex
   const regexPattern = normalizePath(pattern)
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, '.*')
     .replace(/\*/g, '[^/]*')
     .replace(/\?/g, '.');

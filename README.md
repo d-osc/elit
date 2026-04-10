@@ -226,6 +226,7 @@ npx elit desktop build ./src/main.ts --release
 npx elit mobile init
 npx elit mobile run android
 npx elit native generate android ./src/native-screen.ts --name HomeScreen
+npx elit pm start --script "npm start" --name my-app
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk
@@ -255,6 +256,13 @@ Useful flags:
 - `elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app`
 - `elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview`
 - `elit native generate ir ./src/native-screen.ts --platform android --export screen`
+- `elit pm start --script "npm start" --name my-app --runtime node`
+- `elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure`
+- `elit pm start ./src/worker.ts --name worker --runtime bun`
+- `elit pm start --wapk ./app.wapk --name packaged-app`
+- `elit pm save`
+- `elit pm resurrect`
+- `elit pm logs my-app --lines 100`
 - `elit wapk pack . --password secret-123`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
 - `elit wapk run ./app.wapk --password secret-123 --sync-interval 100 --watcher`
@@ -315,6 +323,17 @@ WAPK mode notes:
 - WAPK stays unlocked by default unless `wapk.lock.password` or `--password` is provided.
 - See [docs/wapk.md](docs/wapk.md) for the full archive guide and `examples/wapk-example` for an end-to-end sample.
 
+PM mode notes:
+
+- `elit pm start --script "npm start"`, `elit pm start --file ./app.ts`, and `elit pm start --wapk ./app.wapk` all run through the same detached process manager.
+- `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
+- Use `elit pm list`, `elit pm stop`, `elit pm restart`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
+- Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.
+- Use `--watch`, `--watch-path`, `--watch-ignore`, and `--watch-debounce` when the process should restart after source changes.
+- Use `--health-url`, `--health-grace-period`, `--health-interval`, `--health-timeout`, and `--health-max-failures` when the process exposes an HTTP health endpoint.
+- PM state and logs are stored in `./.elit/pm` by default, or in `pm.dataDir` when configured. `elit pm save` writes to `pm.dumpFile` or `./.elit/pm/dump.json`.
+- TypeScript file targets with runtime `node` require `tsx`; use `--runtime bun` when you want zero-config TypeScript execution.
+
 ## Config File
 
 Elit loads one of these files from the project root:
@@ -334,6 +353,22 @@ The config shape is:
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  pm?: {
+    dataDir?: string;
+    apps?: Array<{
+      name: string;
+      script?: string;
+      file?: string;
+      wapk?: string;
+      runtime?: 'node' | 'bun' | 'deno';
+      cwd?: string;
+      env?: Record<string, string | number | boolean>;
+      autorestart?: boolean;
+      restartDelay?: number;
+      maxRestarts?: number;
+      password?: string;
+    }>;
+  };
   mobile?: {
     cwd?: string;
     appId?: string;
@@ -479,6 +514,25 @@ export default {
       release: true,
     },
   },
+  pm: {
+    apps: [
+      {
+        name: 'api',
+        script: 'npm start',
+        runtime: 'node',
+      },
+      {
+        name: 'worker',
+        file: './src/worker.ts',
+        runtime: 'bun',
+      },
+      {
+        name: 'archive-app',
+        wapk: './dist/app.wapk',
+        runtime: 'node',
+      },
+    ],
+  },
   wapk: {
     name: 'my-app',
     version: '1.0.0',
@@ -509,6 +563,7 @@ Important details:
 - Only `VITE_` variables are exposed to client code during bundling.
 - `desktop` config provides defaults for `elit desktop`, `elit desktop run`, `elit desktop build`, and `elit desktop wapk`. Use `desktop.entry` for hybrid defaults, `desktop.native.entry` for native defaults, and `desktop.mode` to choose which one runs by default.
 - `mobile` config provides defaults for `elit mobile init|sync|open|run|build`.
+- `pm` config provides defaults for `elit pm`. Use `pm.apps[]` for named processes, `pm.dataDir` for metadata/log storage, `pm.dumpFile` for `save`/`resurrect`, and per-app restart/watch/health settings.
 - `wapk` config is loaded from `elit.config.*`, then package metadata is used as fallback.
 - `wapk.lock.password` is the config-level default for locked archives. Use `--password` when you want to supply unlock credentials at command time instead of writing them into config.
 - `wapk run` and `desktop wapk run` sync runtime file changes back into the same `.wapk` archive.
@@ -872,11 +927,12 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.5.2`:
+Highlights in `v3.5.4`:
 
-- Simplified WAPK locking to password-only credentials across config, CLI, and helper APIs.
-- `wapk.lock` now accepts only `password` in `elit.config.*`.
-- `elit wapk` and `elit desktop wapk` now accept only `--password` when opening locked archives.
+- Added `elit pm` for detached background process management of shell commands, file targets, and WAPK apps.
+- Added `pm.apps[]` and `pm.dataDir` in `elit.config.*` for config-first process manager workflows.
+- Added `elit pm save` / `elit pm resurrect`, `pm.dumpFile`, watch mode, health checks, and restart-policy controls for the process manager.
+- Added lifecycle commands for managed apps: `list`, `stop`, `restart`, `delete`, and `logs`.
 
 ## Good Defaults For Generated Code
 

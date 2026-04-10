@@ -147,6 +147,9 @@ npx elit desktop build ./src/main.ts --release
 npx elit mobile init
 npx elit mobile run android
 npx elit native generate android ./src/native-screen.ts --name HomeScreen
+npx elit pm start --script "npm start" --name my-app
+npx elit pm save
+npx elit pm resurrect
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk --runtime bun`;
@@ -200,6 +203,36 @@ const configShape = `{
   build?: BuildOptions | BuildOptions[];
   preview?: PreviewOptions;
   test?: TestOptions;
+  pm?: {
+    dataDir?: string;
+    dumpFile?: string;
+    apps?: Array<{
+      name: string;
+      script?: string;
+      file?: string;
+      wapk?: string;
+      runtime?: 'node' | 'bun' | 'deno';
+      cwd?: string;
+      env?: Record<string, string | number | boolean>;
+      autorestart?: boolean;
+      restartDelay?: number;
+      maxRestarts?: number;
+      password?: string;
+      restartPolicy?: 'always' | 'on-failure' | 'never';
+      minUptime?: number;
+      watch?: boolean;
+      watchPaths?: string[];
+      watchIgnore?: string[];
+      watchDebounce?: number;
+      healthCheck?: {
+        url?: string;
+        gracePeriod?: number;
+        interval?: number;
+        timeout?: number;
+        maxFailures?: number;
+      };
+    }>;
+  };
   mobile?: {
     cwd?: string;
     appId?: string;
@@ -345,6 +378,26 @@ export default {
     release: false,
     outDir: 'dist',
     platform: 'windows',
+  },
+  pm: {
+    dumpFile: './.elit/pm/dump.json',
+    apps: [
+      {
+        name: 'api',
+        script: 'npm start',
+        runtime: 'node',
+        restartPolicy: 'on-failure',
+        watch: true,
+      },
+      {
+        name: 'worker',
+        file: './src/worker.ts',
+        runtime: 'bun',
+        healthCheck: {
+          url: 'http://127.0.0.1:3001/health',
+        },
+      },
+    ],
   },
   wapk: {
     name: '@acme/sample-app',
@@ -588,6 +641,13 @@ const Docs = () =>
               li(code('elit mobile run android|ios --cwd . --target <device-id> --prod --icon ./icon.png --permission android.permission.CAMERA')),
               li(code('elit native generate android ./src/native-screen.ts --name HomeScreen --package com.example.app')),
               li(code('elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview')),
+              li(code('elit pm start --script "npm start" --name my-app --runtime node')),
+              li(code('elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure')),
+              li(code('elit pm start ./src/worker.ts --name worker --runtime bun')),
+              li(code('elit pm start --wapk ./app.wapk --name packaged-app')),
+              li(code('elit pm save')),
+              li(code('elit pm resurrect')),
+              li(code('elit pm logs my-app --lines 100')),
               li(code('elit wapk pack [directory] --include-deps')),
               li(code('elit wapk run <file.wapk> --runtime node|bun|deno')),
               li(code('elit wapk run <file.wapk> --sync-interval 100 --watcher'))

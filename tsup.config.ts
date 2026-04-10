@@ -80,17 +80,17 @@ export default defineConfig([
         entry: {
             cli: 'src/cli.ts'
         },
-        format: ['cjs'],
+        format: ['cjs', 'esm'],
         dts: true,
         clean: false,
         splitting: false,
         external: ['bun', 'esbuild', 'source-map', 'v8'],
         target: 'es2020',
-        outExtension() {
+        outExtension({ format }) {
             return {
-                js: '.js',
+                js: format === 'cjs' ? '.js' : '.mjs',
                 dts: '.d.ts'
             };
-        }
+        },
     }
 ]);

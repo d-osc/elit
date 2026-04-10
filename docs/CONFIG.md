@@ -1,6 +1,6 @@
 # Elit Config Reference
 
-Elit loads project configuration from the project root and uses it to drive dev, preview, build, desktop, mobile, and WAPK workflows.
+Elit loads project configuration from the project root and uses it to drive dev, preview, build, desktop, mobile, process-manager, and WAPK workflows.
 
 ## Config Files
 
@@ -46,6 +46,7 @@ interface ElitConfig {
   test?: TestOptions;
   desktop?: DesktopConfig;
   mobile?: MobileConfig;
+  pm?: PmConfig;
   wapk?: WapkConfig;
 }
 ```
@@ -151,6 +152,63 @@ Notes:
 - `desktop.native.entry` is the native default entry.
 - `desktop.native.exportName` lets the CLI read a specific export.
 - `platform` accepts the standard names plus aliases such as `win`, `mac`, and architecture-specific desktop targets.
+
+## PM
+
+`pm` config stores named apps for `elit pm`.
+
+```typescript
+pm: {
+  dataDir: './.elit/pm',
+  dumpFile: './.elit/pm/dump.json',
+  apps: [
+    {
+      name: 'api',
+      script: 'npm start',
+      runtime: 'node',
+      restartPolicy: 'on-failure',
+      minUptime: 5000,
+      watch: true,
+      watchPaths: ['./src', './package.json'],
+      watchIgnore: ['**/*.log'],
+      watchDebounce: 300,
+      healthCheck: {
+        url: 'http://127.0.0.1:3000/health',
+        gracePeriod: 5000,
+        interval: 10000,
+        timeout: 3000,
+        maxFailures: 3,
+      },
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+    {
+      name: 'worker',
+      file: './src/worker.ts',
+      runtime: 'bun',
+      restartDelay: 500,
+    },
+    {
+      name: 'archive-app',
+      wapk: './dist/app.wapk',
+      runtime: 'node',
+      password: 'secret-123',
+    },
+  ],
+}
+```
+
+Notes:
+
+- `script`, `file`, and `wapk` are mutually exclusive per app.
+- `pm.dataDir` changes where Elit stores process records and log files.
+- `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
+- `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
+- `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.
+- `healthCheck` config polls an HTTP endpoint and restarts the process after repeated failures.
+- `elit pm start` starts every configured app, while `elit pm start <name>` starts one app by name.
+- TypeScript file targets with `runtime: 'node'` require `tsx`; use `runtime: 'bun'` when you want zero-config TypeScript execution.
 
 ## Mobile
 
@@ -278,6 +336,26 @@ export default defineConfig({
     native: {
       entry: './src/main.ts',
     },
+  },
+  pm: {
+    dumpFile: './.elit/pm/dump.json',
+    apps: [
+      {
+        name: 'api',
+        script: 'npm start',
+        runtime: 'node',
+        restartPolicy: 'on-failure',
+        watch: true,
+      },
+      {
+        name: 'worker',
+        file: './src/worker.ts',
+        runtime: 'bun',
+        healthCheck: {
+          url: 'http://127.0.0.1:3001/health',
+        },
+      },
+    ],
   },
   mobile: {
     cwd: '.',

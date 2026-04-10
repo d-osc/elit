@@ -15,6 +15,7 @@ elit desktop build ./src/main.ts --release
 elit mobile init
 elit mobile run android
 elit native generate android ./src/native-screen.ts --name HomeScreen
+elit pm start --script "npm start" --name my-app
 elit wapk pack .
 elit wapk run ./app.wapk
 ```
@@ -139,6 +140,56 @@ Useful options:
 - `--package <name>` for Android
 - `--export <name>` to read a specific module export
 
+### `elit pm`
+
+Detached process manager for shell commands, file targets, and WAPK apps.
+
+Forms:
+
+- `elit pm start --script "npm start" --name my-app`
+- `elit pm start ./src/app.ts --name my-app`
+- `elit pm start --file ./src/app.js --name my-app`
+- `elit pm start --wapk ./app.wapk --name my-app`
+- `elit pm start`
+- `elit pm start my-app`
+- `elit pm list`
+- `elit pm stop <name|all>`
+- `elit pm restart <name|all>`
+- `elit pm delete <name|all>`
+- `elit pm save`
+- `elit pm resurrect`
+- `elit pm logs <name>`
+
+Useful options:
+
+- `--runtime node|bun|deno`
+- `--cwd <dir>`
+- `--env KEY=VALUE`
+- `--password <value>` for locked WAPK apps
+- `--restart-policy always|on-failure|never`
+- `--min-uptime <ms>`
+- `--watch`
+- `--watch-path <path>`
+- `--watch-ignore <pattern>`
+- `--watch-debounce <ms>`
+- `--health-url <url>`
+- `--health-grace-period <ms>`
+- `--health-interval <ms>`
+- `--health-timeout <ms>`
+- `--health-max-failures <count>`
+- `--no-autorestart`
+- `--restart-delay <ms>`
+- `--max-restarts <count>`
+
+Notes:
+
+- `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
+- `pm start <name>` resolves one configured app by name.
+- Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.
+- `pm save` stores the current running app list in `pm.dumpFile` or `./.elit/pm/dump.json`, and `pm resurrect` replays that dump.
+- State and logs are stored in `./.elit/pm` by default, or `pm.dataDir` when configured.
+- TypeScript file targets with `runtime: 'node'` require `tsx`; `runtime: 'bun'` works without extra setup.
+
 ### `elit wapk`
 
 Archive packaging and runtime commands.
@@ -165,6 +216,7 @@ The CLI gets more useful when you store defaults in `elit.config.*`.
 - `dev` and `preview` read `api`, `proxy`, `worker`, `ws`, `ssr`, and `clients[]`.
 - `desktop` reads `desktop.mode`, `desktop.entry`, and `desktop.native.entry`.
 - `mobile` reads `config.mobile` defaults for cwd, app id, icon, permissions, and native generation.
+- `pm` reads `config.pm.dataDir`, `config.pm.dumpFile`, and `config.pm.apps[]` for process manager defaults.
 - `wapk` reads `config.wapk` for runtime, entry, scripts, env, and archive locking.
 
 ## Practical Examples
@@ -179,6 +231,13 @@ elit desktop build ./src/main.ts --release
 elit mobile doctor --cwd . --json
 elit mobile run android --cwd . --target emulator-5554
 elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --name HomeScreen
+elit pm start --script "npm start" --name my-app --runtime node
+elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure
+elit pm start ./src/worker.ts --name worker --runtime bun
+elit pm start --wapk ./app.wapk --name packaged-app
+elit pm save
+elit pm resurrect
+elit pm logs my-app --lines 100
 elit wapk pack . --include-deps
 elit wapk run ./app.wapk --runtime bun --sync-interval 100 --watcher
 ```

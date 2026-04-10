@@ -9,10 +9,11 @@ import { build } from './build';
 import { runDesktopCommand } from './desktop-cli';
 import { runMobileCommand } from './mobile-cli';
 import { runNativeCommand } from './native-cli';
+import { runPmCommand } from './pm-cli';
 import { runWapkCommand } from './wapk-cli';
 import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'native', 'wapk', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'native', 'pm', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 
 /**
@@ -113,6 +114,9 @@ async function main() {
         case 'native':
             await runNative(args.slice(1));
             break;
+        case 'pm':
+          await runPm(args.slice(1));
+          break;
         case 'wapk':
           await runWapk(args.slice(1));
           break;
@@ -412,6 +416,15 @@ export async function runWapk(args: string[]) {
     }
   }
 
+export async function runPm(args: string[]) {
+    try {
+        await runPmCommand(args);
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : error);
+        process.exit(1);
+    }
+}
+
 interface TestOptions {
     files?: string[];
     include?: string[];
@@ -577,6 +590,7 @@ Commands:
   desktop   Run or build a native desktop app
   mobile    Run native mobile workflow commands
   native    Generate native target code from an Elit entry
+  pm        Manage background processes and packaged apps
   wapk      Pack, inspect, extract, or run a .wapk app
   version   Show version number
   help      Show this help message
@@ -630,11 +644,27 @@ WAPK Options:
   elit wapk extract <file.wapk>             Extract a .wapk archive
   elit wapk --runtime node|bun|deno <file>  Override the packaged runtime
 
+PM Options:
+  elit pm start --script "npm start" -n my-app   Start a shell command in the background
+  elit pm start ./app.ts -n my-app               Start a file with inferred runtime
+  elit pm start --wapk ./app.wapk -n my-app      Start a WAPK app through the manager
+  elit pm start my-app --watch                   Start one configured app with file watching enabled
+  elit pm start                                   Start all pm.apps[] entries from elit.config.*
+  elit pm start my-app                            Start one configured app by name
+  elit pm list                                    Show managed process status
+  elit pm stop <name|all>                         Stop one or all managed processes
+  elit pm restart <name|all>                      Restart one or all managed processes
+  elit pm delete <name|all>                       Remove process metadata and logs
+  elit pm save                                    Persist the running process list to pm.dumpFile
+  elit pm resurrect                               Restart the last saved process list
+  elit pm logs <name> --lines 100                 Show recent stdout/stderr logs
+
 Note: Build configuration supports both single and multiple builds:
       - Single build: build: { entry: 'src/app.ts', outDir: 'dist' }
       - Multiple builds: build: [{ entry: 'src/app1.ts' }, { entry: 'src/app2.ts' }]
       When using array, all builds run sequentially.
   Desktop commands can read desktop.entry or desktop.native.entry from elit.config.ts when [entry] is omitted, depending on desktop.mode.
+  PM commands read pm.apps[], pm.dataDir, and pm.dumpFile from elit.config.* when present.
 
 Preview Options:
   -p, --port <number>      Port to run server on (default: 4173)

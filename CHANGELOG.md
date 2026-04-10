@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.4] - 2026-04-10
+
+### Added
+- **Process manager (`elit pm`)** - Added a detached process manager for shell commands, file entrypoints, and packaged WAPK apps
+  - `elit pm start` now supports `--script`, `--file`, positional file targets, and `--wapk`
+  - Added `elit pm list`, `stop`, `restart`, `delete`, and `logs` for lifecycle management
+  - Added `elit pm save` / `elit pm resurrect` to persist and restore the managed app list
+  - Added watch mode, HTTP health checks, `restartPolicy`, and `minUptime` for richer supervision behavior
+  - Added `pm.apps[]`, `pm.dataDir`, and `pm.dumpFile` support in `elit.config.*`
+
+### Documentation
+- **CLI and config reference refresh** - Documented process-manager workflows in the README and docs command/config guides
+
+### Validation
+- **PM smoke validation** - Verified background start, list, logs, stop, and delete flow against the built CLI
+
 ## [3.5.2] - 2026-04-10
 
 ### Changed

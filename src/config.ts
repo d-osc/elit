@@ -60,12 +60,77 @@ export interface ElitConfig {
     desktop?: DesktopConfig;
     /** Mobile command configuration */
     mobile?: MobileConfig;
+    /** Process manager configuration */
+    pm?: PmConfig;
     /** WAPK packaging configuration */
     wapk?: WapkConfig;
 }
 
 export type MobileMode = 'native' | 'hybrid';
 export type DesktopMode = 'native' | 'hybrid';
+export type PmRuntimeName = 'node' | 'bun' | 'deno';
+export type PmRestartPolicy = 'always' | 'on-failure' | 'never';
+
+export interface PmHealthCheckConfig {
+    /** HTTP endpoint polled while the process is online */
+    url?: string;
+    /** Delay before the first health check in milliseconds */
+    gracePeriod?: number;
+    /** Interval between health checks in milliseconds */
+    interval?: number;
+    /** Per-request timeout in milliseconds */
+    timeout?: number;
+    /** Consecutive failed checks before the process is restarted */
+    maxFailures?: number;
+}
+
+export interface PmAppConfig {
+    /** Unique process name used by elit pm list/stop/restart */
+    name: string;
+    /** Shell command to execute, for example: npm start */
+    script?: string;
+    /** JavaScript or TypeScript entry file executed by the selected runtime */
+    file?: string;
+    /** Packaged .wapk file executed through elit wapk run */
+    wapk?: string;
+    /** Runtime used for file or wapk targets */
+    runtime?: PmRuntimeName;
+    /** Working directory for the managed process */
+    cwd?: string;
+    /** Extra environment variables injected into the process */
+    env?: Record<string, string | number | boolean>;
+    /** Disable automatic restart when the process exits */
+    autorestart?: boolean;
+    /** Delay between restart attempts in milliseconds */
+    restartDelay?: number;
+    /** Maximum restart attempts before marking the process as errored */
+    maxRestarts?: number;
+    /** Password forwarded to elit wapk run for locked archives */
+    password?: string;
+    /** Restart strategy used after the child process exits */
+    restartPolicy?: PmRestartPolicy;
+    /** Minimum healthy uptime before restart attempt counters reset */
+    minUptime?: number;
+    /** Restart the process when watched files change */
+    watch?: boolean;
+    /** Files or directories watched when watch mode is enabled */
+    watchPaths?: string[];
+    /** Glob-like patterns ignored by watch mode */
+    watchIgnore?: string[];
+    /** Debounce delay before restarting after a file change */
+    watchDebounce?: number;
+    /** Optional HTTP health checks for long-running services */
+    healthCheck?: PmHealthCheckConfig;
+}
+
+export interface PmConfig {
+    /** Directory used to store pm metadata and log files (default: ./.elit/pm) */
+    dataDir?: string;
+    /** File used by pm save/resurrect (default: <dataDir>/dump.json) */
+    dumpFile?: string;
+    /** Managed applications available to elit pm start */
+    apps?: PmAppConfig[];
+}
 
 export interface MobileConfig {
     /** Project directory for native mobile artifacts */

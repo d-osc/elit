@@ -6,7 +6,7 @@ Welcome to the Elit documentation.
 
 - [QUICK_START.md](./QUICK_START.md) - Fastest path to a working Elit app
 - [API.md](./API.md) - Core API reference for DOM, state, router, server, and config APIs
-- [CONFIG.md](./CONFIG.md) - Config file reference for dev, preview, build, desktop, mobile, and WAPK
+- [CONFIG.md](./CONFIG.md) - Config file reference for dev, preview, build, desktop, mobile, pm, and WAPK
 - [CLI.md](./CLI.md) - Current CLI command reference
 - [server.md](./server.md) - Routing, middleware, shared state, and config-driven WebSocket endpoints
 - [native-css-support.md](./native-css-support.md) - Native CSS support matrix and current gaps
@@ -74,7 +74,7 @@ Welcome to the Elit documentation.
 
 - [server.md](./server.md) - `ServerRouter`, middleware, shared state, and WebSocket endpoints
 - [CONFIG.md](./CONFIG.md) - `defineConfig`, config loading, env loading, and option branches
-- [CLI.md](./CLI.md) - `dev`, `build`, `preview`, `test`, `desktop`, `mobile`, `native`, and `wapk`
+- [CLI.md](./CLI.md) - `dev`, `build`, `preview`, `test`, `desktop`, `mobile`, `native`, `pm`, and `wapk`
 
 ## Resources
 
