@@ -692,8 +692,10 @@ function inferRuntimeFromFile(filePath: string): PmRuntimeName {
     return 'node';
 }
 
+const SIMPLE_PREVIEW_SEGMENT = /^[A-Za-z0-9_./:=+-]+$/;
+
 function quoteCommandSegment(value: string): string {
-    return /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    return SIMPLE_PREVIEW_SEGMENT.test(value) ? value : JSON.stringify(value);
 }
 
 export function buildPmCommand(record: PmRecord): BuiltPmCommand {

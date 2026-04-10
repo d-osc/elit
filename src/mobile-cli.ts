@@ -439,7 +439,7 @@ function openMobileProject(platform: MobilePlatform, options: MobileCommandOptio
         }
 
         if (process.platform === 'win32') {
-            runCommand('cmd', ['/c', 'start', '', projectPath], options.cwd);
+            runCommand('explorer.exe', [projectPath], options.cwd);
             return;
         }
 
@@ -770,6 +770,11 @@ function runGradle(cwd: string, args: string[]): void {
         );
     }
 
+    if (process.platform === 'win32' && isWindowsBatchCommand(gradleCommand.command, androidRoot)) {
+        runWindowsBatchCommand(gradleCommand.command, args, androidRoot);
+        return;
+    }
+
     runCommand(gradleCommand.command, args, androidRoot);
 }
 
@@ -994,46 +999,90 @@ function upsertXmlAttribute(tag: string, name: string, value: string): string {
     return `${tag.slice(0, -1)} ${name}='${value}'>`;
 }
 
-// Characters that cmd.exe interprets specially, adapted from the cross-spawn
-// escaping algorithm (MIT): https://github.com/nicolo-ribaudo/cross-spawn
-const WIN_CMD_META = /([()%!^"\`<>&|;, *?])/g;
+const WIN_CMD_META_CHARS = new Set(['(', ')', '%', '!', '^', '"', '<', '>', '&', '|']);
 
-function escapeWindowsShellArg(value: string): string {
-    // Properly escape embedded quotes and trailing backslashes so the
-    // argument survives cmd.exe's tokenization, then protect every
-    // cmd metacharacter so it cannot change the meaning of the command.
-    const quoted = `"${value
-        .replace(/(\\*)"/, '$1$1\\"')
-        .replace(/(\\*)$/, '$1$1')}"`;
-    return quoted.replace(WIN_CMD_META, '^$1');
+function escapeWindowsCmdMetacharacters(value: string): string {
+    let escaped = '';
+    for (const character of value) {
+        escaped += WIN_CMD_META_CHARS.has(character) ? `^${character}` : character;
+    }
+
+    return escaped;
 }
 
-function spawnWin32Safe(
-    command: string,
-    args: string[],
-    cwd: string,
-    stdio: 'inherit' | 'pipe',
-): ReturnType<typeof spawnSync> {
-    // Build a fully escaped command line and invoke cmd.exe directly so that
-    // environment-derived path components (GRADLE_HOME, ANDROID_HOME, …)
-    // cannot inject shell commands through metacharacters.
-    const safeCommand = normalize(command).replace(WIN_CMD_META, '^$1');
-    const safeArgs = args.map(escapeWindowsShellArg);
-    const commandLine = `"${[safeCommand, ...safeArgs].join(' ')}"`;
-    const comSpec = process.env.ComSpec || 'cmd.exe';
-    return spawnSync(comSpec, ['/d', '/s', '/c', commandLine], {
+function quoteWindowsCmdToken(value: string): string {
+    let quoted = '"';
+    let backslashCount = 0;
+
+    for (const character of value) {
+        if (character === '\\') {
+            backslashCount += 1;
+            continue;
+        }
+
+        if (character === '"') {
+            quoted += '\\'.repeat((backslashCount * 2) + 1);
+            quoted += '"';
+            backslashCount = 0;
+            continue;
+        }
+
+        if (backslashCount > 0) {
+            quoted += '\\'.repeat(backslashCount);
+            backslashCount = 0;
+        }
+
+        quoted += character;
+    }
+
+    if (backslashCount > 0) {
+        quoted += '\\'.repeat(backslashCount * 2);
+    }
+
+    quoted += '"';
+    return escapeWindowsCmdMetacharacters(quoted);
+}
+
+function resolveExecutablePath(command: string, cwd: string): string {
+    const normalizedCommand = normalize(command);
+    const lowerCommand = normalizedCommand.toLowerCase();
+
+    if (
+        normalizedCommand.includes('\\')
+        || normalizedCommand.includes('/')
+        || /^[A-Za-z]:/.test(normalizedCommand)
+        || lowerCommand.endsWith('.cmd')
+        || lowerCommand.endsWith('.bat')
+    ) {
+        return normalizedCommand;
+    }
+
+    return resolveCommandPath(normalizedCommand, cwd) ?? normalizedCommand;
+}
+
+function isWindowsBatchCommand(command: string, cwd: string): boolean {
+    const lowerCommand = resolveExecutablePath(command, cwd).toLowerCase();
+    return lowerCommand.endsWith('.cmd') || lowerCommand.endsWith('.bat');
+}
+
+function runWindowsBatchCommand(command: string, args: string[], cwd: string): void {
+    const commandToken = quoteWindowsCmdToken(resolveExecutablePath(command, cwd));
+    const argTokens = args.map(quoteWindowsCmdToken);
+    const result = spawnSync('cmd.exe', ['/d', '/s', '/c', commandToken, ...argTokens], {
         cwd,
-        stdio,
+        stdio: 'inherit',
         shell: false,
         windowsVerbatimArguments: true,
     });
+
+    if (typeof result.status === 'number' && result.status !== 0) {
+        process.exit(result.status);
+    }
 }
 
 function runCommand(command: string, args: string[], cwd: string): void {
     const normalizedCommand = normalize(command);
-    const result = process.platform === 'win32'
-        ? spawnWin32Safe(normalizedCommand, args, cwd, 'inherit')
-        : spawnSync(normalizedCommand, args, { cwd, stdio: 'inherit', shell: false });
+    const result = spawnSync(normalizedCommand, args, { cwd, stdio: 'inherit', shell: false });
 
     if (typeof result.status === 'number' && result.status !== 0) {
         process.exit(result.status);
