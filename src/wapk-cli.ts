@@ -1680,6 +1680,7 @@ function printWapkHelp(): void {
         'Options:',
         '  -r, --runtime <name>         Runtime override: node, bun, deno',
         '  --sync-interval <ms>         Polling interval for live sync (ms, default 300)',
+        '  --archive-sync-interval <ms> Polling interval for reading archive source changes',
         '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
         '  --archive-watch              Pull external archive changes back into the temp workdir',
         '  --no-archive-watch           Disable external archive read sync',
@@ -1748,6 +1749,7 @@ function parseRunArgs(args: string[]): {
     syncInterval?: number;
     useWatcher?: boolean;
     watchArchive?: boolean;
+    archiveSyncInterval?: number;
 } & WapkCredentialsOptions {
     let file: string | undefined;
     let googleDrive: WapkGoogleDriveConfig | undefined;
@@ -1755,6 +1757,7 @@ function parseRunArgs(args: string[]): {
     let syncInterval: number | undefined;
     let useWatcher: boolean | undefined;
     let watchArchive: boolean | undefined;
+    let archiveSyncInterval: number | undefined;
     let password: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
@@ -1775,6 +1778,14 @@ function parseRunArgs(args: string[]): {
                     throw new Error('--sync-interval must be a number >= 50 (milliseconds)');
                 }
                 syncInterval = value;
+                break;
+            }
+            case '--archive-sync-interval': {
+                const value = parseInt(readRequiredOptionValue(args, ++index, '--archive-sync-interval'), 10);
+                if (Number.isNaN(value) || value < 50) {
+                    throw new Error('--archive-sync-interval must be a number >= 50 (milliseconds)');
+                }
+                archiveSyncInterval = value;
                 break;
             }
             case '--use-watcher':
@@ -1833,7 +1844,7 @@ function parseRunArgs(args: string[]): {
         }
     }
 
-    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, password };
+    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
@@ -1928,7 +1939,7 @@ function resolveConfiguredWapkRunOptions(
         syncInterval: options.syncInterval ?? defaults?.syncInterval,
         useWatcher: options.useWatcher ?? defaults?.useWatcher,
         watchArchive: options.watchArchive ?? defaults?.watchArchive,
-        archiveSyncInterval: defaults?.archiveSyncInterval,
+        archiveSyncInterval: options.archiveSyncInterval ?? defaults?.archiveSyncInterval,
         password: options.password ?? defaults?.password,
     };
 }

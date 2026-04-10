@@ -650,6 +650,8 @@ PM Options:
   elit pm start --script "npm start" -n my-app   Start a shell command in the background
   elit pm start ./app.ts -n my-app               Start a file with inferred runtime
   elit pm start --wapk ./app.wapk -n my-app      Start a WAPK app through the manager
+  elit pm start --wapk gdrive://<fileId> -n my-app  Start a Google Drive WAPK app through the manager
+  elit pm start --google-drive-file-id <id> -n my-app  Start a Google Drive WAPK app without a positional source
   elit pm start my-app --watch                   Start one configured app with file watching enabled
   elit pm start                                   Start all pm.apps[] entries from elit.config.*
   elit pm start my-app                            Start one configured app by name

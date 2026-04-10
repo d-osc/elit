@@ -150,6 +150,8 @@ Forms:
 - `elit pm start ./src/app.ts --name my-app`
 - `elit pm start --file ./src/app.js --name my-app`
 - `elit pm start --wapk ./app.wapk --name my-app`
+- `elit pm start --wapk gdrive://<fileId> --name my-app`
+- `elit pm start --google-drive-file-id <fileId> --name my-app`
 - `elit pm start`
 - `elit pm start my-app`
 - `elit pm list`
@@ -166,6 +168,14 @@ Useful options:
 - `--cwd <dir>`
 - `--env KEY=VALUE`
 - `--password <value>` for locked WAPK apps
+- `--google-drive-file-id <id>` for remote WAPK apps
+- `--google-drive-token-env <env>` for remote WAPK apps
+- `--google-drive-access-token <token>` for remote WAPK apps
+- `--google-drive-shared-drive` for shared-drive WAPK files
+- `--sync-interval <ms>` for WAPK run live sync
+- `--watcher` for WAPK run event-driven sync
+- `--archive-watch` and `--no-archive-watch` for WAPK archive pull sync
+- `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
 - `--min-uptime <ms>`
 - `--watch`
@@ -185,6 +195,8 @@ Notes:
 
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
+- WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
+- PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
 - Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.
 - `pm save` stores the current running app list in `pm.dumpFile` or `./.elit/pm/dump.json`, and `pm resurrect` replays that dump.
 - State and logs are stored in `./.elit/pm` by default, or `pm.dataDir` when configured.
@@ -210,6 +222,7 @@ Useful options:
 
 - `--runtime node|bun|deno`
 - `--sync-interval <ms>`
+- `--archive-sync-interval <ms>`
 - `--watcher`
 - `--archive-watch`
 - `--no-archive-watch`

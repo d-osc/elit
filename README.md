@@ -260,6 +260,8 @@ Useful flags:
 - `elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure`
 - `elit pm start ./src/worker.ts --name worker --runtime bun`
 - `elit pm start --wapk ./app.wapk --name packaged-app`
+- `elit pm start --wapk gdrive://<fileId> --name packaged-app`
+- `elit pm start --google-drive-file-id <fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --name packaged-app`
 - `elit pm save`
 - `elit pm resurrect`
 - `elit pm logs my-app --lines 100`
@@ -326,10 +328,12 @@ WAPK mode notes:
 PM mode notes:
 
 - `elit pm start --script "npm start"`, `elit pm start --file ./app.ts`, and `elit pm start --wapk ./app.wapk` all run through the same detached process manager.
+- WAPK PM targets can also point at `gdrive://<fileId>` or use `pm.apps[].wapkRun.googleDrive` plus forwarded WAPK run flags like `syncInterval`, `watcher`, and `watchArchive`.
 - `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
 - Use `elit pm list`, `elit pm stop`, `elit pm restart`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
 - Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.
 - Use `--watch`, `--watch-path`, `--watch-ignore`, and `--watch-debounce` when the process should restart after source changes.
+- PM `--watch` and WAPK `--watcher` are different: the first restarts the managed process, the second changes how the inner WAPK runtime syncs files.
 - Use `--health-url`, `--health-grace-period`, `--health-interval`, `--health-timeout`, and `--health-max-failures` when the process exposes an HTTP health endpoint.
 - PM state and logs are stored in `./.elit/pm` by default, or in `pm.dataDir` when configured. `elit pm save` writes to `pm.dumpFile` or `./.elit/pm/dump.json`.
 - TypeScript file targets with runtime `node` require `tsx`; use `--runtime bun` when you want zero-config TypeScript execution.
@@ -360,6 +364,21 @@ The config shape is:
       script?: string;
       file?: string;
       wapk?: string;
+      wapkRun?: {
+        file?: string;
+        googleDrive?: {
+          fileId?: string;
+          accessToken?: string;
+          accessTokenEnv?: string;
+          supportsAllDrives?: boolean;
+        };
+        runtime?: 'node' | 'bun' | 'deno';
+        password?: string;
+        syncInterval?: number;
+        useWatcher?: boolean;
+        watchArchive?: boolean;
+        archiveSyncInterval?: number;
+      };
       runtime?: 'node' | 'bun' | 'deno';
       cwd?: string;
       env?: Record<string, string | number | boolean>;

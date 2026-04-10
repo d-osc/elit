@@ -12,6 +12,8 @@ import {
     type PmHealthCheckConfig,
     type PmRestartPolicy,
     type PmRuntimeName,
+    type WapkGoogleDriveConfig,
+    type WapkRunConfig,
 } from './config';
 
 const DEFAULT_PM_DATA_DIR = join('.elit', 'pm');
@@ -56,6 +58,7 @@ export interface PmSavedAppDefinition {
     file?: string;
     wapk?: string;
     password?: string;
+    wapkRun?: WapkRunConfig;
     restartPolicy: PmRestartPolicy;
     autorestart: boolean;
     restartDelay: number;
@@ -74,6 +77,7 @@ export interface ParsedPmStartArgs {
     script?: string;
     file?: string;
     wapk?: string;
+    wapkRun?: WapkRunConfig;
     runtime?: PmRuntimeName;
     cwd?: string;
     env: Record<string, string>;
@@ -104,6 +108,7 @@ export interface ResolvedPmAppDefinition {
     script?: string;
     file?: string;
     wapk?: string;
+    wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
     maxRestarts: number;
@@ -128,6 +133,7 @@ export interface PmRecord {
     script?: string;
     file?: string;
     wapk?: string;
+    wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
     maxRestarts: number;
@@ -222,6 +228,195 @@ function normalizeIntegerOption(value: string, optionName: string, min = 0): num
         throw new Error(`${optionName} must be a number >= ${min}`);
     }
     return parsed;
+}
+
+function normalizeNonEmptyString(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+}
+
+function hasPmGoogleDriveConfig(config: WapkGoogleDriveConfig | undefined): boolean {
+    return Boolean(
+        normalizeNonEmptyString(config?.fileId)
+        || normalizeNonEmptyString(config?.accessToken)
+        || normalizeNonEmptyString(config?.accessTokenEnv)
+        || typeof config?.supportsAllDrives === 'boolean',
+    );
+}
+
+function hasPmWapkRunConfig(config: WapkRunConfig | undefined): boolean {
+    return Boolean(
+        normalizeNonEmptyString(config?.file)
+        || hasPmGoogleDriveConfig(config?.googleDrive)
+        || normalizeNonEmptyString(config?.runtime)
+        || typeof config?.syncInterval === 'number'
+        || typeof config?.useWatcher === 'boolean'
+        || typeof config?.watchArchive === 'boolean'
+        || typeof config?.archiveSyncInterval === 'number'
+        || normalizeNonEmptyString(config?.password),
+    );
+}
+
+function mergePmWapkRunConfig(base: WapkRunConfig | undefined, override: WapkRunConfig | undefined): WapkRunConfig | undefined {
+    if (!base && !override) {
+        return undefined;
+    }
+
+    const googleDrive: WapkGoogleDriveConfig | undefined = hasPmGoogleDriveConfig(base?.googleDrive) || hasPmGoogleDriveConfig(override?.googleDrive)
+        ? {
+            fileId: override?.googleDrive?.fileId ?? base?.googleDrive?.fileId,
+            accessToken: override?.googleDrive?.accessToken ?? base?.googleDrive?.accessToken,
+            accessTokenEnv: override?.googleDrive?.accessTokenEnv ?? base?.googleDrive?.accessTokenEnv,
+            supportsAllDrives: override?.googleDrive?.supportsAllDrives ?? base?.googleDrive?.supportsAllDrives,
+        }
+        : undefined;
+
+    const merged: WapkRunConfig = {
+        file: override?.file ?? base?.file,
+        googleDrive,
+        runtime: override?.runtime ?? base?.runtime,
+        syncInterval: override?.syncInterval ?? base?.syncInterval,
+        useWatcher: override?.useWatcher ?? base?.useWatcher,
+        watchArchive: override?.watchArchive ?? base?.watchArchive,
+        archiveSyncInterval: override?.archiveSyncInterval ?? base?.archiveSyncInterval,
+        password: override?.password ?? base?.password,
+    };
+
+    return hasPmWapkRunConfig(merged) ? merged : undefined;
+}
+
+function stripPmWapkSourceFromRunConfig(config: WapkRunConfig | undefined): WapkRunConfig | undefined {
+    if (!config) {
+        return undefined;
+    }
+
+    const googleDrive = hasPmGoogleDriveConfig({
+        ...config.googleDrive,
+        fileId: undefined,
+    })
+        ? {
+            ...config.googleDrive,
+            fileId: undefined,
+        }
+        : undefined;
+
+    const stripped: WapkRunConfig = {
+        file: undefined,
+        googleDrive,
+        runtime: undefined,
+        syncInterval: config.syncInterval,
+        useWatcher: config.useWatcher,
+        watchArchive: config.watchArchive,
+        archiveSyncInterval: config.archiveSyncInterval,
+        password: undefined,
+    };
+
+    return hasPmWapkRunConfig(stripped) ? stripped : undefined;
+}
+
+function isRemoteWapkArchiveSpecifier(value: string): boolean {
+    return /^(?:gdrive|google-drive):\/\/.+/i.test(value.trim());
+}
+
+function isWapkArchiveSpecifier(value: string): boolean {
+    const normalized = value.trim();
+    return normalized.toLowerCase().endsWith('.wapk') || isRemoteWapkArchiveSpecifier(normalized);
+}
+
+function buildGoogleDriveWapkSpecifier(fileId: string): string {
+    return `gdrive://${fileId}`;
+}
+
+function resolvePmWapkSource(value: string | undefined, cwd: string): string | undefined {
+    const normalized = normalizeNonEmptyString(value);
+    if (!normalized) {
+        return undefined;
+    }
+
+    return isRemoteWapkArchiveSpecifier(normalized)
+        ? normalized
+        : resolve(cwd, normalized);
+}
+
+function resolvePmWapkSourceToken(wapk: string | undefined, wapkRun: WapkRunConfig | undefined): string | undefined {
+    const googleDriveFileId = normalizeNonEmptyString(wapkRun?.googleDrive?.fileId);
+    return normalizeNonEmptyString(wapk)
+        ?? normalizeNonEmptyString(wapkRun?.file)
+        ?? (googleDriveFileId ? buildGoogleDriveWapkSpecifier(googleDriveFileId) : undefined);
+}
+
+function countDefinedPmWapkSources(wapk: string | undefined, wapkRun: WapkRunConfig | undefined): number {
+    const values = [
+        normalizeNonEmptyString(wapk),
+        normalizeNonEmptyString(wapkRun?.file),
+        normalizeNonEmptyString(wapkRun?.googleDrive?.fileId),
+    ].filter((entry): entry is string => Boolean(entry));
+
+    return new Set(values).size;
+}
+
+function appendPmWapkRunArgs(args: string[], previewParts: string[], wapkRun: WapkRunConfig | undefined): void {
+    if (!wapkRun) {
+        return;
+    }
+
+    if (typeof wapkRun.syncInterval === 'number' && Number.isFinite(wapkRun.syncInterval) && wapkRun.syncInterval >= 50) {
+        const value = String(Math.trunc(wapkRun.syncInterval));
+        args.push('--sync-interval', value);
+        previewParts.push('--sync-interval', value);
+    }
+
+    if (wapkRun.useWatcher) {
+        args.push('--watcher');
+        previewParts.push('--watcher');
+    }
+
+    if (typeof wapkRun.watchArchive === 'boolean') {
+        const flag = wapkRun.watchArchive ? '--archive-watch' : '--no-archive-watch';
+        args.push(flag);
+        previewParts.push(flag);
+    }
+
+    if (typeof wapkRun.archiveSyncInterval === 'number' && Number.isFinite(wapkRun.archiveSyncInterval) && wapkRun.archiveSyncInterval >= 50) {
+        const value = String(Math.trunc(wapkRun.archiveSyncInterval));
+        args.push('--archive-sync-interval', value);
+        previewParts.push('--archive-sync-interval', value);
+    }
+
+    const tokenEnv = normalizeNonEmptyString(wapkRun.googleDrive?.accessTokenEnv);
+    if (tokenEnv) {
+        args.push('--google-drive-token-env', tokenEnv);
+        previewParts.push('--google-drive-token-env', tokenEnv);
+    }
+
+    const accessToken = normalizeNonEmptyString(wapkRun.googleDrive?.accessToken);
+    if (accessToken) {
+        args.push('--google-drive-access-token', accessToken);
+        previewParts.push('--google-drive-access-token', '******');
+    }
+
+    if (wapkRun.googleDrive?.supportsAllDrives) {
+        args.push('--google-drive-shared-drive');
+        previewParts.push('--google-drive-shared-drive');
+    }
+}
+
+function buildPmWapkPreview(wapk: string, runtime?: PmRuntimeName, password?: string, wapkRun?: WapkRunConfig): string {
+    const previewParts = ['elit', 'wapk', 'run', quoteCommandSegment(wapk)];
+
+    if (runtime) {
+        previewParts.push('--runtime', runtime);
+    }
+    if (password) {
+        previewParts.push('--password', '******');
+    }
+
+    appendPmWapkRunArgs([], previewParts, wapkRun);
+    return previewParts.join(' ');
 }
 
 function sanitizePmProcessName(name: string): string {
@@ -335,6 +530,10 @@ function looksLikeManagedFile(value: string, cwd: string): boolean {
         return false;
     }
 
+    if (isRemoteWapkArchiveSpecifier(normalized)) {
+        return false;
+    }
+
     if (normalized.toLowerCase().endsWith('.wapk')) {
         return true;
     }
@@ -411,7 +610,7 @@ function parsePmTarget(parsed: ParsedPmStartArgs, workspaceRoot: string): { conf
         return {};
     }
 
-    if (parsed.targetToken.toLowerCase().endsWith('.wapk')) {
+    if (isWapkArchiveSpecifier(parsed.targetToken)) {
         return { wapk: parsed.targetToken };
     }
 
@@ -502,6 +701,7 @@ function toSavedAppDefinition(record: PmRecord): PmSavedAppDefinition {
         file: record.file,
         wapk: record.wapk,
         password: record.password,
+        wapkRun: record.wapkRun,
         restartPolicy: record.restartPolicy,
         autorestart: record.autorestart,
         restartDelay: record.restartDelay,
@@ -544,7 +744,7 @@ function deriveDefaultWatchPaths(type: PmTargetType, cwd: string, file?: string,
     }
 
     if (type === 'wapk' && wapk) {
-        return [wapk];
+        return [isRemoteWapkArchiveSpecifier(wapk) ? cwd : wapk];
     }
 
     return [cwd];
@@ -718,21 +918,19 @@ export function buildPmCommand(record: PmRecord): BuiltPmCommand {
             record.wapk!,
         ];
 
+        const previewParts = ['elit', 'wapk', 'run', quoteCommandSegment(record.wapk!)];
+
         if (record.runtime) {
             args.push('--runtime', record.runtime);
+            previewParts.push('--runtime', record.runtime);
         }
 
         if (record.password) {
             args.push('--password', record.password);
-        }
-
-        const previewParts = ['elit', 'wapk', 'run', quoteCommandSegment(record.wapk!)];
-        if (record.runtime) {
-            previewParts.push('--runtime', record.runtime);
-        }
-        if (record.password) {
             previewParts.push('--password', '******');
         }
+
+        appendPmWapkRunArgs(args, previewParts, record.wapkRun);
 
         return {
             command: cliInvocation.command,
@@ -797,7 +995,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
     const preview = definition.type === 'script'
         ? definition.script!
         : definition.type === 'wapk'
-            ? `elit wapk run ${quoteCommandSegment(definition.wapk!)}${definition.runtime ? ` --runtime ${definition.runtime}` : ''}`
+            ? buildPmWapkPreview(definition.wapk!, definition.runtime, definition.password, definition.wapkRun)
             : `${definition.runtime ?? 'auto'} ${quoteCommandSegment(definition.file!)}`;
 
     return {
@@ -811,6 +1009,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         script: definition.script,
         file: definition.file,
         wapk: definition.wapk,
+        wapkRun: definition.wapkRun,
         autorestart: definition.autorestart,
         restartDelay: definition.restartDelay,
         maxRestarts: definition.maxRestarts,
@@ -1340,14 +1539,15 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
 
 function resolveStartSelection(configApps: PmAppConfig[], parsed: ParsedPmStartArgs, workspaceRoot: string) {
     const target = parsePmTarget(parsed, workspaceRoot);
-    const selectedName = target.configName ?? (!target.script && !target.file && !target.wapk ? parsed.name : undefined);
+    const hasExplicitWapkSource = Boolean(resolvePmWapkSourceToken(parsed.wapk, parsed.wapkRun));
+    const selectedName = target.configName ?? (!target.script && !target.file && !target.wapk && !hasExplicitWapkSource ? parsed.name : undefined);
     const selected = selectedName
         ? configApps.find((app) => app.name === selectedName)
         : undefined;
 
     return {
         selected,
-        startAll: !target.script && !target.file && !target.wapk && !selectedName,
+        startAll: !target.script && !target.file && !target.wapk && !hasExplicitWapkSource && !selectedName,
         target,
     };
 }
@@ -1358,6 +1558,7 @@ function toPmAppConfig(record: PmRecord): PmAppConfig {
         script: record.script,
         file: record.file,
         wapk: record.wapk,
+        wapkRun: record.wapkRun,
         runtime: record.runtime,
         cwd: record.cwd,
         env: record.env,
@@ -1381,6 +1582,7 @@ function toSavedPmAppConfig(app: PmSavedAppDefinition): PmAppConfig {
         script: app.script,
         file: app.file,
         wapk: app.wapk,
+        wapkRun: app.wapkRun,
         runtime: app.runtime,
         cwd: app.cwd,
         env: app.env,
@@ -1402,7 +1604,17 @@ function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: ParsedPmS
     const target = parsePmTarget(parsed, workspaceRoot);
     const resolvedCwd = resolve(workspaceRoot, parsed.cwd ?? base?.cwd ?? '.');
 
-    const hasExplicitTarget = Boolean(target.script || target.file || target.wapk);
+    if (countDefinedPmWapkSources(parsed.wapk, parsed.wapkRun) > 1) {
+        throw new Error('Use only one WAPK archive source per pm start: --wapk or --google-drive-file-id.');
+    }
+
+    if (countDefinedPmWapkSources(base?.wapk, base?.wapkRun) > 1) {
+        throw new Error(`Configured pm app "${base?.name ?? parsed.name ?? 'app'}" must define only one WAPK archive source.`);
+    }
+
+    const explicitWapk = resolvePmWapkSource(resolvePmWapkSourceToken(target.wapk, parsed.wapkRun), resolvedCwd);
+    const baseWapk = resolvePmWapkSource(resolvePmWapkSourceToken(base?.wapk, base?.wapkRun), resolvedCwd);
+    const hasExplicitTarget = Boolean(target.script || target.file || explicitWapk);
     const script = target.script ?? (hasExplicitTarget ? undefined : base?.script);
     const file = target.file
         ? resolve(resolvedCwd, target.file)
@@ -1411,13 +1623,7 @@ function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: ParsedPmS
             : base?.file
                 ? resolve(resolvedCwd, base.file)
                 : undefined;
-    const wapk = target.wapk
-        ? resolve(resolvedCwd, target.wapk)
-        : hasExplicitTarget
-            ? undefined
-            : base?.wapk
-                ? resolve(resolvedCwd, base.wapk)
-                : undefined;
+    const wapk = explicitWapk ?? (hasExplicitTarget ? undefined : baseWapk);
 
     const targetCount = countDefinedTargets({ script, file, wapk });
     if (targetCount === 0) {
@@ -1428,7 +1634,8 @@ function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: ParsedPmS
     }
 
     const name = defaultProcessName({ script, file, wapk }, parsed.name ?? base?.name);
-    const runtime = normalizePmRuntime(parsed.runtime ?? base?.runtime, '--runtime');
+    const mergedWapkRun = mergePmWapkRunConfig(base?.wapkRun, parsed.wapkRun);
+    const runtime = normalizePmRuntime(parsed.runtime ?? mergedWapkRun?.runtime ?? base?.runtime, '--runtime');
 
     let restartPolicy = normalizePmRestartPolicy(parsed.restartPolicy ?? base?.restartPolicy, '--restart-policy')
         ?? ((base?.autorestart ?? true) ? 'always' : 'never');
@@ -1455,8 +1662,15 @@ function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: ParsedPmS
         }
         : base?.healthCheck);
 
-    if ((parsed.password ?? base?.password) && !wapk) {
+    const password = parsed.password ?? mergedWapkRun?.password ?? base?.password;
+    const wapkRun = stripPmWapkSourceFromRunConfig(mergedWapkRun);
+
+    if (password && !wapk) {
         throw new Error('--password is only supported when starting a WAPK app.');
+    }
+
+    if (wapkRun && !wapk) {
+        throw new Error('WAPK run options are only supported when starting a WAPK app.');
     }
 
     return {
@@ -1472,10 +1686,11 @@ function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: ParsedPmS
         script,
         file,
         wapk,
+        wapkRun,
         autorestart,
         restartDelay: parsed.restartDelay ?? base?.restartDelay ?? DEFAULT_RESTART_DELAY,
         maxRestarts: parsed.maxRestarts ?? base?.maxRestarts ?? DEFAULT_MAX_RESTARTS,
-        password: parsed.password ?? base?.password,
+        password,
         restartPolicy,
         minUptime: parsed.minUptime ?? base?.minUptime ?? DEFAULT_MIN_UPTIME,
         watch,
@@ -1526,6 +1741,42 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             case '--wapk':
                 parsed.wapk = readRequiredValue(args, ++index, '--wapk');
                 break;
+            case '--google-drive-file-id':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    googleDrive: {
+                        ...parsed.wapkRun?.googleDrive,
+                        fileId: readRequiredValue(args, ++index, '--google-drive-file-id'),
+                    },
+                };
+                break;
+            case '--google-drive-token-env':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    googleDrive: {
+                        ...parsed.wapkRun?.googleDrive,
+                        accessTokenEnv: readRequiredValue(args, ++index, '--google-drive-token-env'),
+                    },
+                };
+                break;
+            case '--google-drive-access-token':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    googleDrive: {
+                        ...parsed.wapkRun?.googleDrive,
+                        accessToken: readRequiredValue(args, ++index, '--google-drive-access-token'),
+                    },
+                };
+                break;
+            case '--google-drive-shared-drive':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    googleDrive: {
+                        ...parsed.wapkRun?.googleDrive,
+                        supportsAllDrives: true,
+                    },
+                };
+                break;
             case '--runtime':
             case '-r':
                 parsed.runtime = normalizePmRuntime(readRequiredValue(args, ++index, arg), arg);
@@ -1544,6 +1795,37 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             }
             case '--password':
                 parsed.password = readRequiredValue(args, ++index, '--password');
+                break;
+            case '--sync-interval':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    syncInterval: normalizeIntegerOption(readRequiredValue(args, ++index, '--sync-interval'), '--sync-interval', 50),
+                };
+                break;
+            case '--watcher':
+            case '--use-watcher':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    useWatcher: true,
+                };
+                break;
+            case '--archive-watch':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    watchArchive: true,
+                };
+                break;
+            case '--no-archive-watch':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    watchArchive: false,
+                };
+                break;
+            case '--archive-sync-interval':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    archiveSyncInterval: normalizeIntegerOption(readRequiredValue(args, ++index, '--archive-sync-interval'), '--archive-sync-interval', 50),
+                };
                 break;
             case '--restart-policy':
                 parsed.restartPolicy = normalizePmRestartPolicy(readRequiredValue(args, ++index, '--restart-policy'));
@@ -1604,7 +1886,11 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
         }
     }
 
-    const explicitTargets = [parsed.script, parsed.file, parsed.wapk].filter(Boolean);
+    if (countDefinedPmWapkSources(parsed.wapk, parsed.wapkRun) > 1) {
+        throw new Error('Use only one WAPK archive source per pm start: --wapk or --google-drive-file-id.');
+    }
+
+    const explicitTargets = [parsed.script, parsed.file, resolvePmWapkSourceToken(parsed.wapk, parsed.wapkRun)].filter(Boolean);
     if (explicitTargets.length > 1) {
         throw new Error('Use only one target type per pm start: --script, --file, or --wapk.');
     }
@@ -1963,6 +2249,8 @@ function printPmHelp(): void {
         'Usage:',
         '  elit pm start --script "npm start" --name my-app --runtime node',
         '  elit pm start --wapk ./test.wapk --name my-app',
+        '  elit pm start --wapk gdrive://<fileId> --name my-app',
+        '  elit pm start --google-drive-file-id <fileId> --name my-app',
         '  elit pm start ./app.ts --name my-app',
         '  elit pm start --file ./app.js --name my-app',
         '  elit pm start my-app',
@@ -1978,12 +2266,21 @@ function printPmHelp(): void {
         'Start Options:',
         '  --script <command>          Run a shell command, for example: npm start',
         '  --file, -f <path>           Run a .js/.mjs/.cjs/.ts file',
-        '  --wapk <file.wapk>          Run a packaged WAPK app',
+        '  --wapk <source>             Run a local .wapk file or a remote source like gdrive://<fileId>',
+        '  --google-drive-file-id <id> Run a WAPK archive directly from Google Drive',
+        '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
+        '  --google-drive-access-token <value>  OAuth token forwarded to elit wapk run',
+        '  --google-drive-shared-drive Forward supportsAllDrives=true for shared drives',
         '  --runtime, -r <name>        Runtime override: node, bun, deno',
         '  --name, -n <name>           Process name used by list/stop/restart',
         '  --cwd <dir>                 Working directory for the managed process',
         '  --env KEY=VALUE             Add or override an environment variable',
         '  --password <value>          Password for locked WAPK archives',
+        '  --sync-interval <ms>        Forward WAPK live-sync write interval (>= 50ms)',
+        '  --watcher, --use-watcher    Forward event-driven WAPK file watching',
+        '  --archive-watch             Pull archive source changes back into the temp WAPK workdir',
+        '  --no-archive-watch          Disable archive-source read sync for WAPK apps',
+        '  --archive-sync-interval <ms>  Forward WAPK archive read-sync interval (>= 50ms)',
         '  --restart-policy <mode>     Restart policy: always, on-failure, never',
         '  --min-uptime <ms>           Reset crash counter after this healthy uptime',
         '  --watch                     Restart when watched files change',
@@ -2008,7 +2305,8 @@ function printPmHelp(): void {
         '      apps: [',
         '        { name: "api", script: "npm start", cwd: ".", runtime: "node" },',
         '        { name: "worker", file: "./src/worker.ts", runtime: "bun" },',
-        '        { name: "desktop-app", wapk: "./dist/app.wapk", runtime: "node" }',
+        '        { name: "desktop-app", wapk: "./dist/app.wapk", runtime: "node" },',
+        '        { name: "drive-app", wapkRun: { googleDrive: { fileId: "1AbCdEfGhIjKlMnOp", accessTokenEnv: "GOOGLE_DRIVE_ACCESS_TOKEN" }, useWatcher: true, watchArchive: true } }',
         '      ]',
         '    }',
         '  }',
@@ -2020,6 +2318,7 @@ function printPmHelp(): void {
         '  - elit pm start <name> starts a configured app by name.',
         '  - TypeScript files with runtime node require tsx, otherwise use --runtime bun.',
         '  - WAPK processes are executed through elit wapk run inside the manager.',
+        '  - WAPK PM apps can use local archives, gdrive://<fileId>, or pm.apps[].wapkRun.googleDrive.',
     ].join('\n'));
 }
 

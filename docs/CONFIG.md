@@ -195,6 +195,24 @@ pm: {
       runtime: 'node',
       password: 'secret-123',
     },
+    {
+      name: 'drive-app',
+      env: {
+        GOOGLE_DRIVE_ACCESS_TOKEN: process.env.GOOGLE_DRIVE_ACCESS_TOKEN ?? '',
+      },
+      wapkRun: {
+        googleDrive: {
+          fileId: '1AbCdEfGhIjKlMnOp',
+          accessTokenEnv: 'GOOGLE_DRIVE_ACCESS_TOKEN',
+          supportsAllDrives: true,
+        },
+        runtime: 'bun',
+        syncInterval: 150,
+        useWatcher: true,
+        watchArchive: true,
+        archiveSyncInterval: 150,
+      },
+    },
   ],
 }
 ```
@@ -202,10 +220,13 @@ pm: {
 Notes:
 
 - `script`, `file`, and `wapk` are mutually exclusive per app.
+- `wapkRun` lets a PM-managed WAPK app forward Google Drive and live-sync settings into `elit wapk run`.
+- `pm.apps[].wapkRun.file` or `pm.apps[].wapkRun.googleDrive.fileId` can define the WAPK archive source even when `wapk` is omitted.
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.
+- `watcher`, `watchArchive`, `syncInterval`, and `archiveSyncInterval` inside `wapkRun` control the inner WAPK live-sync behavior.
 - `healthCheck` config polls an HTTP endpoint and restarts the process after repeated failures.
 - `elit pm start` starts every configured app, while `elit pm start <name>` starts one app by name.
 - TypeScript file targets with `runtime: 'node'` require `tsx`; use `runtime: 'bun'` when you want zero-config TypeScript execution.

@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "pack": "elit wapk pack .",
-    "run": "elit wapk"
+    "run": "elit wapk",
+    "pm:start:direct": "node ./scripts/pm-start-direct.mjs",
+    "pm:start:config": "node ./scripts/pm-start-config.mjs",
+    "pm:list": "node ./scripts/pm-runner.mjs list",
+    "pm:logs": "node ./scripts/pm-runner.mjs logs drive-app"
   },
   "keywords": [
     "elit",

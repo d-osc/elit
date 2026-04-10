@@ -91,7 +91,7 @@ export interface PmAppConfig {
     script?: string;
     /** JavaScript or TypeScript entry file executed by the selected runtime */
     file?: string;
-    /** Packaged .wapk file executed through elit wapk run */
+    /** Packaged .wapk file or remote archive source executed through elit wapk run */
     wapk?: string;
     /** Runtime used for file or wapk targets */
     runtime?: PmRuntimeName;
@@ -107,6 +107,8 @@ export interface PmAppConfig {
     maxRestarts?: number;
     /** Password forwarded to elit wapk run for locked archives */
     password?: string;
+    /** Extra WAPK run settings, including direct Google Drive access and live-sync options */
+    wapkRun?: WapkRunConfig;
     /** Restart strategy used after the child process exits */
     restartPolicy?: PmRestartPolicy;
     /** Minimum healthy uptime before restart attempt counters reset */

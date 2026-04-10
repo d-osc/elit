@@ -67,6 +67,9 @@ This two-way sync can talk to Google Drive directly. When the remote `.wapk` cha
 # Polling mode with custom interval (ms)
 npx elit wapk run ./app.wapk --sync-interval 100
 
+# Use a separate interval for archive-source reads
+npx elit wapk run ./app.wapk --sync-interval 100 --archive-sync-interval 250
+
 # Event-driven watcher mode
 npx elit wapk run ./app.wapk --watcher
 
@@ -80,6 +83,8 @@ npx elit wapk run --google-drive-file-id 1AbCdEfGhIjKlMnOp --google-drive-token-
 Note: runtime file sync does not force your app process to hot-reload already-imported modules. It keeps the extracted files and the archive aligned on disk; restart or app-level reload logic is still needed when the runtime should pick up already-loaded code.
 
 Google Drive mode requires an OAuth access token that can read and update the target file. The recommended setup is to store that token in an environment variable and point `accessTokenEnv` or `--google-drive-token-env` at it.
+
+The same WAPK run flags can also be forwarded through `elit pm start --wapk ...`, which means PM-managed WAPK apps can now target Google Drive directly as well.
 
 A complete TypeScript config example is available in `examples/wapk-google-drive-example/elit.config.ts`.
 
