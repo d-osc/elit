@@ -275,6 +275,10 @@ export interface WapkRunConfig extends WapkLiveSyncConfig {
     file?: string;
     /** Remote Google Drive archive used by elit wapk run */
     googleDrive?: WapkGoogleDriveConfig;
+    /** Create an online Elit Run shared session instead of starting the local runtime */
+    online?: boolean;
+    /** Elit Run base URL used when online hosting targets a non-default origin */
+    onlineUrl?: string;
     /** Default runtime override used by elit wapk run */
     runtime?: 'node' | 'bun' | 'deno';
     /** Default password used to unlock a locked archive at runtime */

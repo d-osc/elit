@@ -645,6 +645,7 @@ Native Options:
 WAPK Options:
   elit wapk [file.wapk]                     Run a packaged app or the configured default archive
   elit wapk gdrive://<fileId>               Run a packaged app directly from Google Drive
+  elit wapk gdrive://<fileId> --online      Host a Google Drive WAPK on Elit Run
   elit wapk run [file.wapk]                 Run a packaged app or the configured default archive
   elit wapk run --google-drive-file-id <id> Run a packaged app directly from Google Drive
   elit wapk pack [directory]                Pack a directory into a .wapk archive

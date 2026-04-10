@@ -2,6 +2,8 @@
 
 WAPK is an application archive format for packaging and running Elit apps as a single file.
 
+`node_modules` are included by default when packing. If you need to exclude dependencies for a smaller archive, add them to `.wapkignore`.
+
 ## Supported Commands
 
 ```bash
@@ -11,8 +13,8 @@ npx elit wapk pack .
 # Package as a locked archive
 npx elit wapk pack . --password secret-123
 
-# Package with dependencies included
-npx elit wapk pack . --include-deps
+# Package current directory with dependencies
+npx elit wapk pack .
 
 # Inspect archive metadata and files
 npx elit wapk inspect ./app.wapk
@@ -31,6 +33,9 @@ npx elit wapk ./app.wapk
 
 # Explicit run command
 npx elit wapk run ./app.wapk
+
+# Host the archive in Elit Run until Ctrl+C
+npx elit wapk run ./app.wapk --online
 
 # Run a locked archive
 npx elit wapk run ./app.wapk --password secret-123
@@ -78,15 +83,46 @@ npx elit wapk run ./app.wapk --no-archive-watch
 
 # Run a WAPK archive directly from Google Drive
 npx elit wapk run --google-drive-file-id 1AbCdEfGhIjKlMnOp --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN
+
+# Send a local or remote archive into Elit Run instead of the local runtime
+npx elit wapk run ./app.wapk --online
+npx elit wapk gdrive://1AbCdEfGhIjKlMnOp --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --online
+npx elit wapk run --google-drive-file-id 1AbCdEfGhIjKlMnOp --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --online
+
+# Point at a custom Elit Run URL
+npx elit wapk run ./app.wapk --online --online-url http://localhost:4177
 ```
 
 Note: runtime file sync does not force your app process to hot-reload already-imported modules. It keeps the extracted files and the archive aligned on disk; restart or app-level reload logic is still needed when the runtime should pick up already-loaded code.
 
 Google Drive mode requires an OAuth access token that can read and update the target file. The recommended setup is to store that token in an environment variable and point `accessTokenEnv` or `--google-drive-token-env` at it.
 
-The same WAPK run flags can also be forwarded through `elit pm start --wapk ...`, which means PM-managed WAPK apps can now target Google Drive directly as well.
+The same WAPK run flags can also be forwarded through `elit pm start --wapk ...`, which means PM-managed WAPK apps can target Google Drive directly and can also host Elit Run online shares through PM.
 
 A complete TypeScript config example is available in `examples/wapk-google-drive-example/elit.config.ts`.
+
+## Online Elit Run Handoff
+
+`--online` creates a shared session on the Elit Run server instead of starting the local Node/Bun/Deno runtime.
+
+Flow:
+
+1. Elit reads the `.wapk` archive from the local file or remote source.
+2. Elit decodes the archive into a shared-session snapshot.
+3. Elit sends that snapshot to the Elit Run server through its shared-session create API.
+4. Elit Run stores the session in memory and returns a join key.
+5. The CLI prints the returned share key and join URL, stays alive while the share is active, and closes it when you press `Ctrl+C`.
+
+Notes:
+
+- Elit Run must already be running, usually from the `elit-run` repo on `http://localhost:4177` or `http://localhost:4179`.
+- Google Drive-backed archives can be hosted online with either `elit wapk gdrive://<fileId> --online` or `elit wapk run --google-drive-file-id <fileId> ... --online`.
+- Use `--online-url <url>` or `ELIT_WAPK_ONLINE_URL` if your Elit Run instance uses a different origin.
+- `--runtime`, `--sync-interval`, `--watcher`, `--archive-watch`, and `--archive-sync-interval` do not apply in `--online` mode because Elit Run receives a prebuilt shared snapshot instead of a live runtime process.
+- If the archive is locked, provide `--password` so the CLI can decode it before creating the online share session.
+- `--online` does not open a browser window. Guests join later by visiting Elit Run and entering the returned key while the CLI host remains active.
+- Press `Ctrl+C` in the CLI to close the shared session. Connected guests receive the normal host-closed event.
+- When the same archive is hosted through `elit pm start --wapk ... --online`, use `elit pm stop`, `elit pm restart`, or `elit pm delete` to close the shared session gracefully.
 
 ## Real Google Drive Integration Test
 

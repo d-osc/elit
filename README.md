@@ -230,6 +230,7 @@ npx elit native generate android ./src/native-screen.ts --name HomeScreen
 npx elit pm start --script "npm start" --name my-app
 npx elit wapk pack .
 npx elit wapk run ./app.wapk
+npx elit wapk run ./app.wapk --online
 npx elit desktop wapk run ./app.wapk
 ```
 
@@ -263,6 +264,7 @@ Useful flags:
 - `elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure`
 - `elit pm start ./src/worker.ts --name worker --runtime bun`
 - `elit pm start --wapk ./app.wapk --name packaged-app`
+- `elit pm start --wapk ./app.wapk --name packaged-app --online --online-url http://localhost:4179`
 - `elit pm start --wapk gdrive://<fileId> --name packaged-app`
 - `elit pm start --google-drive-file-id <fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --name packaged-app`
 - `elit pm save`
@@ -271,7 +273,10 @@ Useful flags:
 - `elit wapk pack . --password secret-123`
 - `elit wapk ./app.wapk --runtime node|bun|deno`
 - `elit wapk run ./app.wapk --password secret-123 --sync-interval 100 --watcher`
-- `elit wapk pack . --include-deps`
+- `elit wapk run ./app.wapk --online` (stays active until `Ctrl+C`, then closes the shared session)
+- `elit wapk gdrive://<fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --online`
+- `elit wapk run ./app.wapk --online --online-url http://localhost:4177`
+- `elit wapk pack .`
 - `elit wapk inspect ./app.wapk --password secret-123`
 - `elit wapk extract ./app.wapk`
 - `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
@@ -331,9 +336,10 @@ WAPK mode notes:
 PM mode notes:
 
 - `elit pm start --script "npm start"`, `elit pm start --file ./app.ts`, and `elit pm start --wapk ./app.wapk` all run through the same detached process manager.
-- WAPK PM targets can also point at `gdrive://<fileId>` or use `pm.apps[].wapkRun.googleDrive` plus forwarded WAPK run flags like `syncInterval`, `watcher`, and `watchArchive`.
+- WAPK PM targets can also point at `gdrive://<fileId>` or use `pm.apps[].wapkRun.googleDrive` plus forwarded WAPK run flags like `online`, `onlineUrl`, `syncInterval`, `watcher`, and `watchArchive`.
 - `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
 - Use `elit pm list`, `elit pm stop`, `elit pm restart`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
+- PM-managed WAPK online hosts close their Elit Run shared session when you use `elit pm stop`, `elit pm restart`, or `elit pm delete`.
 - Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.
 - Use `--watch`, `--watch-path`, `--watch-ignore`, and `--watch-debounce` when the process should restart after source changes.
 - PM `--watch` and WAPK `--watcher` are different: the first restarts the managed process, the second changes how the inner WAPK runtime syncs files.
@@ -949,7 +955,7 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.5.5`:
+Highlights in `v3.5.6`:
 
 - Added `elit pm` for detached background process management of shell commands, file targets, and WAPK apps.
 - Added `pm.apps[]` and `pm.dataDir` in `elit.config.*` for config-first process manager workflows.

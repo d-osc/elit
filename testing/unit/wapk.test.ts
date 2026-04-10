@@ -91,6 +91,114 @@ function createGoogleDriveFetchMock(initialBuffer: Buffer, fileId = 'drive-file-
     };
 }
 
+function createGoogleDriveOnlineFetchMock(
+    initialBuffer: Buffer,
+    options: {
+        fileId?: string;
+        onlineUrl?: string;
+    } = {},
+) {
+    const originalFetch = global.fetch;
+    const fileId = options.fileId ?? 'drive-file-id';
+    const launcherUrl = new URL(options.onlineUrl ?? 'http://localhost:4179/');
+    let remoteBuffer = Buffer.from(initialBuffer);
+    let revision = 0;
+    let createPayload: any;
+    let closePayload: any;
+
+    const createMetadata = () => ({
+        id: fileId,
+        name: 'remote-app.wapk',
+        modifiedTime: new Date(1710000000000 + revision).toISOString(),
+        size: String(remoteBuffer.length),
+        md5Checksum: createHash('md5').update(remoteBuffer).digest('hex'),
+    });
+
+    const jsonResponse = (payload: unknown) => new Response(JSON.stringify(payload), {
+        headers: { 'content-type': 'application/json' },
+    });
+
+    const readJsonBody = async (body: any) => {
+        if (typeof body === 'string') {
+            return JSON.parse(body);
+        }
+
+        return JSON.parse(await new Response(body).text());
+    };
+
+    global.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        const requestUrl = typeof input === 'string'
+            ? input
+            : input instanceof URL
+                ? input.toString()
+                : input.url;
+        const url = new URL(requestUrl);
+        const method = init?.method ?? 'GET';
+
+        if (url.origin === launcherUrl.origin && url.pathname === launcherUrl.pathname && method === 'GET') {
+            return new Response('ok', { status: 200 });
+        }
+
+        if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/create' && method === 'POST') {
+            createPayload = await readJsonBody(init?.body);
+            setTimeout(() => {
+                process.emit('SIGINT');
+            }, 0);
+            return jsonResponse({
+                ok: true,
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+        }
+
+        if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/close' && method === 'POST') {
+            closePayload = await readJsonBody(init?.body);
+            return jsonResponse({ ok: true });
+        }
+
+        if (!requestUrl.includes(`/files/${fileId}`)) {
+            throw new Error(`Unexpected URL: ${requestUrl}`);
+        }
+
+        if (method === 'GET') {
+            if (requestUrl.includes('alt=media')) {
+                return new Response(remoteBuffer, {
+                    headers: { 'content-type': 'application/octet-stream' },
+                });
+            }
+
+            return jsonResponse(createMetadata());
+        }
+
+        if (method === 'PATCH') {
+            const body = init?.body;
+            if (!body) {
+                throw new Error('Google Drive upload body was missing.');
+            }
+
+            remoteBuffer = Buffer.isBuffer(body)
+                ? Buffer.from(body)
+                : Buffer.from(await new Response(body).arrayBuffer());
+            revision += 1;
+            return jsonResponse(createMetadata());
+        }
+
+        throw new Error(`Unexpected method for ${requestUrl}: ${method}`);
+    }) as typeof fetch;
+
+    return {
+        getCreatePayload() {
+            return createPayload;
+        },
+        getClosePayload() {
+            return closePayload;
+        },
+        restore(): void {
+            global.fetch = originalFetch;
+        },
+    };
+}
+
 describe('wapk helpers', () => {
     it('packs a directory and infers runtime and entry from package.json scripts', async () => {
         const dir = createTempDir();
@@ -122,7 +230,7 @@ describe('wapk helpers', () => {
         }
     });
 
-    it('skips node_modules by default and includes them when requested', async () => {
+    it('includes node_modules by default and keeps --include-deps compatible', async () => {
         const dir = createTempDir();
 
         try {
@@ -146,7 +254,7 @@ describe('wapk helpers', () => {
                 outputPath: path.join(dir, 'with-deps.wapk'),
             }));
 
-            expect(withoutDeps.files.some((file) => file.path.startsWith('node_modules/'))).toBe(false);
+            expect(withoutDeps.files.some((file) => file.path === 'node_modules/example/index.js')).toBe(true);
             expect(withDeps.files.some((file) => file.path === 'node_modules/example/index.js')).toBe(true);
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
@@ -515,6 +623,70 @@ describe('wapk helpers', () => {
             expect(fs.readFileSync(markerPath, 'utf8')).toBe('configured-google-drive-run');
         } finally {
             driveMock?.restore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs the configured Google Drive archive online from elit.config.json', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed-online.wapk');
+        const previousExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        let fetchMock: ReturnType<typeof createGoogleDriveOnlineFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'remote-online-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: 'src/index.js',
+                    run: {
+                        googleDrive: {
+                            fileId: 'drive-file-id',
+                            accessToken: 'token-789',
+                        },
+                        online: true,
+                        onlineUrl: 'http://localhost:4179',
+                        password: 'config-secret',
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("configured-google-drive-online");\n');
+
+            await packWapkDirectory(dir, {
+                outputPath: seedArchivePath,
+                password: 'config-secret',
+            });
+
+            fetchMock = createGoogleDriveOnlineFetchMock(fs.readFileSync(seedArchivePath), {
+                onlineUrl: 'http://localhost:4179',
+            });
+
+            await runWapkCommand([], dir);
+
+            expect(fetchMock.getCreatePayload()).toMatchObject({
+                snapshot: {
+                    hostLabel: 'remote-online-app',
+                    locked: true,
+                    header: {
+                        name: 'remote-online-app',
+                    },
+                },
+            });
+            expect(fetchMock.getClosePayload()).toMatchObject({
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+            expect(logSpy.calls.some((call) => call.join(' ').includes('Share key: ABCD-EFGH-IJKL'))).toBe(true);
+            expect(errorSpy.callCount).toBe(0);
+        } finally {
+            process.exitCode = previousExitCode;
+            fetchMock?.restore();
+            logSpy.mockRestore();
+            errorSpy.mockRestore();
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });

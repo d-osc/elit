@@ -155,6 +155,7 @@ Forms:
 - `elit pm start ./src/app.ts --name my-app`
 - `elit pm start --file ./src/app.js --name my-app`
 - `elit pm start --wapk ./app.wapk --name my-app`
+- `elit pm start --wapk ./app.wapk --name my-app --online`
 - `elit pm start --wapk gdrive://<fileId> --name my-app`
 - `elit pm start --google-drive-file-id <fileId> --name my-app`
 - `elit pm start`
@@ -173,6 +174,8 @@ Useful options:
 - `--cwd <dir>`
 - `--env KEY=VALUE`
 - `--password <value>` for locked WAPK apps
+- `--online` for PM-managed Elit Run WAPK hosting
+- `--online-url <url>` for a custom Elit Run origin
 - `--google-drive-file-id <id>` for remote WAPK apps
 - `--google-drive-token-env <env>` for remote WAPK apps
 - `--google-drive-access-token <token>` for remote WAPK apps
@@ -201,7 +204,9 @@ Notes:
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
+- PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
 - PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
+- `pm stop`, `pm restart`, and `pm delete` close PM-managed online WAPK share sessions before the process exits.
 - Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.
 - `pm save` stores the current running app list in `pm.dumpFile` or `./.elit/pm/dump.json`, and `pm resurrect` replays that dump.
 - State and logs are stored in `./.elit/pm` by default, or `pm.dataDir` when configured.
@@ -215,8 +220,10 @@ Forms:
 
 - `elit wapk <file.wapk>`
 - `elit wapk gdrive://<fileId>`
+- `elit wapk gdrive://<fileId> --online`
 - `elit wapk run <file.wapk>`
 - `elit wapk run --google-drive-file-id <fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN`
+- `elit wapk run <file.wapk> --online`
 - `elit wapk`
 - `elit wapk run`
 - `elit wapk pack [directory]`
@@ -231,10 +238,21 @@ Useful options:
 - `--watcher`
 - `--archive-watch`
 - `--no-archive-watch`
+- `--online`
+- `--online-url <url>`
 - `--google-drive-file-id <id>`
 - `--google-drive-token-env <env>`
 - `--google-drive-access-token <token>`
-- `--include-deps` on `pack`
+- `--include-deps` on `pack` as a legacy compatibility flag
+
+Notes:
+
+- `elit wapk pack` includes `node_modules` by default; use `.wapkignore` if you want to exclude dependencies.
+- `--online` creates a shared session on the Elit Run server directly, keeps the CLI alive, and closes the session when you press `Ctrl+C`.
+- Google Drive archives can use the same online handoff with `elit wapk gdrive://<fileId> --online` or `elit wapk run --google-drive-file-id <fileId> ... --online`.
+- By default it looks for Elit Run at `http://localhost:4177`, then `http://localhost:4179`.
+- Use `--online-url <url>` or `ELIT_WAPK_ONLINE_URL` if your Elit Run instance is running elsewhere.
+- Locked archives in `--online` mode must provide `--password` because the CLI builds the shared snapshot itself.
 
 ## Config-First Workflow
 
@@ -266,8 +284,9 @@ elit pm start --wapk ./app.wapk --name packaged-app
 elit pm save
 elit pm resurrect
 elit pm logs my-app --lines 100
-elit wapk pack . --include-deps
+elit wapk pack .
 elit wapk run ./app.wapk --runtime bun --sync-interval 100 --watcher
+elit wapk run ./app.wapk --online
 ```
 
 ## Related Docs

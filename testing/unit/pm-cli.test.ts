@@ -17,6 +17,8 @@ function createWapkPmRecord(overrides = {}) {
         file: undefined,
         wapk: 'gdrive://drive-file-id',
         wapkRun: {
+            online: true,
+            onlineUrl: 'http://localhost:4179',
             syncInterval: 150,
             useWatcher: true,
             watchArchive: true,
@@ -53,11 +55,12 @@ function createWapkPmRecord(overrides = {}) {
 }
 
 describe('pm cli wapk support', () => {
-    it('parses direct Google Drive WAPK flags', () => {
+    it('parses direct Google Drive WAPK flags plus online hosting options', () => {
         const parsed = parsePmStartArgs([
             '--google-drive-file-id', 'drive-file-id',
             '--google-drive-token-env', 'GOOGLE_DRIVE_ACCESS_TOKEN',
             '--google-drive-shared-drive',
+            '--online-url', 'http://localhost:4179',
             '--sync-interval', '150',
             '--archive-sync-interval', '200',
             '--watcher',
@@ -70,6 +73,8 @@ describe('pm cli wapk support', () => {
                 accessTokenEnv: 'GOOGLE_DRIVE_ACCESS_TOKEN',
                 supportsAllDrives: true,
             },
+            online: true,
+            onlineUrl: 'http://localhost:4179',
             syncInterval: 150,
             archiveSyncInterval: 200,
             useWatcher: true,
@@ -150,17 +155,18 @@ describe('pm cli wapk support', () => {
         });
     });
 
-    it('builds PM commands that forward WAPK Google Drive and live-sync flags', () => {
+    it('builds PM commands that forward WAPK online, Google Drive, and live-sync flags', () => {
         const command = buildPmCommand(createWapkPmRecord());
 
         expect(command.args).toEqual(expect.arrayContaining([
             'wapk',
             'run',
             'gdrive://drive-file-id',
-            '--runtime',
-            'bun',
             '--password',
             'secret-123',
+            '--online',
+            '--online-url',
+            'http://localhost:4179',
             '--sync-interval',
             '150',
             '--watcher',
@@ -173,7 +179,12 @@ describe('pm cli wapk support', () => {
             'secret-token',
             '--google-drive-shared-drive',
         ]));
+        expect(command.args).not.toContain('--runtime');
+        expect(command.env).toEqual({ ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN: '1' });
+        expect(command.runtime).toBeUndefined();
         expect(command.preview).toContain('elit wapk run gdrive://drive-file-id');
+        expect(command.preview).toContain('--online');
+        expect(command.preview).toContain('--online-url http://localhost:4179');
         expect(command.preview).toContain('--sync-interval 150');
         expect(command.preview).toContain('--watcher');
         expect(command.preview).toContain('--archive-watch');
@@ -181,5 +192,43 @@ describe('pm cli wapk support', () => {
         expect(command.preview).toContain('--google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN');
         expect(command.preview).toContain('--google-drive-access-token ******');
         expect(command.preview).toContain('--password ******');
+    });
+
+    it('keeps online WAPK config when resolving a configured PM app', () => {
+        const workspaceRoot = join(process.cwd(), 'pm-online-config');
+        const definitions = resolvePmStartDefinitions(
+            {
+                name: 'online-app',
+                env: {},
+                watchPaths: [],
+                watchIgnore: [],
+            },
+            {
+                pm: {
+                    apps: [
+                        {
+                            name: 'online-app',
+                            wapk: './dist/app.wapk',
+                            wapkRun: {
+                                online: true,
+                                onlineUrl: 'http://localhost:4179',
+                            },
+                        },
+                    ],
+                },
+            },
+            workspaceRoot,
+        );
+
+        expect(definitions).toHaveLength(1);
+        expect(definitions[0]).toMatchObject({
+            name: 'online-app',
+            type: 'wapk',
+            wapk: join(workspaceRoot, 'dist', 'app.wapk'),
+            wapkRun: {
+                online: true,
+                onlineUrl: 'http://localhost:4179',
+            },
+        });
     });
 });

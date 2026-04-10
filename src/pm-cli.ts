@@ -27,6 +27,11 @@ const DEFAULT_HEALTHCHECK_INTERVAL = 10000;
 const DEFAULT_HEALTHCHECK_TIMEOUT = 3000;
 const DEFAULT_HEALTHCHECK_MAX_FAILURES = 3;
 const DEFAULT_LOG_LINES = 40;
+const DEFAULT_PM_STOP_POLL_MS = 100;
+const DEFAULT_PM_STOP_GRACE_PERIOD_MS = 5000;
+const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
+const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
+const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
 const PM_RECORD_EXTENSION = '.json';
 const SUPPORTED_FILE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts']);
 const DEFAULT_WATCH_IGNORE = ['**/.git/**', '**/node_modules/**', '**/.elit/**'];
@@ -173,6 +178,7 @@ interface PmPaths {
 interface BuiltPmCommand {
     command: string;
     args: string[];
+    env?: Record<string, string>;
     shell?: boolean;
     runtime?: PmRuntimeName;
     preview: string;
@@ -248,10 +254,15 @@ function hasPmGoogleDriveConfig(config: WapkGoogleDriveConfig | undefined): bool
     );
 }
 
+function isPmWapkOnlineRunConfig(config: WapkRunConfig | undefined): boolean {
+    return Boolean(config?.online || normalizeNonEmptyString(config?.onlineUrl));
+}
+
 function hasPmWapkRunConfig(config: WapkRunConfig | undefined): boolean {
     return Boolean(
         normalizeNonEmptyString(config?.file)
         || hasPmGoogleDriveConfig(config?.googleDrive)
+        || isPmWapkOnlineRunConfig(config)
         || normalizeNonEmptyString(config?.runtime)
         || typeof config?.syncInterval === 'number'
         || typeof config?.useWatcher === 'boolean'
@@ -278,6 +289,8 @@ function mergePmWapkRunConfig(base: WapkRunConfig | undefined, override: WapkRun
     const merged: WapkRunConfig = {
         file: override?.file ?? base?.file,
         googleDrive,
+        online: override?.online ?? base?.online,
+        onlineUrl: override?.onlineUrl ?? base?.onlineUrl,
         runtime: override?.runtime ?? base?.runtime,
         syncInterval: override?.syncInterval ?? base?.syncInterval,
         useWatcher: override?.useWatcher ?? base?.useWatcher,
@@ -307,6 +320,8 @@ function stripPmWapkSourceFromRunConfig(config: WapkRunConfig | undefined): Wapk
     const stripped: WapkRunConfig = {
         file: undefined,
         googleDrive,
+        online: config.online,
+        onlineUrl: config.onlineUrl,
         runtime: undefined,
         syncInterval: config.syncInterval,
         useWatcher: config.useWatcher,
@@ -364,6 +379,17 @@ function appendPmWapkRunArgs(args: string[], previewParts: string[], wapkRun: Wa
         return;
     }
 
+    if (isPmWapkOnlineRunConfig(wapkRun)) {
+        args.push('--online');
+        previewParts.push('--online');
+    }
+
+    const onlineUrl = normalizeNonEmptyString(wapkRun.onlineUrl);
+    if (onlineUrl) {
+        args.push('--online-url', onlineUrl);
+        previewParts.push('--online-url', onlineUrl);
+    }
+
     if (typeof wapkRun.syncInterval === 'number' && Number.isFinite(wapkRun.syncInterval) && wapkRun.syncInterval >= 50) {
         const value = String(Math.trunc(wapkRun.syncInterval));
         args.push('--sync-interval', value);
@@ -407,8 +433,9 @@ function appendPmWapkRunArgs(args: string[], previewParts: string[], wapkRun: Wa
 
 function buildPmWapkPreview(wapk: string, runtime?: PmRuntimeName, password?: string, wapkRun?: WapkRunConfig): string {
     const previewParts = ['elit', 'wapk', 'run', quoteCommandSegment(wapk)];
+    const online = isPmWapkOnlineRunConfig(wapkRun);
 
-    if (runtime) {
+    if (runtime && !online) {
         previewParts.push('--runtime', runtime);
     }
     if (password) {
@@ -898,6 +925,10 @@ function quoteCommandSegment(value: string): string {
     return SIMPLE_PREVIEW_SEGMENT.test(value) ? value : JSON.stringify(value);
 }
 
+function isPmOnlineWapkRecord(record: Pick<PmRecord, 'type' | 'wapkRun'>): boolean {
+    return record.type === 'wapk' && isPmWapkOnlineRunConfig(record.wapkRun);
+}
+
 export function buildPmCommand(record: PmRecord): BuiltPmCommand {
     if (record.type === 'script') {
         return {
@@ -919,8 +950,9 @@ export function buildPmCommand(record: PmRecord): BuiltPmCommand {
         ];
 
         const previewParts = ['elit', 'wapk', 'run', quoteCommandSegment(record.wapk!)];
+        const online = isPmOnlineWapkRecord(record);
 
-        if (record.runtime) {
+        if (record.runtime && !online) {
             args.push('--runtime', record.runtime);
             previewParts.push('--runtime', record.runtime);
         }
@@ -935,8 +967,9 @@ export function buildPmCommand(record: PmRecord): BuiltPmCommand {
         return {
             command: cliInvocation.command,
             args,
+            env: online ? { [PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV]: '1' } : undefined,
             preview: previewParts.join(' '),
-            runtime: record.runtime,
+            runtime: online ? undefined : record.runtime,
         };
     }
 
@@ -1139,6 +1172,22 @@ async function delay(milliseconds: number): Promise<void> {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 }
 
+async function waitForProcessTermination(pid: number | undefined, timeoutMs: number): Promise<boolean> {
+    if (!pid || !isProcessAlive(pid)) {
+        return true;
+    }
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        if (!isProcessAlive(pid)) {
+            return true;
+        }
+        await delay(DEFAULT_PM_STOP_POLL_MS);
+    }
+
+    return !isProcessAlive(pid);
+}
+
 async function waitForManagedChildExit(child: ReturnType<typeof spawn>) {
     return await new Promise((resolvePromise) => {
         let resolved = false;
@@ -1292,6 +1341,7 @@ function readPlannedRestartRequest(state: { request: { kind: 'watch' | 'health';
 async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord): Promise<void> {
     let record = initialRecord;
     let activeChild: ReturnType<typeof spawn> | null = null;
+    let activeChildStopTimer: ReturnType<typeof setTimeout> | null = null;
     let stopRequested = false;
     const restartState: { request: { kind: 'watch' | 'health'; detail: string } | null } = { request: null };
 
@@ -1308,13 +1358,48 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
         return record;
     };
 
-    const stopActiveChild = (): void => {
-        if (activeChild?.pid && isProcessAlive(activeChild.pid)) {
-            terminateProcessTree(activeChild.pid);
+    const clearActiveChildStopTimer = (): void => {
+        if (activeChildStopTimer) {
+            clearTimeout(activeChildStopTimer);
+            activeChildStopTimer = null;
         }
     };
 
-    const handleStopSignal = (signal: string) => {
+    const stopActiveChild = (): void => {
+        if (!activeChild?.pid || !isProcessAlive(activeChild.pid)) {
+            return;
+        }
+
+        const current = readLatestPmRecord(filePath, record);
+        if (isPmOnlineWapkRecord(current) && activeChild.stdin && !activeChild.stdin.destroyed && activeChild.stdin.writable) {
+            try {
+                activeChild.stdin.end(`${PM_WAPK_ONLINE_SHUTDOWN_COMMAND}\n`);
+                clearActiveChildStopTimer();
+                activeChildStopTimer = setTimeout(() => {
+                    if (activeChild?.pid && isProcessAlive(activeChild.pid)) {
+                        writePmLog(
+                            stderrLog,
+                            `graceful WAPK online shutdown timed out after ${PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS}ms; forcing process termination`,
+                        );
+                        terminateProcessTree(activeChild.pid);
+                    }
+                }, PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS);
+                activeChildStopTimer.unref?.();
+                return;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                writePmLog(stderrLog, `graceful WAPK online shutdown failed: ${message}`);
+            }
+        }
+
+        terminateProcessTree(activeChild.pid);
+    };
+
+    const requestManagedStop = (reason: string): void => {
+        if (stopRequested) {
+            return;
+        }
+
         stopRequested = true;
         persist((current) => ({
             ...current,
@@ -1322,8 +1407,12 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
             status: 'stopping',
             updatedAt: new Date().toISOString(),
         }));
-        writePmLog(stdoutLog, `received ${signal}, stopping managed process`);
+        writePmLog(stdoutLog, reason);
         stopActiveChild();
+    };
+
+    const handleStopSignal = (signal: string) => {
+        requestManagedStop(`received ${signal}, stopping managed process`);
     };
 
     process.on('SIGINT', handleStopSignal);
@@ -1363,15 +1452,17 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
                 return;
             }
 
+            const onlineStdinShutdownEnabled = isPmOnlineWapkRecord(latest);
             const child = spawn(command.command, command.args, {
                 cwd: latest.cwd,
                 env: {
                     ...process.env,
                     ...latest.env,
+                    ...command.env,
                     ELIT_PM_NAME: latest.name,
                     ELIT_PM_ID: latest.id,
                 },
-                stdio: ['ignore', 'pipe', 'pipe'],
+                stdio: [onlineStdinShutdownEnabled ? 'pipe' : 'ignore', 'pipe', 'pipe'],
                 windowsHide: true,
                 shell: command.shell,
             });
@@ -1426,9 +1517,19 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
                 (message) => writePmLog(stdoutLog, message),
             );
 
+            const desiredStatePoller = setInterval(() => {
+                const latestRecord = readLatestPmRecord(filePath, record);
+                if (!stopRequested && latestRecord.desiredState === 'stopped') {
+                    requestManagedStop('stop requested by PM control state');
+                }
+            }, DEFAULT_PM_STOP_POLL_MS);
+            desiredStatePoller.unref?.();
+
             const exitResult: any = await waitForManagedChildExit(child);
+            clearInterval(desiredStatePoller);
             await watchController.close();
             healthMonitor.stop();
+            clearActiveChildStopTimer();
 
             activeChild = null;
             const exitCode = waitForExit(exitResult.code, exitResult.signal);
@@ -1512,6 +1613,7 @@ async function runManagedProcessLoop(filePath: string, initialRecord: PmRecord):
     } finally {
         stopRequested = true;
         stopActiveChild();
+        clearActiveChildStopTimer();
 
         const finalRecord = readLatestPmRecord(filePath, record);
         writePmRecord(filePath, {
@@ -1796,6 +1898,19 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             case '--password':
                 parsed.password = readRequiredValue(args, ++index, '--password');
                 break;
+            case '--online':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    online: true,
+                };
+                break;
+            case '--online-url':
+                parsed.wapkRun = {
+                    ...parsed.wapkRun,
+                    online: true,
+                    onlineUrl: readRequiredValue(args, ++index, '--online-url'),
+                };
+                break;
             case '--sync-interval':
                 parsed.wapkRun = {
                     ...parsed.wapkRun,
@@ -2029,7 +2144,7 @@ function printPmList(paths: PmPaths): void {
     }
 }
 
-function stopPmMatches(matches: PmRecordMatch[]): number {
+async function stopPmMatches(matches: PmRecordMatch[]): Promise<number> {
     let stopped = 0;
 
     for (const match of matches) {
@@ -2043,10 +2158,20 @@ function stopPmMatches(matches: PmRecordMatch[]): number {
         };
         writePmRecord(current.filePath, updated);
 
-        if (current.record.runnerPid && isProcessAlive(current.record.runnerPid)) {
+        const runnerStopped = await waitForProcessTermination(current.record.runnerPid, DEFAULT_PM_STOP_GRACE_PERIOD_MS);
+        const childStopped = await waitForProcessTermination(
+            current.record.childPid,
+            runnerStopped ? DEFAULT_PM_STOP_POLL_MS : DEFAULT_PM_STOP_GRACE_PERIOD_MS,
+        );
+
+        if (!runnerStopped && current.record.runnerPid && isProcessAlive(current.record.runnerPid)) {
             terminateProcessTree(current.record.runnerPid);
-        } else if (current.record.childPid && isProcessAlive(current.record.childPid)) {
+            await waitForProcessTermination(current.record.runnerPid, DEFAULT_PM_STOP_POLL_MS);
+        }
+
+        if (!childStopped && current.record.childPid && isProcessAlive(current.record.childPid)) {
             terminateProcessTree(current.record.childPid);
+            await waitForProcessTermination(current.record.childPid, DEFAULT_PM_STOP_POLL_MS);
         }
 
         writePmRecord(current.filePath, {
@@ -2074,7 +2199,7 @@ async function runPmStop(args: string[]): Promise<void> {
         throw new Error(`No managed process found for: ${target}`);
     }
 
-    const count = stopPmMatches(matches);
+    const count = await stopPmMatches(matches);
     console.log(`[pm] stopped ${count} process${count === 1 ? '' : 'es'}`);
 }
 
@@ -2090,7 +2215,7 @@ async function runPmRestart(args: string[]): Promise<void> {
         throw new Error(`No managed process found for: ${target}`);
     }
 
-    stopPmMatches(matches);
+    await stopPmMatches(matches);
 
     const restarted: string[] = [];
     for (const match of matches) {
@@ -2174,7 +2299,7 @@ async function runPmDelete(args: string[]): Promise<void> {
         throw new Error(`No managed process found for: ${target}`);
     }
 
-    stopPmMatches(matches);
+    await stopPmMatches(matches);
 
     for (const match of matches) {
         if (existsSync(match.record.logFiles.out)) {
@@ -2276,6 +2401,8 @@ function printPmHelp(): void {
         '  --cwd <dir>                 Working directory for the managed process',
         '  --env KEY=VALUE             Add or override an environment variable',
         '  --password <value>          Password for locked WAPK archives',
+        '  --online                    Host the WAPK on Elit Run through PM instead of a local runtime',
+        '  --online-url <url>          Elit Run URL used for PM-managed online WAPK hosting',
         '  --sync-interval <ms>        Forward WAPK live-sync write interval (>= 50ms)',
         '  --watcher, --use-watcher    Forward event-driven WAPK file watching',
         '  --archive-watch             Pull archive source changes back into the temp WAPK workdir',
@@ -2307,6 +2434,7 @@ function printPmHelp(): void {
         '        { name: "worker", file: "./src/worker.ts", runtime: "bun" },',
         '        { name: "desktop-app", wapk: "./dist/app.wapk", runtime: "node" },',
         '        { name: "drive-app", wapkRun: { googleDrive: { fileId: "1AbCdEfGhIjKlMnOp", accessTokenEnv: "GOOGLE_DRIVE_ACCESS_TOKEN" }, useWatcher: true, watchArchive: true } }',
+        '        { name: "online-app", wapk: "./dist/app.wapk", wapkRun: { online: true, onlineUrl: "http://localhost:4179" } }',
         '      ]',
         '    }',
         '  }',
@@ -2319,6 +2447,7 @@ function printPmHelp(): void {
         '  - TypeScript files with runtime node require tsx, otherwise use --runtime bun.',
         '  - WAPK processes are executed through elit wapk run inside the manager.',
         '  - WAPK PM apps can use local archives, gdrive://<fileId>, or pm.apps[].wapkRun.googleDrive.',
+        '  - PM-managed WAPK online hosts close their Elit Run share session when you use elit pm stop, restart, or delete.',
     ].join('\n'));
 }
 

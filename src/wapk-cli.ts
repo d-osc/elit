@@ -18,6 +18,11 @@ export interface WapkHeader {
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
     createdAt: string;
+    author?: string;
+    license?: string;
+    homepage?: string;
+    bugs?: string | { url: string };
+    repository?: string | { type?: string; url?: string };
 }
 
 interface WapkFileEntry {
@@ -116,16 +121,6 @@ const WAPK_LOCKED_VERSION = 2;
 const WAPK_VERSION = WAPK_LOCKED_VERSION;
 const DEFAULT_WAPK_PORT = 3000;
 const DEFAULT_IGNORE = [
-    'node_modules',
-    '.git',
-    '.elit-config-*',
-    '.DS_Store',
-    'Thumbs.db',
-    '.env',
-    '.env.local',
-    'dist',
-    'build',
-    '.wapk',
 ] as const;
 
 export const WAPK_RUNTIMES: WapkRuntimeName[] = ['node', 'bun', 'deno'];
@@ -138,6 +133,54 @@ const WAPK_IV_LENGTH = 12;
 const WAPK_AUTH_TAG_LENGTH = 16;
 const WAPK_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 } as const;
 const DEFAULT_GOOGLE_DRIVE_TOKEN_ENV = 'GOOGLE_DRIVE_ACCESS_TOKEN';
+const DEFAULT_WAPK_ONLINE_URL_ENV = 'ELIT_WAPK_ONLINE_URL';
+const DEFAULT_WAPK_ONLINE_URLS = ['https://wapk.d-osc.com/'] as const;
+const WAPK_ONLINE_CREATE_PATH = '/api/shared-session/create';
+const WAPK_ONLINE_CLOSE_PATH = '/api/shared-session/close';
+const WAPK_ONLINE_CLOSE_REASON = 'The host stopped sharing this session.';
+const WAPK_ONLINE_KEEPALIVE_INTERVAL_MS = 1000;
+const WAPK_ONLINE_PM_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
+const WAPK_ONLINE_PM_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
+
+interface WapkOnlineSharedSessionSnapshot {
+    originalName: string;
+    version: number;
+    locked: boolean;
+    header: WapkHeader;
+    files: Array<{
+        path: string;
+        mode: number;
+        content: string;
+    }>;
+    currentPath: string;
+    hostLabel: string;
+}
+
+interface WapkOnlineCreateRequest {
+    snapshot: WapkOnlineSharedSessionSnapshot;
+}
+
+interface WapkOnlineCreateResponse {
+    ok: boolean;
+    joinKey?: string;
+    adminToken?: string;
+    error?: string;
+}
+
+interface WapkOnlineCloseRequest {
+    joinKey: string;
+    adminToken: string;
+    reason?: string;
+}
+
+interface WapkOnlineCloseResponse {
+    ok: boolean;
+    error?: string;
+}
+
+type WapkOnlineShutdownTrigger =
+    | { kind: 'signal'; signal: 'SIGINT' | 'SIGTERM' }
+    | { kind: 'pm' };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -277,6 +320,8 @@ function normalizeWapkRunConfig(value: unknown): WapkRunConfig | undefined {
     const normalized: WapkRunConfig = {
         file: normalizeNonEmptyString(value.file),
         googleDrive: normalizeWapkGoogleDriveConfig(value.googleDrive),
+        online: normalizeBoolean(value.online),
+        onlineUrl: normalizeNonEmptyString(value.onlineUrl),
         runtime: normalizeRuntime(value.runtime),
         syncInterval: normalizeSyncInterval(value.syncInterval),
         useWatcher: normalizeBoolean(value.useWatcher),
@@ -1132,6 +1177,300 @@ function resolveArchiveHandle(archiveSpecifier: string, googleDrive?: WapkGoogle
     return createLocalArchiveHandle(archiveSpecifier);
 }
 
+function sanitizeOnlineArchiveFileName(label: string | undefined, fallback: string): string {
+    const preferredName = normalizeNonEmptyString(label)
+        ?? normalizeNonEmptyString(basename(fallback))
+        ?? 'app.wapk';
+    const sanitized = preferredName
+        .replace(/[\\/:*?"<>|]+/g, '-')
+        .trim();
+    const fileName = sanitized.length > 0 ? sanitized : 'app.wapk';
+
+    return fileName.toLowerCase().endsWith('.wapk') ? fileName : `${fileName}.wapk`;
+}
+
+function buildOnlineJoinUrl(baseUrl: URL, joinKey: string): string {
+    const joinUrl = new URL(baseUrl.toString());
+    joinUrl.search = '';
+    joinUrl.hash = '';
+    joinUrl.searchParams.set('join', joinKey);
+    return joinUrl.toString();
+}
+
+async function probeOnlineLauncherUrl(url: string): Promise<boolean> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'manual',
+            signal: controller.signal,
+        });
+        return response.ok;
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function normalizeOnlineLauncherUrl(candidate: string, optionName: string): URL {
+    let url: URL;
+
+    try {
+        url = new URL(candidate);
+    } catch {
+        throw new Error(`${optionName} must be a valid http:// or https:// URL.`);
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error(`${optionName} must use http:// or https://.`);
+    }
+
+    return url;
+}
+
+async function resolveWapkOnlineLauncherUrl(explicitUrl?: string): Promise<URL> {
+    const configuredUrl = normalizeNonEmptyString(explicitUrl)
+        ?? normalizeNonEmptyString(process.env[DEFAULT_WAPK_ONLINE_URL_ENV]);
+
+    if (configuredUrl) {
+        const normalized = normalizeOnlineLauncherUrl(configuredUrl, explicitUrl ? '--online-url' : DEFAULT_WAPK_ONLINE_URL_ENV);
+        if (!(await probeOnlineLauncherUrl(normalized.toString()))) {
+            throw new Error(
+                `Could not reach Elit Run at ${normalized.toString()}. Start c:\\Users\\ondev\\Projects\\elit-run first or provide a reachable --online-url.`,
+            );
+        }
+        return normalized;
+    }
+
+    for (const candidate of DEFAULT_WAPK_ONLINE_URLS) {
+        if (await probeOnlineLauncherUrl(candidate)) {
+            return new URL(candidate);
+        }
+    }
+
+    throw new Error(
+        'Could not reach Elit Run on http://localhost:4177 or http://localhost:4179. Start c:\\Users\\ondev\\Projects\\elit-run with npm run dev or npm run preview, or pass --online-url <url>.',
+    );
+}
+
+function encodeOnlineSharedSessionFileContent(content: Buffer): string {
+    return content.toString('base64');
+}
+
+function createWapkOnlineSharedSessionSnapshot(
+    archiveBuffer: Buffer,
+    archiveLabel: string | undefined,
+    archiveIdentifier: string,
+    options: WapkCredentialsOptions,
+): WapkOnlineSharedSessionSnapshot {
+    const decoded = decodeWapk(archiveBuffer, options);
+    const originalName = sanitizeOnlineArchiveFileName(archiveLabel, archiveIdentifier);
+
+    return {
+        originalName,
+        version: decoded.version,
+        locked: Boolean(decoded.lock),
+        header: decoded.header,
+        files: decoded.files.map((file) => ({
+            path: file.path,
+            mode: file.mode,
+            content: encodeOnlineSharedSessionFileContent(file.content),
+        })),
+        currentPath: '/',
+        hostLabel: decoded.header.name,
+    };
+}
+
+async function createWapkOnlineSharedSession(
+    launcherUrl: URL,
+    snapshot: WapkOnlineSharedSessionSnapshot,
+): Promise<{ ok: true; joinKey: string; adminToken: string }> {
+    const response = await fetch(new URL(WAPK_ONLINE_CREATE_PATH, launcherUrl), {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({ snapshot } satisfies WapkOnlineCreateRequest),
+    });
+
+    let payload: Partial<WapkOnlineCreateResponse> | null = null;
+    try {
+        payload = await response.json() as Partial<WapkOnlineCreateResponse>;
+    } catch {
+        payload = null;
+    }
+
+    const joinKey = normalizeNonEmptyString(payload?.joinKey);
+    const adminToken = normalizeNonEmptyString(payload?.adminToken);
+
+    if (!response.ok || !payload?.ok || !joinKey || !adminToken) {
+        throw new Error(payload?.error ?? `Could not create the online shared session (${response.status}).`);
+    }
+
+    return { ok: true, joinKey, adminToken };
+}
+
+async function closeWapkOnlineSharedSession(
+    launcherUrl: URL,
+    session: { joinKey: string; adminToken: string },
+): Promise<void> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+        const response = await fetch(new URL(WAPK_ONLINE_CLOSE_PATH, launcherUrl), {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                joinKey: session.joinKey,
+                adminToken: session.adminToken,
+                reason: WAPK_ONLINE_CLOSE_REASON,
+            } satisfies WapkOnlineCloseRequest),
+            signal: controller.signal,
+        });
+
+        let payload: Partial<WapkOnlineCloseResponse> | null = null;
+        try {
+            payload = await response.json() as Partial<WapkOnlineCloseResponse>;
+        } catch {
+            payload = null;
+        }
+
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error ?? `Could not close the online shared session (${response.status}).`);
+        }
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function isPmWapkOnlineShutdownEnabled(): boolean {
+    return process.env[WAPK_ONLINE_PM_SHUTDOWN_ENV] === '1' && Boolean(process.stdin) && !process.stdin.isTTY;
+}
+
+async function waitForWapkOnlineSessionShutdown(
+    launcherUrl: URL,
+    session: { joinKey: string; adminToken: string },
+): Promise<number> {
+    const shutdownTrigger = await new Promise<WapkOnlineShutdownTrigger>((resolve) => {
+        const keepAlive = setInterval(() => {}, WAPK_ONLINE_KEEPALIVE_INTERVAL_MS);
+        const pmManaged = isPmWapkOnlineShutdownEnabled();
+        let stdinBuffer = '';
+
+        const cleanup = (): void => {
+            clearInterval(keepAlive);
+            process.off('SIGINT', onSigInt);
+            process.off('SIGTERM', onSigTerm);
+            if (pmManaged) {
+                process.stdin.off('data', onStdinData);
+                process.stdin.pause();
+            }
+        };
+
+        const finish = (trigger: WapkOnlineShutdownTrigger): void => {
+            cleanup();
+            resolve(trigger);
+        };
+
+        const onSigInt = (): void => {
+            finish({ kind: 'signal', signal: 'SIGINT' });
+        };
+
+        const onSigTerm = (): void => {
+            finish({ kind: 'signal', signal: 'SIGTERM' });
+        };
+
+        const onStdinData = (chunk: Buffer | string): void => {
+            stdinBuffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+
+            const lines = stdinBuffer.split(/\r?\n/);
+            stdinBuffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+                if (line.trim() === WAPK_ONLINE_PM_SHUTDOWN_COMMAND) {
+                    finish({ kind: 'pm' });
+                    return;
+                }
+            }
+        };
+
+        process.on('SIGINT', onSigInt);
+        process.on('SIGTERM', onSigTerm);
+
+        if (pmManaged) {
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', onStdinData);
+            process.stdin.resume();
+        }
+    });
+
+    if (shutdownTrigger.kind === 'pm') {
+        console.log(`\n[wapk] PM requested shutdown for shared session ${session.joinKey}...`);
+    } else {
+        console.log(`\n[wapk] Closing shared session ${session.joinKey}...`);
+    }
+
+    try {
+        await closeWapkOnlineSharedSession(launcherUrl, session);
+        console.log('[wapk] Shared session closed.');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[wapk] Could not close the shared session cleanly: ${message}`);
+    }
+
+    if (shutdownTrigger.kind === 'pm') {
+        return 0;
+    }
+
+    return shutdownTrigger.signal === 'SIGINT' ? 130 : 143;
+}
+
+async function runWapkOnline(
+    archiveSpecifier: string,
+    options: {
+        googleDrive?: WapkGoogleDriveConfig;
+        onlineUrl?: string;
+        password?: string;
+    },
+): Promise<void> {
+    const archiveHandle = resolveArchiveHandle(archiveSpecifier, options.googleDrive);
+    const snapshot = await archiveHandle.readSnapshot();
+    const fileName = sanitizeOnlineArchiveFileName(snapshot.label ?? archiveHandle.label, archiveHandle.identifier);
+    const launcherUrl = await resolveWapkOnlineLauncherUrl(options.onlineUrl);
+    const sharedSessionSnapshot = createWapkOnlineSharedSessionSnapshot(
+        snapshot.buffer,
+        snapshot.label ?? archiveHandle.label,
+        archiveHandle.identifier,
+        options.password ? { password: options.password } : {},
+    );
+
+    console.log(`[wapk] Online handoff: ${fileName}`);
+    console.log(`[wapk] Elit Run:      ${launcherUrl.toString()}`);
+    console.log('[wapk] Creating shared session...');
+
+    const response = await createWapkOnlineSharedSession(launcherUrl, sharedSessionSnapshot);
+    const joinUrl = buildOnlineJoinUrl(launcherUrl, response.joinKey);
+    const pmManaged = isPmWapkOnlineShutdownEnabled();
+
+    console.log(`[wapk] Share key: ${response.joinKey}`);
+    console.log(`[wapk] Join URL:  ${joinUrl}`);
+    console.log(
+        pmManaged
+            ? '[wapk] Session active. Use elit pm stop, restart, or delete to close the shared session.'
+            : '[wapk] Session active. Press Ctrl+C to stop sharing and close the session.',
+    );
+
+    process.exitCode = await waitForWapkOnlineSessionShutdown(launcherUrl, {
+        joinKey: response.joinKey,
+        adminToken: response.adminToken,
+    });
+}
+
 async function writeWapkArchiveFromMemory(
     archiveHandle: WapkArchiveHandle,
     header: WapkHeader,
@@ -1473,9 +1812,7 @@ export async function packWapkDirectory(
     const config = await readWapkProjectConfig(sourceDirectory);
     const lock = resolvePackLockCredentials(config.lock, options);
     const userIgnore = readIgnorePatterns(sourceDirectory);
-    const ignorePatterns = options.includeDeps
-        ? [...DEFAULT_IGNORE.filter((pattern) => pattern !== 'node_modules'), ...userIgnore]
-        : [...DEFAULT_IGNORE, ...userIgnore];
+    const ignorePatterns = [...DEFAULT_IGNORE, ...userIgnore];
     const files = collectFiles(sourceDirectory, sourceDirectory, ignorePatterns);
     const outputPath = resolve(options.outputPath ?? join(process.cwd(), `${sanitizePackageName(config.name)}.wapk`));
     const header: WapkHeader = {
@@ -1496,8 +1833,11 @@ export async function packWapkDirectory(
     if (lock) {
         console.log('Lock:    enabled');
     }
-    if (options.includeDeps) {
+    if (files.some((file) => file.path.startsWith('node_modules/'))) {
         console.log('Deps:    included');
+    }
+    if (options.includeDeps) {
+        console.log('Note:    --include-deps is no longer required; node_modules are packed by default');
     }
     console.log(`Files:   ${files.length}`);
 
@@ -1671,9 +2011,10 @@ function printWapkHelp(): void {
         '  elit wapk run [file.wapk] --runtime node|bun|deno',
         '  elit wapk run [file.wapk] --sync-interval 100',
         '  elit wapk run [file.wapk] --watcher',
+        '  elit wapk run [file.wapk] --online',
+        '  elit wapk gdrive://<fileId> --online',
         '  elit wapk pack [directory]',
         '  elit wapk pack [directory] --password secret-123',
-        '  elit wapk pack [directory] --include-deps',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
         '',
@@ -1684,19 +2025,24 @@ function printWapkHelp(): void {
         '  --watcher, --use-watcher     Use event-driven file watcher instead of polling',
         '  --archive-watch              Pull external archive changes back into the temp workdir',
         '  --no-archive-watch           Disable external archive read sync',
+        '  --online                     Create an Elit Run share session, stay alive, and close on Ctrl+C',
+        '  --online-url <url>           Elit Run URL (default: localhost:4177, fallback localhost:4179)',
         '  --google-drive-file-id <id>  Run a remote .wapk directly from Google Drive',
         '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
         '  --google-drive-access-token <value>  OAuth token for Google Drive API calls',
         '  --google-drive-shared-drive  Include supportsAllDrives=true for shared drives',
-        '  --include-deps               Include node_modules in the archive',
+        '  --include-deps               Legacy compatibility flag; node_modules are packed by default',
         '  --password <value>           Password for locking or unlocking the archive',
         '  -h, --help                   Show this help',
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
+        '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
         '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',
         '  - Google Drive mode talks to the Drive API directly; no local archive file is required.',
+        '  - Online mode creates a shared session on Elit Run directly, keeps the CLI alive, and closes it on Ctrl+C.',
+        '  - Locked archives in online mode must provide --password so the CLI can build the shared snapshot.',
         '  - Locked archives require the same password for run/extract/inspect.',
         '  - Archives stay unlocked by default unless a password is provided.',
         '  - Use --watcher for faster file change detection (less CPU usage).',
@@ -1750,6 +2096,8 @@ function parseRunArgs(args: string[]): {
     useWatcher?: boolean;
     watchArchive?: boolean;
     archiveSyncInterval?: number;
+    online?: boolean;
+    onlineUrl?: string;
 } & WapkCredentialsOptions {
     let file: string | undefined;
     let googleDrive: WapkGoogleDriveConfig | undefined;
@@ -1758,6 +2106,8 @@ function parseRunArgs(args: string[]): {
     let useWatcher: boolean | undefined;
     let watchArchive: boolean | undefined;
     let archiveSyncInterval: number | undefined;
+    let online: boolean | undefined;
+    let onlineUrl: string | undefined;
     let password: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
@@ -1799,6 +2149,15 @@ function parseRunArgs(args: string[]): {
             }
             case '--no-archive-watch': {
                 watchArchive = false;
+                break;
+            }
+            case '--online': {
+                online = true;
+                break;
+            }
+            case '--online-url': {
+                online = true;
+                onlineUrl = readRequiredOptionValue(args, ++index, '--online-url');
                 break;
             }
             case '--google-drive-file-id': {
@@ -1844,7 +2203,7 @@ function parseRunArgs(args: string[]): {
         }
     }
 
-    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, password };
+    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, online, onlineUrl, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
@@ -1930,8 +2289,12 @@ function resolveConfiguredWapkRunOptions(
     useWatcher?: boolean;
     watchArchive?: boolean;
     archiveSyncInterval?: number;
+    online: boolean;
+    onlineUrl?: string;
     password?: string;
 } {
+    const onlineUrl = options.onlineUrl ?? defaults?.onlineUrl;
+
     return {
         file: options.file ?? defaults?.file,
         googleDrive: mergeGoogleDriveRunConfig(options.googleDrive, defaults?.googleDrive),
@@ -1940,6 +2303,8 @@ function resolveConfiguredWapkRunOptions(
         useWatcher: options.useWatcher ?? defaults?.useWatcher,
         watchArchive: options.watchArchive ?? defaults?.watchArchive,
         archiveSyncInterval: options.archiveSyncInterval ?? defaults?.archiveSyncInterval,
+        online: options.online ?? defaults?.online ?? Boolean(onlineUrl),
+        onlineUrl,
         password: options.password ?? defaults?.password,
     };
 }
@@ -2009,6 +2374,25 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
         }
 
         throw new Error('Usage: elit wapk run <file.wapk>');
+    }
+
+    if (runOptions.online) {
+        if (
+            parsedRunOptions.runtime !== undefined
+            || parsedRunOptions.syncInterval !== undefined
+            || parsedRunOptions.useWatcher !== undefined
+            || parsedRunOptions.watchArchive !== undefined
+            || parsedRunOptions.archiveSyncInterval !== undefined
+        ) {
+            console.warn('[wapk] --runtime, --sync-interval, --watcher, --archive-watch, and --archive-sync-interval are ignored with --online.');
+        }
+
+        await runWapkOnline(archiveSpecifier, {
+            googleDrive: runOptions.googleDrive,
+            onlineUrl: runOptions.onlineUrl,
+            password: runOptions.password,
+        });
+        return;
     }
 
     const prepared = await prepareWapkApp(archiveSpecifier, {

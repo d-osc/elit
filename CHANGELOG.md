@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.6] - 2026-04-11
+
+### Added
+- **Headless WAPK online share** - `elit wapk run <file.wapk> --online` can now create an Elit Run shared session without opening a browser and return the join key directly to the CLI
+  - Added `--online` and `--online-url <url>` for WAPK run flows
+  - The CLI now sends a decoded shared-session snapshot straight to the Elit Run server API and prints the returned share key and join URL
+  - Elit Run now supports static server-created shared sessions so guests can join with the returned key even when no browser host was opened
+
+### Changed
+- **Persistent WAPK online host lifecycle** - `elit wapk run <file.wapk> --online` now stays alive so the host session remains visibly active and closes the server-side shared session when the CLI receives `Ctrl+C`
+- **PM-managed WAPK online lifecycle** - `elit pm start --wapk <file.wapk> --online` now forwards Elit Run hosting flags and closes the shared session cleanly when PM stops, restarts, or deletes the managed app
+
 ## [3.5.5] - 2026-04-11
 
 ### Added

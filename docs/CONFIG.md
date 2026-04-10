@@ -213,6 +213,14 @@ pm: {
         archiveSyncInterval: 150,
       },
     },
+    {
+      name: 'online-app',
+      wapk: './dist/app.wapk',
+      wapkRun: {
+        online: true,
+        onlineUrl: 'http://localhost:4179',
+      },
+    },
   ],
 }
 ```
@@ -220,13 +228,14 @@ pm: {
 Notes:
 
 - `script`, `file`, and `wapk` are mutually exclusive per app.
-- `wapkRun` lets a PM-managed WAPK app forward Google Drive and live-sync settings into `elit wapk run`.
+- `wapkRun` lets a PM-managed WAPK app forward Google Drive, online hosting, and live-sync settings into `elit wapk run`.
 - `pm.apps[].wapkRun.file` or `pm.apps[].wapkRun.googleDrive.fileId` can define the WAPK archive source even when `wapk` is omitted.
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.
-- `watcher`, `watchArchive`, `syncInterval`, and `archiveSyncInterval` inside `wapkRun` control the inner WAPK live-sync behavior.
+- `online` and `onlineUrl` inside `wapkRun` turn a PM-managed WAPK app into an Elit Run host instead of a local runtime.
+- `watcher`, `watchArchive`, `syncInterval`, and `archiveSyncInterval` inside `wapkRun` control the inner WAPK live-sync behavior when the WAPK app is using a local runtime.
 - `healthCheck` config polls an HTTP endpoint and restarts the process after repeated failures.
 - `elit pm start` starts every configured app, while `elit pm start <name>` starts one app by name.
 - TypeScript file targets with `runtime: 'node'` require `tsx`; use `runtime: 'bun'` when you want zero-config TypeScript execution.
@@ -314,6 +323,8 @@ Notes:
 - `lock.password` stores a plain-text password.
 - `wapk.run.file` lets `elit wapk` or `elit wapk run` start a default archive without passing a file path each time.
 - `wapk.run.googleDrive` lets WAPK talk to the Google Drive API directly, so the archive does not need to exist as a local file.
+- `wapk.run.online` sends the archive to Elit Run instead of starting the local runtime.
+- `wapk.run.onlineUrl` overrides the default Elit Run origin when online mode targets a custom host.
 - `wapk.run.watchArchive` keeps the temp workdir in sync with external archive updates from the archive source, including Google Drive.
 - `wapk.run.googleDrive.accessTokenEnv` is the recommended way to provide the OAuth token; Elit also falls back to the `GOOGLE_DRIVE_ACCESS_TOKEN` environment variable.
 - `wapk.run.password` can override the archive password used at runtime; when it is omitted, Elit falls back to `wapk.lock.password`.
