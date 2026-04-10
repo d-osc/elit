@@ -218,6 +218,7 @@ Main commands:
 ```bash
 npx elit dev
 npx elit build --entry ./src/main.ts --out-dir dist
+npx elit --version
 npx elit preview
 npx elit test
 npx elit desktop ./src/main.ts
@@ -234,6 +235,8 @@ npx elit desktop wapk run ./app.wapk
 
 Useful flags:
 
+- `elit --version`
+- `elit -v`
 - `elit dev --port 3000 --host 0.0.0.0 --no-open`
 - `elit build --entry ./src/main.ts --out-dir dist --format esm --sourcemap`
 - `elit preview --root dist --base-path /app`
@@ -946,7 +949,7 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.5.4`:
+Highlights in `v3.5.5`:
 
 - Added `elit pm` for detached background process management of shell commands, file targets, and WAPK apps.
 - Added `pm.apps[]` and `pm.dataDir` in `elit.config.*` for config-first process manager workflows.

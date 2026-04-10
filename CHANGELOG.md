@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.5] - 2026-04-11
+
+### Added
+- **Global CLI version flags** - `elit --version` and `elit -v` now work as shortcuts for `elit version`
+
 
 ## [3.5.4] - 2026-04-10
 

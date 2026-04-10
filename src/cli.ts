@@ -15,6 +15,7 @@ import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
 
 const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'native', 'pm', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
+const VERSION_FLAGS = new Set(['--version', '-v']);
 
 /**
  * Helper: Setup graceful shutdown handlers (eliminates duplication in runDev and runPreview)
@@ -84,7 +85,7 @@ function parseArgs<T>(args: string[], handlers: Record<string, ArgHandler<T>>, o
 
 async function main() {
     const args = process.argv.slice(2);
-    const command = (args[0] as Command) || 'help';
+  const command = VERSION_FLAGS.has(args[0] || '') ? 'version' : ((args[0] as Command) || 'help');
 
     if (!COMMANDS.includes(command)) {
         console.error(`Unknown command: ${command}`);
@@ -581,6 +582,8 @@ Elit - Modern Web Development Toolkit
 
 Usage:
   elit <command> [options]
+  elit --version
+  elit -v
 
 Commands:
   dev       Start development server
@@ -594,6 +597,9 @@ Commands:
   wapk      Pack, inspect, extract, or run a .wapk app
   version   Show version number
   help      Show this help message
+
+Global Flags:
+  -v, --version          Show version number
 
 Dev Options:
   -p, --port <number>    Port to run server on (default: 3000)

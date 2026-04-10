@@ -7,6 +7,7 @@ Reference for the current `elit` command-line interface.
 ```bash
 elit dev
 elit build --entry ./src/main.ts --out-dir dist
+elit --version
 elit preview
 elit test
 elit desktop ./src/main.ts
@@ -19,6 +20,10 @@ elit pm start --script "npm start" --name my-app
 elit wapk pack .
 elit wapk run ./app.wapk
 ```
+
+## Global Flags
+
+- `--version`, `-v`: show the installed Elit CLI version
 
 ## Core Commands
 
