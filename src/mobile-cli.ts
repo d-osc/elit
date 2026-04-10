@@ -770,15 +770,17 @@ function runGradle(cwd: string, args: string[]): void {
         );
     }
 
-    if (process.platform === 'win32' && isWindowsBatchCommand(gradleCommand.command, androidRoot)) {
-        runWindowsBatchCommand(gradleCommand.command, args, androidRoot);
+    const env = gradleCommand.prependPath ? prependCommandPath(gradleCommand.prependPath) : undefined;
+
+    if (process.platform === 'win32' && gradleCommand.useWindowsBatchShell) {
+        runWindowsBatchCommand(gradleCommand.command, args, androidRoot, env);
         return;
     }
 
-    runCommand(gradleCommand.command, args, androidRoot);
+    runCommand(gradleCommand.command, args, androidRoot, env);
 }
 
-function resolveGradleCommand(cwd: string): { command: string; details: string } | undefined {
+function resolveGradleCommand(cwd: string): { command: string; details: string; prependPath?: string; useWindowsBatchShell?: boolean } | undefined {
     const androidRoot = join(cwd, 'android');
     const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const wrapperPath = join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
@@ -787,6 +789,7 @@ function resolveGradleCommand(cwd: string): { command: string; details: string }
         return {
             command: wrapper,
             details: 'Using project gradle wrapper.',
+            useWindowsBatchShell: process.platform === 'win32',
         };
     }
 
@@ -794,6 +797,7 @@ function resolveGradleCommand(cwd: string): { command: string; details: string }
         return {
             command: 'gradle',
             details: 'Using Gradle from PATH.',
+            useWindowsBatchShell: process.platform === 'win32',
         };
     }
 
@@ -803,8 +807,10 @@ function resolveGradleCommand(cwd: string): { command: string; details: string }
     }
 
     return {
-        command: fallbackGradle,
+        command: process.platform === 'win32' ? 'gradle' : fallbackGradle,
         details: `Using fallback Gradle at ${fallbackGradle}.`,
+        prependPath: process.platform === 'win32' ? dirname(fallbackGradle) : undefined,
+        useWindowsBatchShell: process.platform === 'win32',
     };
 }
 
@@ -1043,33 +1049,25 @@ function quoteWindowsCmdToken(value: string): string {
     return escapeWindowsCmdMetacharacters(quoted);
 }
 
-function resolveExecutablePath(command: string, cwd: string): string {
-    const normalizedCommand = normalize(command);
-    const lowerCommand = normalizedCommand.toLowerCase();
+function prependCommandPath(pathEntry: string): NodeJS.ProcessEnv {
+    const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+    const currentPath = process.env[pathKey];
+    const delimiter = process.platform === 'win32' ? ';' : ':';
 
-    if (
-        normalizedCommand.includes('\\')
-        || normalizedCommand.includes('/')
-        || /^[A-Za-z]:/.test(normalizedCommand)
-        || lowerCommand.endsWith('.cmd')
-        || lowerCommand.endsWith('.bat')
-    ) {
-        return normalizedCommand;
-    }
-
-    return resolveCommandPath(normalizedCommand, cwd) ?? normalizedCommand;
+    return {
+        ...process.env,
+        [pathKey]: currentPath && currentPath.length > 0
+            ? `${pathEntry}${delimiter}${currentPath}`
+            : pathEntry,
+    };
 }
 
-function isWindowsBatchCommand(command: string, cwd: string): boolean {
-    const lowerCommand = resolveExecutablePath(command, cwd).toLowerCase();
-    return lowerCommand.endsWith('.cmd') || lowerCommand.endsWith('.bat');
-}
-
-function runWindowsBatchCommand(command: string, args: string[], cwd: string): void {
-    const commandToken = quoteWindowsCmdToken(resolveExecutablePath(command, cwd));
+function runWindowsBatchCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
+    const commandToken = quoteWindowsCmdToken(normalize(command));
     const argTokens = args.map(quoteWindowsCmdToken);
     const result = spawnSync('cmd.exe', ['/d', '/s', '/c', commandToken, ...argTokens], {
         cwd,
+        env,
         stdio: 'inherit',
         shell: false,
         windowsVerbatimArguments: true,
@@ -1080,9 +1078,9 @@ function runWindowsBatchCommand(command: string, args: string[], cwd: string): v
     }
 }
 
-function runCommand(command: string, args: string[], cwd: string): void {
+function runCommand(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
     const normalizedCommand = normalize(command);
-    const result = spawnSync(normalizedCommand, args, { cwd, stdio: 'inherit', shell: false });
+    const result = spawnSync(normalizedCommand, args, { cwd, env, stdio: 'inherit', shell: false });
 
     if (typeof result.status === 'number' && result.status !== 0) {
         process.exit(result.status);
