@@ -73,6 +73,25 @@ export default {
       exclude: ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**', '**/dist/**', '**/coverage/**']
     }
   },
+  wapk: {
+    name: 'elit-full-db-example',
+    version: '1.0.0',
+    runtime: 'node',
+    script: {
+      start: 'elit preview',
+    },
+    port: 3333,
+    env: {
+      APP_NAME: 'Elit Full DB Example',
+    },
+    run: {
+      runtime: 'node',
+      useWatcher: true,
+      watchArchive: true,
+      syncInterval: 150,
+      archiveSyncInterval: 150,
+    }
+  },
   // Add scripts for running tests
   scripts: {
     'test': 'elit test',

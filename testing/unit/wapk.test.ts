@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runWapkCommand } from '../../src/wapk-cli';
+import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runPreparedWapkApp, runWapkCommand } from '../../src/wapk-cli';
 
 function createTempDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'elit-wapk-'));
@@ -230,6 +230,41 @@ describe('wapk helpers', () => {
         }
     });
 
+    it('falls back to build.entry when wapk.entry is omitted', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                build: [
+                    {
+                        entry: './src/main.ts',
+                    },
+                ],
+                wapk: {
+                    name: 'build-entry-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    script: {
+                        start: 'npm run preview',
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'main.ts'), 'console.log("from-build-entry");\n');
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'build-entry-app.wapk'),
+            });
+            const archive = readWapkArchive(archivePath);
+
+            expect(archive.header.name).toBe('build-entry-app');
+            expect(archive.header.entry).toBe('src/main.ts');
+            expect(archive.header.scripts).toMatchObject({ start: 'npm run preview' });
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it('includes node_modules by default and keeps --include-deps compatible', async () => {
         const dir = createTempDir();
 
@@ -258,6 +293,67 @@ describe('wapk helpers', () => {
             expect(withDeps.files.some((file) => file.path === 'node_modules/example/index.js')).toBe(true);
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('packs linked node_modules packages by dereferencing their package contents', async () => {
+        const workspaceDir = createTempDir();
+        const appDir = path.join(workspaceDir, 'app');
+        const linkedPackageDir = path.join(workspaceDir, 'linked-lib');
+        const linkedDependencyDir = path.join(workspaceDir, 'node_modules', 'dep-lib');
+
+        try {
+            fs.mkdirSync(path.join(appDir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(appDir, 'node_modules'), { recursive: true });
+            fs.mkdirSync(path.join(linkedPackageDir, 'dist'), { recursive: true });
+            fs.mkdirSync(linkedDependencyDir, { recursive: true });
+
+            fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({
+                name: 'linked-app',
+                version: '1.0.0',
+                main: 'src/index.mjs',
+                type: 'module',
+                dependencies: {
+                    'linked-lib': 'file:../linked-lib',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(appDir, 'src', 'index.mjs'), 'import { value } from "linked-lib";\nconsole.log(value);\n');
+
+            fs.writeFileSync(path.join(linkedPackageDir, 'package.json'), JSON.stringify({
+                name: 'linked-lib',
+                version: '1.0.0',
+                type: 'module',
+                main: './dist/index.js',
+                module: './dist/index.mjs',
+                dependencies: {
+                    'dep-lib': '1.0.0',
+                },
+                files: ['dist'],
+            }, null, 2));
+            fs.writeFileSync(path.join(linkedPackageDir, 'dist', 'index.js'), 'module.exports = { value: 1 };\n');
+            fs.writeFileSync(path.join(linkedPackageDir, 'dist', 'index.mjs'), 'export const value = 1;\n');
+            fs.writeFileSync(path.join(linkedDependencyDir, 'package.json'), JSON.stringify({
+                name: 'dep-lib',
+                version: '1.0.0',
+            }, null, 2));
+            fs.writeFileSync(path.join(linkedDependencyDir, 'index.js'), 'module.exports = 1;\n');
+
+            fs.symlinkSync(
+                linkedPackageDir,
+                path.join(appDir, 'node_modules', 'linked-lib'),
+                process.platform === 'win32' ? 'junction' : 'dir',
+            );
+
+            const archivePath = await packWapkDirectory(appDir, {
+                outputPath: path.join(workspaceDir, 'linked-app.wapk'),
+            });
+            const archive = readWapkArchive(archivePath);
+
+            expect(archive.files.some((file) => file.path === 'node_modules/linked-lib/package.json')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'node_modules/linked-lib/dist/index.mjs')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'node_modules/dep-lib/index.js')).toBe(true);
+        } finally {
+            fs.rmSync(workspaceDir, { recursive: true, force: true });
         }
     });
 
@@ -501,6 +597,46 @@ describe('wapk helpers', () => {
         }
     });
 
+    test('keeps node_modules in the archive after live-sync writes local changes', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'node_modules', 'example'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'sync-node-modules-app',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("sync");\n');
+            fs.writeFileSync(path.join(dir, 'node_modules', 'example', 'package.json'), JSON.stringify({
+                name: 'example',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'node_modules', 'example', 'index.js'), 'module.exports = 1;\n');
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'sync-node-modules.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath, {
+                syncInterval: 50,
+                watchArchive: true,
+            });
+            const liveSync = createWapkLiveSync(prepared);
+
+            fs.writeFileSync(path.join(prepared.workDir, 'data.json'), '{"ok":true}\n');
+            await liveSync.flush();
+            await liveSync.stop();
+
+            const archive = readWapkArchive(archivePath);
+            expect(archive.files.some((file) => file.path === 'data.json')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'node_modules/example/index.js')).toBe(true);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     test('runs the configured default archive from elit.config.json', async () => {
         const dir = createTempDir();
         const archivePath = path.join(dir, 'shared', 'google-drive-app.wapk');
@@ -537,6 +673,212 @@ describe('wapk helpers', () => {
             await runWapkCommand([], dir);
 
             expect(fs.readFileSync(markerPath, 'utf8')).toBe('configured-run');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('repairs stale local file dependencies before installing extracted runtime deps', async () => {
+        const workspaceDir = createTempDir();
+        const packageRoot = path.join(workspaceDir, 'workspace-root');
+        const appDir = path.join(packageRoot, 'examples', 'repair-app');
+
+        try {
+            fs.mkdirSync(path.join(packageRoot, 'dist'), { recursive: true });
+            fs.mkdirSync(path.join(appDir, 'src'), { recursive: true });
+
+            fs.writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({
+                name: 'elit',
+                version: '1.0.0',
+                type: 'module',
+                exports: {
+                    './server': {
+                        import: './dist/server.mjs',
+                        require: './dist/server.js',
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(packageRoot, 'dist', 'server.mjs'), 'export const serverOk = true;\n');
+            fs.writeFileSync(path.join(packageRoot, 'dist', 'server.js'), 'exports.serverOk = true;\n');
+
+            fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({
+                name: 'repair-app',
+                version: '1.0.0',
+                main: 'src/index.js',
+                dependencies: {
+                    elit: 'file:../../',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(appDir, 'package-lock.json'), JSON.stringify({
+                name: 'repair-app',
+                version: '1.0.0',
+                lockfileVersion: 3,
+                requires: true,
+                packages: {
+                    '': {
+                        name: 'repair-app',
+                        version: '1.0.0',
+                        dependencies: {
+                            elit: 'file:../../',
+                        },
+                    },
+                    '../..': {
+                        name: 'elit',
+                        version: '1.0.0',
+                    },
+                    'node_modules/elit': {
+                        resolved: '../..',
+                        link: true,
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(appDir, 'src', 'index.js'), 'console.log("repair-app");\n');
+
+            const archivePath = await packWapkDirectory(appDir, {
+                outputPath: path.join(workspaceDir, 'repair-app.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath, {
+                dependencySearchRoots: [packageRoot],
+            });
+
+            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules', 'elit', 'package.json'))).toBe(true);
+            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules', 'elit', 'dist', 'server.mjs'))).toBe(true);
+
+            fs.rmSync(prepared.workDir, { recursive: true, force: true });
+        } finally {
+            fs.rmSync(workspaceDir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs browser-style archives through the packaged start script', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'browser-start-app',
+                version: '1.0.0',
+                main: 'src/main.js',
+                scripts: {
+                    start: 'node server.js',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'public', 'index.html'), '<!doctype html><html><body><div id="app"></div></body></html>\n');
+            fs.writeFileSync(path.join(dir, 'src', 'main.js'), 'window.location.pathname;\n');
+            fs.writeFileSync(path.join(dir, 'server.js'), 'require("node:fs").writeFileSync("started.txt", "preview-ok");\n');
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'browser-start.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath, {
+                syncInterval: 50,
+            });
+
+            const exitCode = await runPreparedWapkApp(prepared);
+            const archive = readWapkArchive(archivePath);
+            const startedFile = archive.files.find((file) => file.path === 'started.txt');
+
+            expect(exitCode).toBe(0);
+            expect(startedFile?.content.toString('utf8')).toBe('preview-ok');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs browser-style start scripts through the local platform bin shim', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'node_modules', '.bin'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'browser-start-bin-app',
+                version: '1.0.0',
+                main: 'src/main.js',
+                scripts: {
+                    start: 'elit preview',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'public', 'index.html'), '<!doctype html><html><body><div id="app"></div></body></html>\n');
+            fs.writeFileSync(path.join(dir, 'src', 'main.js'), 'window.location.pathname;\n');
+
+            if (process.platform === 'win32') {
+                fs.writeFileSync(path.join(dir, 'node_modules', '.bin', 'elit'), '#!/bin/sh\necho wrong-shim\n');
+                fs.writeFileSync(
+                    path.join(dir, 'node_modules', '.bin', 'elit.cmd'),
+                    '@echo off\r\necho preview-ok> started.txt\r\n',
+                );
+            } else {
+                fs.writeFileSync(
+                    path.join(dir, 'node_modules', '.bin', 'elit'),
+                    '#!/bin/sh\nprintf "preview-ok" > started.txt\n',
+                );
+                fs.chmodSync(path.join(dir, 'node_modules', '.bin', 'elit'), 0o755);
+                fs.writeFileSync(path.join(dir, 'node_modules', '.bin', 'elit.cmd'), '@echo off\r\n');
+            }
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'browser-start-bin.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath, {
+                syncInterval: 50,
+            });
+
+            const exitCode = await runPreparedWapkApp(prepared);
+            const archive = readWapkArchive(archivePath);
+            const startedFile = archive.files.find((file) => file.path === 'started.txt');
+
+            expect(exitCode).toBe(0);
+            expect(startedFile?.content.toString('utf8')).toBe('preview-ok');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('runs browser-style start scripts from the packaged node_modules bin target', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'node_modules', 'elit', 'dist'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'browser-start-package-bin-app',
+                version: '1.0.0',
+                main: 'src/main.js',
+                scripts: {
+                    start: 'elit preview',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'public', 'index.html'), '<!doctype html><html><body><div id="app"></div></body></html>\n');
+            fs.writeFileSync(path.join(dir, 'src', 'main.js'), 'window.location.pathname;\n');
+            fs.writeFileSync(path.join(dir, 'node_modules', 'elit', 'package.json'), JSON.stringify({
+                name: 'elit',
+                version: '1.0.0',
+                bin: {
+                    elit: './dist/cli.js',
+                },
+            }, null, 2));
+            fs.writeFileSync(
+                path.join(dir, 'node_modules', 'elit', 'dist', 'cli.js'),
+                'require("node:fs").writeFileSync("started.txt", process.argv.slice(2).join(" "));\n',
+            );
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'browser-start-package-bin.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath, {
+                syncInterval: 50,
+            });
+
+            const exitCode = await runPreparedWapkApp(prepared);
+            const archive = readWapkArchive(archivePath);
+            const startedFile = archive.files.find((file) => file.path === 'started.txt');
+
+            expect(exitCode).toBe(0);
+            expect(startedFile?.content.toString('utf8')).toBe('preview');
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }

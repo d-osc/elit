@@ -57,7 +57,7 @@ When you run a WAPK archive, Elit now uses a live-sync workflow:
 
 1. Reads `.wapk` into memory.
 2. Extracts to a temporary working directory.
-3. Runs your entry file from that working directory.
+3. Runs your entry file from that working directory, or uses `scripts.start` / `wapk.script.start` automatically when the archive looks like a browser app.
 4. Syncs changed files back into the same archive source.
 5. Pulls external archive updates back into the temp working directory.
 6. Cleans up temporary files when the process exits.

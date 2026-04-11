@@ -1,8 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { loadConfig, type WapkGoogleDriveConfig, type WapkLockConfig, type WapkRunConfig } from './config';
 
@@ -101,6 +101,16 @@ export interface PreparedWapkApp {
     watchArchive?: boolean;
     archiveSyncInterval?: number;
     lock?: ResolvedWapkCredentials;
+    runtimeWasExplicitlyRequested?: boolean;
+    syncIncludesNodeModules: boolean;
+}
+
+interface WapkLaunchCommand {
+    executable: string;
+    args: string[];
+    env: NodeJS.ProcessEnv;
+    label: string;
+    shell?: boolean;
 }
 
 interface WapkProjectConfig {
@@ -115,6 +125,25 @@ interface WapkProjectConfig {
     lock?: WapkLockConfig;
 }
 
+const DEFAULT_WAPK_ENTRY_CANDIDATES = [
+    'src/main.ts',
+    'src/main.tsx',
+    'src/main.js',
+    'src/main.jsx',
+    'src/index.ts',
+    'src/index.tsx',
+    'src/index.js',
+    'src/index.jsx',
+    'main.ts',
+    'main.tsx',
+    'main.js',
+    'main.jsx',
+    'index.ts',
+    'index.tsx',
+    'index.js',
+    'index.jsx',
+] as const;
+
 const WAPK_MAGIC = Buffer.from('WAPK');
 const WAPK_UNLOCKED_VERSION = 1;
 const WAPK_LOCKED_VERSION = 2;
@@ -124,7 +153,7 @@ const DEFAULT_IGNORE = [
 ] as const;
 
 export const WAPK_RUNTIMES: WapkRuntimeName[] = ['node', 'bun', 'deno'];
-const RUNTIME_SYNC_IGNORE = new Set(['node_modules', '.git']);
+const RUNTIME_SYNC_IGNORE = new Set(['.git']);
 const WAPK_CIPHER = 'aes-256-gcm';
 const WAPK_KDF = 'scrypt';
 const WAPK_KEY_LENGTH = 32;
@@ -270,7 +299,7 @@ function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
         version: typeof value.version === 'string' ? value.version : undefined,
         runtime: normalizeRuntime(value.runtime ?? value.engine),
         entry: typeof value.entry === 'string' ? value.entry : undefined,
-        scripts: normalizeStringMap(value.scripts),
+        scripts: normalizeStringMap(value.scripts ?? value.script),
         port: normalizePort(value.port),
         env: normalizeStringMap(value.env),
         desktop: normalizeDesktopConfig(value.desktop),
@@ -409,6 +438,50 @@ function inferRuntimeAndEntryFromScript(script: string | undefined): { runtime?:
     }
 
     return {};
+}
+
+function resolveBuildEntryCandidate(config: unknown): string | undefined {
+    if (!isRecord(config)) {
+        return undefined;
+    }
+
+    const builds = Array.isArray(config.build)
+        ? config.build
+        : [config.build];
+
+    for (const build of builds) {
+        if (!isRecord(build)) {
+            continue;
+        }
+
+        const entry = normalizeNonEmptyString(build.entry);
+        if (entry) {
+            return entry;
+        }
+    }
+
+    return undefined;
+}
+
+function resolveExistingWapkEntry(directory: string, candidates: readonly (string | undefined)[]): string | undefined {
+    for (const candidate of candidates) {
+        const normalizedCandidate = normalizeNonEmptyString(candidate);
+        if (!normalizedCandidate) {
+            continue;
+        }
+
+        try {
+            const entry = normalizeArchivePath(directory, normalizedCandidate);
+            const entryPath = resolve(directory, entry);
+            if (existsSync(entryPath) && statSync(entryPath).isFile()) {
+                return entry;
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    return undefined;
 }
 
 function readJsonFile(filePath: string): Record<string, unknown> | undefined {
@@ -621,13 +694,23 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
     const runtime = elitWapkConfig.runtime
         ?? inferred.runtime
         ?? 'node';
-    const entryValue = typeof elitWapkConfig.entry === 'string'
-        ? elitWapkConfig.entry
-        : typeof packageJson?.main === 'string'
-            ? packageJson.main
-            : inferred.entry
-                ?? 'index.js';
-    const entry = normalizeArchivePath(directory, entryValue);
+    const configuredEntry = normalizeNonEmptyString(elitWapkConfig.entry);
+    const entry = configuredEntry
+        ? normalizeArchivePath(directory, configuredEntry)
+        : resolveExistingWapkEntry(directory, [
+            typeof packageJson?.main === 'string' ? packageJson.main : undefined,
+            typeof packageJson?.module === 'string' ? packageJson.module : undefined,
+            inferred.entry,
+            resolveBuildEntryCandidate(elitConfig),
+            ...DEFAULT_WAPK_ENTRY_CANDIDATES,
+        ]);
+
+    if (!entry) {
+        throw new Error(
+            `WAPK entry could not be inferred. Set wapk.entry, package.json main, build.entry, or add one of: ${DEFAULT_WAPK_ENTRY_CANDIDATES.join(', ')}`,
+        );
+    }
+
     const entryPath = resolve(directory, entry);
 
     if (!existsSync(entryPath) || !statSync(entryPath).isFile()) {
@@ -648,15 +731,235 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
 }
 
 function readIgnorePatterns(directory: string): string[] {
-    const ignorePath = join(directory, '.wapkignore');
-    if (!existsSync(ignorePath)) {
+    return readLineIgnorePatterns(join(directory, '.wapkignore'));
+}
+
+function readLineIgnorePatterns(filePath: string): string[] {
+    if (!existsSync(filePath)) {
         return [];
     }
 
-    return readFileSync(ignorePath, 'utf8')
+    return readFileSync(filePath, 'utf8')
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter((line) => line.length > 0 && !line.startsWith('#'));
+}
+
+function normalizePackageEntry(value: string): string | undefined {
+    const normalized = normalizeNonEmptyString(value)?.replace(/^[.][\\/]/, '').split('\\').join('/');
+    return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function collectStringLeaves(value: unknown, target: Set<string>): void {
+    if (typeof value === 'string') {
+        const normalized = normalizePackageEntry(value);
+        if (normalized) {
+            target.add(normalized);
+        }
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        for (const entry of value) {
+            collectStringLeaves(entry, target);
+        }
+        return;
+    }
+
+    if (!isRecord(value)) {
+        return;
+    }
+
+    for (const entry of Object.values(value)) {
+        collectStringLeaves(entry, target);
+    }
+}
+
+function collectPackageTopLevelEntries(directory: string): string[] {
+    return readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.name !== 'node_modules' && entry.name !== '.git' && !entry.name.startsWith('.'))
+        .map((entry) => entry.name);
+}
+
+function collectLinkedPackageCandidates(directory: string): string[] {
+    const packageJson = readJsonFile(join(directory, 'package.json'));
+    if (!packageJson) {
+        return [];
+    }
+
+    const candidates = new Set<string>(['package.json']);
+    const packageFiles = Array.isArray(packageJson.files)
+        ? packageJson.files.filter((value): value is string => typeof value === 'string')
+        : [];
+
+    if (packageFiles.length > 0) {
+        for (const file of packageFiles) {
+            const normalized = normalizePackageEntry(file);
+            if (normalized) {
+                candidates.add(normalized);
+            }
+        }
+    } else {
+        const runtimeEntries = new Set<string>();
+        for (const value of [packageJson.main, packageJson.module, packageJson.browser, packageJson.types, packageJson.typings]) {
+            collectStringLeaves(value, runtimeEntries);
+        }
+
+        if (typeof packageJson.bin === 'string') {
+            collectStringLeaves(packageJson.bin, runtimeEntries);
+        } else if (isRecord(packageJson.bin)) {
+            collectStringLeaves(Object.values(packageJson.bin), runtimeEntries);
+        }
+
+        collectStringLeaves(packageJson.exports, runtimeEntries);
+
+        for (const entry of runtimeEntries) {
+            const rootEntry = entry.includes('/') ? entry.split('/')[0] ?? entry : entry;
+            if (rootEntry) {
+                candidates.add(rootEntry);
+            }
+        }
+
+        if (candidates.size === 1) {
+            for (const fallback of ['dist', 'src']) {
+                if (existsSync(join(directory, fallback))) {
+                    candidates.add(fallback);
+                }
+            }
+        }
+
+        if (candidates.size === 1) {
+            for (const fallbackEntry of collectPackageTopLevelEntries(directory)) {
+                candidates.add(fallbackEntry);
+            }
+        }
+    }
+
+    for (const metadataFile of ['README.md', 'README', 'LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENCE', 'CHANGELOG.md']) {
+        if (existsSync(join(directory, metadataFile))) {
+            candidates.add(metadataFile);
+        }
+    }
+
+    return [...candidates];
+}
+
+function prefixCollectedFiles(files: readonly WapkFileEntry[], prefix: string): WapkFileEntry[] {
+    return files.map((file) => ({
+        ...file,
+        path: `${prefix}/${file.path}`,
+    }));
+}
+
+function collectInstalledPackageNames(packageJson: Record<string, unknown>): string[] {
+    const packageNames = new Set<string>();
+
+    for (const dependencyGroup of [
+        packageJson.dependencies,
+        packageJson.optionalDependencies,
+        packageJson.peerDependencies,
+    ]) {
+        if (!isRecord(dependencyGroup)) {
+            continue;
+        }
+
+        for (const packageName of Object.keys(dependencyGroup)) {
+            const normalizedPackageName = normalizeNonEmptyString(packageName);
+            if (normalizedPackageName) {
+                packageNames.add(normalizedPackageName);
+            }
+        }
+    }
+
+    return [...packageNames];
+}
+
+function resolveInstalledPackageDirectory(startDirectory: string, packageName: string): string | undefined {
+    let currentDirectory = resolve(startDirectory);
+
+    while (true) {
+        const candidate = join(currentDirectory, 'node_modules', ...packageName.split('/'));
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+
+        const parentDirectory = dirname(currentDirectory);
+        if (parentDirectory === currentDirectory) {
+            return undefined;
+        }
+
+        currentDirectory = parentDirectory;
+    }
+}
+
+function collectLinkedPackageFiles(
+    linkPath: string,
+    archivePrefix: string,
+    seenPackages: Set<string> = new Set(),
+): WapkFileEntry[] {
+    const packageRoot = realpathSync(linkPath);
+    if (seenPackages.has(packageRoot)) {
+        return [];
+    }
+
+    seenPackages.add(packageRoot);
+    const candidates = collectLinkedPackageCandidates(packageRoot);
+    if (candidates.length === 0) {
+        return [];
+    }
+
+    const ignorePatterns = ['node_modules', ...readLineIgnorePatterns(join(packageRoot, '.npmignore'))];
+    const collected = new Map<string, WapkFileEntry>();
+
+    for (const candidate of candidates) {
+        let relativeCandidate: string;
+        try {
+            relativeCandidate = normalizeArchivePath(packageRoot, candidate);
+        } catch {
+            continue;
+        }
+
+        const fullCandidatePath = resolve(packageRoot, relativeCandidate);
+        if (!existsSync(fullCandidatePath)) {
+            continue;
+        }
+
+        const stats = statSync(fullCandidatePath);
+        const entries = stats.isDirectory()
+            ? prefixCollectedFiles(collectFiles(fullCandidatePath, packageRoot, ignorePatterns), archivePrefix)
+            : stats.isFile()
+                ? [{
+                    path: `${archivePrefix}/${relativeCandidate}`,
+                    content: readFileSync(fullCandidatePath),
+                    mode: stats.mode,
+                }]
+                : [];
+
+        for (const entry of entries) {
+            collected.set(entry.path, entry);
+        }
+    }
+
+    const packageJson = readJsonFile(join(packageRoot, 'package.json'));
+    if (packageJson) {
+        for (const dependencyName of collectInstalledPackageNames(packageJson)) {
+            const dependencyDirectory = resolveInstalledPackageDirectory(packageRoot, dependencyName);
+            if (!dependencyDirectory) {
+                continue;
+            }
+
+            const dependencyEntries = collectLinkedPackageFiles(
+                dependencyDirectory,
+                `node_modules/${dependencyName}`,
+                seenPackages,
+            );
+            for (const entry of dependencyEntries) {
+                collected.set(entry.path, entry);
+            }
+        }
+    }
+
+    return [...collected.values()];
 }
 
 function shouldIgnore(relativePath: string, ignorePatterns: readonly string[]): boolean {
@@ -689,6 +992,25 @@ function collectFiles(directory: string, baseDirectory: string, ignorePatterns: 
         const fullPath = join(directory, entry.name);
         const relativePath = relative(baseDirectory, fullPath).split('\\').join('/');
         if (shouldIgnore(relativePath, ignorePatterns)) {
+            continue;
+        }
+
+        if (entry.isSymbolicLink()) {
+            try {
+                const stats = statSync(fullPath);
+                if (stats.isDirectory() && relativePath.split('/').includes('node_modules')) {
+                    files.push(...collectLinkedPackageFiles(fullPath, relativePath));
+                } else if (stats.isFile()) {
+                    files.push({
+                        path: relativePath,
+                        content: readFileSync(fullPath),
+                        mode: stats.mode,
+                    });
+                }
+            } catch {
+                continue;
+            }
+
             continue;
         }
 
@@ -915,15 +1237,289 @@ function extractFiles(files: readonly WapkFileEntry[], destination: string): voi
     }
 }
 
-function collectRuntimeSyncFiles(directory: string): WapkFileEntry[] {
-    return filterRuntimeSyncFiles(collectFiles(directory, directory, []));
+function collectRuntimeSyncFiles(
+    directory: string,
+    options: { includeNodeModules?: boolean } = {},
+): WapkFileEntry[] {
+    return filterRuntimeSyncFiles(collectFiles(directory, directory, []), options);
 }
 
-function filterRuntimeSyncFiles(files: readonly WapkFileEntry[]): WapkFileEntry[] {
+function isTypescriptRuntimeEntry(filePath: string): boolean {
+    return /\.(?:ts|tsx|cts|mts)$/i.test(filePath);
+}
+
+function commandExists(command: string): boolean {
+    const result = spawnSync(command, ['--version'], {
+        stdio: 'ignore',
+        windowsHide: true,
+    });
+
+    return !result.error;
+}
+
+function resolveTsxExecutable(searchDirectories: readonly string[]): string | undefined {
+    const executableName = process.platform === 'win32' ? 'tsx.cmd' : 'tsx';
+
+    for (const directory of searchDirectories) {
+        const localPath = join(directory, 'node_modules', '.bin', executableName);
+        if (existsSync(localPath)) {
+            return localPath;
+        }
+    }
+
+    return commandExists(executableName) ? executableName : undefined;
+}
+
+function readUtf8FileIfExists(filePath: string): string | undefined {
+    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+        return undefined;
+    }
+
+    return readFileSync(filePath, 'utf8');
+}
+
+function hasLikelyWebAppAssets(directory: string): boolean {
+    return [
+        'public/index.html',
+        'index.html',
+        'dist/index.html',
+    ].some((relativePath) => existsSync(join(directory, ...relativePath.split('/'))));
+}
+
+function isLikelyBrowserEntry(entryPath: string): boolean {
+    const source = readUtf8FileIfExists(entryPath);
+    if (!source) {
+        return false;
+    }
+
+    return /dom\.render\s*\(|\bwindow\.|\bdocument\.|\bnavigator\.|\blocation\.|from\s+['"]elit\/dom['"]/.test(source);
+}
+
+function resolveLocalBinExecutable(directory: string, command: string): string {
+    if (command.includes('/') || command.includes('\\')) {
+        return isAbsolute(command) ? command : resolve(directory, command);
+    }
+
+    const localBinDirectory = join(directory, 'node_modules', '.bin');
+    const directLocalPath = join(localBinDirectory, command);
+
+    if (process.platform === 'win32') {
+        for (const extension of ['.cmd', '.exe']) {
+            const localPath = join(localBinDirectory, `${command}${extension}`);
+            if (existsSync(localPath)) {
+                return localPath;
+            }
+        }
+
+        if (existsSync(directLocalPath)) {
+            return directLocalPath;
+        }
+
+        switch (command) {
+            case 'npm':
+                return 'npm.cmd';
+            case 'npx':
+                return 'npx.cmd';
+            case 'pnpm':
+                return 'pnpm.cmd';
+            case 'pnpx':
+                return 'pnpx.cmd';
+            case 'yarn':
+                return 'yarn.cmd';
+            case 'tsx':
+                return 'tsx.cmd';
+            case 'elit':
+                return 'elit.cmd';
+            default:
+                return command;
+        }
+    }
+
+    if (existsSync(directLocalPath)) {
+        return directLocalPath;
+    }
+
+    return command;
+}
+
+function resolvePackagedNodeBinScript(directory: string, command: string): string | undefined {
+    if (command.includes('/') || command.includes('\\')) {
+        return undefined;
+    }
+
+    const packageDirectory = join(directory, 'node_modules', ...command.split('/'));
+    const packageJson = readJsonFile(join(packageDirectory, 'package.json'));
+    if (!packageJson) {
+        return undefined;
+    }
+
+    let binEntry: string | undefined;
+    if (typeof packageJson.bin === 'string') {
+        const packageName = normalizeNonEmptyString(packageJson.name);
+        if (packageName === command) {
+            binEntry = packageJson.bin;
+        }
+    } else if (isRecord(packageJson.bin)) {
+        const directBin = packageJson.bin[command];
+        if (typeof directBin === 'string') {
+            binEntry = directBin;
+        } else {
+            const packageName = normalizeNonEmptyString(packageJson.name);
+            if (packageName === command) {
+                const entries = Object.values(packageJson.bin).filter((value): value is string => typeof value === 'string');
+                if (entries.length === 1) {
+                    binEntry = entries[0];
+                }
+            }
+        }
+    }
+
+    const normalizedBinEntry = typeof binEntry === 'string'
+        ? normalizePackageEntry(binEntry)
+        : undefined;
+    if (!normalizedBinEntry) {
+        return undefined;
+    }
+
+    const binPath = resolve(packageDirectory, normalizedBinEntry);
+    return existsSync(binPath) && statSync(binPath).isFile()
+        ? binPath
+        : undefined;
+}
+
+function prependLocalNodeModulesBinToPath(directory: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const localBinDirectory = join(directory, 'node_modules', '.bin');
+    if (!existsSync(localBinDirectory)) {
+        return env;
+    }
+
+    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+    const currentPath = env[pathKey];
+
+    return {
+        ...env,
+        [pathKey]: currentPath ? `${localBinDirectory}${delimiter}${currentPath}` : localBinDirectory,
+    };
+}
+
+function hasShellMetacharacters(command: string): boolean {
+    return /&&|\|\||[|;<>]/.test(command);
+}
+
+function resolveWapkStartScript(prepared: PreparedWapkApp): string | undefined {
+    const startScript = normalizeNonEmptyString(prepared.header.scripts.start);
+    if (!startScript || prepared.runtimeWasExplicitlyRequested) {
+        return undefined;
+    }
+
+    if (!existsSync(join(prepared.workDir, 'package.json'))) {
+        return undefined;
+    }
+
+    if (isLikelyBrowserEntry(prepared.entryPath)) {
+        return startScript;
+    }
+
+    return hasLikelyWebAppAssets(prepared.workDir) && /\b(?:preview|serve|dev)\b/i.test(startScript)
+        ? startScript
+        : undefined;
+}
+
+function resolveWapkStartScriptLaunchCommand(
+    prepared: PreparedWapkApp,
+    env: NodeJS.ProcessEnv,
+    startScript: string,
+): WapkLaunchCommand {
+    const launchEnv = prependLocalNodeModulesBinToPath(prepared.workDir, env);
+
+    if (hasShellMetacharacters(startScript)) {
+        return {
+            executable: startScript,
+            args: [],
+            env: launchEnv,
+            label: `scripts.start (${startScript})`,
+            shell: true,
+        };
+    }
+
+    const tokens = tokenizeCommand(startScript);
+    if (tokens.length === 0) {
+        throw new Error('WAPK scripts.start is empty.');
+    }
+
+    const [command, ...args] = tokens;
+    const packagedBinScript = resolvePackagedNodeBinScript(prepared.workDir, command);
+    if (packagedBinScript) {
+        return {
+            executable: resolveWapkRuntimeExecutable('node'),
+            args: [packagedBinScript, ...args],
+            env: launchEnv,
+            label: `scripts.start (${startScript})`,
+        };
+    }
+
+    return {
+        executable: resolveLocalBinExecutable(prepared.workDir, command),
+        args,
+        env: launchEnv,
+        label: `scripts.start (${startScript})`,
+    };
+}
+
+function resolveWapkEntryLaunchCommand(
+    prepared: PreparedWapkApp,
+    env: NodeJS.ProcessEnv,
+): WapkLaunchCommand {
+    const isNodeTypescriptEntry = prepared.runtime === 'node' && isTypescriptRuntimeEntry(prepared.entryPath);
+    const tsxExecutable = isNodeTypescriptEntry
+        ? resolveTsxExecutable([prepared.workDir, process.cwd()])
+        : undefined;
+
+    if (isNodeTypescriptEntry && !tsxExecutable) {
+        throw new Error('TypeScript WAPK execution with runtime "node" requires tsx to be installed, or use runtime "bun".');
+    }
+
+    const executable = tsxExecutable ?? resolveWapkRuntimeExecutable(prepared.runtime);
+    const args = tsxExecutable
+        ? [prepared.entryPath]
+        : getWapkRuntimeArgs(prepared.runtime, prepared.entryPath);
+
+    return {
+        executable,
+        args,
+        env,
+        label: tsxExecutable ? 'entry via tsx' : 'entry',
+    };
+}
+
+function resolveWapkLaunchCommand(
+    prepared: PreparedWapkApp,
+    env: NodeJS.ProcessEnv,
+): WapkLaunchCommand {
+    const startScript = resolveWapkStartScript(prepared);
+    if (startScript) {
+        return resolveWapkStartScriptLaunchCommand(prepared, env, startScript);
+    }
+
+    return resolveWapkEntryLaunchCommand(prepared, env);
+}
+
+function filterRuntimeSyncFiles(
+    files: readonly WapkFileEntry[],
+    options: { includeNodeModules?: boolean } = {},
+): WapkFileEntry[] {
     return [...files]
         .filter((file) => {
             const firstPart = file.path.split('/')[0] ?? '';
-            return !RUNTIME_SYNC_IGNORE.has(firstPart);
+            if (RUNTIME_SYNC_IGNORE.has(firstPart)) {
+                return false;
+            }
+
+            if (!options.includeNodeModules && firstPart === 'node_modules') {
+                return false;
+            }
+
+            return true;
         })
         .sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -1512,8 +2108,12 @@ function removeEmptyParentDirectories(directory: string, rootDir: string): void 
     }
 }
 
-function applyArchiveFilesToWorkDir(directory: string, files: readonly WapkFileEntry[]): void {
-    const existingFiles = collectRuntimeSyncFiles(directory);
+function applyArchiveFilesToWorkDir(
+    directory: string,
+    files: readonly WapkFileEntry[],
+    options: { includeNodeModules?: boolean } = {},
+): void {
+    const existingFiles = collectRuntimeSyncFiles(directory, options);
     const nextPaths = new Set(files.map((file) => file.path));
 
     for (const file of existingFiles) {
@@ -1532,20 +2132,22 @@ function applyArchiveFilesToWorkDir(directory: string, files: readonly WapkFileE
 async function readArchiveRuntimeState(
     archiveHandle: WapkArchiveHandle,
     lock?: ResolvedWapkCredentials,
+    options: { includeNodeModules?: boolean } = {},
 ): Promise<{ header: WapkHeader; files: WapkFileEntry[]; signature?: string; label: string }> {
     const snapshot = await archiveHandle.readSnapshot();
     const decoded = decodeWapk(snapshot.buffer, lock ? { password: lock.password } : {});
 
     return {
         header: decoded.header,
-        files: filterRuntimeSyncFiles(decoded.files),
+        files: filterRuntimeSyncFiles(decoded.files, options),
         signature: snapshot.signature,
         label: snapshot.label ?? archiveHandle.label,
     };
 }
 
 export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncController {
-    let memoryFiles = collectRuntimeSyncFiles(prepared.workDir);
+    const syncOptions = { includeNodeModules: prepared.syncIncludesNodeModules };
+    let memoryFiles = collectRuntimeSyncFiles(prepared.workDir, syncOptions);
     const syncInterval = prepared.syncInterval ?? 300;
     const archiveSyncInterval = prepared.archiveSyncInterval ?? syncInterval;
     const watchArchive = prepared.watchArchive ?? true;
@@ -1573,7 +2175,7 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
         }
 
         try {
-            const archiveState = await readArchiveRuntimeState(prepared.archiveHandle, prepared.lock);
+            const archiveState = await readArchiveRuntimeState(prepared.archiveHandle, prepared.lock, syncOptions);
             lastArchiveSignature = archiveState.signature ?? archiveSignature;
             currentHeader = archiveState.header;
             currentArchiveLabel = archiveState.label;
@@ -1582,7 +2184,7 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
                 return false;
             }
 
-            applyArchiveFilesToWorkDir(prepared.workDir, archiveState.files);
+            applyArchiveFilesToWorkDir(prepared.workDir, archiveState.files, syncOptions);
             memoryFiles = archiveState.files;
             return true;
         } catch (error) {
@@ -1599,7 +2201,7 @@ export function createWapkLiveSync(prepared: PreparedWapkApp): WapkLiveSyncContr
             .then(async () => {
                 if (stopped) return;
 
-                const nextFiles = collectRuntimeSyncFiles(prepared.workDir);
+                const nextFiles = collectRuntimeSyncFiles(prepared.workDir, syncOptions);
                 const localDirty = !filesEqual(memoryFiles, nextFiles);
                 const now = Date.now();
                 const shouldPollArchive = watchArchive && (lastArchivePollAt === 0 || now - lastArchivePollAt >= archiveSyncInterval);
@@ -1723,7 +2325,119 @@ function resolveNpmExecutable(nodeExecutable: string): string {
     return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
-function installDependenciesIfNeeded(directory: string, runtime: WapkRuntimeName): void {
+function readPackageName(directory: string): string | undefined {
+    const packageJsonPath = join(directory, 'package.json');
+    if (!existsSync(packageJsonPath)) {
+        return undefined;
+    }
+
+    try {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
+        return packageJson.name;
+    } catch {
+        return undefined;
+    }
+}
+
+function findPackageRootByName(searchRoots: readonly string[], packageName: string): string | undefined {
+    const visited = new Set<string>();
+
+    for (const root of searchRoots) {
+        let currentDirectory = resolve(root);
+
+        while (!visited.has(currentDirectory)) {
+            visited.add(currentDirectory);
+
+            if (readPackageName(currentDirectory) === packageName) {
+                return currentDirectory;
+            }
+
+            const parentDirectory = dirname(currentDirectory);
+            if (parentDirectory === currentDirectory) {
+                break;
+            }
+
+            currentDirectory = parentDirectory;
+        }
+    }
+
+    return undefined;
+}
+
+function repairLocalFileDependenciesForInstall(
+    directory: string,
+    searchRoots: readonly string[],
+): { rewritten: boolean; unresolved: string[] } {
+    const packageJsonPath = join(directory, 'package.json');
+    const packageJson = readJsonFile(packageJsonPath);
+    if (!packageJson) {
+        return { rewritten: false, unresolved: [] };
+    }
+
+    let rewritten = false;
+    const unresolved = new Set<string>();
+
+    for (const dependencyGroupName of ['dependencies', 'devDependencies', 'optionalDependencies'] as const) {
+        const dependencyGroup = packageJson[dependencyGroupName];
+        if (!isRecord(dependencyGroup)) {
+            continue;
+        }
+
+        for (const [packageName, packageSpec] of Object.entries(dependencyGroup)) {
+            const normalizedSpec = normalizeNonEmptyString(packageSpec);
+            if (!normalizedSpec || !normalizedSpec.startsWith('file:')) {
+                continue;
+            }
+
+            const relativeTarget = normalizedSpec.slice('file:'.length);
+            if (!relativeTarget) {
+                continue;
+            }
+
+            const resolvedTarget = resolve(directory, relativeTarget);
+            if (existsSync(resolvedTarget)) {
+                try {
+                    const targetStats = statSync(resolvedTarget);
+                    if (targetStats.isFile() || readPackageName(resolvedTarget) === packageName) {
+                        continue;
+                    }
+                } catch {
+                    // Fall through and attempt to repair the dependency.
+                }
+            }
+
+            const packageRoot = findPackageRootByName(searchRoots, packageName);
+            if (!packageRoot) {
+                unresolved.add(packageName);
+                continue;
+            }
+
+            let rewrittenTarget = relative(directory, packageRoot).split('\\').join('/');
+            if (!rewrittenTarget || rewrittenTarget.length === 0) {
+                rewrittenTarget = '.';
+            }
+
+            dependencyGroup[packageName] = `file:${rewrittenTarget}`;
+            rewritten = true;
+        }
+    }
+
+    if (rewritten) {
+        writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+        rmSync(join(directory, 'package-lock.json'), { force: true });
+    }
+
+    return {
+        rewritten,
+        unresolved: [...unresolved],
+    };
+}
+
+function installDependenciesIfNeeded(
+    directory: string,
+    runtime: WapkRuntimeName,
+    dependencySearchRoots: readonly string[] = [],
+): void {
     if (runtime === 'deno') {
         return;
     }
@@ -1741,6 +2455,13 @@ function installDependenciesIfNeeded(directory: string, runtime: WapkRuntimeName
 
     if (!hasDependencies) {
         return;
+    }
+
+    const repairResult = repairLocalFileDependenciesForInstall(directory, dependencySearchRoots);
+    if (repairResult.unresolved.length > 0) {
+        throw new Error(
+            `WAPK archive is missing node_modules and depends on local file packages that could not be resolved from this machine: ${repairResult.unresolved.join(', ')}. Repack the archive so node_modules are included, or run the archive from a workspace checkout that contains those packages.`,
+        );
     }
 
     const runtimeExecutable = resolveRuntimeExecutable(runtime);
@@ -1865,6 +2586,8 @@ export async function prepareWapkApp(
     wapkPath: string,
     options: WapkCredentialsOptions & {
         runtime?: WapkRuntimeName;
+        runtimeWasExplicitlyRequested?: boolean;
+        dependencySearchRoots?: string[];
         syncInterval?: number;
         useWatcher?: boolean;
         watchArchive?: boolean;
@@ -1884,7 +2607,13 @@ export async function prepareWapkApp(
     const runtime = options.runtime ?? decoded.header.runtime;
     const workDir = mkdtempSync(join(tmpdir(), 'elit-wapk-'));
     extractFiles(decoded.files, workDir);
-    installDependenciesIfNeeded(workDir, runtime);
+    const dependencySearchRoots = [
+        ...(options.dependencySearchRoots ?? []),
+        archivePath.startsWith('gdrive://') ? undefined : dirname(archivePath),
+        process.cwd(),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+    installDependenciesIfNeeded(workDir, runtime, dependencySearchRoots);
+    const syncIncludesNodeModules = existsSync(join(workDir, 'node_modules'));
 
     const entryPath = resolve(workDir, decoded.header.entry);
 
@@ -1907,11 +2636,12 @@ export async function prepareWapkApp(
         watchArchive: options.watchArchive,
         archiveSyncInterval: options.archiveSyncInterval,
         lock,
+        runtimeWasExplicitlyRequested: options.runtimeWasExplicitlyRequested,
+        syncIncludesNodeModules,
     };
 }
 
 export async function runPreparedWapkApp(prepared: PreparedWapkApp): Promise<number> {
-    const executable = resolveWapkRuntimeExecutable(prepared.runtime);
     const port = prepared.header.port ?? DEFAULT_WAPK_PORT;
     const env = {
         ...process.env,
@@ -1926,10 +2656,24 @@ export async function runPreparedWapkApp(prepared: PreparedWapkApp): Promise<num
 
     const sync = createWapkLiveSync(prepared);
 
-    const child = spawn(executable, getWapkRuntimeArgs(prepared.runtime, prepared.entryPath), {
+    let launch: WapkLaunchCommand;
+    try {
+        launch = resolveWapkLaunchCommand(prepared, env);
+    } catch (error) {
+        await sync.stop();
+        rmSync(prepared.workDir, { recursive: true, force: true });
+        throw error;
+    }
+
+    if (launch.label !== 'entry') {
+        console.log(`[wapk] Launch:  ${launch.label}`);
+    }
+
+    const child = spawn(launch.executable, launch.args, {
         cwd: prepared.workDir,
-        env,
+        env: launch.env,
         stdio: 'inherit',
+        shell: launch.shell,
         windowsHide: true,
     });
 
@@ -2039,6 +2783,7 @@ function printWapkHelp(): void {
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
         '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
+        '  - Browser-style archives with scripts.start or wapk.script.start run that start script automatically.',
         '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',
         '  - Google Drive mode talks to the Drive API directly; no local archive file is required.',
         '  - Online mode creates a shared session on Elit Run directly, keeps the CLI alive, and closes it on Ctrl+C.',
@@ -2398,6 +3143,8 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
     const prepared = await prepareWapkApp(archiveSpecifier, {
         googleDrive: runOptions.googleDrive,
         runtime: runOptions.runtime,
+        runtimeWasExplicitlyRequested: parsedRunOptions.runtime !== undefined,
+        dependencySearchRoots: [cwd],
         syncInterval: runOptions.syncInterval,
         useWatcher: runOptions.useWatcher,
         watchArchive: runOptions.watchArchive,

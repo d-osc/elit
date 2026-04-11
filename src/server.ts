@@ -561,6 +561,13 @@ interface ImportMapEntry {
   [importName: string]: string;
 }
 
+interface TransformCacheEntry {
+  content: Buffer;
+  mimeType: string;
+  mtimeMs: number;
+  size: number;
+}
+
 // Cache for generated import maps to avoid re-scanning
 const importMapCache = new Map<string, ImportMapEntry>();
 
@@ -569,6 +576,32 @@ const importMapCache = new Map<string, ImportMapEntry>();
  */
 export function clearImportMapCache(): void {
   importMapCache.clear();
+}
+
+function toBuffer(content: string | Buffer): Buffer {
+  return typeof content === 'string' ? Buffer.from(content) : content;
+}
+
+function createTransformCacheKey(filePath: string, mode: 'dev' | 'preview', query: string): string {
+  return `${mode}:${query}:${filePath}`;
+}
+
+function getValidTransformCacheEntry(
+  transformCache: Map<string, TransformCacheEntry>,
+  cacheKey: string,
+  stats: { mtimeMs: number; size: number },
+): TransformCacheEntry | undefined {
+  const entry = transformCache.get(cacheKey);
+  if (!entry) {
+    return undefined;
+  }
+
+  if (entry.mtimeMs === stats.mtimeMs && entry.size === stats.size) {
+    return entry;
+  }
+
+  transformCache.delete(cacheKey);
+  return undefined;
 }
 
 /**
@@ -1245,6 +1278,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const config = { ...defaultOptions, ...options };
   const wsClients = new Set<WebSocket>();
   const stateManager = new StateManager();
+  const transformCache = new Map<string, TransformCacheEntry>();
 
   // Clear import map cache in dev mode to ensure fresh scans
   if (config.mode === 'dev') {
@@ -1622,19 +1656,29 @@ export function createDevServer(options: DevServerOptions): DevServer {
         return send404(res, '404 Not Found');
       }
 
-      let content = await readFile(resolvedPath);
       const ext = extname(resolvedPath);
-      let mimeType = lookup(resolvedPath) || 'application/octet-stream';
-
-      // Handle CSS imports as JavaScript modules (like Vite)
-      // When CSS is imported in JS/TS with ?inline query, transform it to a JS module that injects styles
       const urlQuery = req.url?.split('?')[1] || '';
       const isInlineCSS = urlQuery.includes('inline');
+      const cacheableTransform = ext === '.ts' || ext === '.tsx' || (ext === '.css' && isInlineCSS);
+      const resolvedStats = cacheableTransform ? await stat(resolvedPath) : undefined;
+      let mimeType = lookup(resolvedPath) || 'application/octet-stream';
+      let content: Buffer;
 
-      if (ext === '.css' && isInlineCSS) {
-        // Transform CSS to JavaScript module that injects styles
-        const cssContent = escapeForTemplateLiteral(content.toString());
-        const jsModule = `
+      if (cacheableTransform && resolvedStats) {
+        const cacheKey = createTransformCacheKey(resolvedPath, config.mode, urlQuery);
+        const cachedTransform = getValidTransformCacheEntry(transformCache, cacheKey, resolvedStats);
+
+        if (cachedTransform) {
+          content = cachedTransform.content;
+          mimeType = cachedTransform.mimeType;
+        } else {
+          const sourceContent = toBuffer(await readFile(resolvedPath));
+
+          // Handle CSS imports as JavaScript modules (like Vite)
+          // When CSS is imported in JS/TS with ?inline query, transform it to a JS module that injects styles
+          if (ext === '.css' && isInlineCSS) {
+            const cssContent = escapeForTemplateLiteral(sourceContent.toString());
+            const jsModule = `
 const css = \`${cssContent}\`;
 const style = document.createElement('style');
 style.setAttribute('data-file', '${filePath}');
@@ -1642,105 +1686,113 @@ style.textContent = css;
 document.head.appendChild(style);
 export default css;
 `;
-        content = Buffer.from(jsModule);
-        mimeType = 'application/javascript';
-      }
-
-      // Handle TypeScript files - transpile only (no bundling)
-      if (ext === '.ts' || ext === '.tsx') {
-        try {
-          let transpiled: string;
-
-          if (isDeno) {
-            // Deno - use Deno.emit
-            // @ts-ignore
-            const result = await Deno.emit(resolvedPath, {
-              check: false,
-              compilerOptions: {
-                sourceMap: config.mode !== 'preview',
-                inlineSourceMap: config.mode !== 'preview',
-                target: 'ES2020',
-                module: 'esnext'
-              },
-              sources: {
-                [resolvedPath]: content.toString()
-              }
-            });
-
-            transpiled = result.files[resolvedPath.replace(/\.tsx?$/, '.js')] || '';
-
-          } else if (isBun) {
-            // Bun - use Bun.Transpiler
-            // @ts-ignore
-            const transpiler = new Bun.Transpiler({
-              loader: ext === '.tsx' ? 'tsx' : 'ts',
-              target: 'browser'
-            });
-
-            // @ts-ignore
-            transpiled = transpiler.transformSync(content.toString());
+            content = Buffer.from(jsModule);
+            mimeType = 'application/javascript';
           } else {
-            // Node.js - use esbuild
-            const loader = ext === '.tsx' ? 'tsx' : 'ts';
-            const { transformSync } = await import('esbuild');
+            try {
+              let transpiled: string;
 
-            if (config.mode === 'preview') {
-              // Preview mode: transpile then obfuscate via esbuild-obfuscator-plugin's
-              // underlying javascript-obfuscator library
-              const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
+              if (isDeno) {
+                // Deno - use Deno.emit
+                // @ts-ignore
+                const result = await Deno.emit(resolvedPath, {
+                  check: false,
+                  compilerOptions: {
+                    sourceMap: config.mode !== 'preview',
+                    inlineSourceMap: config.mode !== 'preview',
+                    target: 'ES2020',
+                    module: 'esnext'
+                  },
+                  sources: {
+                    [resolvedPath]: sourceContent.toString()
+                  }
+                });
 
-              const tsResult = transformSync(content.toString(), {
-                loader: loader as any,
-                format: 'esm',
-                target: 'es2020',
-                sourcemap: false
-              });
+                transpiled = result.files[resolvedPath.replace(/\.tsx?$/, '.js')] || '';
 
-              transpiled = JavaScriptObfuscator.obfuscate(tsResult.code, {
-                compact: true,
-                renameGlobals: false
-              }).getObfuscatedCode();
-            } else {
-              // Dev mode: transpile with inline source maps
-              const result = transformSync(content.toString(), {
-                loader: loader as any,
-                format: 'esm',
-                target: 'es2020',
-                sourcemap: 'inline'
-              });
-              transpiled = result.code;
+              } else if (isBun) {
+                // Bun - use Bun.Transpiler
+                // @ts-ignore
+                const transpiler = new Bun.Transpiler({
+                  loader: ext === '.tsx' ? 'tsx' : 'ts',
+                  target: 'browser'
+                });
+
+                // @ts-ignore
+                transpiled = transpiler.transformSync(sourceContent.toString());
+              } else {
+                // Node.js - use esbuild
+                const loader = ext === '.tsx' ? 'tsx' : 'ts';
+                const { transformSync } = await import('esbuild');
+
+                if (config.mode === 'preview') {
+                  // Preview mode: transpile then obfuscate via esbuild-obfuscator-plugin's
+                  // underlying javascript-obfuscator library
+                  const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
+
+                  const tsResult = transformSync(sourceContent.toString(), {
+                    loader: loader as any,
+                    format: 'esm',
+                    target: 'es2020',
+                    sourcemap: false
+                  });
+
+                  transpiled = JavaScriptObfuscator.obfuscate(tsResult.code, {
+                    compact: true,
+                    renameGlobals: false
+                  }).getObfuscatedCode();
+                } else {
+                  // Dev mode: transpile with inline source maps
+                  const result = transformSync(sourceContent.toString(), {
+                    loader: loader as any,
+                    format: 'esm',
+                    target: 'es2020',
+                    sourcemap: 'inline'
+                  });
+                  transpiled = result.code;
+                }
+              }
+
+              // Rewrite .ts imports to .js for browser compatibility
+              // This allows developers to write import './file.ts' in their source code
+              // and the dev server will automatically rewrite it to import './file.js'
+              transpiled = transpiled.replace(
+                /from\s+["']([^"']+)\.ts(x?)["']/g,
+                (_, path, tsx) => `from "${path}.js${tsx}"`
+              );
+              transpiled = transpiled.replace(
+                /import\s+["']([^"']+)\.ts(x?)["']/g,
+                (_, path, tsx) => `import "${path}.js${tsx}"`
+              );
+
+              // Rewrite CSS imports to add ?inline query parameter
+              // This tells the server to return CSS as a JavaScript module
+              transpiled = transpiled.replace(
+                /import\s+["']([^"']+\.css)["']/g,
+                (_, path) => `import "${path}?inline"`
+              );
+              transpiled = transpiled.replace(
+                /from\s+["']([^"']+\.css)["']/g,
+                (_, path) => `from "${path}?inline"`
+              );
+
+              content = Buffer.from(transpiled);
+              mimeType = 'application/javascript';
+            } catch (error) {
+              if (config.logging) console.error('[500] TypeScript compilation error:', error);
+              return send500(res, `TypeScript compilation error:\n${error}`);
             }
           }
 
-          // Rewrite .ts imports to .js for browser compatibility
-          // This allows developers to write import './file.ts' in their source code
-          // and the dev server will automatically rewrite it to import './file.js'
-          transpiled = transpiled.replace(
-            /from\s+["']([^"']+)\.ts(x?)["']/g,
-            (_, path, tsx) => `from "${path}.js${tsx}"`
-          );
-          transpiled = transpiled.replace(
-            /import\s+["']([^"']+)\.ts(x?)["']/g,
-            (_, path, tsx) => `import "${path}.js${tsx}"`
-          );
-
-          // Rewrite CSS imports to add ?inline query parameter
-          // This tells the server to return CSS as a JavaScript module
-          transpiled = transpiled.replace(
-            /import\s+["']([^"']+\.css)["']/g,
-            (_, path) => `import "${path}?inline"`
-          );
-          transpiled = transpiled.replace(
-            /from\s+["']([^"']+\.css)["']/g,
-            (_, path) => `from "${path}?inline"`
-          );
-
-          content = Buffer.from(transpiled);
-          mimeType = 'application/javascript';
-        } catch (error) {
-          if (config.logging) console.error('[500] TypeScript compilation error:', error);
-          return send500(res, `TypeScript compilation error:\n${error}`);
+          transformCache.set(cacheKey, {
+            content,
+            mimeType,
+            mtimeMs: resolvedStats.mtimeMs,
+            size: resolvedStats.size,
+          });
         }
+      } else {
+        content = toBuffer(await readFile(resolvedPath));
       }
 
       // Inject HMR client and import map for HTML files
@@ -2092,6 +2144,7 @@ export default css;
     if (isClosing) return;
     isClosing = true;
     if (config.logging) console.log('\n[Server] Shutting down...');
+    transformCache.clear();
     if (watcher) await watcher.close();
     if (webSocketServers.length > 0) {
       webSocketServers.forEach(wsServer => wsServer.close());
