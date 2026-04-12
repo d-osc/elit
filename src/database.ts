@@ -117,99 +117,192 @@ function stripTypescriptSource(source: string, filename: string): string {
     }
 }
 
+function isSimpleIdentifier(value: string): boolean {
+    return /^[A-Za-z_$][\w$]*$/.test(value);
+}
+
+function stripOptionalLineTerminator(value: string): string {
+    const trimmed = value.trim();
+    return trimmed.endsWith(';')
+        ? trimmed.slice(0, -1).trimEnd()
+        : trimmed;
+}
+
+function parseQuotedModulePath(value: string): string | null {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+        return null;
+    }
+
+    const quote = trimmed[0];
+    if ((quote !== '"' && quote !== "'") || trimmed[trimmed.length - 1] !== quote) {
+        return null;
+    }
+
+    return trimmed.slice(1, -1);
+}
+
+function getLineIndentation(line: string): string {
+    const match = line.match(/^\s*/);
+    return match?.[0] ?? '';
+}
+
+function rewriteImportLine(
+    line: string,
+    nextImportBinding: () => string,
+    resolveDefaultImport: (bindingName: string) => string,
+): string | null {
+    const indentation = getLineIndentation(line);
+    const trimmed = stripOptionalLineTerminator(line);
+    if (!trimmed.startsWith('import ')) {
+        return null;
+    }
+
+    const importBody = trimmed.slice('import '.length).trim();
+    const sideEffectModulePath = parseQuotedModulePath(importBody);
+    if (sideEffectModulePath !== null) {
+        return `${indentation}require(${JSON.stringify(sideEffectModulePath)});`;
+    }
+
+    const fromIndex = importBody.lastIndexOf(' from ');
+    if (fromIndex === -1) {
+        return null;
+    }
+
+    const clause = importBody.slice(0, fromIndex).trim();
+    const modulePath = parseQuotedModulePath(importBody.slice(fromIndex + 6));
+    if (!clause || modulePath === null) {
+        return null;
+    }
+
+    const buildDefaultImport = (defaultName: string): { bindingName: string; code: string } | null => {
+        if (!isSimpleIdentifier(defaultName)) {
+            return null;
+        }
+
+        const bindingName = nextImportBinding();
+        return {
+            bindingName,
+            code: [
+                `${indentation}const ${bindingName} = require(${JSON.stringify(modulePath)});`,
+                `${indentation}const ${defaultName} = ${resolveDefaultImport(bindingName)};`,
+            ].join('\n'),
+        };
+    };
+
+    if (clause.startsWith('* as ')) {
+        const namespaceName = clause.slice(5).trim();
+        return isSimpleIdentifier(namespaceName)
+            ? `${indentation}const ${namespaceName} = require(${JSON.stringify(modulePath)});`
+            : null;
+    }
+
+    if (clause.startsWith('{') && clause.endsWith('}')) {
+        const namedBindings = clause.slice(1, -1).trim();
+        return namedBindings.length > 0
+            ? `${indentation}const { ${formatNamedImportBindings(namedBindings)} } = require(${JSON.stringify(modulePath)});`
+            : null;
+    }
+
+    const commaIndex = clause.indexOf(',');
+    if (commaIndex !== -1) {
+        const defaultName = clause.slice(0, commaIndex).trim();
+        const remainder = clause.slice(commaIndex + 1).trim();
+        const defaultImport = buildDefaultImport(defaultName);
+        if (!defaultImport) {
+            return null;
+        }
+
+        if (remainder.startsWith('* as ')) {
+            const namespaceName = remainder.slice(5).trim();
+            if (!isSimpleIdentifier(namespaceName)) {
+                return null;
+            }
+
+            return `${defaultImport.code}\n${indentation}const ${namespaceName} = ${defaultImport.bindingName};`;
+        }
+
+        if (remainder.startsWith('{') && remainder.endsWith('}')) {
+            const namedBindings = remainder.slice(1, -1).trim();
+            if (!namedBindings) {
+                return null;
+            }
+
+            return `${defaultImport.code}\n${indentation}const { ${formatNamedImportBindings(namedBindings)} } = ${defaultImport.bindingName};`;
+        }
+
+        return null;
+    }
+
+    return buildDefaultImport(clause)?.code ?? null;
+}
+
+function rewriteExportLine(
+    line: string,
+    namedExports: Set<string>,
+    markDefaultExport: () => void,
+): string | null {
+    const trimmed = stripOptionalLineTerminator(line);
+    if (!trimmed.startsWith('export ')) {
+        return null;
+    }
+
+    const indentation = getLineIndentation(line);
+
+    if (trimmed.startsWith('export default ')) {
+        markDefaultExport();
+        return `${indentation}module.exports = ${trimmed.slice('export default '.length)}`;
+    }
+
+    const valueDeclarationMatch = /^export\s+(const|let|var)\s+([A-Za-z_$][\w$]*)\b/.exec(trimmed);
+    if (valueDeclarationMatch) {
+        namedExports.add(valueDeclarationMatch[2]);
+        return `${indentation}${trimmed.slice('export '.length)}`;
+    }
+
+    const asyncFunctionMatch = /^export\s+async\s+function\s+([A-Za-z_$][\w$]*)\b/.exec(trimmed);
+    if (asyncFunctionMatch) {
+        namedExports.add(asyncFunctionMatch[1]);
+        return `${indentation}${trimmed.slice('export '.length)}`;
+    }
+
+    const functionMatch = /^export\s+function\s+([A-Za-z_$][\w$]*)\b/.exec(trimmed);
+    if (functionMatch) {
+        namedExports.add(functionMatch[1]);
+        return `${indentation}${trimmed.slice('export '.length)}`;
+    }
+
+    const classMatch = /^export\s+class\s+([A-Za-z_$][\w$]*)\b/.exec(trimmed);
+    if (classMatch) {
+        namedExports.add(classMatch[1]);
+        return `${indentation}${trimmed.slice('export '.length)}`;
+    }
+
+    if (trimmed.startsWith('export {') && trimmed.endsWith('}')) {
+        const specifiers = trimmed.slice('export {'.length, -1).trim();
+        return specifiers.length > 0
+            ? `${indentation}${formatNamedExportAssignments(specifiers)}`
+            : null;
+    }
+
+    return null;
+}
+
 function rewriteModuleSyntaxToCommonJs(source: string): string {
-    let code = source;
     let importCounter = 0;
     let hasDefaultExport = false;
     const namedExports = new Set<string>();
 
     const nextImportBinding = () => `__vm_import_${importCounter++}`;
     const resolveDefaultImport = (bindingName: string) => `${bindingName} && Object.prototype.hasOwnProperty.call(${bindingName}, "default") ? ${bindingName}.default : ${bindingName}`;
-
-    code = code.replace(
-        /^\s*import\s+([A-Za-z_$][\w$]*)\s*,\s*\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\3\s*;?\s*$/gm,
-        (_match: string, defaultName: string, namespaceName: string, _quote: string, modulePath: string) => {
-            const bindingName = nextImportBinding();
-            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};\nconst ${namespaceName} = ${bindingName};`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*import\s+([A-Za-z_$][\w$]*)\s*,\s*\{([^}]+)\}\s+from\s+(['"])([^'"]+)\3\s*;?\s*$/gm,
-        (_match: string, defaultName: string, namedBindings: string, _quote: string, modulePath: string) => {
-            const bindingName = nextImportBinding();
-            const destructured = formatNamedImportBindings(namedBindings);
-            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};\nconst { ${destructured} } = ${bindingName};`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
-        (_match: string, namespaceName: string, _quote: string, modulePath: string) => `const ${namespaceName} = require(${JSON.stringify(modulePath)});`,
-    );
-
-    code = code.replace(
-        /^\s*import\s+\{([^}]+)\}\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
-        (_match: string, namedBindings: string, _quote: string, modulePath: string) => `const { ${formatNamedImportBindings(namedBindings)} } = require(${JSON.stringify(modulePath)});`,
-    );
-
-    code = code.replace(
-        /^\s*import\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
-        (_match: string, defaultName: string, _quote: string, modulePath: string) => {
-            const bindingName = nextImportBinding();
-            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*import\s+(['"])([^'"]+)\1\s*;?\s*$/gm,
-        (_match: string, _quote: string, modulePath: string) => `require(${JSON.stringify(modulePath)});`,
-    );
-
-    code = code.replace(
-        /^\s*export\s+default\s+/gm,
-        () => {
-            hasDefaultExport = true;
-            return 'module.exports = ';
-        },
-    );
-
-    code = code.replace(
-        /^\s*export\s+(const|let|var)\s+([A-Za-z_$][\w$]*)\b/gm,
-        (_match: string, declarationKind: string, name: string) => {
-            namedExports.add(name);
-            return `${declarationKind} ${name}`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*export\s+async\s+function\s+([A-Za-z_$][\w$]*)\b/gm,
-        (_match: string, name: string) => {
-            namedExports.add(name);
-            return `async function ${name}`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*export\s+function\s+([A-Za-z_$][\w$]*)\b/gm,
-        (_match: string, name: string) => {
-            namedExports.add(name);
-            return `function ${name}`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*export\s+class\s+([A-Za-z_$][\w$]*)\b/gm,
-        (_match: string, name: string) => {
-            namedExports.add(name);
-            return `class ${name}`;
-        },
-    );
-
-    code = code.replace(
-        /^\s*export\s+\{([^}]+)\}\s*;?\s*$/gm,
-        (_match: string, specifiers: string) => formatNamedExportAssignments(specifiers),
-    );
+    const code = source
+        .split(/\r?\n/)
+        .map((line) => rewriteImportLine(line, nextImportBinding, resolveDefaultImport)
+            ?? rewriteExportLine(line, namedExports, () => {
+                hasDefaultExport = true;
+            })
+            ?? line)
+        .join('\n');
 
     const exportFooter = [...namedExports].map((name) => `module.exports.${name} = ${name};`);
     if (hasDefaultExport) {

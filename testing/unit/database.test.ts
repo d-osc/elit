@@ -206,4 +206,66 @@ describe('database helpers preserve typed declarations', () => {
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
+
+    it('rewrites default plus namespace imports in fallback mode without using regex-heavy import parsing', async () => {
+        const dir = createTempDir();
+        const originalSourceTextModule = (vm as any).SourceTextModule;
+
+        try {
+            fs.writeFileSync(path.join(dir, 'users.ts'), [
+                'export const users = [{ id: 1, name: "Ann" }];',
+                'export default users;',
+                '',
+            ].join('\n'), 'utf8');
+
+            (vm as any).SourceTextModule = undefined;
+
+            const db = new Database({ dir, language: 'ts' });
+            const result = await db.execute(`
+                import defaultUsers, * as usersModule from '@db/users';
+                console.log(defaultUsers[0].name, usersModule.users[0].name, usersModule.default[0].name);
+            `);
+
+            expect(result.logs).toEqual([
+                {
+                    type: 'log',
+                    args: ['Ann', 'Ann', 'Ann'],
+                },
+            ]);
+        } finally {
+            (vm as any).SourceTextModule = originalSourceTextModule;
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('rewrites default plus named imports in fallback mode without using regex-heavy import parsing', async () => {
+        const dir = createTempDir();
+        const originalSourceTextModule = (vm as any).SourceTextModule;
+
+        try {
+            fs.writeFileSync(path.join(dir, 'users.ts'), [
+                'export const users = [{ id: 1, name: "Ann" }];',
+                'export default users;',
+                '',
+            ].join('\n'), 'utf8');
+
+            (vm as any).SourceTextModule = undefined;
+
+            const db = new Database({ dir, language: 'ts' });
+            const result = await db.execute(`
+                import defaultUsers, { users as namedUsers } from '@db/users';
+                console.log(defaultUsers[0].name, namedUsers[0].name);
+            `);
+
+            expect(result.logs).toEqual([
+                {
+                    type: 'log',
+                    args: ['Ann', 'Ann'],
+                },
+            ]);
+        } finally {
+            (vm as any).SourceTextModule = originalSourceTextModule;
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
 });
