@@ -14,6 +14,7 @@
     "wapk:pack": "npm run build:preview && elit wapk pack ./",
     "wapk:pack:dev": "npm run build:dev && elit wapk pack ./",
     "wapk:run": "elit wapk run ./elit-full-db-example.wapk",
+    "wapk:run:online": "elit wapk run ./elit-full-db-example.wapk --online",
     "wapk:inspect": "elit wapk inspect ./elit-full-db-example.wapk",
     "test": "elit test",
     "test:watch": "elit test --watch",

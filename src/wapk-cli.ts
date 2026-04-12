@@ -165,6 +165,7 @@ const DEFAULT_GOOGLE_DRIVE_TOKEN_ENV = 'GOOGLE_DRIVE_ACCESS_TOKEN';
 const DEFAULT_WAPK_ONLINE_URL_ENV = 'ELIT_WAPK_ONLINE_URL';
 const DEFAULT_WAPK_ONLINE_URLS = ['https://wapk.d-osc.com/'] as const;
 const WAPK_ONLINE_CREATE_PATH = '/api/shared-session/create';
+const WAPK_ONLINE_READ_PATH = '/api/shared-session/read';
 const WAPK_ONLINE_CLOSE_PATH = '/api/shared-session/close';
 const WAPK_ONLINE_CLOSE_REASON = 'The host stopped sharing this session.';
 const WAPK_ONLINE_KEEPALIVE_INTERVAL_MS = 1000;
@@ -193,6 +194,20 @@ interface WapkOnlineCreateResponse {
     ok: boolean;
     joinKey?: string;
     adminToken?: string;
+    error?: string;
+}
+
+interface WapkOnlineReadRequest {
+    joinKey: string;
+    hostToken: string;
+    knownRevision?: number;
+}
+
+interface WapkOnlineReadResponse {
+    ok: boolean;
+    revision?: number;
+    changed?: boolean;
+    snapshot?: WapkOnlineSharedSessionSnapshot;
     error?: string;
 }
 
@@ -1897,7 +1912,7 @@ async function resolveWapkOnlineLauncherUrl(explicitUrl?: string): Promise<URL> 
         const normalized = normalizeOnlineLauncherUrl(configuredUrl, explicitUrl ? '--online-url' : DEFAULT_WAPK_ONLINE_URL_ENV);
         if (!(await probeOnlineLauncherUrl(normalized.toString()))) {
             throw new Error(
-                `Could not reach Elit Run at ${normalized.toString()}. Start c:\\Users\\ondev\\Projects\\elit-run first or provide a reachable --online-url.`,
+                `Could not reach Elit Run at ${normalized.toString()}. Start an Elit Run server with npm run dev or npm run preview, or provide a reachable --online-url.`,
             );
         }
         return normalized;
@@ -1910,7 +1925,7 @@ async function resolveWapkOnlineLauncherUrl(explicitUrl?: string): Promise<URL> 
     }
 
     throw new Error(
-        'Could not reach Elit Run on http://localhost:4177 or http://localhost:4179. Start c:\\Users\\ondev\\Projects\\elit-run with npm run dev or npm run preview, or pass --online-url <url>.',
+        'Could not reach Elit Run on http://localhost:4177 or http://localhost:4179. Start an Elit Run server with npm run dev or npm run preview, or pass --online-url <url>.',
     );
 }
 
@@ -1942,6 +1957,18 @@ function createWapkOnlineSharedSessionSnapshot(
     };
 }
 
+function decodeOnlineSharedSessionFileContent(content: string): Buffer {
+    return Buffer.from(content, 'base64');
+}
+
+function createWapkFilesFromOnlineSharedSessionSnapshot(snapshot: WapkOnlineSharedSessionSnapshot): WapkFileEntry[] {
+    return snapshot.files.map((file) => ({
+        path: file.path,
+        mode: file.mode,
+        content: decodeOnlineSharedSessionFileContent(file.content),
+    }));
+}
+
 async function createWapkOnlineSharedSession(
     launcherUrl: URL,
     snapshot: WapkOnlineSharedSessionSnapshot,
@@ -1969,6 +1996,71 @@ async function createWapkOnlineSharedSession(
     }
 
     return { ok: true, joinKey, adminToken };
+}
+
+async function readWapkOnlineSharedSessionSnapshot(
+    launcherUrl: URL,
+    session: { joinKey: string; adminToken: string },
+    knownRevision: number,
+): Promise<{ revision: number; changed: boolean; snapshot: WapkOnlineSharedSessionSnapshot | null }> {
+    const response = await fetch(new URL(WAPK_ONLINE_READ_PATH, launcherUrl), {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            joinKey: session.joinKey,
+            hostToken: session.adminToken,
+            knownRevision,
+        } satisfies WapkOnlineReadRequest),
+    });
+
+    let payload: Partial<WapkOnlineReadResponse> | null = null;
+    try {
+        payload = await response.json() as Partial<WapkOnlineReadResponse>;
+    } catch {
+        payload = null;
+    }
+
+    const revision = typeof payload?.revision === 'number' && Number.isInteger(payload.revision) && payload.revision >= 0
+        ? payload.revision
+        : 0;
+    const changed = payload?.changed === true;
+
+    if (!response.ok || !payload?.ok || typeof payload.changed !== 'boolean' || typeof payload.revision !== 'number') {
+        throw new Error(payload?.error ?? `Could not read the online shared session snapshot (${response.status}).`);
+    }
+
+    if (!changed) {
+        return {
+            revision,
+            changed: false,
+            snapshot: null,
+        };
+    }
+
+    if (!payload.snapshot) {
+        throw new Error('The online shared session response did not include an updated snapshot.');
+    }
+
+    return {
+        revision,
+        changed: true,
+        snapshot: payload.snapshot,
+    };
+}
+
+async function applyWapkOnlineSharedSessionSnapshotToArchive(
+    archiveHandle: WapkArchiveHandle,
+    snapshot: WapkOnlineSharedSessionSnapshot,
+    lock?: ResolvedWapkCredentials,
+): Promise<{ header: WapkHeader; signature?: string; label: string }> {
+    return await writeWapkArchiveFromMemory(
+        archiveHandle,
+        snapshot.header,
+        createWapkFilesFromOnlineSharedSessionSnapshot(snapshot),
+        lock,
+    );
 }
 
 async function closeWapkOnlineSharedSession(
@@ -2014,9 +2106,50 @@ function isPmWapkOnlineShutdownEnabled(): boolean {
 async function waitForWapkOnlineSessionShutdown(
     launcherUrl: URL,
     session: { joinKey: string; adminToken: string },
+    archiveHandle: WapkArchiveHandle,
+    lock?: ResolvedWapkCredentials,
 ): Promise<number> {
+    let snapshotRevision = 0;
+    let snapshotSyncPending = false;
+    let snapshotSyncPromise: Promise<void> = Promise.resolve();
+    let lastSnapshotSyncError: string | null = null;
+
+    const syncGuestSnapshotUpdates = (): Promise<void> => {
+        if (snapshotSyncPending) {
+            return snapshotSyncPromise;
+        }
+
+        snapshotSyncPending = true;
+        snapshotSyncPromise = (async () => {
+            try {
+                const result = await readWapkOnlineSharedSessionSnapshot(launcherUrl, session, snapshotRevision);
+                if (!result.changed || !result.snapshot) {
+                    snapshotRevision = result.revision;
+                    return;
+                }
+
+                const writeResult = await applyWapkOnlineSharedSessionSnapshotToArchive(archiveHandle, result.snapshot, lock);
+                snapshotRevision = result.revision;
+                lastSnapshotSyncError = null;
+                console.log(`[wapk] Applied guest changes back to ${writeResult.label}.`);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (lastSnapshotSyncError !== message) {
+                    lastSnapshotSyncError = message;
+                    console.error(`[wapk] Could not sync guest changes back to ${archiveHandle.label}: ${message}`);
+                }
+            } finally {
+                snapshotSyncPending = false;
+            }
+        })();
+
+        return snapshotSyncPromise;
+    };
+
     const shutdownTrigger = await new Promise<WapkOnlineShutdownTrigger>((resolve) => {
-        const keepAlive = setInterval(() => {}, WAPK_ONLINE_KEEPALIVE_INTERVAL_MS);
+        const keepAlive = setInterval(() => {
+            void syncGuestSnapshotUpdates();
+        }, WAPK_ONLINE_KEEPALIVE_INTERVAL_MS);
         const pmManaged = isPmWapkOnlineShutdownEnabled();
         let stdinBuffer = '';
 
@@ -2067,6 +2200,8 @@ async function waitForWapkOnlineSessionShutdown(
         }
     });
 
+    await syncGuestSnapshotUpdates();
+
     if (shutdownTrigger.kind === 'pm') {
         console.log(`\n[wapk] PM requested shutdown for shared session ${session.joinKey}...`);
     } else {
@@ -2114,6 +2249,9 @@ async function runWapkOnline(
     const response = await createWapkOnlineSharedSession(launcherUrl, sharedSessionSnapshot);
     const joinUrl = buildOnlineJoinUrl(launcherUrl, response.joinKey);
     const pmManaged = isPmWapkOnlineShutdownEnabled();
+    const onlineArchiveLock = sharedSessionSnapshot.locked && options.password
+        ? resolveArchiveCredentials({ password: options.password })
+        : undefined;
 
     console.log(`[wapk] Share key: ${response.joinKey}`);
     console.log(`[wapk] Join URL:  ${joinUrl}`);
@@ -2126,7 +2264,7 @@ async function runWapkOnline(
     process.exitCode = await waitForWapkOnlineSessionShutdown(launcherUrl, {
         joinKey: response.joinKey,
         adminToken: response.adminToken,
-    });
+    }, archiveHandle, onlineArchiveLock);
 }
 
 async function writeWapkArchiveFromMemory(
@@ -2686,7 +2824,7 @@ function printWapkHelp(): void {
         '  --archive-watch              Pull external archive changes back into the temp workdir',
         '  --no-archive-watch           Disable external archive read sync',
         '  --online                     Create an Elit Run share session, stay alive, and close on Ctrl+C',
-        '  --online-url <url>           Elit Run URL (default: localhost:4177, fallback localhost:4179)',
+        '  --online-url <url>           Elit Run URL (default: auto-detect localhost:4177 or localhost:4179)',
         '  --google-drive-file-id <id>  Run a remote .wapk directly from Google Drive',
         '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
         '  --google-drive-access-token <value>  OAuth token for Google Drive API calls',
