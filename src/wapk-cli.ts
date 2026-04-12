@@ -2375,32 +2375,6 @@ function ensureRuntimeAvailable(runtime: WapkRuntimeName, executable: string): v
     }
 }
 
-function resolveNpmExecutable(nodeExecutable: string): string {
-    const candidate = process.platform === 'win32'
-        ? join(dirname(nodeExecutable), 'npm.cmd')
-        : join(dirname(nodeExecutable), 'npm');
-
-    if (existsSync(candidate)) {
-        return candidate;
-    }
-
-    return process.platform === 'win32' ? 'npm.cmd' : 'npm';
-}
-
-function readPackageName(directory: string): string | undefined {
-    const packageJsonPath = join(directory, 'package.json');
-    if (!existsSync(packageJsonPath)) {
-        return undefined;
-    }
-
-    try {
-        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
-        return packageJson.name;
-    } catch {
-        return undefined;
-    }
-}
-
 function hasPackageJson(directory: string): boolean {
     const packageJsonPath = join(directory, 'package.json');
     return existsSync(packageJsonPath) && statSync(packageJsonPath).isFile();
@@ -2425,171 +2399,6 @@ function findNearestPackageDirectory(startDirectory: string, rootDirectory: stri
         }
 
         currentDirectory = parentDirectory;
-    }
-}
-
-function findPackageRootByName(searchRoots: readonly string[], packageName: string): string | undefined {
-    const visited = new Set<string>();
-
-    for (const root of searchRoots) {
-        let currentDirectory = resolve(root);
-
-        while (!visited.has(currentDirectory)) {
-            visited.add(currentDirectory);
-
-            if (readPackageName(currentDirectory) === packageName) {
-                return currentDirectory;
-            }
-
-            const parentDirectory = dirname(currentDirectory);
-            if (parentDirectory === currentDirectory) {
-                break;
-            }
-
-            currentDirectory = parentDirectory;
-        }
-    }
-
-    return undefined;
-}
-
-function repairLocalFileDependenciesForInstall(
-    directory: string,
-    searchRoots: readonly string[],
-): { rewritten: boolean; unresolved: string[] } {
-    const packageJsonPath = join(directory, 'package.json');
-    const packageJson = readJsonFile(packageJsonPath);
-    if (!packageJson) {
-        return { rewritten: false, unresolved: [] };
-    }
-
-    let rewritten = false;
-    const unresolved = new Set<string>();
-
-    for (const dependencyGroupName of ['dependencies', 'devDependencies', 'optionalDependencies'] as const) {
-        const dependencyGroup = packageJson[dependencyGroupName];
-        if (!isRecord(dependencyGroup)) {
-            continue;
-        }
-
-        for (const [packageName, packageSpec] of Object.entries(dependencyGroup)) {
-            const normalizedSpec = normalizeNonEmptyString(packageSpec);
-            if (!normalizedSpec || !normalizedSpec.startsWith('file:')) {
-                continue;
-            }
-
-            const relativeTarget = normalizedSpec.slice('file:'.length);
-            if (!relativeTarget) {
-                continue;
-            }
-
-            const resolvedTarget = resolve(directory, relativeTarget);
-            if (existsSync(resolvedTarget)) {
-                try {
-                    const targetStats = statSync(resolvedTarget);
-                    if (targetStats.isFile() || readPackageName(resolvedTarget) === packageName) {
-                        continue;
-                    }
-                } catch {
-                    // Fall through and attempt to repair the dependency.
-                }
-            }
-
-            const packageRoot = findPackageRootByName(searchRoots, packageName);
-            if (!packageRoot) {
-                unresolved.add(packageName);
-                continue;
-            }
-
-            let rewrittenTarget = relative(directory, packageRoot).split('\\').join('/');
-            if (!rewrittenTarget || rewrittenTarget.length === 0) {
-                rewrittenTarget = '.';
-            }
-
-            dependencyGroup[packageName] = `file:${rewrittenTarget}`;
-            rewritten = true;
-        }
-    }
-
-    if (rewritten) {
-        writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
-        rmSync(join(directory, 'package-lock.json'), { force: true });
-    }
-
-    return {
-        rewritten,
-        unresolved: [...unresolved],
-    };
-}
-
-function installDependenciesIfNeeded(
-    directory: string,
-    runtime: WapkRuntimeName,
-    dependencySearchRoots: readonly string[] = [],
-    options: { allowUnresolvedLocalFileDependencies?: boolean } = {},
-): void {
-    if (runtime === 'deno') {
-        return;
-    }
-
-    const packageJsonPath = join(directory, 'package.json');
-    if (!existsSync(packageJsonPath) || existsSync(join(directory, 'node_modules'))) {
-        return;
-    }
-
-    const packageJson = readJsonFile(packageJsonPath);
-    const dependencyGroups = [packageJson?.dependencies, packageJson?.devDependencies];
-    const hasDependencies = dependencyGroups.some(
-        (value) => isRecord(value) && Object.keys(value).length > 0,
-    );
-
-    if (!hasDependencies) {
-        return;
-    }
-
-    const repairResult = repairLocalFileDependenciesForInstall(directory, dependencySearchRoots);
-    if (repairResult.unresolved.length > 0) {
-        if (options.allowUnresolvedLocalFileDependencies) {
-            console.warn(
-                `[wapk] Skipping dependency install for ${directory} because unresolved local file packages are not required by the nested runtime package: ${repairResult.unresolved.join(', ')}.`,
-            );
-            return;
-        }
-
-        throw new Error(
-            `WAPK archive is missing node_modules and depends on local file packages that could not be resolved from this machine: ${repairResult.unresolved.join(', ')}. Repack the archive so node_modules are included, or run the archive from a workspace checkout that contains those packages.`,
-        );
-    }
-
-    const runtimeExecutable = resolveRuntimeExecutable(runtime);
-    let command = runtimeExecutable;
-    let args: string[] = [];
-
-    if (runtime === 'bun') {
-        args = ['install'];
-    } else {
-        command = resolveNpmExecutable(runtimeExecutable);
-        args = ['install'];
-    }
-
-    console.log(`[wapk] Installing dependencies with ${basename(command)}...`);
-    const result = spawnSync(command, args, {
-        cwd: directory,
-        shell: shouldUseShellExecution(command),
-        stdio: 'inherit',
-        windowsHide: true,
-    });
-
-    if (result.error) {
-        if ((result.error as NodeJS.ErrnoException).code === 'ENOENT') {
-            throw new Error(`Dependency installer was not found for runtime "${runtime}".`);
-        }
-
-        throw result.error;
-    }
-
-    if (result.status !== 0) {
-        throw new Error(`Dependency installation failed with exit code ${result.status ?? 1}.`);
     }
 }
 
@@ -2720,18 +2529,6 @@ export async function prepareWapkApp(
     extractFiles(decoded.files, workDir);
     const entryPath = resolve(workDir, decoded.header.entry);
     const entryPackageDirectory = findNearestPackageDirectory(dirname(entryPath), workDir);
-    const hasNestedRuntimePackage = Boolean(entryPackageDirectory && resolve(entryPackageDirectory) !== resolve(workDir));
-    const dependencySearchRoots = [
-        ...(options.dependencySearchRoots ?? []),
-        archivePath.startsWith('gdrive://') ? undefined : dirname(archivePath),
-        process.cwd(),
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-    installDependenciesIfNeeded(workDir, runtime, dependencySearchRoots, {
-        allowUnresolvedLocalFileDependencies: hasNestedRuntimePackage,
-    });
-    if (hasNestedRuntimePackage && entryPackageDirectory) {
-        installDependenciesIfNeeded(entryPackageDirectory, runtime, [workDir, ...dependencySearchRoots]);
-    }
     const syncIncludesNodeModules = existsSync(join(workDir, 'node_modules')) || Boolean(
         entryPackageDirectory && existsSync(join(entryPackageDirectory, 'node_modules')),
     );
@@ -2901,6 +2698,7 @@ function printWapkHelp(): void {
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
         '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them.',
+        '  - Run never installs dependencies automatically; archives must include the runtime dependencies they need.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
         '  - Browser-style archives with scripts.start or wapk.script.start run that start script automatically.',
         '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',

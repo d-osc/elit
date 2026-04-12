@@ -1081,7 +1081,7 @@ var init_fs = __esm({
   }
 });
 
-// node_modules/elit/src/server.ts
+// ../../src/server.ts
 var nodeModule = __toESM(require("node:module"));
 init_http();
 
@@ -2016,7 +2016,7 @@ function watch(paths, options2) {
   return watcher;
 }
 
-// node_modules/elit/src/server.ts
+// ../../src/server.ts
 init_fs();
 
 // ../../src/mime-types.ts
@@ -2108,7 +2108,7 @@ function lookup(path2) {
   return MIME_TYPES[ext] || false;
 }
 
-// node_modules/elit/src/server.ts
+// ../../src/server.ts
 init_runtime();
 
 // ../../src/render-context.ts
@@ -2852,7 +2852,7 @@ var dom = new DomNode();
 var render = dom.render.bind(dom);
 var renderToString = dom.renderToString.bind(dom);
 
-// node_modules/elit/src/server.ts
+// ../../src/server.ts
 var stripTypeScriptTypes2 = typeof nodeModule.stripTypeScriptTypes === "function" ? nodeModule.stripTypeScriptTypes : void 0;
 var cachedNodeEsbuildTransformSync;
 function stripBrowserTypeScriptSource(source2, filename) {
@@ -4377,7 +4377,7 @@ ${elitImportMap}`;
 // elit-standalone-dev-entry.ts
 var import_node_path2 = require("node:path");
 
-// node_modules/elit/src/database.ts
+// ../../src/database.ts
 var import_node_vm = __toESM(require("node:vm"));
 var import_node_fs = __toESM(require("node:fs"));
 var import_node_path = __toESM(require("node:path"));
@@ -5860,7 +5860,7 @@ function notFoundHandler(req, res, next) {
 router.use(notFoundHandler);
 var server = router;
 
-// node_modules/elit/src/el.ts
+// ../../src/el.ts
 var hasDocument = typeof document !== "undefined";
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);

@@ -151,8 +151,8 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsup && node -e \"require('fs').copyFileSync('src/test-globals.d.ts', 'dist/test-globals.d.ts')\" && tsc --emitDeclarationOnly --outDir dist --declaration --declarationMap",
-    "dev": "tsup --watch",
+    "build": "node ./scripts/tsup-runner.mjs",
+    "dev": "node ./scripts/tsup-runner.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "elit test",
     "test:run": "elit test --run",

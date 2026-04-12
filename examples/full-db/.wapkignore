@@ -1,7 +1,7 @@
 node_modules
 tests
 src
-dist
+dev-dist
 tsconfig.json
 .elit-config-*
 *.wapk

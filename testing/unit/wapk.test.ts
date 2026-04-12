@@ -359,6 +359,59 @@ describe('wapk helpers', () => {
         }
     });
 
+    it('skips root dependency installation when scripts.start points directly at a nested runtime entry', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'dev-dist'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'root-only-lib'), { recursive: true });
+
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'skip-root-install-app',
+                version: '1.0.0',
+                type: 'commonjs',
+                scripts: {
+                    start: 'node ./dev-dist/index.js',
+                },
+                dependencies: {
+                    'root-only-lib': 'file:./root-only-lib',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'skip-root-install-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: './dev-dist/index.js',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'root-only-lib', 'package.json'), JSON.stringify({
+                name: 'root-only-lib',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'root-only-lib', 'index.js'), 'module.exports = "root-only-lib";\n');
+            fs.writeFileSync(path.join(dir, 'dev-dist', 'index.js'), 'console.log("nested-runtime");\n');
+            fs.writeFileSync(path.join(dir, 'dev-dist', 'package.json'), JSON.stringify({
+                private: true,
+                type: 'commonjs',
+                main: 'index.js',
+            }, null, 2));
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'skip-root-install-app.wapk'),
+            });
+            const prepared = await prepareWapkApp(archivePath);
+
+            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules'))).toBe(false);
+            expect(fs.existsSync(path.join(prepared.workDir, 'dev-dist', 'node_modules'))).toBe(false);
+
+            fs.rmSync(prepared.workDir, { recursive: true, force: true });
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it('packs linked node_modules packages by dereferencing their package contents', async () => {
         const workspaceDir = createTempDir();
         const appDir = path.join(workspaceDir, 'app');
@@ -763,7 +816,7 @@ describe('wapk helpers', () => {
         }
     });
 
-    test('repairs stale local file dependencies before installing extracted runtime deps', async () => {
+    test('does not install extracted dependencies automatically when node_modules are missing from the archive', async () => {
         const workspaceDir = createTempDir();
         const packageRoot = path.join(workspaceDir, 'workspace-root');
         const appDir = path.join(packageRoot, 'examples', 'repair-app');
@@ -826,8 +879,8 @@ describe('wapk helpers', () => {
                 dependencySearchRoots: [packageRoot],
             });
 
-            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules', 'elit', 'package.json'))).toBe(true);
-            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules', 'elit', 'dist', 'server.mjs'))).toBe(true);
+            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules'))).toBe(false);
+            expect(fs.existsSync(path.join(prepared.workDir, 'node_modules', 'elit', 'package.json'))).toBe(false);
 
             fs.rmSync(prepared.workDir, { recursive: true, force: true });
         } finally {

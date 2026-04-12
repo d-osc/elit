@@ -79,9 +79,9 @@ export default {
     name: 'elit-full-db-example',
     version: '1.0.0',
     runtime: 'node',
-    entry: './dev-dist/index.js',
+    entry: './dist/index.js',
     script: {
-      start: 'node ./dev-dist/index.js',
+      start: 'node ./dist/index.js',
     },
     env: {
       APP_NAME: 'Elit Full DB Example',
