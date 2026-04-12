@@ -1048,6 +1048,7 @@ export const Footer = () =>
         p(
           t('footer.license'), ' | ',
           a({ href: 'https://github.com/d-osc/elit' }, 'GitHub'),
+          ' | ', a({ href: 'pdpa.html' }, currentLang.value === 'th' ? 'PDPA / ความเป็นส่วนตัว' : 'PDPA / Privacy'),
           ' | ', t('footer.builtWith'), ' v3.5.7 | ',
           'Created by ', a({ href: 'https://github.com/n-devs', target: '_blank' }, 'n-devs')
         )

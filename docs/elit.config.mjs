@@ -10,7 +10,7 @@ export default {
     host: 'localhost',
     root: __dirname,
     index: './index.html',
-    basePath: '/elit',
+    basePath: '',
     open: true,
     logging: true,
     // Global proxy configuration - uncomment to use
@@ -109,7 +109,7 @@ export default {
     format: 'esm',
     target: 'es2020',
     platform: 'browser',
-    basePath: '/elit',
+    basePath: '',
     treeshake: true,
     logging: true,
     copy: [
@@ -135,6 +135,22 @@ export default {
       {
         from: 'favicon.svg',
         to: 'favicon.svg'
+      },
+      {
+        from: 'robots.txt',
+        to: 'robots.txt'
+      },
+      {
+        from: 'sitemap.xml',
+        to: 'sitemap.xml'
+      },
+      {
+        from: 'og-image.svg',
+        to: 'og-image.svg'
+      },
+      {
+        from: 'pdpa.html',
+        to: 'pdpa.html'
       }
     ]
   },
