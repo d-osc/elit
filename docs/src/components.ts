@@ -10,7 +10,7 @@ import { currentTheme, toggleTheme } from './theme';
 // Header Component
 export const Logo = (router: Router) =>
   routerLink(router, { to: '/', className: 'logo' },
-    img({ className: 'logo-icon', src: '/elit/favicon.svg', alt: 'Elit Logo' }),
+    img({ className: 'logo-icon', src: '/favicon.svg', alt: 'Elit Logo' }),
     span('Elit')
   );
 
