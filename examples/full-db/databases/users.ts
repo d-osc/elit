@@ -32,5 +32,22 @@ export const users = [
             stars: 0
         },
         createdAt: "2026-01-20T19:43:21.979Z"
+    },
+    {
+        id: "user_1775926039446",
+        name: "Tester1",
+        email: "tester1@mail.com",
+        password: "57928887870297efc5a4a6bdec9ffbbc.472e4fdb47aac2e22ec7695ddd27d616e0d8573423df3fc651d32330e22c63cd0851e926f3b4cb95da7628c9e3c9670bd8f390f302c493a6da0f1c9d9bfbe2da",
+        bio: "New user",
+        location: "",
+        website: "",
+        avatar: "",
+        stats: {
+            projects: 0,
+            followers: 0,
+            following: 0,
+            stars: 0
+        },
+        createdAt: "2026-04-11T16:47:19.446Z"
     }
 ];

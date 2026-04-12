@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
 Write-Host '[mobile-test] init'
-bun ../../src/cli.ts mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web
+bun run mobile:init
 
 Write-Host '[mobile-test] sync'
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web
+bun run mobile:sync
 
 Write-Host '[mobile-test] doctor --json'
-$doctorOutput = bun ../../src/cli.ts mobile doctor --cwd . --json
+$doctorOutput = bun run mobile:doctor
 Write-Output $doctorOutput
 
 $assetPath = Join-Path $PWD 'android\app\src\main\assets\public\index.html'

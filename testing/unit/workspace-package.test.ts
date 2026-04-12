@@ -1,0 +1,51 @@
+/// <reference path="../../src/test-globals.d.ts" />
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { resolveWorkspacePackageImport } from '../../src/workspace-package';
+
+describe('workspace package self-reference resolution', () => {
+    const tempDirs: string[] = [];
+
+    function createTempWorkspace(): string {
+        const tempDir = mkdtempSync(join(tmpdir(), 'elit-workspace-'));
+        tempDirs.push(tempDir);
+        return tempDir;
+    }
+
+    afterEach(() => {
+        while (tempDirs.length > 0) {
+            rmSync(tempDirs.pop()!, { recursive: true, force: true });
+        }
+    });
+
+    it('prefers source files when running inside the elit workspace', () => {
+        const workspaceRoot = createTempWorkspace();
+        const appDir = join(workspaceRoot, 'examples', 'app');
+
+        mkdirSync(join(workspaceRoot, 'src'), { recursive: true });
+        mkdirSync(join(workspaceRoot, 'dist'), { recursive: true });
+        mkdirSync(appDir, { recursive: true });
+
+        writeFileSync(join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'elit' }, null, 2));
+        writeFileSync(join(workspaceRoot, 'src', 'index.ts'), 'export const sourceValue = true;\n');
+        writeFileSync(join(workspaceRoot, 'dist', 'index.mjs'), 'export const distValue = true;\n');
+
+        expect(resolveWorkspacePackageImport('elit', appDir)).toBe(join(workspaceRoot, 'src', 'index.ts'));
+    });
+
+    it('falls back to dist artifacts when src is unavailable', () => {
+        const workspaceRoot = createTempWorkspace();
+        const appDir = join(workspaceRoot, 'packages', 'example-app');
+
+        mkdirSync(join(workspaceRoot, 'dist'), { recursive: true });
+        mkdirSync(appDir, { recursive: true });
+
+        writeFileSync(join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'elit' }, null, 2));
+        writeFileSync(join(workspaceRoot, 'dist', 'router.cjs'), 'module.exports = {};\n');
+
+        expect(resolveWorkspacePackageImport('elit/router', appDir)).toBe(join(workspaceRoot, 'dist', 'router.cjs'));
+    });
+});

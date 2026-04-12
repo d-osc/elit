@@ -38,6 +38,8 @@ export default defineConfig({
         host: 'localhost',
         open: false,
         logging: true,
+        outDir: './dev-dist',
+        outFile: 'index.js',
         root: '../..',
         basePath: '',
         index: './examples/universal-app-example/public/index.html',

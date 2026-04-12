@@ -40,11 +40,11 @@ chmod +x ./test-mobile.sh
 ## Manual commands
 
 ```bash
-bun ../../src/cli.ts mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web --icon ./icon.png --permission android.permission.ACCESS_NETWORK_STATE
-bun ../../src/cli.ts mobile doctor --cwd . --json
-bun ../../src/cli.ts mobile devices ios --cwd . --json
-bun ../../src/cli.ts mobile run ios --cwd . --target booted
+npx elit mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web
+npx elit mobile sync --cwd . --web-dir web --icon ./icon.png --permission android.permission.ACCESS_NETWORK_STATE
+npx elit mobile doctor --cwd . --json
+npx elit mobile devices ios --cwd . --json
+npx elit mobile run ios --cwd . --target booted
 ```
 
 When `mobile.native.entry` is present, sync writes generated files to:

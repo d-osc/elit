@@ -10,6 +10,6 @@ export const client = html(
   ),
   body(
     div({ id: 'app' }),
-    script({ type: 'module', src: '/src/main.js' })
+    script({ type: 'module', src: '/main.js' })
   )
 );

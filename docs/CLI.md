@@ -7,6 +7,8 @@ Reference for the current `elit` command-line interface.
 ```bash
 elit dev
 elit build --entry ./src/main.ts --out-dir dist
+elit build-dev
+elit build-preview
 elit --version
 elit preview
 elit test
@@ -57,6 +59,40 @@ Common flags:
 - `--no-minify`
 - `--sourcemap`
 - `--silent`
+
+`build` compiles the client output. Use the standalone build commands when you also want a runnable Node server bundle.
+
+### `elit build-dev`
+
+Builds production output and emits a standalone development server bundle.
+
+Common flags:
+
+- `--entry`, `-e`
+- `--out-dir`, `-o`
+- `--format`, `-f`
+- `--dev-out-file <file>`
+- `--no-minify`
+- `--sourcemap`
+- `--silent`
+
+`build-dev` reuses the normal `build` pipeline, then emits a standalone dev server bundle. The server bundle uses `dev.outDir` or defaults to `dev-dist`, and defaults to `index.js` so you can run it directly with `node index.js`.
+
+### `elit build-preview`
+
+Builds production output and emits a standalone preview server bundle.
+
+Common flags:
+
+- `--entry`, `-e`
+- `--out-dir`, `-o`
+- `--format`, `-f`
+- `--preview-out-file <file>`
+- `--no-minify`
+- `--sourcemap`
+- `--silent`
+
+`build-preview` reuses the normal `build` pipeline, then emits a standalone preview server bundle into the preview output root. The preview server defaults to `index.js`, so you can run it directly with `node index.js` after the build completes.
 
 ### `elit preview`
 

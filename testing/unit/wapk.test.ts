@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runPreparedWapkApp, runWapkCommand } from '../../src/wapk-cli';
+import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runPreparedWapkApp, runWapkCommand, shouldUseShellExecution } from '../../src/wapk-cli';
 
 function createTempDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'elit-wapk-'));
@@ -200,6 +200,13 @@ function createGoogleDriveOnlineFetchMock(
 }
 
 describe('wapk helpers', () => {
+    it('uses shell execution for Windows command scripts only', () => {
+        expect(shouldUseShellExecution('C:/tools/npm.cmd', 'win32')).toBe(true);
+        expect(shouldUseShellExecution('C:/tools/tsx.CMD', 'win32')).toBe(true);
+        expect(shouldUseShellExecution('C:/tools/node.exe', 'win32')).toBe(false);
+        expect(shouldUseShellExecution('/usr/bin/npm', 'linux')).toBe(false);
+    });
+
     it('packs a directory and infers runtime and entry from package.json scripts', async () => {
         const dir = createTempDir();
 
@@ -296,6 +303,62 @@ describe('wapk helpers', () => {
         }
     });
 
+    it('packs nested standalone package dependencies even when root node_modules is ignored', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'dev-dist'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'node_modules', 'example-runtime'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'node_modules', '@example', 'helper-runtime'), { recursive: true });
+            fs.writeFileSync(path.join(dir, '.wapkignore'), 'node_modules\n');
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'nested-runtime-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: './dev-dist/index.js',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'dev-dist', 'index.js'), 'require("example-runtime");\n');
+            fs.writeFileSync(path.join(dir, 'dev-dist', 'package.json'), JSON.stringify({
+                private: true,
+                main: 'index.js',
+                dependencies: {
+                    'example-runtime': '1.0.0',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'node_modules', 'example-runtime', 'package.json'), JSON.stringify({
+                name: 'example-runtime',
+                version: '1.0.0',
+                main: 'index.js',
+                dependencies: {
+                    '@example/helper-runtime': '1.0.0',
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'node_modules', 'example-runtime', 'index.js'), 'module.exports = 1;\n');
+            fs.writeFileSync(path.join(dir, 'node_modules', '@example', 'helper-runtime', 'package.json'), JSON.stringify({
+                name: '@example/helper-runtime',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'node_modules', '@example', 'helper-runtime', 'index.js'), 'module.exports = 2;\n');
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'nested-runtime-app.wapk'),
+            });
+            const archive = readWapkArchive(archivePath);
+
+            expect(archive.files.some((file) => file.path === 'dev-dist/package.json')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'dev-dist/node_modules/example-runtime/package.json')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'dev-dist/node_modules/example-runtime/index.js')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'dev-dist/node_modules/@example/helper-runtime/index.js')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'node_modules/example-runtime/index.js')).toBe(false);
+            expect(archive.files.some((file) => file.path === 'node_modules/@example/helper-runtime/index.js')).toBe(false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it('packs linked node_modules packages by dereferencing their package contents', async () => {
         const workspaceDir = createTempDir();
         const appDir = path.join(workspaceDir, 'app');
@@ -354,6 +417,28 @@ describe('wapk helpers', () => {
             expect(archive.files.some((file) => file.path === 'node_modules/dep-lib/index.js')).toBe(true);
         } finally {
             fs.rmSync(workspaceDir, { recursive: true, force: true });
+        }
+    });
+
+    it('does not include the output archive itself when packing inside the source directory', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'self-pack-app',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'index.js'), 'console.log("self-pack");\n');
+
+            const archivePath = await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'self-pack-app.wapk'),
+            });
+            const archive = readWapkArchive(archivePath);
+
+            expect(archive.files.some((file) => file.path === 'self-pack-app.wapk')).toBe(false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
         }
     });
 
@@ -780,7 +865,7 @@ describe('wapk helpers', () => {
             const startedFile = archive.files.find((file) => file.path === 'started.txt');
 
             expect(exitCode).toBe(0);
-            expect(startedFile?.content.toString('utf8')).toBe('preview-ok');
+            expect(startedFile?.content.toString('utf8').trim()).toBe('preview-ok');
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -831,7 +916,7 @@ describe('wapk helpers', () => {
             const startedFile = archive.files.find((file) => file.path === 'started.txt');
 
             expect(exitCode).toBe(0);
-            expect(startedFile?.content.toString('utf8')).toBe('preview-ok');
+            expect(startedFile?.content.toString('utf8').trim()).toBe('preview-ok');
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }

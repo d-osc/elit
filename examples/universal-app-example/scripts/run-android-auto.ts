@@ -1,4 +1,8 @@
+/// <reference types="node" />
+
 import { spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 type AndroidDevice = {
     id: string;
@@ -9,9 +13,14 @@ type AndroidDevicesReport = {
     devices?: AndroidDevice[];
 };
 
-function runBun(args: string[], captureOutput = false): { status: number | null; stdout: string; stderr: string } {
-    const result = spawnSync('bun', args, {
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const projectDir = resolve(scriptDir, '..');
+const elitCliPath = resolve(projectDir, 'node_modules', 'elit', 'dist', 'cli.cjs');
+
+function runElit(args: string[], captureOutput = false): { status: number | null; stdout: string; stderr: string } {
+    const result = spawnSync(process.execPath, [elitCliPath, ...args], {
         encoding: 'utf8',
+        cwd: projectDir,
         stdio: captureOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     });
 
@@ -22,7 +31,7 @@ function runBun(args: string[], captureOutput = false): { status: number | null;
     };
 }
 
-const devicesResult = runBun(['../../src/cli.ts', 'mobile', 'devices', 'android', '--cwd', '.', '--json'], true);
+const devicesResult = runElit(['mobile', 'devices', 'android', '--cwd', '.', '--json'], true);
 if (devicesResult.status !== 0) {
     throw new Error(devicesResult.stderr.trim() || 'Failed to read Android devices.');
 }
@@ -39,7 +48,7 @@ if (connectedDevices.length === 0) {
 const preferredDevice = connectedDevices.find((device) => device.id.startsWith('emulator-')) ?? connectedDevices[0];
 console.log(`[universal-mobile-run] Selected target ${preferredDevice.id}`);
 
-const runResult = runBun(['../../src/cli.ts', 'mobile', 'run', 'android', '--cwd', '.', '--target', preferredDevice.id]);
+const runResult = runElit(['mobile', 'run', 'android', '--cwd', '.', '--target', preferredDevice.id]);
 if (runResult.status && runResult.status !== 0) {
     process.exit(runResult.status);
 }

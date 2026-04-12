@@ -2,13 +2,13 @@
 set -euo pipefail
 
 echo "[android-native-test] init"
-bun ../../src/cli.ts mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web
+bun run mobile:init
 
 echo "[android-native-test] sync"
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web
+bun run mobile:sync
 
 echo "[android-native-test] doctor --json (informational)"
-bun ../../src/cli.ts mobile doctor --cwd . --json || true
+bun run mobile:doctor || true
 
 GENERATED_SCREEN_PATH="android/app/src/main/java/com/elit/androidnativeexample/ElitGeneratedScreen.kt"
 if [[ ! -f "$GENERATED_SCREEN_PATH" ]]; then
@@ -50,6 +50,6 @@ if [[ ! -f "$ASSET_PATH" ]]; then
 fi
 
 echo "[android-native-test] build android"
-bun ../../src/cli.ts mobile build android --cwd .
+bun run mobile:build:android
 
 echo "[android-native-test] PASS: scaffold, generation, and Android build completed"

@@ -3,17 +3,19 @@
  * Main CLI for Elit
  */
 
-import { ELIT_CONFIG_FILES, loadConfig, mergeConfig, loadEnv } from './config';
+import { ELIT_CONFIG_FILES, loadConfig, mergeConfig, loadEnv, resolveConfigPath } from './config';
 import { createDevServer } from './server';
 import { build } from './build';
 import { runDesktopCommand } from './desktop-cli';
 import { runMobileCommand } from './mobile-cli';
 import { runNativeCommand } from './native-cli';
 import { runPmCommand } from './pm-cli';
+import { buildStandaloneDevServer } from './dev-build';
+import { buildStandalonePreviewServer } from './preview-build';
 import { runWapkCommand } from './wapk-cli';
-import type { DevServerOptions, BuildOptions, PreviewOptions } from './types';
+import type { DevServerOptions, BuildOptions, PreviewOptions, BuildResult } from './types';
 
-const COMMANDS = ['dev', 'build', 'preview', 'test', 'desktop', 'mobile', 'native', 'pm', 'wapk', 'help', 'version'] as const;
+const COMMANDS = ['dev', 'build', 'build-dev', 'build-preview', 'preview', 'test', 'desktop', 'mobile', 'native', 'pm', 'wapk', 'help', 'version'] as const;
 type Command = typeof COMMANDS[number];
 const VERSION_FLAGS = new Set(['--version', '-v']);
 
@@ -34,12 +36,82 @@ function setupShutdownHandlers(closeFunc: () => Promise<void>): void {
 /**
  * Helper: Execute build with error handling (eliminates duplication in runBuild)
  */
-async function executeBuild(options: BuildOptions): Promise<void> {
+async function executeBuild(options: BuildOptions): Promise<BuildResult> {
     try {
-        await build(options);
+    return await build(options);
     } catch (error) {
         process.exit(1);
+    throw error;
     }
+}
+
+function shouldEmitStandalonePreview(cliOptions: Partial<BuildOptions>, buildOptions: BuildOptions, previewConfig: PreviewOptions | null): boolean {
+  return Boolean(buildOptions.standalonePreview ?? cliOptions.standalonePreview ?? previewConfig?.standalone);
+}
+
+function shouldEmitStandaloneDev(cliOptions: Partial<BuildOptions>, buildOptions: BuildOptions, devConfig: DevServerOptions | null): boolean {
+  return Boolean(buildOptions.standaloneDev ?? cliOptions.standaloneDev ?? devConfig?.standalone);
+}
+
+function withStandaloneBuildFlag(args: string[], standaloneFlag: '--standalone-dev' | '--standalone-preview'): string[] {
+  return args.includes(standaloneFlag) ? args : [standaloneFlag, ...args];
+}
+
+async function emitStandalonePreviewIfNeeded(params: {
+  cliOptions: Partial<BuildOptions>;
+  buildOptions: BuildOptions;
+  allBuilds: BuildOptions[];
+  configPath: string | null;
+  cwd: string;
+  previewConfig: PreviewOptions | null;
+}): Promise<void> {
+  if (!shouldEmitStandalonePreview(params.cliOptions, params.buildOptions, params.previewConfig)) {
+    return;
+  }
+
+  await buildStandalonePreviewServer({
+    allBuilds: params.allBuilds,
+    buildConfig: params.buildOptions,
+    configPath: params.configPath,
+    cwd: params.cwd,
+    logging: params.buildOptions.logging,
+    outFile: params.cliOptions.standalonePreviewOutFile,
+    previewConfig: params.previewConfig,
+  });
+}
+
+async function emitStandaloneDevIfNeeded(params: {
+  allBuilds: BuildOptions[];
+  cliOptions: Partial<BuildOptions>;
+  buildOptions: BuildOptions;
+  configPath: string | null;
+  cwd: string;
+  devConfig: DevServerOptions | null;
+}): Promise<void> {
+  if (!shouldEmitStandaloneDev(params.cliOptions, params.buildOptions, params.devConfig)) {
+    return;
+  }
+
+  const mode = process.env.MODE || 'development';
+  const env = loadEnv(mode);
+  const devOptions: DevServerOptions = {
+    ...(params.devConfig || {}),
+    env: { ...(params.devConfig?.env || {}), ...env },
+  };
+
+  if (!devOptions.root && (!devOptions.clients || devOptions.clients.length === 0)) {
+    devOptions.root = params.cwd;
+  }
+
+  await buildStandaloneDevServer({
+    allBuilds: params.allBuilds,
+    buildConfig: params.buildOptions,
+    configPath: params.configPath,
+    cwd: params.cwd,
+    devConfig: devOptions,
+    logging: params.buildOptions.logging,
+    outFile: params.cliOptions.standaloneDevOutFile || params.buildOptions.standaloneDevOutFile,
+  });
 }
 
 /**
@@ -100,6 +172,12 @@ async function main() {
         case 'build':
             await runBuild(args.slice(1));
             break;
+      case 'build-dev':
+        await runBuildDev(args.slice(1));
+        break;
+      case 'build-preview':
+        await runBuildPreview(args.slice(1));
+        break;
         case 'preview':
             await runPreview(args.slice(1));
             break;
@@ -189,6 +267,8 @@ export async function runDev(args: string[]) {
 export async function runBuild(args: string[]) {
     const cliOptions = parseBuildArgs(args);
     const config = await loadConfig();
+  const configPath = resolveConfigPath();
+  const cwd = process.cwd();
 
     // Load environment variables
     const mode = process.env.MODE || 'production';
@@ -206,6 +286,22 @@ export async function runBuild(args: string[]) {
             validateEntry(options.entry);
 
             await executeBuild(options);
+          await emitStandalonePreviewIfNeeded({
+            cliOptions,
+            buildOptions: options,
+            allBuilds: [options],
+            configPath,
+            cwd,
+            previewConfig: config?.preview || null,
+          });
+          await emitStandaloneDevIfNeeded({
+            allBuilds: [options],
+            cliOptions,
+            buildOptions: options,
+            configPath,
+            cwd,
+            devConfig: config?.dev || null,
+          });
             process.exit(0);
         } else {
             // Run all builds from config
@@ -231,6 +327,23 @@ export async function runBuild(args: string[]) {
                 }
             }
 
+            await emitStandalonePreviewIfNeeded({
+              cliOptions,
+              buildOptions: builds[0],
+              allBuilds: builds,
+              configPath,
+              cwd,
+              previewConfig: config?.preview || null,
+            });
+            await emitStandaloneDevIfNeeded({
+              allBuilds: builds,
+              cliOptions,
+              buildOptions: builds[0],
+              configPath,
+              cwd,
+              devConfig: config?.dev || null,
+            });
+
             console.log(`\n✓ All ${builds.length} builds completed successfully`);
             process.exit(0);
         }
@@ -242,10 +355,34 @@ export async function runBuild(args: string[]) {
         validateEntry(options.entry);
 
         await executeBuild(options);
+        await emitStandalonePreviewIfNeeded({
+          cliOptions,
+          buildOptions: options,
+          allBuilds: [options],
+          configPath,
+          cwd,
+          previewConfig: config?.preview || null,
+        });
+        await emitStandaloneDevIfNeeded({
+          allBuilds: [options],
+          cliOptions,
+          buildOptions: options,
+          configPath,
+          cwd,
+          devConfig: config?.dev || null,
+        });
         console.log('\n✓ Build completed successfully');
         process.exit(0);
     }
 }
+
+    export async function runBuildDev(args: string[]) {
+      await runBuild(withStandaloneBuildFlag(args, '--standalone-dev'));
+    }
+
+    export async function runBuildPreview(args: string[]) {
+      await runBuild(withStandaloneBuildFlag(args, '--standalone-preview'));
+    }
 
 export async function runPreview(args: string[]) {
     const cliOptions = parsePreviewArgs(args);
@@ -537,7 +674,7 @@ function parseDevArgs(args: string[]): Partial<DevServerOptions> {
     return parseArgs(args, handlers, options);
 }
 
-function parseBuildArgs(args: string[]): Partial<BuildOptions> {
+export function parseBuildArgs(args: string[]): Partial<BuildOptions> {
     const options: Partial<BuildOptions> = {};
 
     const handlers: Record<string, ArgHandler<Partial<BuildOptions>>> = {
@@ -549,10 +686,22 @@ function parseBuildArgs(args: string[]): Partial<BuildOptions> {
         '--sourcemap': (opts) => { opts.sourcemap = true; },
         '-f': (opts, value, index) => { opts.format = value as BuildOptions['format']; index.current++; },
         '--format': (opts, value, index) => { opts.format = value as BuildOptions['format']; index.current++; },
+        '--standalone-dev': (opts) => { opts.standaloneDev = true; },
+        '--dev-out-file': (opts, value, index) => { opts.standaloneDevOutFile = value; index.current++; },
+        '--standalone-preview': (opts) => { opts.standalonePreview = true; },
+        '--preview-out-file': (opts, value, index) => { opts.standalonePreviewOutFile = value; index.current++; },
         '--silent': (opts) => { opts.logging = false; },
     };
 
     return parseArgs(args, handlers, options);
+}
+
+export function parseBuildDevArgs(args: string[]): Partial<BuildOptions> {
+  return parseBuildArgs(withStandaloneBuildFlag(args, '--standalone-dev'));
+}
+
+export function parseBuildPreviewArgs(args: string[]): Partial<BuildOptions> {
+  return parseBuildArgs(withStandaloneBuildFlag(args, '--standalone-preview'));
 }
 
 function parsePreviewArgs(args: string[]): Partial<{ port: number; host: string; root: string; basePath: string; open: boolean; logging: boolean }> {
@@ -588,6 +737,8 @@ Usage:
 Commands:
   dev       Start development server
   build     Build for production
+  build-dev Build production output and emit a standalone development server bundle
+  build-preview Build production output and emit a standalone preview server bundle
   preview   Preview production build
   test      Run tests
   desktop   Run or build a native desktop app
@@ -615,6 +766,12 @@ Build Options:
   --no-minify            Disable minification
   --sourcemap            Generate sourcemap
   --silent               Disable logging
+
+Standalone Build Commands:
+  elit build-dev         Build production output and emit a standalone development server bundle
+  elit build-dev --dev-out-file server.js
+  elit build-preview     Build production output and emit a standalone preview server bundle
+  elit build-preview --preview-out-file server.js
 
 Desktop Options:
   elit desktop [entry]                      Run an Elit desktop entry using the resolved desktop mode
@@ -775,6 +932,8 @@ Examples:
   elit dev
   elit dev --port 8080
   elit build --entry src/app.ts
+  elit build-dev
+  elit build-preview
   elit preview
   elit preview --port 5000
   elit native generate android src/native-screen.ts --name HomeScreen
@@ -978,12 +1137,26 @@ Config file example (elit.config.ts):
 }
 
 function printVersion() {
-    const pkg = require('../package.json');
-    console.log(`elit v${pkg.version}`);
+  const fs = require('fs');
+  const path = require('path');
+  const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { version?: string };
+  console.log(`elit v${packageJson.version ?? 'unknown'}`);
+}
+
+function isDirectCliExecution(): boolean {
+  if (typeof require !== 'undefined' && typeof module !== 'undefined') {
+    return require.main === module;
+  }
+
+  const entry = process.argv[1]?.replace(/\\/g, '/');
+  return Boolean(entry && /\/cli(?:\.(?:[cm]?js|[cm]?ts))?$/.test(entry));
 }
 
 // Run CLI
-main().catch((error) => {
+if (isDirectCliExecution()) {
+  main().catch((error) => {
     console.error('Fatal error:', error);
     process.exit(1);
-});
+  });
+}

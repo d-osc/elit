@@ -5,6 +5,8 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ELIT_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
+CLI_PATH="$ELIT_ROOT/dist/cli.cjs"
 WAPK_FILE="$PROJECT_DIR/example-app.wapk"
 PORT="${PORT:-3333}"
 
@@ -25,7 +27,7 @@ trap cleanup EXIT
 
 # Step 1: Pack the project
 echo "[1/4] Packing project into WAPK..."
-bun run ../../../src/cli.ts wapk pack "$PROJECT_DIR" --output-path "$WAPK_FILE"
+node "$CLI_PATH" wapk pack "$PROJECT_DIR" --output-path "$WAPK_FILE"
 if [ -f "$WAPK_FILE" ]; then
     SIZE=$(stat -f%z "$WAPK_FILE" 2>/dev/null || stat -c%s "$WAPK_FILE" 2>/dev/null || echo "unknown")
     echo "✓ WAPK packed: $WAPK_FILE ($SIZE bytes)"
@@ -37,7 +39,7 @@ echo ""
 
 # Step 2: Inspect archive
 echo "[2/4] Inspecting WAPK archive..."
-bun run ../../../src/cli.ts wapk inspect "$WAPK_FILE"
+node "$CLI_PATH" wapk inspect "$WAPK_FILE"
 echo ""
 
 # Step 3: Run with polling sync (default)
@@ -46,7 +48,7 @@ timeout 8s bash -c "
     cd '$PROJECT_DIR'
     
     # Run in background
-    bun run ../../../src/cli.ts wapk run '$WAPK_FILE' &
+    node '$CLI_PATH' wapk run '$WAPK_FILE' &
     PID=\$!
     
     # Give server time to start
@@ -90,7 +92,7 @@ fi
 # Check WAPK was updated with new files
 echo ""
 echo "Checking WAPK archive contents after sync..."
-bun run ../../../src/cli.ts wapk inspect "$WAPK_FILE" 2>/dev/null | grep -E "(wapk-runtime.log|marker-)" || echo "⚠ Runtime files may not be in archive yet"
+node "$CLI_PATH" wapk inspect "$WAPK_FILE" 2>/dev/null | grep -E "(wapk-runtime.log|marker-)" || echo "⚠ Runtime files may not be in archive yet"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════════╗"

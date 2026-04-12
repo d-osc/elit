@@ -4,14 +4,14 @@
   "private": true,
   "description": "Native mobile example for elit mobile workflow",
   "scripts": {
-    "mobile:init": "bun ../../src/cli.ts mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web",
-    "mobile:sync": "bun ../../src/cli.ts mobile sync --cwd . --web-dir web",
-    "mobile:doctor": "bun ../../src/cli.ts mobile doctor --cwd . --json",
+    "mobile:init": "elit mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web",
+    "mobile:sync": "elit mobile sync --cwd . --web-dir web",
+    "mobile:doctor": "elit mobile doctor --cwd . --json",
     "mobile:test:win": "powershell -ExecutionPolicy Bypass -File ./test-mobile.ps1",
-    "mobile:run:android": "bun ../../src/cli.ts mobile run android --cwd .",
-    "mobile:run:ios": "bun ../../src/cli.ts mobile run ios --cwd .",
-    "mobile:build:android": "bun ../../src/cli.ts mobile build android --cwd .",
-    "mobile:build:ios": "bun ../../src/cli.ts mobile build ios --cwd ."
+    "mobile:run:android": "elit mobile run android --cwd .",
+    "mobile:run:ios": "elit mobile run ios --cwd .",
+    "mobile:build:android": "elit mobile build android --cwd .",
+    "mobile:build:ios": "elit mobile build ios --cwd ."
   },
   "devDependencies": {
     "elit": "file:../.."

@@ -10,6 +10,7 @@ import { loadConfig, type DesktopConfig, type DesktopMode } from './config';
 import { renderMaterializedNativeTree, type NativeTree } from './native';
 import { loadNativeEntryResult } from './native-cli';
 import type { DesktopRenderOptions } from './render-context';
+import { resolveWorkspacePackageImport } from './workspace-package';
 
 import {
     WAPK_RUNTIMES,
@@ -135,45 +136,6 @@ const PLATFORMS = {
     'mac-arm': 'aarch64-apple-darwin',
 } as const;
 const TS_LIKE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.jsx']);
-
-function findWorkspacePackageRoot(startDir: string, packageName: string): string | undefined {
-    let currentDir = resolve(startDir);
-
-    while (true) {
-        const packageJsonPath = join(currentDir, 'package.json');
-        if (existsSync(packageJsonPath)) {
-            try {
-                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
-                if (packageJson.name === packageName) {
-                    return currentDir;
-                }
-            } catch {
-                // Ignore invalid package metadata while walking upward.
-            }
-        }
-
-        const parentDir = dirname(currentDir);
-        if (parentDir === currentDir) {
-            return undefined;
-        }
-        currentDir = parentDir;
-    }
-}
-
-function resolveWorkspacePackageImport(specifier: string, startDir: string): string | undefined {
-    if (specifier !== 'elit' && !specifier.startsWith('elit/')) {
-        return undefined;
-    }
-
-    const packageRoot = findWorkspacePackageRoot(startDir, 'elit');
-    if (!packageRoot) {
-        return undefined;
-    }
-
-    const subpath = specifier === 'elit' ? 'index' : specifier.slice('elit/'.length);
-    const candidate = resolve(packageRoot, 'src', `${subpath}.ts`);
-    return existsSync(candidate) ? candidate : undefined;
-}
 
 function toDesktopBootstrapImportPath(fromPath: string, toPath: string): string {
     const importPath = relative(dirname(fromPath), toPath).replace(/\\/g, '/');

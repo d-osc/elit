@@ -3,6 +3,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
+import { Database } from '../../src/database';
 import { save } from '../../src/database';
 import { update } from '../../src/database';
 
@@ -92,6 +94,115 @@ describe('database helpers preserve typed declarations', () => {
             expect((content.match(/export const users: User\[] =/g) || []).length).toBe(1);
             expect(content.includes('export const users: any = users;')).toBe(false);
         } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('executes ES module JavaScript database files without requiring CommonJS packaging', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.writeFileSync(path.join(dir, 'users.js'), [
+                'export const users = [{ id: 1, name: "Ann" }];',
+                'export default users;',
+                '',
+            ].join('\n'), 'utf8');
+
+            const db = new Database({ dir, language: 'js' });
+            const result = await db.execute(`
+                import { users } from '@db/users';
+                console.log(users[0].name);
+            `);
+
+            expect(result.logs).toEqual([
+                {
+                    type: 'log',
+                    args: ['Ann'],
+                },
+            ]);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('strips TypeScript syntax from database modules without a bundled esbuild dependency', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.writeFileSync(path.join(dir, 'users.ts'), [
+                'type User = { id: number; name: string };',
+                '',
+                'export const users: User[] = [{ id: 1, name: "Ann" }];',
+                'export default users;',
+                '',
+            ].join('\n'), 'utf8');
+
+            const db = new Database({ dir, language: 'ts' });
+            const result = await db.execute(`
+                import { users } from '@db/users';
+                console.log(users[0].name);
+            `);
+
+            expect(result.logs).toEqual([
+                {
+                    type: 'log',
+                    args: ['Ann'],
+                },
+            ]);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('preserves underlying @db module execution errors instead of masking them as missing modules', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.writeFileSync(path.join(dir, 'broken.ts'), [
+                'throw new Error("broken module");',
+                '',
+                'export const value = 1;',
+                '',
+            ].join('\n'), 'utf8');
+
+            const db = new Database({ dir, language: 'ts' });
+
+            await expect(db.execute(`
+                import { value } from '@db/broken';
+                console.log(value);
+            `)).rejects.toThrow('broken module');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('loads @db TypeScript modules in fallback mode without leaking caller bindings into the module scope', async () => {
+        const dir = createTempDir();
+        const originalSourceTextModule = (vm as any).SourceTextModule;
+
+        try {
+            fs.writeFileSync(path.join(dir, 'users.ts'), [
+                'export const users = [{ id: 1, name: "Ann" }];',
+                'export default users;',
+                '',
+            ].join('\n'), 'utf8');
+
+            (vm as any).SourceTextModule = undefined;
+
+            const db = new Database({ dir, language: 'ts' });
+            const result = await db.execute(`
+                import { users } from '@db/users';
+                console.log(users[0].name);
+            `);
+
+            expect(result.logs).toEqual([
+                {
+                    type: 'log',
+                    args: ['Ann'],
+                },
+            ]);
+        } finally {
+            (vm as any).SourceTextModule = originalSourceTextModule;
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });

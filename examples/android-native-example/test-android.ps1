@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
 Write-Host '[android-native-test] init'
-bun ../../src/cli.ts mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web
+bun run mobile:init
 
 Write-Host '[android-native-test] sync'
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web
+bun run mobile:sync
 
 Write-Host '[android-native-test] doctor --json (informational)'
-$doctorOutput = bun ../../src/cli.ts mobile doctor --cwd . --json
+$doctorOutput = bun run mobile:doctor
 Write-Output $doctorOutput
 if ($LASTEXITCODE -ne 0) {
     Write-Warning '[android-native-test] mobile doctor reported missing checks; continuing to generation/build validation.'
@@ -45,6 +45,6 @@ if (-not (Test-Path $assetPath)) {
 }
 
 Write-Host '[android-native-test] build android'
-bun ../../src/cli.ts mobile build android --cwd .
+bun run mobile:build:android
 
 Write-Host '[android-native-test] PASS: scaffold, generation, and Android build completed'

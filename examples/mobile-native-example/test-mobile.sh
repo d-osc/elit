@@ -2,13 +2,13 @@
 set -euo pipefail
 
 echo "[mobile-test] init"
-bun ../../src/cli.ts mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir web
+bun run mobile:init
 
 echo "[mobile-test] sync"
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web
+bun run mobile:sync
 
 echo "[mobile-test] doctor --json"
-bun ../../src/cli.ts mobile doctor --cwd . --json || true
+bun run mobile:doctor || true
 
 ASSET_PATH="android/app/src/main/assets/public/index.html"
 if [[ ! -f "$ASSET_PATH" ]]; then

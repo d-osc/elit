@@ -43,12 +43,12 @@ bun run mobile:test:sh
 ## Manual commands
 
 ```bash
-bun ../../src/cli.ts mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web
-bun ../../src/cli.ts mobile sync --cwd . --web-dir web
-bun ../../src/cli.ts mobile doctor --cwd . --json
-bun ../../src/cli.ts mobile devices android --cwd . --json
-bun ../../src/cli.ts mobile build android --cwd .
-bun ../../src/cli.ts mobile run android --cwd . --target <device-id>
+npx elit mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web
+npx elit mobile sync --cwd . --web-dir web
+npx elit mobile doctor --cwd . --json
+npx elit mobile devices android --cwd . --json
+npx elit mobile build android --cwd .
+npx elit mobile run android --cwd . --target <device-id>
 bun ./scripts/run-android-auto.ts
 ```
 

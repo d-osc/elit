@@ -7,6 +7,8 @@ export default {
     host: 'localhost',
     open: true,
     logging: true,
+    outDir: './dev-dist',
+    outFile: 'index.js',
     clients: [{
       root: '.',
       basePath: '',
@@ -49,7 +51,7 @@ export default {
     port: 3000,
     host: 'localhost',
     open: false,
-    logging: true,
+    logging: false,
      clients: [{
       root: '.',
       basePath: '',
@@ -77,10 +79,10 @@ export default {
     name: 'elit-full-db-example',
     version: '1.0.0',
     runtime: 'node',
+    entry: './dev-dist/index.js',
     script: {
-      start: 'elit preview',
+      start: 'node ./dev-dist/index.js',
     },
-    port: 3333,
     env: {
       APP_NAME: 'Elit Full DB Example',
     },

@@ -8,7 +8,7 @@ param(
 
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ElitRoot = "$ProjectDir\..\.."
-$CliPath = "$ElitRoot\src\cli.ts"
+$CliPath = Join-Path $ElitRoot 'dist\cli.cjs'
 $WapkFile = ""
 $LogFile = Join-Path $ProjectDir "wapk-runtime.log"
 
@@ -37,7 +37,7 @@ Write-Header "WAPK Example App - Live-Sync Test"
 # Step 1: Pack the project
 Write-Host "[1/4] Packing project into WAPK..." -ForegroundColor Green
 Push-Location $ProjectDir
-$PackOutput = & bun run $CliPath wapk pack . 2>&1
+$PackOutput = & node $CliPath wapk pack . 2>&1
 Pop-Location
 Write-Host $PackOutput
 
@@ -56,7 +56,7 @@ Write-Host ""
 
 # Step 2: Inspect archive
 Write-Host "[2/4] Inspecting WAPK archive..." -ForegroundColor Green
-& bun run $CliPath wapk inspect $WapkFile
+& node $CliPath wapk inspect $WapkFile
 Write-Host ""
 
 # Step 3: Run with specified mode
@@ -66,9 +66,9 @@ Write-Host "[3/4] Running with $Mode..." -ForegroundColor Green
 
 
 # Start WAPK app in background
-$Arguments = @("run", $CliPath, "wapk", "run", $WapkFile)
+$Arguments = @($CliPath, "wapk", "run", $WapkFile)
 if ($Watcher) { $Arguments += "--watcher" }
-$AppProcess = Start-Process -FilePath "bun" -ArgumentList $Arguments -PassThru -NoNewWindow
+$AppProcess = Start-Process -FilePath "node" -ArgumentList $Arguments -PassThru -NoNewWindow
 $AppPid = $AppProcess.Id
 
 try {
@@ -113,7 +113,7 @@ try {
     
     # Wait for process
     Start-Sleep -Seconds 1
-    if (!$Process.HasExited) {
+    if (!$AppProcess.HasExited) {
         Write-Host "  -> Process still running, waiting..." -ForegroundColor Yellow
         $AppProcess.WaitForExit(3000)
     }
@@ -147,7 +147,7 @@ if ($MarkerCount -gt 0) {
 # Check WAPK was updated
 Write-Host ""
 Write-Host "Checking WAPK archive final contents..." -ForegroundColor Yellow
-& bun run $CliPath wapk inspect $WapkFile 2>&1 | Select-String -Pattern "wapk-runtime.log|marker-" -ErrorAction SilentlyContinue | ForEach-Object {
+& node $CliPath wapk inspect $WapkFile 2>&1 | Select-String -Pattern "wapk-runtime.log|marker-" -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host "  [OK] Found: $_" -ForegroundColor Green
 }
 
@@ -155,5 +155,5 @@ Write-Header "Test Complete!"
 Write-Host "Next Steps:" -ForegroundColor Cyan
 Write-Host "  • Test watcher mode:  .\test-wapk.ps1 -Watcher" -ForegroundColor Gray
 Write-Host "  • Customize port:     .\test-wapk.ps1 -Port 8080" -ForegroundColor Gray
-Write-Host "  • Manual testing:     bun run $CliPath wapk run example-app.wapk" -ForegroundColor Gray
+Write-Host "  • Manual testing:     node $CliPath wapk run example-app.wapk" -ForegroundColor Gray
 Write-Host ""

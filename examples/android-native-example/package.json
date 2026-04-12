@@ -4,12 +4,12 @@
   "private": true,
   "description": "Android-first native mobile example for elit",
   "scripts": {
-    "mobile:init": "bun ../../src/cli.ts mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web",
-    "mobile:sync": "bun ../../src/cli.ts mobile sync --cwd . --web-dir web",
-    "mobile:doctor": "bun ../../src/cli.ts mobile doctor --cwd . --json",
-    "mobile:devices:android": "bun ../../src/cli.ts mobile devices android --cwd . --json",
-    "mobile:build:android": "bun ../../src/cli.ts mobile build android --cwd .",
-    "mobile:run:android": "bun ../../src/cli.ts mobile run android --cwd .",
+    "mobile:init": "elit mobile init . --app-id com.elit.androidnativeexample --app-name ElitAndroidNativeExample --web-dir web",
+    "mobile:sync": "elit mobile sync --cwd . --web-dir web",
+    "mobile:doctor": "elit mobile doctor --cwd . --json",
+    "mobile:devices:android": "elit mobile devices android --cwd . --json",
+    "mobile:build:android": "elit mobile build android --cwd .",
+    "mobile:run:android": "elit mobile run android --cwd .",
     "mobile:run:android:auto": "bun ./scripts/run-android-auto.ts",
     "mobile:test:win": "powershell -ExecutionPolicy Bypass -File ./test-android.ps1",
     "mobile:test:sh": "bash ./test-android.sh"

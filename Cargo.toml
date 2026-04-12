@@ -1,20 +1,20 @@
 [package]
 name = "elit-desktop"
-version = "0.1.0"
+version = "3.5.6"
 edition = "2021"
-build = "src/desktop/build.rs"
+build = "desktop/build.rs"
 
 [lib]
 name = "elit_desktop"
-path = "src/desktop/lib.rs"
+path = "desktop/lib.rs"
 
 [[bin]]
 name = "elit-desktop"
-path = "src/desktop/main.rs"
+path = "desktop/main.rs"
 
 [[bin]]
 name = "elit-desktop-native"
-path = "src/desktop/native_main.rs"
+path = "desktop/native_main.rs"
 
 [features]
 default = ["runtime-quickjs", "runtime-external"]

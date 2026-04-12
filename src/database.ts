@@ -1,7 +1,7 @@
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
-import { transformSync } from 'esbuild';
+import * as nodeModule from 'node:module';
 
 interface VMOptions {
     language?: 'ts' | 'js';
@@ -9,8 +9,259 @@ interface VMOptions {
     dir?: string;
 }
 
+type VMModuleLoader = 'ts' | 'tsx' | 'js' | 'jsx';
+
+interface VMTranspileOptions {
+    filename?: string;
+    format?: 'cjs';
+    loader?: VMModuleLoader;
+}
+
+interface VMTransformResult {
+    code: string;
+}
+
+type StripTypeScriptTypes = (
+    code: string,
+    options?: {
+        mode?: 'strip' | 'transform';
+        sourceMap?: boolean;
+        sourceUrl?: string;
+    },
+) => string;
+
+const stripTypeScriptTypes = typeof (nodeModule as { stripTypeScriptTypes?: unknown }).stripTypeScriptTypes === 'function'
+    ? ((nodeModule as { stripTypeScriptTypes: StripTypeScriptTypes }).stripTypeScriptTypes)
+    : undefined;
+
+let cachedEsbuildTransformSync:
+    | ((code: string, options: { loader?: VMModuleLoader; format?: 'cjs' }) => { code: string })
+    | null
+    | undefined;
+
+function getEsbuildTransformSync() {
+    if (cachedEsbuildTransformSync !== undefined) {
+        return cachedEsbuildTransformSync;
+    }
+
+    if (typeof nodeModule.createRequire !== 'function') {
+        cachedEsbuildTransformSync = null;
+        return cachedEsbuildTransformSync;
+    }
+
+    try {
+        const requireFromApp = nodeModule.createRequire(path.join(process.cwd(), 'package.json'));
+        const esbuildModule = requireFromApp('esbuild') as {
+            transformSync?: (code: string, options: { loader?: VMModuleLoader; format?: 'cjs' }) => { code: string };
+        };
+
+        cachedEsbuildTransformSync = typeof esbuildModule?.transformSync === 'function'
+            ? esbuildModule.transformSync.bind(esbuildModule)
+            : null;
+    } catch {
+        cachedEsbuildTransformSync = null;
+    }
+
+    return cachedEsbuildTransformSync;
+}
+
+function parseModuleBindings(specifiers: string): Array<{ imported: string; local: string }> {
+    return specifiers
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .map((entry) => {
+            const [imported, local] = entry.split(/\s+as\s+/);
+            return {
+                imported: (imported || '').trim(),
+                local: (local || imported || '').trim(),
+            };
+        })
+        .filter((entry) => entry.imported.length > 0 && entry.local.length > 0);
+}
+
+function formatNamedImportBindings(specifiers: string): string {
+    return parseModuleBindings(specifiers)
+        .map(({ imported, local }) => imported === local ? imported : `${imported}: ${local}`)
+        .join(', ');
+}
+
+function formatNamedExportAssignments(specifiers: string): string {
+    return parseModuleBindings(specifiers)
+        .map(({ imported, local }) => `module.exports.${local} = ${imported};`)
+        .join('\n');
+}
+
+function stripTypescriptSource(source: string, filename: string): string {
+    if (!stripTypeScriptTypes) {
+        throw new Error('TypeScript database execution requires Node.js 22+ or the esbuild package.');
+    }
+
+    const originalEmitWarning = process.emitWarning;
+
+    try {
+        process.emitWarning = (((warning: string | Error, ...args: any[]) => {
+            if (typeof warning === 'string' && warning.includes('stripTypeScriptTypes')) {
+                return;
+            }
+
+            return (originalEmitWarning as any).call(process, warning, ...args);
+        }) as typeof process.emitWarning);
+
+        return stripTypeScriptTypes(source, {
+            mode: 'transform',
+            sourceUrl: filename,
+        });
+    } finally {
+        process.emitWarning = originalEmitWarning;
+    }
+}
+
+function rewriteModuleSyntaxToCommonJs(source: string): string {
+    let code = source;
+    let importCounter = 0;
+    let hasDefaultExport = false;
+    const namedExports = new Set<string>();
+
+    const nextImportBinding = () => `__vm_import_${importCounter++}`;
+    const resolveDefaultImport = (bindingName: string) => `${bindingName} && Object.prototype.hasOwnProperty.call(${bindingName}, "default") ? ${bindingName}.default : ${bindingName}`;
+
+    code = code.replace(
+        /^\s*import\s+([A-Za-z_$][\w$]*)\s*,\s*\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\3\s*;?\s*$/gm,
+        (_match: string, defaultName: string, namespaceName: string, _quote: string, modulePath: string) => {
+            const bindingName = nextImportBinding();
+            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};\nconst ${namespaceName} = ${bindingName};`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*import\s+([A-Za-z_$][\w$]*)\s*,\s*\{([^}]+)\}\s+from\s+(['"])([^'"]+)\3\s*;?\s*$/gm,
+        (_match: string, defaultName: string, namedBindings: string, _quote: string, modulePath: string) => {
+            const bindingName = nextImportBinding();
+            const destructured = formatNamedImportBindings(namedBindings);
+            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};\nconst { ${destructured} } = ${bindingName};`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
+        (_match: string, namespaceName: string, _quote: string, modulePath: string) => `const ${namespaceName} = require(${JSON.stringify(modulePath)});`,
+    );
+
+    code = code.replace(
+        /^\s*import\s+\{([^}]+)\}\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
+        (_match: string, namedBindings: string, _quote: string, modulePath: string) => `const { ${formatNamedImportBindings(namedBindings)} } = require(${JSON.stringify(modulePath)});`,
+    );
+
+    code = code.replace(
+        /^\s*import\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"]+)\2\s*;?\s*$/gm,
+        (_match: string, defaultName: string, _quote: string, modulePath: string) => {
+            const bindingName = nextImportBinding();
+            return `const ${bindingName} = require(${JSON.stringify(modulePath)});\nconst ${defaultName} = ${resolveDefaultImport(bindingName)};`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*import\s+(['"])([^'"]+)\1\s*;?\s*$/gm,
+        (_match: string, _quote: string, modulePath: string) => `require(${JSON.stringify(modulePath)});`,
+    );
+
+    code = code.replace(
+        /^\s*export\s+default\s+/gm,
+        () => {
+            hasDefaultExport = true;
+            return 'module.exports = ';
+        },
+    );
+
+    code = code.replace(
+        /^\s*export\s+(const|let|var)\s+([A-Za-z_$][\w$]*)\b/gm,
+        (_match: string, declarationKind: string, name: string) => {
+            namedExports.add(name);
+            return `${declarationKind} ${name}`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*export\s+async\s+function\s+([A-Za-z_$][\w$]*)\b/gm,
+        (_match: string, name: string) => {
+            namedExports.add(name);
+            return `async function ${name}`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*export\s+function\s+([A-Za-z_$][\w$]*)\b/gm,
+        (_match: string, name: string) => {
+            namedExports.add(name);
+            return `function ${name}`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*export\s+class\s+([A-Za-z_$][\w$]*)\b/gm,
+        (_match: string, name: string) => {
+            namedExports.add(name);
+            return `class ${name}`;
+        },
+    );
+
+    code = code.replace(
+        /^\s*export\s+\{([^}]+)\}\s*;?\s*$/gm,
+        (_match: string, specifiers: string) => formatNamedExportAssignments(specifiers),
+    );
+
+    const exportFooter = [...namedExports].map((name) => `module.exports.${name} = ${name};`);
+    if (hasDefaultExport) {
+        exportFooter.push('module.exports.default = module.exports;');
+    }
+
+    return exportFooter.length > 0
+        ? `${code.trimEnd()}\n${exportFooter.join('\n')}\n`
+        : code;
+}
+
+function transpileVmModule(source: string, options: VMTranspileOptions = {}): VMTransformResult {
+    const loader = options.loader || 'js';
+    const filename = options.filename || `virtual.${loader}`;
+
+    if (loader === 'tsx' || loader === 'jsx') {
+        const esbuildTransformSync = getEsbuildTransformSync();
+        if (!esbuildTransformSync) {
+            throw new Error(`JSX database execution requires the esbuild package (${filename}).`);
+        }
+
+        return esbuildTransformSync(source, {
+            loader,
+            format: options.format,
+        });
+    }
+
+    if (loader === 'ts') {
+        try {
+            return {
+                code: rewriteModuleSyntaxToCommonJs(stripTypescriptSource(source, filename)),
+            };
+        } catch (error) {
+            const esbuildTransformSync = getEsbuildTransformSync();
+            if (!esbuildTransformSync) {
+                throw error;
+            }
+
+            return esbuildTransformSync(source, {
+                loader,
+                format: options.format,
+            });
+        }
+    }
+
+    return {
+        code: rewriteModuleSyntaxToCommonJs(source),
+    };
+}
+
 class VM {
-    private transpiler: typeof transformSync;
+    private transpiler: (code: string, options?: VMTranspileOptions) => VMTransformResult;
     private ctx: vm.Context;
     private registerModules: { [key: string]: any };
     private DATABASE_DIR: string;
@@ -39,7 +290,7 @@ class VM {
             this.pkgScriptDB = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         }
         this.language = options?.language || 'ts';
-        this.transpiler = transformSync;
+        this.transpiler = transpileVmModule;
 
         this.registerModules = options?.registerModules || {};
         this._registerModules = { ...this.registerModules };
@@ -64,7 +315,7 @@ class VM {
                 return this.createRequire(moduleId);
             } catch (e) {
                 // Fall back to original require for node_modules
-                if (originalRequire) {
+                if (originalRequire && !moduleId.startsWith('@db/') && !moduleId.startsWith('./') && !moduleId.startsWith('../')) {
                     return originalRequire(moduleId);
                 }
                 throw e;
@@ -102,7 +353,7 @@ class VM {
             if (fs.existsSync(fullPath)) {
                 actualPath = fullPath;
             } else {
-                const extensions = ['.ts', '.tsx', '.js', '.mjs'];
+                const extensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'];
                 for (const ext of extensions) {
                     if (fs.existsSync(fullPath + ext)) {
                         actualPath = fullPath + ext;
@@ -118,39 +369,35 @@ class VM {
                 throw new Error(`Module '${moduleId}' not found at ${fullPath}`);
             }
 
-            // For TypeScript files, read and transpile the content
-            if (actualPath.endsWith('.ts') || actualPath.endsWith('.tsx')) {
+            // For ES module and TypeScript files, transpile the content into CommonJS for vm execution.
+            if (actualPath.endsWith('.ts') || actualPath.endsWith('.tsx') || actualPath.endsWith('.mts') || actualPath.endsWith('.cts') || actualPath.endsWith('.js') || actualPath.endsWith('.mjs')) {
                 const content = fs.readFileSync(actualPath, 'utf8');
-                const js = this.transpiler(content, { loader: 'ts', format: 'cjs' }).code;
+                const loader: VMModuleLoader = actualPath.endsWith('.ts') || actualPath.endsWith('.mts') || actualPath.endsWith('.cts')
+                    ? 'ts'
+                    : actualPath.endsWith('.tsx')
+                        ? 'tsx'
+                        : 'js';
+                const js = this.transpiler(content, {
+                    loader,
+                    format: 'cjs',
+                    filename: actualPath,
+                }).code;
 
                 // Create a wrapper object to capture the final exports
                 const moduleWrapper = { exports: {} };
-                const originalModule = this._registerModules.module;
-                const originalExports = this._registerModules.exports;
+                const moduleContext = vm.createContext({
+                    ...this._registerModules,
+                    module: moduleWrapper,
+                    exports: moduleWrapper.exports,
+                });
 
-                this._registerModules.module = moduleWrapper;
-                this._registerModules.exports = moduleWrapper.exports;
-
-                try {
-                    vm.runInContext(js, this.ctx, { filename: actualPath });
-                } finally {
-                    if (originalModule) {
-                        this._registerModules.module = originalModule;
-                    } else {
-                        delete this._registerModules.module;
-                    }
-                    if (originalExports) {
-                        this._registerModules.exports = originalExports;
-                    } else {
-                        delete this._registerModules.exports;
-                    }
-                }
+                vm.runInContext(js, moduleContext, { filename: actualPath });
 
                 console.log('[createRequire] Returning exports:', moduleWrapper.exports);
                 return moduleWrapper.exports;
             }
 
-            // For JS files, use standard require
+            // For CommonJS files, use standard require.
             const result = require(actualPath);
             console.log('[createRequire] Returning (JS):', result);
             return result;
@@ -257,26 +504,25 @@ class VM {
         const systemModules = await SystemModuleResolver(this.options);
         this.register(systemModules);
 
-        const js = this.transpiler(code, { loader: this.language, format: 'cjs' }).code;
+        const js = this.transpiler(code, {
+            loader: this.language,
+            format: 'cjs',
+            filename: path.join(this.SCRIPTDB_DIR, `virtual-entry.${this.language}`),
+        }).code;
         console.log('[run] Transpiled code:', js);
 
-        // Try to use SourceTextModule if available (requires Node.js --experimental-vm-modules)
-        try {
-            const SourceTextModule = (vm as any).SourceTextModule;
-            console.log('[run] SourceTextModule available:', typeof SourceTextModule === 'function');
-            if (typeof SourceTextModule === 'function') {
-                const mod = new SourceTextModule(js, { context: this.ctx, identifier: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js') });
-                await mod.link(this.moduleLinker.bind(this));
-                await mod.evaluate();
+        // Use SourceTextModule when the runtime provides it so module loading errors surface directly.
+        const SourceTextModule = (vm as any).SourceTextModule;
+        console.log('[run] SourceTextModule available:', typeof SourceTextModule === 'function');
+        if (typeof SourceTextModule === 'function') {
+            const mod = new SourceTextModule(js, { context: this.ctx, identifier: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js') });
+            await mod.link(this.moduleLinker.bind(this));
+            await mod.evaluate();
 
-                return {
-                    namespace: mod.namespace,
-                    logs: logs
-                };
-            }
-        } catch (e) {
-            console.log('[run] SourceTextModule failed, using fallback:', e);
-            // SourceTextModule not available, fall through to alternative approach
+            return {
+                namespace: mod.namespace,
+                logs: logs
+            };
         }
 
         // Fallback: Pre-process imports and use vm.runInContext
@@ -322,12 +568,41 @@ class VM {
         console.log('[run] DATABASE_DIR:', this.DATABASE_DIR);
 
         try {
-            const result = vm.runInContext(processedCode, this.ctx, {
-                filename: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js')
-            });
+            const moduleWrapper = { exports: {} as any };
+            const initialExports = moduleWrapper.exports;
+            const originalModule = this._registerModules.module;
+            const originalExports = this._registerModules.exports;
+
+            this._registerModules.module = moduleWrapper;
+            this._registerModules.exports = moduleWrapper.exports;
+            this.ctx = vm.createContext(this._registerModules);
+
+            let result: any;
+            try {
+                result = vm.runInContext(processedCode, this.ctx, {
+                    filename: path.join(this.SCRIPTDB_DIR, 'virtual-entry.js')
+                });
+            } finally {
+                if (originalModule) {
+                    this._registerModules.module = originalModule;
+                } else {
+                    delete this._registerModules.module;
+                }
+
+                if (originalExports) {
+                    this._registerModules.exports = originalExports;
+                } else {
+                    delete this._registerModules.exports;
+                }
+
+                this.ctx = vm.createContext(this._registerModules);
+            }
+
+            const hasExplicitExports = moduleWrapper.exports !== initialExports
+                || (typeof initialExports === 'object' && initialExports !== null && Object.keys(initialExports).length > 0);
 
             return {
-                namespace: result,
+                namespace: hasExplicitExports ? moduleWrapper.exports : result,
                 logs: logs
             };
         } catch (e) {

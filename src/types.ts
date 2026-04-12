@@ -104,6 +104,8 @@ export interface WebSocketEndpointConfig {
 export interface ClientConfig {
     /** Root directory to serve files from */
     root: string;
+    /** Optional fallback root used when the primary root is unavailable in packaged standalone runs */
+    fallbackRoot?: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
     basePath: string;
     /** Custom index file path (relative to root, e.g., './public/index.html') */
@@ -159,6 +161,8 @@ export interface DevServerOptions {
     domain?: string;
     /** Root directory to serve files from */
     root?: string;
+    /** Optional fallback root used when the primary root is unavailable in packaged standalone runs */
+    fallbackRoot?: string;
     /** Base path for the client application (e.g., '/app1', '/app2') */
     basePath?: string;
     /** Custom index file path (relative to root, e.g., './public/index.html') */
@@ -189,6 +193,12 @@ export interface DevServerOptions {
     mode?: 'dev' | 'preview';
     /** Environment variables to inject (prefix with VITE_ for client access) */
     env?: Record<string, string>;
+    /** Emit a bundled development server during elit build */
+    standalone?: boolean;
+    /** Output directory for a bundled standalone development server (default: dev-dist) */
+    outDir?: string;
+    /** Output filename for a bundled standalone development server (default: index.js) */
+    outFile?: string;
 }
 
 export interface DevServer {
@@ -251,6 +261,14 @@ export interface BuildOptions {
     copy?: Array<{ from: string; to: string; transform?: (content: string, config: BuildOptions) => string }>;
     /** Post-build hook */
     onBuildEnd?: (result: BuildResult) => void | Promise<void>;
+    /** Emit a standalone preview server bundle after the client build */
+    standalonePreview?: boolean;
+    /** Emit a standalone development server bundle after the client build */
+    standaloneDev?: boolean;
+    /** Output filename for the standalone development server bundle (default: index.js) */
+    standaloneDevOutFile?: string;
+    /** Output filename for the standalone preview server bundle (default: index.js) */
+    standalonePreviewOutFile?: string;
 }
 
 export interface BuildResult {
@@ -297,6 +315,10 @@ export interface PreviewOptions {
     worker?: WorkerConfig[];
     /** Environment variables to inject (prefix with VITE_ for client access) */
     env?: Record<string, string>;
+    /** Emit a bundled preview server during elit build */
+    standalone?: boolean;
+    /** Output filename for the standalone preview server bundle (default: index.js) */
+    outFile?: string;
 }
 
 // ===== Test Types =====

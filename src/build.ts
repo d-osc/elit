@@ -11,6 +11,7 @@ import { statSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, existsS
 import { resolve, join, basename, extname, dirname } from './path';
 import { runtime } from './runtime';
 import type { BuildOptions, BuildResult } from './types';
+import { resolveWorkspacePackageImport } from './workspace-package';
 
 /**
  * Helper: Ensure directory exists (eliminates duplication in directory creation)
@@ -38,45 +39,6 @@ function calculateBuildMetrics(startTime: number, outputPath: string): { buildTi
 function readFileAsString(filePath: string): string {
     const contentBuffer = readFileSync(filePath, 'utf-8');
     return typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
-}
-
-function findWorkspacePackageRoot(startDir: string, packageName: string): string | undefined {
-    let currentDir = resolve(startDir);
-
-    while (true) {
-        const packageJsonPath = join(currentDir, 'package.json');
-        if (existsSync(packageJsonPath)) {
-            try {
-                const packageJson = JSON.parse(readFileAsString(packageJsonPath)) as { name?: string };
-                if (packageJson.name === packageName) {
-                    return currentDir;
-                }
-            } catch {
-                // Ignore invalid package metadata while walking upward.
-            }
-        }
-
-        const parentDir = dirname(currentDir);
-        if (parentDir === currentDir) {
-            return undefined;
-        }
-        currentDir = parentDir;
-    }
-}
-
-function resolveWorkspacePackageImport(specifier: string, startDir: string): string | undefined {
-    if (specifier !== 'elit' && !specifier.startsWith('elit/')) {
-        return undefined;
-    }
-
-    const packageRoot = findWorkspacePackageRoot(startDir, 'elit');
-    if (!packageRoot) {
-        return undefined;
-    }
-
-    const subpath = specifier === 'elit' ? 'index' : specifier.slice('elit/'.length);
-    const candidate = resolve(packageRoot, 'src', `${subpath}.ts`);
-    return existsSync(candidate) ? candidate : undefined;
 }
 
 function createWorkspacePackagePlugin(entryDir: string) {

@@ -87,8 +87,8 @@ The dev server will automatically inject the import map:
   "imports": {
     "@preact/signals-core": "/node_modules/@preact/signals-core/dist/signals-core.mjs",
     "@preact/signals-core/": "/node_modules/@preact/signals-core/",
-    "elit": "/node_modules/elit/src/index.ts",
-    "elit/": "/node_modules/elit/src/",
+    "elit": "/node_modules/elit/dist/index.mjs",
+    "elit/": "/node_modules/elit/",
     ...
   }
 }</script>

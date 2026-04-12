@@ -7,6 +7,8 @@ export default {
     host: 'localhost',
     open: false,
     logging: true,
+    outDir: './dev-dist',
+    outFile: 'index.js',
     clients: [{
       root: '.',
       basePath: '',

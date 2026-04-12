@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 Write-Host '[universal-test] web build'
-bun ../../src/cli.ts build
+bun run web:build
 
 $distIndex = Join-Path $PWD 'dist\index.html'
 $distScript = Join-Path $PWD 'dist\main.js'
@@ -17,16 +17,16 @@ if (-not (Test-Path $distIcon)) {
 }
 
 Write-Host '[universal-test] desktop smoke'
-bun ../../src/cli.ts desktop ./src/desktop-smoke.ts
+bun run desktop:smoke
 
 Write-Host '[universal-test] mobile init'
-bun ../../src/cli.ts mobile init . --app-id com.elit.universalexample --app-name ElitUniversalExample --web-dir dist
+bun run mobile:init
 
 Write-Host '[universal-test] mobile sync'
-bun ../../src/cli.ts mobile sync --cwd . --web-dir dist
+bun run mobile:sync
 
 Write-Host '[universal-test] mobile doctor --json (informational)'
-$doctorOutput = bun ../../src/cli.ts mobile doctor --cwd . --json
+$doctorOutput = bun run mobile:doctor
 Write-Output $doctorOutput
 if ($LASTEXITCODE -ne 0) {
     Write-Warning '[universal-test] mobile doctor reported missing checks; continuing to build validation.'
@@ -52,6 +52,6 @@ if (-not $generatedScreen.Contains('openUri("https://github.com/d-osc/elit")')) 
 }
 
 Write-Host '[universal-test] mobile build android'
-bun ../../src/cli.ts mobile build android --cwd .
+bun run mobile:build:android
 
 Write-Host '[universal-test] PASS: web, desktop, and mobile smoke flow completed'

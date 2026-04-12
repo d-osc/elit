@@ -14,7 +14,7 @@ A simple HTTP server demonstrating **WAPK live-sync** functionality in `elit`.
 
 ### Prerequisites
 - `bun` runtime installed
-- Parent `elit` CLI available
+- `elit` CLI installed or runnable with `npx`
 
 ### Run Tests
 
@@ -40,22 +40,22 @@ PORT=3333 bash test-wapk.sh --watcher
 
 1. **Pack the project:**
    ```bash
-   bun run ../../../src/cli.ts wapk pack . --output-path app.wapk
+   npx elit wapk pack . --output-path app.wapk
    ```
 
 2. **Inspect archive:**
    ```bash
-   bun run ../../../src/cli.ts wapk inspect app.wapk
+   npx elit wapk inspect app.wapk
    ```
 
 3. **Run with polling (custom interval):**
    ```bash
-   bun run ../../../src/cli.ts wapk run app.wapk --sync-interval 200
+   npx elit wapk run app.wapk --sync-interval 200
    ```
 
 4. **Run with watcher (faster):**
    ```bash
-   bun run ../../../src/cli.ts wapk run app.wapk --watcher
+   npx elit wapk run app.wapk --watcher
    ```
 
 5. **In another terminal, trigger file creation:**

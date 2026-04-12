@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { readFileSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -15,6 +17,7 @@ interface DesktopInteractionRecord {
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectDir = resolve(scriptDir, '..');
 const repoDir = resolve(projectDir, '..', '..');
+const elitCliPath = resolve(projectDir, 'node_modules', 'elit', 'dist', 'cli.cjs');
 const interactionFile = resolve(projectDir, 'desktop-dist', 'desktop-smoke-interactions.jsonl');
 
 rmSync(interactionFile, { force: true });
@@ -45,7 +48,7 @@ if (nativeBuild.status !== 0) {
 const result = spawnSync(
     process.execPath,
     [
-        '../../src/cli.ts',
+        elitCliPath,
         'desktop',
         'run',
         '--mode',

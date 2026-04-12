@@ -4,15 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx tsx ../src/cli.ts dev",
-    "build": "npx tsx ../src/cli.ts build && node -e \"require('fs').copyFileSync('googleb820e1884218aee0.html','dist/googleb820e1884218aee0.html')\"",
-    "preview": "npx tsx ../src/cli.ts preview"
+    "dev": "elit dev",
+    "build": "elit build && node -e \"require('fs').copyFileSync('googleb820e1884218aee0.html','dist/googleb820e1884218aee0.html')\"",
+    "preview": "elit preview"
   },
   "dependencies": {
     "elit": "file:.."
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0"
+    "typescript": "^5.3.0"
   }
 }

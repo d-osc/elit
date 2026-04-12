@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "[universal-test] web build"
-bun ../../src/cli.ts build
+bun run web:build
 
 if [[ ! -f dist/index.html ]]; then
   echo "[universal-test] FAILED: missing built index at dist/index.html"
@@ -18,16 +18,16 @@ if [[ ! -f dist/favicon.svg ]]; then
 fi
 
 echo "[universal-test] desktop smoke"
-bun ../../src/cli.ts desktop ./src/desktop-smoke.ts
+bun run desktop:smoke
 
 echo "[universal-test] mobile init"
-bun ../../src/cli.ts mobile init . --app-id com.elit.universalexample --app-name ElitUniversalExample --web-dir dist
+bun run mobile:init
 
 echo "[universal-test] mobile sync"
-bun ../../src/cli.ts mobile sync --cwd . --web-dir dist
+bun run mobile:sync
 
 echo "[universal-test] mobile doctor --json (informational)"
-bun ../../src/cli.ts mobile doctor --cwd . --json || true
+bun run mobile:doctor || true
 
 GENERATED_SCREEN_PATH="android/app/src/main/java/com/elit/universalexample/ElitGeneratedScreen.kt"
 if [[ ! -f "$GENERATED_SCREEN_PATH" ]]; then
@@ -52,6 +52,6 @@ if ! grep -Fq 'openUri("https://github.com/d-osc/elit")' "$GENERATED_SCREEN_PATH
 fi
 
 echo "[universal-test] mobile build android"
-bun ../../src/cli.ts mobile build android --cwd .
+bun run mobile:build:android
 
 echo "[universal-test] PASS: web, desktop, and mobile smoke flow completed"

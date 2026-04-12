@@ -950,7 +950,7 @@ function collectLinkedPackageFiles(
 
             const dependencyEntries = collectLinkedPackageFiles(
                 dependencyDirectory,
-                `node_modules/${dependencyName}`,
+                resolveLinkedDependencyArchivePrefix(archivePrefix, dependencyName),
                 seenPackages,
             );
             for (const entry of dependencyEntries) {
@@ -960,6 +960,18 @@ function collectLinkedPackageFiles(
     }
 
     return [...collected.values()];
+}
+
+function resolveLinkedDependencyArchivePrefix(archivePrefix: string, dependencyName: string): string {
+    const normalizedPrefix = archivePrefix.split('\\').join('/');
+    const marker = '/node_modules/';
+    const markerIndex = normalizedPrefix.lastIndexOf(marker);
+
+    if (markerIndex === -1) {
+        return `node_modules/${dependencyName}`;
+    }
+
+    return `${normalizedPrefix.slice(0, markerIndex + marker.length)}${dependencyName}`;
 }
 
 function shouldIgnore(relativePath: string, ignorePatterns: readonly string[]): boolean {
@@ -1032,6 +1044,48 @@ function collectFiles(directory: string, baseDirectory: string, ignorePatterns: 
     }
 
     return files;
+}
+
+function collectNestedEntryPackageFiles(sourceDirectory: string, entry: string): WapkFileEntry[] {
+    const entryPath = resolve(sourceDirectory, entry);
+    const entryPackageDirectory = findNearestPackageDirectory(dirname(entryPath), sourceDirectory);
+
+    if (!entryPackageDirectory || resolve(entryPackageDirectory) === resolve(sourceDirectory)) {
+        return [];
+    }
+
+    const relativePackageDirectory = relative(sourceDirectory, entryPackageDirectory).split('\\').join('/');
+    if (!relativePackageDirectory || relativePackageDirectory.startsWith('..') || isAbsolute(relativePackageDirectory)) {
+        return [];
+    }
+
+    const packageJson = readJsonFile(join(entryPackageDirectory, 'package.json'));
+    if (!packageJson) {
+        return [];
+    }
+
+    const collected = new Map<string, WapkFileEntry>();
+    const seenPackages = new Set<string>();
+
+    for (const dependencyName of collectInstalledPackageNames(packageJson)) {
+        const dependencyDirectory = resolveInstalledPackageDirectory(entryPackageDirectory, dependencyName)
+            ?? resolveInstalledPackageDirectory(sourceDirectory, dependencyName);
+        if (!dependencyDirectory) {
+            continue;
+        }
+
+        const dependencyEntries = collectLinkedPackageFiles(
+            dependencyDirectory,
+            `${relativePackageDirectory}/node_modules/${dependencyName}`,
+            seenPackages,
+        );
+
+        for (const entryFile of dependencyEntries) {
+            collected.set(entryFile.path, entryFile);
+        }
+    }
+
+    return [...collected.values()];
 }
 
 function encodeWapkPayload(header: WapkHeader, files: readonly WapkFileEntry[]): Buffer {
@@ -1406,6 +1460,10 @@ function hasShellMetacharacters(command: string): boolean {
     return /&&|\|\||[|;<>]/.test(command);
 }
 
+export function shouldUseShellExecution(command: string, platform: NodeJS.Platform = process.platform): boolean {
+    return platform === 'win32' && /\.(?:cmd|bat|ps1)$/i.test(command);
+}
+
 function resolveWapkStartScript(prepared: PreparedWapkApp): string | undefined {
     const startScript = normalizeNonEmptyString(prepared.header.scripts.start);
     if (!startScript || prepared.runtimeWasExplicitlyRequested) {
@@ -1458,11 +1516,14 @@ function resolveWapkStartScriptLaunchCommand(
         };
     }
 
+    const executable = resolveLocalBinExecutable(prepared.workDir, command);
+
     return {
-        executable: resolveLocalBinExecutable(prepared.workDir, command),
+        executable,
         args,
         env: launchEnv,
         label: `scripts.start (${startScript})`,
+        shell: shouldUseShellExecution(executable),
     };
 }
 
@@ -1489,6 +1550,7 @@ function resolveWapkEntryLaunchCommand(
         args,
         env,
         label: tsxExecutable ? 'entry via tsx' : 'entry',
+        shell: shouldUseShellExecution(executable),
     };
 }
 
@@ -2339,6 +2401,33 @@ function readPackageName(directory: string): string | undefined {
     }
 }
 
+function hasPackageJson(directory: string): boolean {
+    const packageJsonPath = join(directory, 'package.json');
+    return existsSync(packageJsonPath) && statSync(packageJsonPath).isFile();
+}
+
+function findNearestPackageDirectory(startDirectory: string, rootDirectory: string): string | undefined {
+    let currentDirectory = resolve(startDirectory);
+    const resolvedRootDirectory = resolve(rootDirectory);
+
+    while (true) {
+        if (hasPackageJson(currentDirectory)) {
+            return currentDirectory;
+        }
+
+        if (currentDirectory === resolvedRootDirectory) {
+            return undefined;
+        }
+
+        const parentDirectory = dirname(currentDirectory);
+        if (parentDirectory === currentDirectory) {
+            return undefined;
+        }
+
+        currentDirectory = parentDirectory;
+    }
+}
+
 function findPackageRootByName(searchRoots: readonly string[], packageName: string): string | undefined {
     const visited = new Set<string>();
 
@@ -2437,6 +2526,7 @@ function installDependenciesIfNeeded(
     directory: string,
     runtime: WapkRuntimeName,
     dependencySearchRoots: readonly string[] = [],
+    options: { allowUnresolvedLocalFileDependencies?: boolean } = {},
 ): void {
     if (runtime === 'deno') {
         return;
@@ -2459,6 +2549,13 @@ function installDependenciesIfNeeded(
 
     const repairResult = repairLocalFileDependenciesForInstall(directory, dependencySearchRoots);
     if (repairResult.unresolved.length > 0) {
+        if (options.allowUnresolvedLocalFileDependencies) {
+            console.warn(
+                `[wapk] Skipping dependency install for ${directory} because unresolved local file packages are not required by the nested runtime package: ${repairResult.unresolved.join(', ')}.`,
+            );
+            return;
+        }
+
         throw new Error(
             `WAPK archive is missing node_modules and depends on local file packages that could not be resolved from this machine: ${repairResult.unresolved.join(', ')}. Repack the archive so node_modules are included, or run the archive from a workspace checkout that contains those packages.`,
         );
@@ -2478,6 +2575,7 @@ function installDependenciesIfNeeded(
     console.log(`[wapk] Installing dependencies with ${basename(command)}...`);
     const result = spawnSync(command, args, {
         cwd: directory,
+        shell: shouldUseShellExecution(command),
         stdio: 'inherit',
         windowsHide: true,
     });
@@ -2532,10 +2630,23 @@ export async function packWapkDirectory(
 
     const config = await readWapkProjectConfig(sourceDirectory);
     const lock = resolvePackLockCredentials(config.lock, options);
+    const outputPath = resolve(options.outputPath ?? join(process.cwd(), `${sanitizePackageName(config.name)}.wapk`));
+    const relativeOutputPath = relative(sourceDirectory, outputPath).split('\\').join('/');
+    const outputPathIsInsideSource = relativeOutputPath.length > 0
+        && !relativeOutputPath.startsWith('..')
+        && !isAbsolute(relativeOutputPath);
     const userIgnore = readIgnorePatterns(sourceDirectory);
     const ignorePatterns = [...DEFAULT_IGNORE, ...userIgnore];
-    const files = collectFiles(sourceDirectory, sourceDirectory, ignorePatterns);
-    const outputPath = resolve(options.outputPath ?? join(process.cwd(), `${sanitizePackageName(config.name)}.wapk`));
+    const collectedFiles = collectFiles(sourceDirectory, sourceDirectory, ignorePatterns);
+    const nestedEntryPackageFiles = collectNestedEntryPackageFiles(sourceDirectory, config.entry);
+    const fileMap = new Map<string, WapkFileEntry>();
+    for (const file of [...collectedFiles, ...nestedEntryPackageFiles]) {
+        if (outputPathIsInsideSource && file.path === relativeOutputPath) {
+            continue;
+        }
+        fileMap.set(file.path, file);
+    }
+    const files = [...fileMap.values()];
     const header: WapkHeader = {
         name: config.name,
         version: config.version,
@@ -2554,7 +2665,7 @@ export async function packWapkDirectory(
     if (lock) {
         console.log('Lock:    enabled');
     }
-    if (files.some((file) => file.path.startsWith('node_modules/'))) {
+    if (files.some((file) => file.path.split('/').includes('node_modules'))) {
         console.log('Deps:    included');
     }
     if (options.includeDeps) {
@@ -2607,15 +2718,23 @@ export async function prepareWapkApp(
     const runtime = options.runtime ?? decoded.header.runtime;
     const workDir = mkdtempSync(join(tmpdir(), 'elit-wapk-'));
     extractFiles(decoded.files, workDir);
+    const entryPath = resolve(workDir, decoded.header.entry);
+    const entryPackageDirectory = findNearestPackageDirectory(dirname(entryPath), workDir);
+    const hasNestedRuntimePackage = Boolean(entryPackageDirectory && resolve(entryPackageDirectory) !== resolve(workDir));
     const dependencySearchRoots = [
         ...(options.dependencySearchRoots ?? []),
         archivePath.startsWith('gdrive://') ? undefined : dirname(archivePath),
         process.cwd(),
     ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-    installDependenciesIfNeeded(workDir, runtime, dependencySearchRoots);
-    const syncIncludesNodeModules = existsSync(join(workDir, 'node_modules'));
-
-    const entryPath = resolve(workDir, decoded.header.entry);
+    installDependenciesIfNeeded(workDir, runtime, dependencySearchRoots, {
+        allowUnresolvedLocalFileDependencies: hasNestedRuntimePackage,
+    });
+    if (hasNestedRuntimePackage && entryPackageDirectory) {
+        installDependenciesIfNeeded(entryPackageDirectory, runtime, [workDir, ...dependencySearchRoots]);
+    }
+    const syncIncludesNodeModules = existsSync(join(workDir, 'node_modules')) || Boolean(
+        entryPackageDirectory && existsSync(join(entryPackageDirectory, 'node_modules')),
+    );
 
     if (!existsSync(entryPath) || !statSync(entryPath).isFile()) {
         rmSync(workDir, { recursive: true, force: true });

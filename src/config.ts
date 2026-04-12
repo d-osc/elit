@@ -3,8 +3,9 @@
  */
 
 import { existsSync, readFileSync } from './fs';
-import { resolve } from './path';
+import { relative, resolve } from './path';
 import type { DevServerOptions, BuildOptions, PreviewOptions, TestOptions } from './types';
+import { resolveWorkspacePackageImport } from './workspace-package';
 
 /**
  * Helper: Read file and ensure string output (eliminates duplication in file reading)
@@ -24,6 +25,11 @@ function removeQuotes(value: string): string {
         return trimmed.slice(1, -1);
     }
     return trimmed;
+}
+
+function normalizeRelativeImportPath(fromDirectory: string, targetPath: string): string {
+    const relativePath = relative(fromDirectory, targetPath).replace(/\\/g, '/');
+    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
 }
 
 /**
@@ -315,6 +321,18 @@ export const ELIT_CONFIG_FILES = [
     'elit.config.json'
 ] as const;
 
+export function resolveConfigPath(cwd: string = process.cwd()): string | null {
+    for (const configFile of ELIT_CONFIG_FILES) {
+        const configPath = resolve(cwd, configFile);
+
+        if (existsSync(configPath)) {
+            return configPath;
+        }
+    }
+
+    return null;
+}
+
 /**
  * Load environment variables from .env files
  */
@@ -360,17 +378,15 @@ export function loadEnv(mode: string = 'development', cwd: string = process.cwd(
  * Load elit config from current directory
  */
 export async function loadConfig(cwd: string = process.cwd()): Promise<ElitConfig | null> {
-    for (const configFile of ELIT_CONFIG_FILES) {
-        const configPath = resolve(cwd, configFile);
+    const configPath = resolveConfigPath(cwd);
 
-        if (existsSync(configPath)) {
-            try {
-                return await loadConfigFile(configPath);
-            } catch (error) {
-                console.error(`Error loading config file: ${configFile}`);
-                console.error(error);
-                throw error;
-            }
+    if (configPath) {
+        try {
+            return await loadConfigFile(configPath);
+        } catch (error) {
+            console.error(`Error loading config file: ${configPath.split(/[/\\]/).pop()}`);
+            console.error(error);
+            throw error;
         }
     }
 
@@ -400,6 +416,16 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
                 name: 'external-all',
                 setup(build: any) {
                     build.onResolve({ filter: /.*/ }, (args: any) => {
+                        const workspacePackageImport = resolveWorkspacePackageImport(args.path, args.resolveDir || configDir, {
+                            preferBuilt: true,
+                        });
+                        if (workspacePackageImport) {
+                            return {
+                                path: normalizeRelativeImportPath(configDir, workspacePackageImport),
+                                external: true,
+                            };
+                        }
+
                         // Skip relative imports (local files)
                         if (args.path.startsWith('./') || args.path.startsWith('../')) {
                             return undefined;

@@ -1,21 +1,141 @@
 /**
  * Development server with HMR support
  * Cross-runtime transpilation support
- * - Node.js: uses esbuild
+ * - Node.js: uses stripTypeScriptTypes with esbuild fallback
  * - Bun: uses Bun.Transpiler
  * - Deno: uses Deno.emit
  */
+
+import * as nodeModule from 'node:module';
 
 import { createServer, IncomingMessage, ServerResponse, request as httpRequest } from './http';
 import { request as httpsRequest } from './https';
 import { WebSocketServer, WebSocket, ReadyState, CLOSE_CODES } from './ws';
 import { watch } from './chokidar';
-import { readFile, stat, realpath } from './fs';
+import { existsSync, readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
 import { isBun, isDeno } from './runtime';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig, WebSocketEndpointConfig } from './types';
 import { dom } from './dom';
+
+type StripTypeScriptTypes = (
+  code: string,
+  options?: {
+    mode?: 'strip' | 'transform';
+    sourceMap?: boolean;
+    sourceUrl?: string;
+  },
+) => string;
+
+type NodeTransformLoader = 'ts' | 'tsx';
+
+const stripTypeScriptTypes = typeof (nodeModule as { stripTypeScriptTypes?: unknown }).stripTypeScriptTypes === 'function'
+  ? ((nodeModule as { stripTypeScriptTypes: StripTypeScriptTypes }).stripTypeScriptTypes)
+  : undefined;
+
+let cachedNodeEsbuildTransformSync:
+  | ((code: string, options: { loader: NodeTransformLoader; format: 'esm'; target: 'es2020'; sourcemap: false | 'inline' }) => { code: string })
+  | null
+  | undefined;
+
+function stripBrowserTypeScriptSource(source: string, filename: string): string {
+  if (!stripTypeScriptTypes) {
+    throw new Error(`TypeScript dev server transpilation requires Node.js 22+ or the esbuild package (${filename}).`);
+  }
+
+  const originalEmitWarning = process.emitWarning;
+
+  try {
+    process.emitWarning = (((warning: string | Error, ...args: any[]) => {
+      if (typeof warning === 'string' && warning.includes('stripTypeScriptTypes')) {
+        return;
+      }
+
+      return (originalEmitWarning as any).call(process, warning, ...args);
+    }) as typeof process.emitWarning);
+
+    return stripTypeScriptTypes(source, {
+      mode: 'transform',
+      sourceUrl: filename,
+    });
+  } finally {
+    process.emitWarning = originalEmitWarning;
+  }
+}
+
+async function getNodeEsbuildTransformSync() {
+  if (cachedNodeEsbuildTransformSync !== undefined) {
+    return cachedNodeEsbuildTransformSync;
+  }
+
+  try {
+    const esbuildModule = await import('esbuild') as {
+      transformSync?: (code: string, options: { loader: NodeTransformLoader; format: 'esm'; target: 'es2020'; sourcemap: false | 'inline' }) => { code: string };
+    };
+
+    cachedNodeEsbuildTransformSync = typeof esbuildModule.transformSync === 'function'
+      ? esbuildModule.transformSync.bind(esbuildModule)
+      : null;
+  } catch {
+    cachedNodeEsbuildTransformSync = null;
+  }
+
+  return cachedNodeEsbuildTransformSync;
+}
+
+async function transpileNodeBrowserModule(source: string, options: { filename: string; loader: NodeTransformLoader; mode: 'dev' | 'preview' }): Promise<string> {
+  const compileWithEsbuild = async () => {
+    const esbuildTransformSync = await getNodeEsbuildTransformSync();
+
+    if (!esbuildTransformSync) {
+      const runtimeLabel = options.loader === 'tsx' ? 'TSX' : 'TypeScript';
+      throw new Error(`${runtimeLabel} dev server transpilation requires the esbuild package (${options.filename}).`);
+    }
+
+    if (options.mode === 'preview') {
+      const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
+      const tsResult = esbuildTransformSync(source, {
+        loader: options.loader,
+        format: 'esm',
+        target: 'es2020',
+        sourcemap: false,
+      });
+
+      return JavaScriptObfuscator.obfuscate(tsResult.code, {
+        compact: true,
+        renameGlobals: false,
+      }).getObfuscatedCode();
+    }
+
+    return esbuildTransformSync(source, {
+      loader: options.loader,
+      format: 'esm',
+      target: 'es2020',
+      sourcemap: 'inline',
+    }).code;
+  };
+
+  if (options.loader === 'ts') {
+    try {
+      const stripped = stripBrowserTypeScriptSource(source, options.filename);
+
+      if (options.mode === 'preview') {
+        const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
+        return JavaScriptObfuscator.obfuscate(stripped, {
+          compact: true,
+          renameGlobals: false,
+        }).getObfuscatedCode();
+      }
+
+      return stripped;
+    } catch {
+      return compileWithEsbuild();
+    }
+  }
+
+  return compileWithEsbuild();
+}
 
 // ===== Router =====
 
@@ -370,7 +490,7 @@ const send404 = (res: ServerResponse, msg = 'Not Found'): void => sendError(res,
 const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res, 403, msg);
 const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
 
-async function resolveElitImportBasePath(rootDir: string, basePath: string, mode: 'dev' | 'preview'): Promise<string> {
+export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePath: string, mode: 'dev' | 'preview'): Promise<string | undefined> {
   const resolvedRootDir = await realpath(resolve(rootDir));
 
   try {
@@ -382,32 +502,32 @@ async function resolveElitImportBasePath(rootDir: string, basePath: string, mode
       return basePath ? `${basePath}/${workspaceDir}` : `/${workspaceDir}`;
     }
   } catch {
-    // Fall back to node_modules imports when the root is not the Elit package workspace.
+    // Fall back to generated package exports when the root is not the Elit package workspace.
   }
 
-  const packageDir = mode === 'dev' ? 'src' : 'dist';
-  return basePath ? `${basePath}/node_modules/elit/${packageDir}` : `/node_modules/elit/${packageDir}`;
+  return undefined;
 }
 
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
-const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
-  const srcPath = await resolveElitImportBasePath(rootDir, basePath, mode);
+export const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
+  const workspaceImportBasePath = await resolveWorkspaceElitImportBasePath(rootDir, basePath, mode);
+  const fileExt = mode === 'dev' ? '.ts' : '.js';
 
-  const fileExt = mode === 'dev' ? '.ts' : '.mjs';
-
-  // Base Elit imports
-  const elitImports: ImportMapEntry = {
-    "elit": `${srcPath}/index${fileExt}`,
-    "elit/": `${srcPath}/`,
-    "elit/dom": `${srcPath}/dom${fileExt}`,
-    "elit/state": `${srcPath}/state${fileExt}`,
-    "elit/style": `${srcPath}/style${fileExt}`,
-    "elit/el": `${srcPath}/el${fileExt}`,
-    "elit/universal": `${srcPath}/universal${fileExt}`,
-    "elit/router": `${srcPath}/router${fileExt}`,
-    "elit/hmr": `${srcPath}/hmr${fileExt}`,
-    "elit/types": `${srcPath}/types${fileExt}`
-  };
+  const elitImports: ImportMapEntry = workspaceImportBasePath
+    ? {
+        "elit": `${workspaceImportBasePath}/index${fileExt}`,
+        "elit/": `${workspaceImportBasePath}/`,
+        "elit/dom": `${workspaceImportBasePath}/dom${fileExt}`,
+        "elit/state": `${workspaceImportBasePath}/state${fileExt}`,
+        "elit/style": `${workspaceImportBasePath}/style${fileExt}`,
+        "elit/el": `${workspaceImportBasePath}/el${fileExt}`,
+        "elit/universal": `${workspaceImportBasePath}/universal${fileExt}`,
+        "elit/router": `${workspaceImportBasePath}/router${fileExt}`,
+        "elit/hmr": `${workspaceImportBasePath}/hmr${fileExt}`,
+        "elit/types": `${workspaceImportBasePath}/types${fileExt}`,
+        "elit/native": `${workspaceImportBasePath}/native${fileExt}`
+      }
+    : {};
 
   // Generate external library imports
   const externalImports = await generateExternalImportMaps(rootDir, basePath);
@@ -1251,11 +1371,14 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'ws'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'fallbackRoot' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'ws'> = {
   port: 3000,
   host: 'localhost',
   https: false,
   open: true,
+  standalone: false,
+  outDir: 'dev-dist',
+  outFile: 'index.js',
   watch: ['**/*.ts', '**/*.js', '**/*.html', '**/*.css'],
   ignore: ['node_modules/**', 'dist/**', '.git/**', '**/*.d.ts'],
   logging: true,
@@ -1274,6 +1397,26 @@ interface NormalizedClient {
   mode: 'dev' | 'preview';
 }
 
+function shouldUseClientFallbackRoot(primaryRoot: string, fallbackRoot: string | undefined, indexPath?: string): boolean {
+  if (!fallbackRoot) {
+    return false;
+  }
+
+  const resolvedPrimaryRoot = resolve(primaryRoot);
+  const resolvedFallbackRoot = resolve(fallbackRoot);
+
+  if (!existsSync(resolvedFallbackRoot)) {
+    return false;
+  }
+
+  const normalizedIndexPath = (indexPath || '/index.html').replace(/^\//, '');
+  const primaryHasRuntimeSources = existsSync(join(resolvedPrimaryRoot, 'src'))
+    || existsSync(join(resolvedPrimaryRoot, 'public'))
+    || existsSync(join(resolvedPrimaryRoot, normalizedIndexPath));
+
+  return !primaryHasRuntimeSources;
+}
+
 export function createDevServer(options: DevServerOptions): DevServer {
   const config = { ...defaultOptions, ...options };
   const wsClients = new Set<WebSocket>();
@@ -1290,7 +1433,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const clientsToNormalize = usesClientArray
     ? config.clients!
     : config.root
-      ? [{ root: config.root, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, ws: config.ws, mode: config.mode }]
+      ? [{ root: config.root, fallbackRoot: config.fallbackRoot, basePath: config.basePath || '', index: config.index, ssr: config.ssr, api: config.api, proxy: config.proxy, ws: config.ws, mode: config.mode }]
       : null;
   if (!clientsToNormalize) throw new Error('DevServerOptions must include either "clients" array or "root" directory');
 
@@ -1313,11 +1456,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
       }
     }
 
+    const useFallbackRoot = shouldUseClientFallbackRoot(client.root, client.fallbackRoot, indexPath);
+    const activeRoot = useFallbackRoot ? (client.fallbackRoot || client.root) : client.root;
+
     return {
-      root: client.root,
+      root: activeRoot,
       basePath,
-      index: indexPath,
-      ssr: client.ssr,
+      index: useFallbackRoot ? undefined : indexPath,
+      ssr: useFallbackRoot ? undefined : client.ssr,
       api: client.api,
       ws: normalizeWebSocketEndpoints(client.ws, basePath),
       proxyHandler: client.proxy ? createProxyHandler(client.proxy) : undefined,
@@ -1418,9 +1564,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
       return;
     }
 
-    // For root path requests, prioritize SSR over index files if SSR is configured
+    // For root path requests, preview mode should prefer built index files and only
+    // fall back to SSR if no index file exists. Dev mode keeps SSR-first behavior.
     let filePath: string;
-    if (url === '/' && matchedClient.ssr && !matchedClient.index) {
+    if (url === '/' && config.mode !== 'preview' && matchedClient.ssr && !matchedClient.index) {
       // Use SSR directly when configured and no custom index specified
       return await serveSSR(res, matchedClient);
     } else {
@@ -1721,36 +1868,11 @@ export default css;
                 // @ts-ignore
                 transpiled = transpiler.transformSync(sourceContent.toString());
               } else {
-                // Node.js - use esbuild
-                const loader = ext === '.tsx' ? 'tsx' : 'ts';
-                const { transformSync } = await import('esbuild');
-
-                if (config.mode === 'preview') {
-                  // Preview mode: transpile then obfuscate via esbuild-obfuscator-plugin's
-                  // underlying javascript-obfuscator library
-                  const { default: JavaScriptObfuscator } = await import('javascript-obfuscator');
-
-                  const tsResult = transformSync(sourceContent.toString(), {
-                    loader: loader as any,
-                    format: 'esm',
-                    target: 'es2020',
-                    sourcemap: false
-                  });
-
-                  transpiled = JavaScriptObfuscator.obfuscate(tsResult.code, {
-                    compact: true,
-                    renameGlobals: false
-                  }).getObfuscatedCode();
-                } else {
-                  // Dev mode: transpile with inline source maps
-                  const result = transformSync(sourceContent.toString(), {
-                    loader: loader as any,
-                    format: 'esm',
-                    target: 'es2020',
-                    sourcemap: 'inline'
-                  });
-                  transpiled = result.code;
-                }
+                transpiled = await transpileNodeBrowserModule(sourceContent.toString(), {
+                  filename: resolvedPath,
+                  loader: ext === '.tsx' ? 'tsx' : 'ts',
+                  mode: config.mode,
+                });
               }
 
               // Rewrite .ts imports to .js for browser compatibility

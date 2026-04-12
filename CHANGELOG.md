@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Persistent WAPK online host lifecycle** - `elit wapk run <file.wapk> --online` now stays alive so the host session remains visibly active and closes the server-side shared session when the CLI receives `Ctrl+C`
 - **PM-managed WAPK online lifecycle** - `elit pm start --wapk <file.wapk> --online` now forwards Elit Run hosting flags and closes the shared session cleanly when PM stops, restarts, or deletes the managed app
 
+### Fixed
+- **Standalone WAPK preview/dev archive boot flow** - standalone packaged preview and dev builds now start from the expected built assets instead of leaking source-only paths into extracted WAPK runs
+  - Preview root requests now prefer built `index.html` before SSR when built output is available, preventing stale `/src/main.js` script tags from breaking packaged preview sessions
+  - Standalone dev bundles now fall back to built `dist/` assets when source roots are excluded from the archive, so packaged dev runs can serve `main.js` without shipping `dev-dist/node_modules`
+  - The full-db example and the create-elit template now keep the `#app` mount point aligned across `public/index.html`, `src/main.ts`, and client bootstrapping
+- **Packaged database VM module loading** - `@db/...` imports in standalone packaged runs now keep real module errors intact and avoid cross-module binding collisions during the CommonJS fallback execution path
+
+### Tests
+- **Standalone packaging regression coverage** - added focused coverage for preview root selection, dev fallback roots, HTML mount-point alignment, standalone package dependency replacement, and fallback database loading for `@db/...` modules
+
 ## [3.5.5] - 2026-04-11
 
 ### Added

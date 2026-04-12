@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { accessSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -17,6 +17,7 @@ import {
     type DesktopRenderOptions,
 } from './render-context';
 import type { Child } from './types';
+import { resolveWorkspacePackageImport } from './workspace-package';
 
 type NativeTarget = 'android' | 'ios' | 'ir';
 export type NativeEntryRuntimeTarget = 'mobile' | 'desktop';
@@ -49,49 +50,6 @@ interface NativeGenerateOptions {
 }
 
 const DEFAULT_ENTRY_EXPORTS = ['default', 'screen', 'app', 'view', 'root', 'native', 'Screen', 'App', 'View', 'Root'] as const;
-
-function findWorkspacePackageRoot(startDir: string, packageName: string): string | undefined {
-    let currentDir = resolve(startDir);
-
-    while (true) {
-        const packageJsonPath = resolve(currentDir, 'package.json');
-        try {
-            const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: string };
-            if (packageJson.name === packageName) {
-                return currentDir;
-            }
-        } catch {
-            // Ignore directories without valid package metadata.
-        }
-
-        const parentDir = dirname(currentDir);
-        if (parentDir === currentDir) {
-            return undefined;
-        }
-        currentDir = parentDir;
-    }
-}
-
-function resolveWorkspacePackageImport(specifier: string, startDir: string): string | undefined {
-    if (specifier !== 'elit' && !specifier.startsWith('elit/')) {
-        return undefined;
-    }
-
-    const packageRoot = findWorkspacePackageRoot(startDir, 'elit');
-    if (!packageRoot) {
-        return undefined;
-    }
-
-    const subpath = specifier === 'elit' ? 'index' : specifier.slice('elit/'.length);
-    const candidate = resolve(packageRoot, 'src', `${subpath}.ts`);
-
-    try {
-        accessSync(candidate);
-        return candidate;
-    } catch {
-        return undefined;
-    }
-}
 
 export async function runNativeCommand(args: string[]): Promise<void> {
     if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
