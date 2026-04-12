@@ -1,4 +1,4 @@
-import { VNode } from 'elit';
+import type { VNode } from 'elit';
 import { SnakeGameContent } from './snake-game';
 import { TodoListContent } from './todo-list';
 import { StockManagementContent } from './stock-management';

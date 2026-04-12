@@ -1,7 +1,8 @@
 import {
-  VNode, div, h2, h3, p, ul, li, strong, pre, code, button,
+  div, h2, h3, p, ul, li, strong, pre, code, button,
   createState, reactive
 } from 'elit';
+import type { VNode } from 'elit';
 import { codeBlock } from '../../highlight';
 
 // Snake Game Demo Component
