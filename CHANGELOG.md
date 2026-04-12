@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.7] - 2026-04-12
+
+### Changed
+- **WAPK entry inference and browser-start execution** - WAPK packaging and runtime launch now handle CLI-driven web app archives more predictably
+  - `elit wapk pack` can now fall back to `build.entry` from `elit.config.*` when `wapk.entry` is omitted
+  - Browser-style archives now prefer `scripts.start` when the package exposes preview/dev-style startup flows, including local `node_modules/.bin` shims and packaged `bin` targets such as `elit preview`
+  - Windows start-script execution now uses shell mode only for script launchers like `.cmd`, `.bat`, and `.ps1`, avoiding unnecessary shell wrapping for normal executables
+- **Publish layout tightening** - npm package contents now ship the built `dist/*` artifacts plus the relocated `desktop/` Rust sources instead of publishing the full source tree
+  - Keeps installed package payloads aligned with the exported runtime surface and native desktop build inputs
+
+### Fixed
+- **Database VM fallback import rewriting** - database execution in runtimes without `vm.SourceTextModule` now rewrites mixed ES module import forms more reliably
+  - Fixed fallback handling for `default + named` and `default + namespace` imports from `@db/...` modules
+  - Keeps module-local bindings isolated so imported database modules do not leak or collide with caller scope during CommonJS fallback execution
+
+### Documentation
+- **CLI-first docs/example scripts** - docs and example app scripts now invoke the installed `elit` CLI commands directly, and the docs package now consumes the published `elit` package instead of a workspace file link
+
+### Tests
+- **WAPK and database regression coverage** - added focused coverage for `build.entry` fallback, Windows shell-launch detection, browser-style start-script execution through local and packaged bin shims, and fallback database import rewriting for mixed import shapes
+
 ## [3.5.6] - 2026-04-11
 
 ### Added
