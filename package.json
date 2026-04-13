@@ -1,6 +1,6 @@
 {
   "name": "elit",
-  "version": "3.5.7",
+  "version": "3.5.8",
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -148,6 +148,26 @@
       "types": "./dist/cli.d.ts",
       "import": "./dist/cli.mjs",
       "require": "./dist/cli.js"
+    },
+    "./render-context": {
+      "types": "./dist/render-context.d.ts",
+      "import": "./dist/render-context.mjs",
+      "require": "./dist/render-context.js"
+    },
+    "./preview-build": {
+      "types": "./dist/preview-build.d.ts",
+      "import": "./dist/preview-build.mjs",
+      "require": "./dist/preview-build.js"
+    },
+    "./dev-build": {
+      "types": "./dist/dev-build.d.ts",
+      "import": "./dist/dev-build.mjs",
+      "require": "./dist/dev-build.js"
+    },
+    "./desktop-auto-render": {
+      "types": "./dist/desktop-auto-render.d.ts",
+      "import": "./dist/desktop-auto-render.mjs",
+      "require": "./dist/desktop-auto-render.js"
     }
   },
   "scripts": {

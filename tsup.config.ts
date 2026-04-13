@@ -63,6 +63,8 @@ export const nodeOnlyConfig = {
         'test-reporter': 'src/test-reporter.ts',
         test: 'src/test.ts',
         desktop: 'src/desktop.ts',
+        'desktop-auto-render': 'src/desktop-auto-render.ts',
+        'render-context': 'src/render-context.ts',
         runtime: 'src/runtime.ts'
     },
     format: createBundleFormats(),

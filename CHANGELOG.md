@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.8] - 2026-04-13
+
+### Changed
+- **Desktop bootstrap helper packaging** - desktop bootstrap support helpers now ship in the published package output so installed desktop workflows can resolve the same runtime support modules without relying on the source tree
+  - Added built `dist/desktop-auto-render.*` and `dist/render-context.*` artifacts for desktop bootstrap/prelude generation
+  - Package exports now expose `elit/desktop-auto-render` and `elit/render-context` for consumers that need the packaged helper surface
+
+### Fixed
+- **Desktop packaged-install bootstrap resolution** - `elit desktop run` and `elit desktop build` no longer generate imports into missing `node_modules/elit/src/*` files when Elit is consumed from a published install
+  - Desktop bootstrap generation now prefers workspace `src/*` helpers during local development
+  - Published installs now fall back to the shipped `dist/*` helper modules when `src/*` is not present
+
+### Tests
+- **Desktop packaging regression coverage** - added focused desktop CLI coverage for bootstrap helper resolution in both workspace and packaged-install layouts
+
 ## [3.5.7] - 2026-04-12
 
 ### Changed

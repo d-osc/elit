@@ -136,6 +136,7 @@ const PLATFORMS = {
     'mac-arm': 'aarch64-apple-darwin',
 } as const;
 const TS_LIKE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.jsx']);
+type DesktopBootstrapSupportModuleName = 'desktop-auto-render' | 'render-context';
 
 function toDesktopBootstrapImportPath(fromPath: string, toPath: string): string {
     const importPath = relative(dirname(fromPath), toPath).replace(/\\/g, '/');
@@ -185,12 +186,32 @@ function resolveDesktopEntryDisplayName(entryPath: string, fallbackName: string)
     return formatDesktopDisplayName(fallbackName);
 }
 
+export function resolveDesktopBootstrapSupportModulePath(
+    moduleName: DesktopBootstrapSupportModuleName,
+    packageRoot = PACKAGE_ROOT,
+): string {
+    const candidates = [
+        resolve(packageRoot, 'src', `${moduleName}.ts`),
+        resolve(packageRoot, 'dist', `${moduleName}.mjs`),
+    ];
+
+    for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    throw new Error(
+        `Desktop support module "${moduleName}" was not found in ${packageRoot}. Expected one of: ${candidates.join(', ')}`,
+    );
+}
+
 function createDesktopBootstrapEntry(entryPath: string, appName: string): DesktopBootstrapEntry {
     const bootstrapId = randomUUID();
     const bootstrapPath = join(dirname(entryPath), `.elit-desktop-bootstrap-${appName}-${bootstrapId}.ts`);
     const preludePath = join(dirname(entryPath), `.elit-desktop-prelude-${appName}-${bootstrapId}.ts`);
-    const desktopAutoRenderPath = resolve(PACKAGE_ROOT, 'src', 'desktop-auto-render.ts');
-    const renderContextPath = resolve(PACKAGE_ROOT, 'src', 'render-context.ts');
+    const desktopAutoRenderPath = resolveDesktopBootstrapSupportModulePath('desktop-auto-render');
+    const renderContextPath = resolveDesktopBootstrapSupportModulePath('render-context');
     const defaultTitle = `${resolveDesktopEntryDisplayName(entryPath, appName)} Desktop`;
 
     writeFileSync(
