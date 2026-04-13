@@ -296,7 +296,10 @@ export async function buildStandaloneDevServer(options: StandaloneDevBuildOption
     mkdirSync(outputDir, { recursive: true });
 
     const { build, version } = await import('esbuild');
-    const workspacePackagePlugin = createWorkspacePackagePlugin(cwd);
+    const workspacePackagePlugin = createWorkspacePackagePlugin(cwd, {
+        preferBuilt: true,
+        preferredBuiltFormat: 'cjs',
+    });
     const entrySource = createStandaloneDevEntrySource(options.configPath, plan, options.devConfig, {
         cwd,
         buildConfig: options.buildConfig,

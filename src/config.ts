@@ -424,6 +424,7 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
                     build.onResolve({ filter: /.*/ }, (args: any) => {
                         const workspacePackageImport = resolveWorkspacePackageImport(args.path, args.resolveDir || configDir, {
                             preferBuilt: true,
+                            preferredBuiltFormat: 'esm',
                         });
                         if (workspacePackageImport) {
                             return {

@@ -7,15 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-04-13
+
+### Fixed
+- **Browser import maps now expose only browser-safe Elit entries** - dev/preview HTML and standalone `build-dev` / `build-preview` outputs no longer publish server-only or build-only `elit/*` specifiers to the browser runtime
+  - Browser import maps are now limited to `elit`, `elit/dom`, `elit/el`, `elit/native`, `elit/universal`, `elit/router`, `elit/state`, `elit/style`, `elit/hmr`, and `elit/types`
+  - Prevents browser clients from resolving non-browser subpaths such as `elit/server`, `elit/build`, and `elit/`
+- **Standalone dev fallback asset resolution** - standalone `build-dev` servers no longer return `404 Not Found` for built assets like `/main.js` when SSR and public assets are still served from the primary source root
+  - Dev server static file resolution now falls back to `fallbackRoot` before returning `404`
+  - Keeps SSR output and primary-root public assets intact while serving built client bundles and sourcemaps from the generated output when needed
+
+### Tests
+- **Browser-safe import map regression coverage** - updated server import-map tests to assert that only the browser-safe Elit subset is emitted for both workspace and installed-package browser flows
+- **Standalone dev mixed-root fallback coverage** - added regression coverage for the case where SSR/public assets come from the source root while built client assets are resolved from `fallbackRoot`
+
 ## [3.6.0] - 2026-04-13
 
 ### Fixed
-- **Dev-mode workspace Elit import maps now use built JavaScript output** - the dev server no longer emits workspace-local `elit/*` browser imports that point at `/src/*.ts`
-  - Workspace-root Elit imports now resolve through `/dist/*.js` in both `dev` and `preview` modes
-  - Keeps browser import maps aligned with the published package surface and avoids exposing TypeScript source paths to the browser runtime
+- **Dev-mode workspace Elit import maps now use built ESM output** - the dev server no longer emits workspace-local `elit/*` browser imports that point at `/src/*.ts` or non-module IIFE browser files
+  - Workspace-root Elit imports now resolve through `/dist/*.mjs` in both `dev` and `preview` modes
+  - Keeps browser import maps aligned with the published package surface and preserves named ESM exports for browser module loading
+- **Standalone preview/dev self-reference resolution now prefers built artifacts** - generated standalone server bundles now resolve `elit/*` self-references through built `dist/*` artifacts before falling back to the workspace source tree
+  - Keeps standalone preview/dev package self-references aligned with the published runtime surface
+  - Standalone Node/CJS bundles now prefer built CJS artifacts while browser/config ESM flows keep preferring built ESM artifacts
+  - Avoids reintroducing `node_modules/elit/src/*.ts` references in standalone consumer-facing flows when built artifacts are available
+  - Prevents `build-dev` standalone bundles from pulling in ESM artifacts that rely on `import.meta.url` and then crashing on startup under Node CJS
 
 ### Tests
-- **Server import map regression coverage** - updated the server import map tests to assert that workspace-local Elit imports resolve to `/dist/*.js` and no longer include `/src/` or `.ts` entries in dev mode
+- **Server import map regression coverage** - updated the server import map tests to assert that workspace-local Elit imports resolve to `/dist/*.mjs` and no longer include `/src/` or `.ts` entries in dev mode
+- **Workspace self-reference regression coverage** - added resolver coverage for `preferBuilt` on both root and `elit/server` subpath imports used by standalone server bundles
 
 ## [3.5.9] - 2026-04-13
 

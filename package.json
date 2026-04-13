@@ -4,170 +4,201 @@
   "description": "Optimized lightweight library for creating DOM elements with reactive state",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
-  "browser": "dist/index.mjs",
+  "browser": "dist/index.js",
+  "require": "dist/index.cjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "elit": "./dist/cli.js"
+    "elit": "./dist/cli.cjs"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "browser": "./dist/index.mjs",
+      "browser": "./dist/index.js",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     },
     "./dom": {
       "types": "./dist/dom.d.ts",
+      "browser": "./dist/dom.js",
       "import": "./dist/dom.mjs",
-      "require": "./dist/dom.js"
+      "require": "./dist/dom.cjs"
     },
     "./desktop": {
       "types": "./dist/desktop.d.ts",
+      "browser": "./dist/desktop.js",
       "import": "./dist/desktop.mjs",
-      "require": "./dist/desktop.js"
+      "require": "./dist/desktop.cjs"
     },
     "./el": {
       "types": "./dist/el.d.ts",
+      "browser": "./dist/el.js",
       "import": "./dist/el.mjs",
-      "require": "./dist/el.js"
+      "require": "./dist/el.cjs"
     },
     "./native": {
       "types": "./dist/native.d.ts",
+      "browser": "./dist/native.js",
       "import": "./dist/native.mjs",
-      "require": "./dist/native.js"
+      "require": "./dist/native.cjs"
     },
     "./universal": {
       "types": "./dist/universal.d.ts",
+      "browser": "./dist/universal.js",
       "import": "./dist/universal.mjs",
-      "require": "./dist/universal.js"
+      "require": "./dist/universal.cjs"
     },
     "./router": {
       "types": "./dist/router.d.ts",
+      "browser": "./dist/router.js",
       "import": "./dist/router.mjs",
-      "require": "./dist/router.js"
+      "require": "./dist/router.cjs"
     },
     "./state": {
       "types": "./dist/state.d.ts",
+      "browser": "./dist/state.js",
       "import": "./dist/state.mjs",
-      "require": "./dist/state.js"
+      "require": "./dist/state.cjs"
     },
     "./style": {
       "types": "./dist/style.d.ts",
+      "browser": "./dist/style.js",
       "import": "./dist/style.mjs",
-      "require": "./dist/style.js"
+      "require": "./dist/style.cjs"
     },
     "./server": {
       "types": "./dist/server.d.ts",
+      "browser": "./dist/server.js",
       "import": "./dist/server.mjs",
-      "require": "./dist/server.js"
+      "require": "./dist/server.cjs"
     },
     "./hmr": {
       "types": "./dist/hmr.d.ts",
+      "browser": "./dist/hmr.js",
       "import": "./dist/hmr.mjs",
-      "require": "./dist/hmr.js"
+      "require": "./dist/hmr.cjs"
     },
     "./build": {
       "types": "./dist/build.d.ts",
+      "browser": "./dist/build.js",
       "import": "./dist/build.mjs",
-      "require": "./dist/build.js"
+      "require": "./dist/build.cjs"
     },
     "./http": {
       "types": "./dist/http.d.ts",
+      "browser": "./dist/http.js",
       "import": "./dist/http.mjs",
-      "require": "./dist/http.js"
+      "require": "./dist/http.cjs"
     },
     "./https": {
       "types": "./dist/https.d.ts",
+      "browser": "./dist/https.js",
       "import": "./dist/https.mjs",
-      "require": "./dist/https.js"
+      "require": "./dist/https.cjs"
     },
     "./ws": {
       "types": "./dist/ws.d.ts",
+      "browser": "./dist/ws.js",
       "import": "./dist/ws.mjs",
-      "require": "./dist/ws.js"
+      "require": "./dist/ws.cjs"
     },
     "./fs": {
       "types": "./dist/fs.d.ts",
+      "browser": "./dist/fs.js",
       "import": "./dist/fs.mjs",
-      "require": "./dist/fs.js"
+      "require": "./dist/fs.cjs"
     },
     "./mime-types": {
       "types": "./dist/mime-types.d.ts",
+      "browser": "./dist/mime-types.js",
       "import": "./dist/mime-types.mjs",
-      "require": "./dist/mime-types.js"
+      "require": "./dist/mime-types.cjs"
     },
     "./chokidar": {
       "types": "./dist/chokidar.d.ts",
+      "browser": "./dist/chokidar.js",
       "import": "./dist/chokidar.mjs",
-      "require": "./dist/chokidar.js"
+      "require": "./dist/chokidar.cjs"
     },
     "./path": {
       "types": "./dist/path.d.ts",
+      "browser": "./dist/path.js",
       "import": "./dist/path.mjs",
-      "require": "./dist/path.js"
+      "require": "./dist/path.cjs"
     },
     "./wss": {
       "types": "./dist/wss.d.ts",
+      "browser": "./dist/wss.js",
       "import": "./dist/wss.mjs",
-      "require": "./dist/wss.js"
+      "require": "./dist/wss.cjs"
     },
     "./runtime": {
       "types": "./dist/runtime.d.ts",
+      "browser": "./dist/runtime.js",
       "import": "./dist/runtime.mjs",
-      "require": "./dist/runtime.js"
+      "require": "./dist/runtime.cjs"
     },
     "./database": {
       "types": "./dist/database.d.ts",
+      "browser": "./dist/database.js",
       "import": "./dist/database.mjs",
-      "require": "./dist/database.js"
+      "require": "./dist/database.cjs"
     },
     "./test": {
       "types": "./dist/test.d.ts",
+      "browser": "./dist/test.js",
       "import": "./dist/test.mjs",
-      "require": "./dist/test.js"
+      "require": "./dist/test.cjs"
     },
     "./test-runtime": {
       "types": "./dist/test-runtime.d.ts",
+      "browser": "./dist/test-runtime.js",
       "import": "./dist/test-runtime.mjs",
-      "require": "./dist/test-runtime.js"
+      "require": "./dist/test-runtime.cjs"
     },
     "./test-reporter": {
       "types": "./dist/test-reporter.d.ts",
+      "browser": "./dist/test-reporter.js",
       "import": "./dist/test-reporter.mjs",
-      "require": "./dist/test-reporter.js"
+      "require": "./dist/test-reporter.cjs"
     },
     "./test-globals": {
       "types": "./dist/test-globals.d.ts"
     },
     "./types": {
       "types": "./dist/types.d.ts",
+      "browser": "./dist/types.js",
       "import": "./dist/types.mjs",
-      "require": "./dist/types.js"
+      "require": "./dist/types.cjs"
     },
     "./cli": {
       "types": "./dist/cli.d.ts",
+      "browser": "./dist/cli.js",
       "import": "./dist/cli.mjs",
-      "require": "./dist/cli.js"
+      "require": "./dist/cli.cjs"
     },
     "./render-context": {
       "types": "./dist/render-context.d.ts",
+      "browser": "./dist/render-context.js",
       "import": "./dist/render-context.mjs",
-      "require": "./dist/render-context.js"
+      "require": "./dist/render-context.cjs"
     },
     "./preview-build": {
       "types": "./dist/preview-build.d.ts",
+      "browser": "./dist/preview-build.js",
       "import": "./dist/preview-build.mjs",
-      "require": "./dist/preview-build.js"
+      "require": "./dist/preview-build.cjs"
     },
     "./dev-build": {
       "types": "./dist/dev-build.d.ts",
+      "browser": "./dist/dev-build.js",
       "import": "./dist/dev-build.mjs",
-      "require": "./dist/dev-build.js"
+      "require": "./dist/dev-build.cjs"
     },
     "./desktop-auto-render": {
       "types": "./dist/desktop-auto-render.d.ts",
+      "browser": "./dist/desktop-auto-render.js",
       "import": "./dist/desktop-auto-render.mjs",
-      "require": "./dist/desktop-auto-render.js"
+      "require": "./dist/desktop-auto-render.cjs"
     }
   },
   "scripts": {

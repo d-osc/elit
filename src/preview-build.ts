@@ -30,12 +30,12 @@ export interface StandalonePreviewBuildOptions {
     outFile?: string;
 }
 
-export function createWorkspacePackagePlugin(resolveDir: string) {
+export function createWorkspacePackagePlugin(resolveDir: string, options: { preferBuilt?: boolean; preferredBuiltFormat?: 'cjs' | 'esm' } = {}) {
     return {
         name: 'workspace-package-self-reference',
         setup(build: any) {
             build.onResolve({ filter: /^elit(?:\/.*)?$/ }, (args: { path: string; resolveDir?: string }) => {
-                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || resolveDir);
+                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || resolveDir, options);
                 return resolved ? { path: resolved } : undefined;
             });
         },
@@ -262,7 +262,10 @@ export async function buildStandalonePreviewServer(options: StandalonePreviewBui
     mkdirSync(outputDir, { recursive: true });
 
     const { build } = await import('esbuild');
-    const workspacePackagePlugin = createWorkspacePackagePlugin(cwd);
+    const workspacePackagePlugin = createWorkspacePackagePlugin(cwd, {
+        preferBuilt: true,
+        preferredBuiltFormat: 'cjs',
+    });
     const entrySource = createStandalonePreviewEntrySource(options.configPath, plan, options.previewConfig);
 
     await build({

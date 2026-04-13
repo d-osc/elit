@@ -57,15 +57,21 @@ function findInstalledPackageRoot(startDir: string, packageName: string): string
 function getWorkspacePackageImportCandidates(
     packageRoot: string,
     specifier: string,
-    options: { preferBuilt?: boolean } = {},
+    options: { preferBuilt?: boolean; preferredBuiltFormat?: 'cjs' | 'esm' } = {},
 ): string[] {
     const subpath = specifier === 'elit' ? 'index' : specifier.slice('elit/'.length);
 
-    const builtCandidates = [
-        resolve(packageRoot, 'dist', `${subpath}.mjs`),
-        resolve(packageRoot, 'dist', `${subpath}.js`),
-        resolve(packageRoot, 'dist', `${subpath}.cjs`),
-    ];
+    const builtCandidates = options.preferredBuiltFormat === 'cjs'
+        ? [
+            resolve(packageRoot, 'dist', `${subpath}.cjs`),
+            resolve(packageRoot, 'dist', `${subpath}.js`),
+            resolve(packageRoot, 'dist', `${subpath}.mjs`),
+        ]
+        : [
+            resolve(packageRoot, 'dist', `${subpath}.mjs`),
+            resolve(packageRoot, 'dist', `${subpath}.js`),
+            resolve(packageRoot, 'dist', `${subpath}.cjs`),
+        ];
     const sourceCandidates = [
         resolve(packageRoot, 'src', `${subpath}.ts`),
         resolve(packageRoot, 'src', `${subpath}.tsx`),
@@ -79,7 +85,7 @@ function getWorkspacePackageImportCandidates(
 export function resolveWorkspacePackageImport(
     specifier: string,
     startDir: string,
-    options: { preferBuilt?: boolean } = {},
+    options: { preferBuilt?: boolean; preferredBuiltFormat?: 'cjs' | 'esm' } = {},
 ): string | undefined {
     if (specifier !== 'elit' && !specifier.startsWith('elit/')) {
         return undefined;

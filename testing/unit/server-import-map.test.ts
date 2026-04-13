@@ -33,7 +33,7 @@ describe('server import map generation', () => {
         }
     });
 
-    it('uses workspace-local dist JavaScript paths for the elit workspace root in both dev and preview', async () => {
+    it('uses workspace-local dist ESM paths for the elit workspace root in both dev and preview', async () => {
         const workspaceRoot = createTempDir('elit-server-workspace-');
 
         writeFileSync(join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'elit' }, null, 2));
@@ -43,20 +43,41 @@ describe('server import map generation', () => {
 
         const devImports = parseImportMap(await createElitImportMap(workspaceRoot, '', 'dev'));
 
-        expect(devImports.elit).toBe('/dist/index.js');
-        expect(devImports['elit/dom']).toBe('/dist/dom.js');
+        expect(devImports.elit).toBe('/dist/index.mjs');
+        expect(devImports['elit/dom']).toBe('/dist/dom.mjs');
+        expect(devImports['elit/el']).toBe('/dist/el.mjs');
+        expect(devImports['elit/native']).toBe('/dist/native.mjs');
+        expect(devImports['elit/universal']).toBe('/dist/universal.mjs');
+        expect(devImports['elit/router']).toBe('/dist/router.mjs');
+        expect(devImports['elit/state']).toBe('/dist/state.mjs');
+        expect(devImports['elit/style']).toBe('/dist/style.mjs');
+        expect(devImports['elit/hmr']).toBe('/dist/hmr.mjs');
+        expect(devImports['elit/types']).toBe('/dist/types.mjs');
+        expect(devImports['elit/']).toBeUndefined();
+        expect(devImports['elit/server']).toBeUndefined();
+        expect(devImports['elit/build']).toBeUndefined();
         expect(JSON.stringify(devImports)).not.toContain('/src/');
         expect(JSON.stringify(devImports)).not.toContain('.ts');
     });
 
-    it('maps installed elit packages through dist exports instead of src paths', async () => {
+    it('maps only browser-safe installed elit exports through dist outputs', async () => {
         const appRoot = createTempDir('elit-server-import-map-');
         const installedElitDir = join(appRoot, 'node_modules', 'elit');
 
         mkdirSync(join(installedElitDir, 'dist'), { recursive: true });
         writeFileSync(join(appRoot, 'package.json'), JSON.stringify({ name: 'example-app' }, null, 2));
         writeFileSync(join(installedElitDir, 'dist', 'index.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'dom.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'el.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'native.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'universal.mjs'), 'export {};\n');
         writeFileSync(join(installedElitDir, 'dist', 'router.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'state.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'style.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'hmr.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'types.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'server.mjs'), 'export {};\n');
+        writeFileSync(join(installedElitDir, 'dist', 'build.mjs'), 'export {};\n');
         writeFileSync(
             join(installedElitDir, 'package.json'),
             JSON.stringify({
@@ -67,10 +88,40 @@ describe('server import map generation', () => {
                         import: './dist/index.mjs',
                         require: './dist/index.cjs',
                     },
+                    './dom': {
+                        import: './dist/dom.mjs',
+                    },
+                    './el': {
+                        import: './dist/el.mjs',
+                    },
+                    './native': {
+                        import: './dist/native.mjs',
+                    },
+                    './universal': {
+                        import: './dist/universal.mjs',
+                    },
                     './router': {
                         browser: './dist/router.js',
                         import: './dist/router.mjs',
                         require: './dist/router.cjs',
+                    },
+                    './state': {
+                        import: './dist/state.mjs',
+                    },
+                    './style': {
+                        import: './dist/style.mjs',
+                    },
+                    './hmr': {
+                        import: './dist/hmr.mjs',
+                    },
+                    './types': {
+                        import: './dist/types.mjs',
+                    },
+                    './server': {
+                        import: './dist/server.mjs',
+                    },
+                    './build': {
+                        import: './dist/build.mjs',
                     },
                 },
             }, null, 2),
@@ -81,8 +132,18 @@ describe('server import map generation', () => {
         const imports = parseImportMap(await createElitImportMap(appRoot, '/base', 'preview'));
 
         expect(imports.elit).toBe('/base/node_modules/elit/dist/index.mjs');
+        expect(imports['elit/dom']).toBe('/base/node_modules/elit/dist/dom.mjs');
+        expect(imports['elit/el']).toBe('/base/node_modules/elit/dist/el.mjs');
+        expect(imports['elit/native']).toBe('/base/node_modules/elit/dist/native.mjs');
+        expect(imports['elit/universal']).toBe('/base/node_modules/elit/dist/universal.mjs');
         expect(imports['elit/router']).toBe('/base/node_modules/elit/dist/router.mjs');
-        expect(imports['elit/']).toBe('/base/node_modules/elit/');
+        expect(imports['elit/state']).toBe('/base/node_modules/elit/dist/state.mjs');
+        expect(imports['elit/style']).toBe('/base/node_modules/elit/dist/style.mjs');
+        expect(imports['elit/hmr']).toBe('/base/node_modules/elit/dist/hmr.mjs');
+        expect(imports['elit/types']).toBe('/base/node_modules/elit/dist/types.mjs');
+        expect(imports['elit/']).toBeUndefined();
+        expect(imports['elit/server']).toBeUndefined();
+        expect(imports['elit/build']).toBeUndefined();
         expect(JSON.stringify(imports)).not.toContain('/node_modules/elit/src/');
     });
 });

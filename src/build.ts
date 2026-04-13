@@ -41,12 +41,12 @@ function readFileAsString(filePath: string): string {
     return typeof contentBuffer === 'string' ? contentBuffer : contentBuffer.toString('utf-8');
 }
 
-function createWorkspacePackagePlugin(entryDir: string) {
+function createWorkspacePackagePlugin(entryDir: string, options: { preferBuilt?: boolean; preferredBuiltFormat?: 'cjs' | 'esm' } = {}) {
     return {
         name: 'workspace-package-self-reference',
         setup(build: any) {
             build.onResolve({ filter: /^elit(?:\/.*)?$/ }, (args: { path: string; resolveDir?: string }) => {
-                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || entryDir);
+                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || entryDir, options);
                 return resolved ? { path: resolved } : undefined;
             });
         },
@@ -149,7 +149,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
 
     try {
         const platform = config.platform || (config.format === 'cjs' ? 'node' : 'browser');
-        const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(entryPath));
+        const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(entryPath), {
+            preferBuilt: platform === 'browser',
+            preferredBuiltFormat: platform === 'browser' ? 'esm' : undefined,
+        });
         const plugins = platform === 'browser'
             ? [workspacePackagePlugin, browserOnlyPlugin]
             : [workspacePackagePlugin];

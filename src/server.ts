@@ -507,25 +507,35 @@ export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePa
   return undefined;
 }
 
+const BROWSER_SAFE_ELIT_IMPORTS = {
+  'elit': 'index',
+  'elit/dom': 'dom',
+  'elit/el': 'el',
+  'elit/native': 'native',
+  'elit/universal': 'universal',
+  'elit/router': 'router',
+  'elit/state': 'state',
+  'elit/style': 'style',
+  'elit/hmr': 'hmr',
+  'elit/types': 'types',
+} as const;
+
+function createBrowserSafeElitImports(basePath: string, fileExt: string): ImportMapEntry {
+  return Object.fromEntries(
+    Object.entries(BROWSER_SAFE_ELIT_IMPORTS).map(([specifier, outputName]) => [
+      specifier,
+      `${basePath}/${outputName}${fileExt}`,
+    ]),
+  );
+}
+
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
 export const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
   const workspaceImportBasePath = await resolveWorkspaceElitImportBasePath(rootDir, basePath, mode);
-  const fileExt = '.js';
+  const fileExt = '.mjs';
 
   const elitImports: ImportMapEntry = workspaceImportBasePath
-    ? {
-        "elit": `${workspaceImportBasePath}/index${fileExt}`,
-        "elit/": `${workspaceImportBasePath}/`,
-        "elit/dom": `${workspaceImportBasePath}/dom${fileExt}`,
-        "elit/state": `${workspaceImportBasePath}/state${fileExt}`,
-        "elit/style": `${workspaceImportBasePath}/style${fileExt}`,
-        "elit/el": `${workspaceImportBasePath}/el${fileExt}`,
-        "elit/universal": `${workspaceImportBasePath}/universal${fileExt}`,
-        "elit/router": `${workspaceImportBasePath}/router${fileExt}`,
-        "elit/hmr": `${workspaceImportBasePath}/hmr${fileExt}`,
-        "elit/types": `${workspaceImportBasePath}/types${fileExt}`,
-        "elit/native": `${workspaceImportBasePath}/native${fileExt}`
-      }
+    ? createBrowserSafeElitImports(workspaceImportBasePath, fileExt)
     : {};
 
   // Generate external library imports
@@ -915,6 +925,42 @@ function processExportsField(
   baseUrl: string,
   importMap: ImportMapEntry
 ): void {
+  if (pkgName === 'elit') {
+    if (typeof exports !== 'object' || exports === null) {
+      return;
+    }
+
+    const elitExports = exports as Record<string, unknown>;
+    const browserSafeImports: ImportMapEntry = {};
+
+    const rootResolved = '.' in elitExports
+      ? resolveExport(elitExports['.'])
+      : 'import' in elitExports
+        ? resolveExport(elitExports)
+        : null;
+
+    if (rootResolved) {
+      browserSafeImports.elit = `${baseUrl}/${rootResolved}`;
+    }
+
+    const allowedSubpaths = Object.keys(BROWSER_SAFE_ELIT_IMPORTS)
+      .filter((specifier) => specifier !== 'elit')
+      .map((specifier) => ({
+        exportKey: `./${specifier.slice('elit/'.length)}`,
+        importName: specifier,
+      }));
+
+    for (const { exportKey, importName } of allowedSubpaths) {
+      const resolved = resolveExport(elitExports[exportKey]);
+      if (resolved) {
+        browserSafeImports[importName] = `${baseUrl}/${resolved}`;
+      }
+    }
+
+    Object.assign(importMap, browserSafeImports);
+    return;
+  }
+
   // Simple string export
   if (typeof exports === 'string') {
     importMap[pkgName] = `${baseUrl}/${exports}`;
@@ -1387,6 +1433,7 @@ const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root
 
 interface NormalizedClient {
   root: string;
+  fallbackRoot?: string;
   basePath: string;
   index?: string;
   ssr?: () => Child | string;
@@ -1414,6 +1461,109 @@ function shouldUseClientFallbackRoot(primaryRoot: string, fallbackRoot: string |
     || existsSync(join(resolvedPrimaryRoot, normalizedIndexPath));
 
   return !primaryHasRuntimeSources;
+}
+
+function isPathWithinRoot(filePath: string, rootDir: string): boolean {
+  return filePath === rootDir || filePath.startsWith(rootDir.endsWith(sep) ? rootDir : `${rootDir}${sep}`);
+}
+
+async function getAllowedClientRoots(client: Pick<NormalizedClient, 'root' | 'fallbackRoot'>): Promise<string[]> {
+  const allowedRoots: string[] = [];
+
+  for (const candidateRoot of [client.root, client.fallbackRoot]) {
+    if (!candidateRoot) {
+      continue;
+    }
+
+    try {
+      const resolvedRoot = await realpath(resolve(candidateRoot));
+      if (!allowedRoots.includes(resolvedRoot)) {
+        allowedRoots.push(resolvedRoot);
+      }
+    } catch {
+      // Ignore unavailable fallback roots.
+    }
+  }
+
+  return allowedRoots;
+}
+
+async function getClientBaseDirs(
+  client: Pick<NormalizedClient, 'root' | 'fallbackRoot'>,
+  isDistRequest: boolean,
+  isNodeModulesRequest: boolean,
+): Promise<string[]> {
+  const baseDirs: string[] = [];
+
+  for (const candidateRoot of [client.root, client.fallbackRoot]) {
+    if (!candidateRoot) {
+      continue;
+    }
+
+    try {
+      const resolvedRoot = await realpath(resolve(candidateRoot));
+      let baseDir = resolvedRoot;
+
+      if (isDistRequest || isNodeModulesRequest) {
+        const targetDir = isDistRequest ? 'dist' : 'node_modules';
+        const foundDir = await findSpecialDir(candidateRoot, targetDir);
+        baseDir = foundDir ? await realpath(foundDir) : resolvedRoot;
+      }
+
+      if (!baseDirs.includes(baseDir)) {
+        baseDirs.push(baseDir);
+      }
+    } catch {
+      // Ignore unavailable fallback roots.
+    }
+  }
+
+  return baseDirs;
+}
+
+async function resolveClientPathFromBaseDir(baseDir: string, normalizedPath: string): Promise<string | undefined> {
+  const tryRealpathWithinBaseDir = async (relativePath: string): Promise<string | undefined> => {
+    const unresolvedPath = resolve(join(baseDir, relativePath));
+    if (!isPathWithinRoot(unresolvedPath, baseDir)) {
+      return undefined;
+    }
+
+    try {
+      return await realpath(unresolvedPath);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const exactPath = await tryRealpathWithinBaseDir(normalizedPath);
+  if (exactPath) {
+    return exactPath;
+  }
+
+  if (normalizedPath.endsWith('.js')) {
+    const tsPath = await tryRealpathWithinBaseDir(normalizedPath.replace(/\.js$/, '.ts'));
+    if (tsPath) {
+      return tsPath;
+    }
+  }
+
+  if (normalizedPath.includes('.')) {
+    return undefined;
+  }
+
+  for (const candidatePath of [
+    `${normalizedPath}.ts`,
+    `${normalizedPath}.js`,
+    join(normalizedPath, 'index.ts'),
+    join(normalizedPath, 'index.js'),
+  ]) {
+    const resolvedPath = await tryRealpathWithinBaseDir(candidatePath);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+  }
+
+  return undefined;
 }
 
 export function createDevServer(options: DevServerOptions): DevServer {
@@ -1460,6 +1610,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     return {
       root: activeRoot,
+      fallbackRoot: useFallbackRoot ? undefined : client.fallbackRoot,
       basePath,
       index: useFallbackRoot ? undefined : indexPath,
       ssr: useFallbackRoot ? undefined : client.ssr,
@@ -1600,98 +1751,28 @@ export function createDevServer(options: DevServerOptions): DevServer {
     }
     normalizedPath = tempPath;
 
-    // Resolve file path
-    const rootDir = await realpath(resolve(matchedClient.root));
-    let baseDir = rootDir;
+    let fullPath;
+    const baseDirs = await getClientBaseDirs(matchedClient, isDistRequest, isNodeModulesRequest);
 
-    // Auto-detect base directory for /dist/* and /node_modules/* requests
-    if (isDistRequest || isNodeModulesRequest) {
-      const targetDir = isDistRequest ? 'dist' : 'node_modules';
-      const foundDir = await findSpecialDir(matchedClient.root, targetDir);
-      baseDir = foundDir ? await realpath(foundDir) : rootDir;
+    for (const baseDir of baseDirs) {
+      fullPath = await resolveClientPathFromBaseDir(baseDir, normalizedPath);
+      if (fullPath) {
+        if (config.logging && filePath === '/src/pages') {
+          console.log(`[DEBUG] Initial resolve succeeded: ${fullPath}`);
+        }
+        break;
+      }
     }
 
-    let fullPath;
-
-    try {
-      // First check path without resolving symlinks for security
-      const unresolvedPath = resolve(join(baseDir, normalizedPath));
-      if (!unresolvedPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
-        if (config.logging) console.log(`[403] File access outside of root (before symlink): ${unresolvedPath}`);
-        return send403(res, '403 Forbidden');
-      }
-
-      // Then resolve symlinks to get actual file
-      fullPath = await realpath(unresolvedPath);
-      if (config.logging && filePath === '/src/pages') {
-        console.log(`[DEBUG] Initial resolve succeeded: ${fullPath}`);
-      }
-    } catch (firstError) {
-      // If file not found, try different extensions
-      let resolvedPath: string | undefined;
-
-      if (config.logging && !normalizedPath.includes('.')) {
-        console.log(`[DEBUG] File not found: ${normalizedPath}, trying extensions...`);
-      }
-
-      // If .js file not found, try .ts file
-      if (normalizedPath.endsWith('.js')) {
-        const tsPath = normalizedPath.replace(/\.js$/, '.ts');
-        try {
-          const tsFullPath = await realpath(resolve(join(baseDir, tsPath)));
-          // Security: Ensure path is strictly within the allowed root directory
-          if (!tsFullPath.startsWith(baseDir.endsWith(sep) ? baseDir : baseDir + sep)) {
-            if (config.logging) console.log(`[403] Fallback TS path outside of root: ${tsFullPath}`);
-            return send403(res, '403 Forbidden');
-          }
-          resolvedPath = tsFullPath;
-        } catch {
-          // Continue to next attempt
+    if (!fullPath) {
+      if (!res.headersSent) {
+        if (filePath === '/index.html' && matchedClient.ssr) {
+          return await serveSSR(res, matchedClient);
         }
+        if (config.logging) console.log(`[404] ${filePath}`);
+        return send404(res, '404 Not Found');
       }
-
-      // If no extension, try adding .ts or .js, or index files
-      if (!resolvedPath && !normalizedPath.includes('.')) {
-        // Try .ts first
-        try {
-          resolvedPath = await realpath(resolve(join(baseDir, normalizedPath + '.ts')));
-          if (config.logging) console.log(`[DEBUG] Found: ${normalizedPath}.ts`);
-        } catch {
-          // Try .js
-          try {
-            resolvedPath = await realpath(resolve(join(baseDir, normalizedPath + '.js')));
-            if (config.logging) console.log(`[DEBUG] Found: ${normalizedPath}.js`);
-          } catch {
-            // Try index.ts in directory
-            try {
-              resolvedPath = await realpath(resolve(join(baseDir, normalizedPath, 'index.ts')));
-              if (config.logging) console.log(`[DEBUG] Found: ${normalizedPath}/index.ts`);
-            } catch {
-              // Try index.js in directory
-              try {
-                resolvedPath = await realpath(resolve(join(baseDir, normalizedPath, 'index.js')));
-                if (config.logging) console.log(`[DEBUG] Found: ${normalizedPath}/index.js`);
-              } catch {
-                if (config.logging) console.log(`[DEBUG] Not found: all attempts failed for ${normalizedPath}`);
-              }
-            }
-          }
-        }
-      }
-
-      if (!resolvedPath) {
-        if (!res.headersSent) {
-          // If index.html not found but SSR function exists, use SSR
-          if (filePath === '/index.html' && matchedClient.ssr) {
-            return await serveSSR(res, matchedClient);
-          }
-          if (config.logging) console.log(`[404] ${filePath}`);
-          return send404(res, '404 Not Found');
-        }
-        return;
-      }
-
-      fullPath = resolvedPath;
+      return;
     }
 
     // Check if resolved path is a directory, try index files
@@ -1731,12 +1812,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
     // No need to check again after symlink resolution as that would block legitimate symlinks
 
     try {
+      const allowedRoots = await getAllowedClientRoots(matchedClient);
       const stats = await stat(fullPath);
 
       if (stats.isDirectory()) {
         try {
           const indexPath = await realpath(resolve(join(fullPath, 'index.html')));
-          if (!indexPath.startsWith(rootDir + sep) && indexPath !== rootDir) {
+          if (!isPathWithinRoot(indexPath, fullPath) && !allowedRoots.some((rootDir) => isPathWithinRoot(indexPath, rootDir))) {
             return send403(res, '403 Forbidden');
           }
           await stat(indexPath);
@@ -1768,7 +1850,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
     }
 
     try {
-      const rootDir = await realpath(resolve(client.root));
+      const allowedRoots = await getAllowedClientRoots(client);
+      const rootDir = allowedRoots[0] || await realpath(resolve(client.root));
 
       // Security: Check path before resolving symlinks
       const unresolvedPath = resolve(filePath);
@@ -1776,7 +1859,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
       // Skip security check for node_modules and dist (these may be symlinks)
       if (!isNodeModulesOrDist) {
         // Check if path is within project root
-        if (!unresolvedPath.startsWith(rootDir + sep) && unresolvedPath !== rootDir) {
+        if (!allowedRoots.some((allowedRoot) => isPathWithinRoot(unresolvedPath, allowedRoot))) {
           if (config.logging) console.log(`[403] Attempted to serve file outside allowed directories: ${filePath}`);
           return send403(res, '403 Forbidden');
         }
