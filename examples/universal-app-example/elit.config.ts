@@ -1,5 +1,9 @@
 import { defineConfig } from '../../src/config';
 
+const desktopBinaryPath = process.env.ELIT_DESKTOP_BINARY_PATH;
+const desktopNativeBinaryPath = process.env.ELIT_DESKTOP_NATIVE_BINARY_PATH;
+const desktopCargoTargetDir = process.env.ELIT_DESKTOP_CARGO_TARGET_DIR;
+
 export default defineConfig({
     build: [{
         entry: './src/web-main.ts',
@@ -24,9 +28,12 @@ export default defineConfig({
         ],
     }],
     desktop: {
+        ...(desktopBinaryPath ? { binaryPath: desktopBinaryPath } : {}),
+        ...(desktopNativeBinaryPath ? { nativeBinaryPath: desktopNativeBinaryPath } : {}),
+        ...(desktopCargoTargetDir ? { cargoTargetDir: desktopCargoTargetDir } : {}),
         compiler: 'auto',
         entry: './src/web-main.ts',
-        mode: 'native',
+        mode: 'hybrid',
         native: {
             entry: './src/web-main.ts',
         },

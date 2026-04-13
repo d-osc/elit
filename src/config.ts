@@ -205,8 +205,14 @@ export interface DesktopConfig {
     mode?: DesktopMode;
     /** Desktop entry file used when the CLI command omits <entry> in hybrid mode */
     entry?: string;
+    /** Optional prebuilt hybrid desktop runtime binary path, relative to the current project when not absolute */
+    binaryPath?: string;
+    /** Optional Cargo target directory override for desktop runtime builds */
+    cargoTargetDir?: string;
     /** Optional native desktop entry defaults */
     native?: DesktopNativeConfig;
+    /** Optional prebuilt native desktop runtime binary path, relative to the current project when not absolute */
+    nativeBinaryPath?: string;
     /** Native desktop runtime: quickjs, bun, node, deno */
     runtime?: 'quickjs' | 'bun' | 'node' | 'deno';
     /** Desktop entry compiler: auto, none, esbuild, tsx, tsup */
@@ -455,6 +461,9 @@ async function loadConfigFile(configPath: string): Promise<ElitConfig> {
             await build({
                 entryPoints: [configPath],
                 bundle: true,
+                banner: {
+                    js: `import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);`,
+                },
                 format: 'esm',
                 platform: 'node',
                 outfile: tempFile,

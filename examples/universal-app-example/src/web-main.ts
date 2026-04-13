@@ -132,6 +132,7 @@ if (surface === 'desktop') {
         height: 720,
         title: `${APP_NAME} Desktop`,
         width: 1080,
+        icon:"./public/favicon.svg",
     });
 }
 

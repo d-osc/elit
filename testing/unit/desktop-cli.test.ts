@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import {
     getDefaultDesktopMode,
     parseDesktopMode,
+    resolveDesktopBinaryOverridePath,
+    resolveDesktopCargoTargetBaseDir,
     resolveConfiguredDesktopEntry,
     resolveDesktopBootstrapSupportModulePath,
 } from '../../src/desktop-cli';
@@ -77,5 +79,64 @@ describe('desktop bootstrap support module resolution', () => {
         } finally {
             rmSync(packageRoot, { force: true, recursive: true });
         }
+    });
+});
+
+describe('desktop cargo target directory resolution', () => {
+    it('uses LocalAppData on Windows when available', () => {
+        const packageRoot = mkdtempSync(join(tmpdir(), 'elit-desktop-cli-'));
+        const appDir = join(packageRoot, 'examples', 'app');
+
+        try {
+            mkdirSync(appDir, { recursive: true });
+
+            expect(resolveDesktopCargoTargetBaseDir(packageRoot, appDir, {
+                LOCALAPPDATA: 'C:\\Users\\tester\\AppData\\Local',
+            }, 'win32')).toBe(join('C:\\Users\\tester\\AppData\\Local', 'elit', 'target', 'desktop'));
+        } finally {
+            rmSync(packageRoot, { force: true, recursive: true });
+        }
+    });
+
+    it('moves installed-package builds outside node_modules when no Windows cache directory is available', () => {
+        const consumerRoot = mkdtempSync(join(tmpdir(), 'elit-desktop-cli-'));
+        const packageRoot = join(consumerRoot, 'node_modules', 'elit');
+
+        try {
+            mkdirSync(packageRoot, { recursive: true });
+
+            expect(resolveDesktopCargoTargetBaseDir(packageRoot, consumerRoot, {}, 'linux')).toBe(
+                join(consumerRoot, '.elit', 'target', 'desktop'),
+            );
+        } finally {
+            rmSync(consumerRoot, { force: true, recursive: true });
+        }
+    });
+
+    it('allows an explicit cargo target override', () => {
+        expect(resolveDesktopCargoTargetBaseDir('C:/package', 'C:/app', {
+            ELIT_DESKTOP_CARGO_TARGET_DIR: 'D:/elit-cache/desktop',
+            LOCALAPPDATA: 'C:/Users/tester/AppData/Local',
+        }, 'win32')).toBe('D:/elit-cache/desktop');
+    });
+});
+
+describe('desktop runtime binary override resolution', () => {
+    it('prefers env-configured desktop binary overrides', () => {
+        expect(resolveDesktopBinaryOverridePath('./runtime/elit-desktop.exe', 'ELIT_DESKTOP_BINARY_PATH', 'C:/app', {
+            ELIT_DESKTOP_BINARY_PATH: 'D:/approved/elit-desktop.exe',
+        })).toBe('D:/approved/elit-desktop.exe');
+    });
+
+    it('falls back to config-configured desktop binary overrides', () => {
+        expect(resolveDesktopBinaryOverridePath('./runtime/elit-desktop.exe', 'ELIT_DESKTOP_BINARY_PATH', 'C:/app', {})).toBe(
+            'C:/app/runtime/elit-desktop.exe',
+        );
+    });
+
+    it('supports native desktop binary overrides', () => {
+        expect(resolveDesktopBinaryOverridePath('./runtime/elit-desktop-native.exe', 'ELIT_DESKTOP_NATIVE_BINARY_PATH', 'C:/app', {})).toBe(
+            'C:/app/runtime/elit-desktop-native.exe',
+        );
     });
 });

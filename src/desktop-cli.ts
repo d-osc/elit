@@ -34,6 +34,9 @@ interface DesktopRunOptions {
     runtime: DesktopRuntimeName;
     compiler: DesktopCompilerName;
     exportName?: string;
+    binaryPath?: string;
+    nativeBinaryPath?: string;
+    cargoTargetDir?: string;
     release: boolean;
     entry?: string;
 }
@@ -48,12 +51,16 @@ interface EnsureBinaryOptions {
     release: boolean;
     triple?: string;
     entryPath?: string;
+    binaryPath?: string;
+    cargoTargetDir?: string;
 }
 
 interface EnsureNativeBinaryOptions {
     release: boolean;
     triple?: string;
     entryPath?: string;
+    binaryPath?: string;
+    cargoTargetDir?: string;
 }
 
 interface PreparedEntry {
@@ -143,6 +150,12 @@ function toDesktopBootstrapImportPath(fromPath: string, toPath: string): string 
     return importPath.startsWith('./') || importPath.startsWith('../') ? importPath : `./${importPath}`;
 }
 
+function isNodeModulesPackagePath(path: string): boolean {
+    return path
+        .split(/[\\/]+/)
+        .some((segment) => segment.toLowerCase() === 'node_modules');
+}
+
 function formatDesktopDisplayName(value: string): string {
     if (!value) {
         return 'Elit';
@@ -204,6 +217,44 @@ export function resolveDesktopBootstrapSupportModulePath(
     throw new Error(
         `Desktop support module "${moduleName}" was not found in ${packageRoot}. Expected one of: ${candidates.join(', ')}`,
     );
+}
+
+export function resolveDesktopCargoTargetBaseDir(
+    packageRoot = PACKAGE_ROOT,
+    cwd = process.cwd(),
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+): string {
+    const explicitTargetDir = env.ELIT_DESKTOP_CARGO_TARGET_DIR?.trim();
+    if (explicitTargetDir) {
+        return resolve(explicitTargetDir);
+    }
+
+    const localAppData = env.LOCALAPPDATA?.trim();
+    if (platform === 'win32' && localAppData) {
+        return resolve(localAppData, 'elit', 'target', 'desktop');
+    }
+
+    if (isNodeModulesPackagePath(packageRoot)) {
+        return resolve(cwd, '.elit', 'target', 'desktop');
+    }
+
+    return resolve(packageRoot, 'target', 'desktop');
+}
+
+export function resolveDesktopBinaryOverridePath(
+    configuredPath: string | undefined,
+    envName: 'ELIT_DESKTOP_BINARY_PATH' | 'ELIT_DESKTOP_NATIVE_BINARY_PATH',
+    cwd = process.cwd(),
+    env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+    const explicitPath = env[envName]?.trim() || configuredPath?.trim();
+
+    if (!explicitPath) {
+        return undefined;
+    }
+
+    return resolve(cwd, explicitPath);
 }
 
 function createDesktopBootstrapEntry(entryPath: string, appName: string): DesktopBootstrapEntry {
@@ -312,6 +363,9 @@ function parseDesktopRunArgs(args: string[], config?: DesktopConfig): DesktopRun
         mode: getDefaultDesktopMode(config),
         entry: undefined,
         exportName: config?.native?.exportName,
+        binaryPath: config?.binaryPath,
+        nativeBinaryPath: config?.nativeBinaryPath,
+        cargoTargetDir: config?.cargoTargetDir,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -383,6 +437,9 @@ function parseDesktopBuildArgs(args: string[], config?: DesktopConfig): DesktopB
         mode: getDefaultDesktopMode(config),
         entry: undefined,
         exportName: config?.native?.exportName,
+        binaryPath: config?.binaryPath,
+        nativeBinaryPath: config?.nativeBinaryPath,
+        cargoTargetDir: config?.cargoTargetDir,
         runtime: config?.runtime ?? 'quickjs',
         compiler: config?.compiler ?? 'auto',
         release: config?.release ?? false,
@@ -541,6 +598,8 @@ function printDesktopHelp(): void {
         '  - TypeScript and module-style QuickJS entries are transpiled automatically.',
         '  - The tsx compiler is Node-only and keeps loading the original source tree.',
         '  - The tsx and tsup compilers require those packages to be installed.',
+        '  - Use desktop.binaryPath / desktop.nativeBinaryPath or ELIT_DESKTOP_BINARY_PATH / ELIT_DESKTOP_NATIVE_BINARY_PATH to reuse prebuilt runtimes when Cargo builds are blocked.',
+        '  - Use desktop.cargoTargetDir or ELIT_DESKTOP_CARGO_TARGET_DIR to move the desktop Cargo cache to a policy-approved location.',
         '  - desktop.mode defaults to "native" when desktop.native.entry exists, otherwise "hybrid".',
         '  - desktop.entry is used for hybrid mode. desktop.native.entry is used for native mode.',
         '  - Native mode falls back to desktop.entry when only the legacy desktop.entry is configured.',
@@ -829,6 +888,8 @@ async function runDesktopRuntime(options: DesktopRunOptions): Promise<void> {
     try {
         const binary = ensureDesktopBinary({
             runtime: options.runtime,
+            binaryPath: options.binaryPath,
+            cargoTargetDir: options.cargoTargetDir,
             release: options.release,
             entryPath: options.entry,
         });
@@ -847,6 +908,8 @@ async function runDesktopNativeRuntime(options: DesktopRunOptions): Promise<void
 
     try {
         const binary = ensureDesktopNativeBinary({
+            binaryPath: options.nativeBinaryPath,
+            cargoTargetDir: options.cargoTargetDir,
             release: options.release,
             entryPath: options.entry,
         });
@@ -867,13 +930,14 @@ async function buildDesktopBundle(options: DesktopBuildOptions): Promise<void> {
     }
 
     const triple = options.platform ? PLATFORMS[options.platform] : undefined;
-    buildDesktopRuntime({
+    const binary = ensureDesktopBinary({
         runtime: options.runtime,
+        binaryPath: options.binaryPath,
+        cargoTargetDir: options.cargoTargetDir,
         release: options.release,
         triple,
         entryPath: options.entry,
     });
-    const binary = findDesktopBinary(options.runtime, options.release, triple);
 
     if (!binary) {
         throw new Error('Desktop runtime binary was not found after cargo build completed.');
@@ -911,12 +975,13 @@ async function buildDesktopBundle(options: DesktopBuildOptions): Promise<void> {
 
 async function buildDesktopNativeBundle(options: DesktopBuildOptions): Promise<void> {
     const triple = options.platform ? PLATFORMS[options.platform] : undefined;
-    buildDesktopNativeRuntime({
+    const binary = ensureDesktopNativeBinary({
+        binaryPath: options.nativeBinaryPath,
+        cargoTargetDir: options.cargoTargetDir,
         release: options.release,
         triple,
         entryPath: options.entry,
     });
-    const binary = findDesktopNativeBinary(options.release, triple);
 
     if (!binary) {
         throw new Error('Desktop native runtime binary was not found after cargo build completed.');
@@ -952,11 +1017,20 @@ async function buildDesktopNativeBundle(options: DesktopBuildOptions): Promise<v
 }
 
 function ensureDesktopBinary(options: EnsureBinaryOptions): string {
-    let binary = findDesktopBinary(options.runtime, options.release, options.triple);
+    const overriddenBinary = resolveDesktopBinaryOverridePath(options.binaryPath, 'ELIT_DESKTOP_BINARY_PATH');
+    if (overriddenBinary) {
+        if (!existsSync(overriddenBinary)) {
+            throw new Error(`Configured desktop runtime binary was not found: ${overriddenBinary}`);
+        }
+
+        return overriddenBinary;
+    }
+
+    let binary = findDesktopBinary(options.runtime, options.release, options.triple, options.cargoTargetDir);
 
     if (!binary || isDesktopRustBuildStale(binary)) {
         buildDesktopRuntime(options);
-        binary = findDesktopBinary(options.runtime, options.release, options.triple);
+        binary = findDesktopBinary(options.runtime, options.release, options.triple, options.cargoTargetDir);
     }
 
     if (!binary) {
@@ -967,11 +1041,20 @@ function ensureDesktopBinary(options: EnsureBinaryOptions): string {
 }
 
 function ensureDesktopNativeBinary(options: EnsureNativeBinaryOptions): string {
-    let binary = findDesktopNativeBinary(options.release, options.triple);
+    const overriddenBinary = resolveDesktopBinaryOverridePath(options.binaryPath, 'ELIT_DESKTOP_NATIVE_BINARY_PATH');
+    if (overriddenBinary) {
+        if (!existsSync(overriddenBinary)) {
+            throw new Error(`Configured desktop native runtime binary was not found: ${overriddenBinary}`);
+        }
+
+        return overriddenBinary;
+    }
+
+    let binary = findDesktopNativeBinary(options.release, options.triple, options.cargoTargetDir);
 
     if (!binary || isDesktopRustBuildStale(binary)) {
         buildDesktopNativeRuntime(options);
-        binary = findDesktopNativeBinary(options.release, options.triple);
+        binary = findDesktopNativeBinary(options.release, options.triple, options.cargoTargetDir);
     }
 
     if (!binary) {
@@ -1003,7 +1086,7 @@ function buildDesktopRuntime(options: EnsureBinaryOptions): void {
 
     const env: NodeJS.ProcessEnv = {
         ...process.env,
-        CARGO_TARGET_DIR: desktopCargoTargetDir(options.runtime),
+        CARGO_TARGET_DIR: desktopCargoTargetDir(options.runtime, options.cargoTargetDir),
     };
 
     const iconPath = resolveDesktopIcon(options.entryPath);
@@ -1028,6 +1111,7 @@ function buildDesktopRuntime(options: EnsureBinaryOptions): void {
     }
 
     if (result.status !== 0) {
+        printDesktopCargoFailureHint('hybrid');
         process.exit(result.status ?? 1);
     }
 }
@@ -1051,7 +1135,7 @@ function buildDesktopNativeRuntime(options: EnsureNativeBinaryOptions): void {
 
     const env: NodeJS.ProcessEnv = {
         ...process.env,
-        CARGO_TARGET_DIR: desktopNativeCargoTargetDir(),
+        CARGO_TARGET_DIR: desktopNativeCargoTargetDir(options.cargoTargetDir),
     };
 
     const iconPath = resolveDesktopIcon(options.entryPath);
@@ -1076,12 +1160,24 @@ function buildDesktopNativeRuntime(options: EnsureNativeBinaryOptions): void {
     }
 
     if (result.status !== 0) {
+        printDesktopCargoFailureHint('native');
         process.exit(result.status ?? 1);
     }
 }
 
-function findDesktopBinary(runtime: DesktopRuntimeName, release: boolean, triple?: string): string | null {
-    const targetDir = desktopCargoTargetDir(runtime);
+function findDesktopBinary(
+    runtime: DesktopRuntimeName,
+    release: boolean,
+    triple?: string,
+    configuredTargetDir?: string,
+    configuredBinaryPath?: string,
+): string | null {
+    const overriddenBinary = resolveDesktopBinaryOverridePath(configuredBinaryPath, 'ELIT_DESKTOP_BINARY_PATH');
+    if (overriddenBinary) {
+        return existsSync(overriddenBinary) ? overriddenBinary : null;
+    }
+
+    const targetDir = desktopCargoTargetDir(runtime, configuredTargetDir);
     const profile = release ? 'release' : 'debug';
     const binaryName = isWindowsTarget(triple) ? 'elit-desktop.exe' : 'elit-desktop';
     const candidates = triple
@@ -1097,8 +1193,18 @@ function findDesktopBinary(runtime: DesktopRuntimeName, release: boolean, triple
     return null;
 }
 
-function findDesktopNativeBinary(release: boolean, triple?: string): string | null {
-    const targetDir = desktopNativeCargoTargetDir();
+function findDesktopNativeBinary(
+    release: boolean,
+    triple?: string,
+    configuredTargetDir?: string,
+    configuredBinaryPath?: string,
+): string | null {
+    const overriddenBinary = resolveDesktopBinaryOverridePath(configuredBinaryPath, 'ELIT_DESKTOP_NATIVE_BINARY_PATH');
+    if (overriddenBinary) {
+        return existsSync(overriddenBinary) ? overriddenBinary : null;
+    }
+
+    const targetDir = desktopNativeCargoTargetDir(configuredTargetDir);
     const profile = release ? 'release' : 'debug';
     const binaryName = isWindowsTarget(triple) ? 'elit-desktop-native.exe' : 'elit-desktop-native';
     const candidates = triple
@@ -1114,12 +1220,40 @@ function findDesktopNativeBinary(release: boolean, triple?: string): string | nu
     return null;
 }
 
-function desktopCargoTargetDir(runtime: DesktopRuntimeName): string {
-    return resolve(PACKAGE_ROOT, 'target', 'desktop', runtime);
+function desktopCargoTargetDir(runtime: DesktopRuntimeName, configuredTargetDir?: string): string {
+    return resolve(resolveDesktopCargoTargetBaseDir(
+        PACKAGE_ROOT,
+        process.cwd(),
+        {
+            ...process.env,
+            ...(configuredTargetDir ? { ELIT_DESKTOP_CARGO_TARGET_DIR: configuredTargetDir } : {}),
+        },
+    ), runtime);
 }
 
-function desktopNativeCargoTargetDir(): string {
-    return resolve(PACKAGE_ROOT, 'target', 'desktop', 'native');
+function desktopNativeCargoTargetDir(configuredTargetDir?: string): string {
+    return resolve(resolveDesktopCargoTargetBaseDir(
+        PACKAGE_ROOT,
+        process.cwd(),
+        {
+            ...process.env,
+            ...(configuredTargetDir ? { ELIT_DESKTOP_CARGO_TARGET_DIR: configuredTargetDir } : {}),
+        },
+    ), 'native');
+}
+
+function printDesktopCargoFailureHint(mode: 'hybrid' | 'native'): void {
+    if (process.platform !== 'win32') {
+        return;
+    }
+
+    const binaryConfigLabel = mode === 'native'
+        ? 'desktop.nativeBinaryPath or ELIT_DESKTOP_NATIVE_BINARY_PATH'
+        : 'desktop.binaryPath or ELIT_DESKTOP_BINARY_PATH';
+
+    console.error('[desktop] Cargo build failed. If Windows Application Control blocks Rust build scripts on this machine, configure a prebuilt runtime binary.');
+    console.error(`[desktop] Use ${binaryConfigLabel} to bypass Cargo for desktop runs/builds.`);
+    console.error('[desktop] Use desktop.cargoTargetDir or ELIT_DESKTOP_CARGO_TARGET_DIR if your environment only allows specific cache locations.');
 }
 
 function isDesktopRustBuildStale(binaryPath: string): boolean {

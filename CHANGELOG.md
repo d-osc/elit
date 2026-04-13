@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.9] - 2026-04-13
+
+### Changed
+- **Universal app desktop example defaults** - the universal app example now reflects the current desktop runtime path more closely for local testing and locked-down Windows workflows
+  - The example desktop config now forwards `ELIT_DESKTOP_BINARY_PATH`, `ELIT_DESKTOP_NATIVE_BINARY_PATH`, and `ELIT_DESKTOP_CARGO_TARGET_DIR` into `desktop` config
+  - The sample desktop flow now defaults to hybrid mode and sets `./public/favicon.svg` as the desktop window icon
+
+### Fixed
+- **Desktop Cargo target placement under Windows policy controls** - installed desktop runtime builds no longer place Cargo build-script executables under `node_modules/elit/target/*`, which can be blocked by Windows Application Control policy
+  - On Windows, desktop runtime builds now default to `%LOCALAPPDATA%/elit/target/desktop/*` instead of the package-local target tree
+  - `ELIT_DESKTOP_CARGO_TARGET_DIR` can override the cache location explicitly when a different policy-approved path is required
+  - Non-Windows installed-package builds still fall back to the consuming app's `.elit/target/desktop/*` directory when Elit runs from `node_modules`
+- **Desktop runtime override escape hatch** - desktop run/build commands can now bypass Cargo entirely by using a prebuilt runtime binary when Windows policy blocks Rust build-script executables
+  - Added `desktop.binaryPath` / `desktop.nativeBinaryPath` config support plus `ELIT_DESKTOP_BINARY_PATH` / `ELIT_DESKTOP_NATIVE_BINARY_PATH` environment overrides
+  - Added `desktop.cargoTargetDir` config support plus `ELIT_DESKTOP_CARGO_TARGET_DIR` environment overrides for policy-approved Cargo cache locations
+  - Windows Cargo failure output now points at the prebuilt-runtime override and target-cache override options
+- **TypeScript config loader compatibility** - `.ts` config files that import bundled local helpers now load cleanly even when those helpers still use CommonJS-style `require(...)`
+  - The temporary ESM config bundle now injects `createRequire(import.meta.url)` so repo-local helper modules can access Node built-ins such as `fs` during config evaluation
+
+### Documentation
+- **Locked-down Windows example workflow** - documented how to prebuild the desktop runtime on an allowed Windows machine, copy the binaries to a policy-approved path, and run the universal app example with the desktop override env vars
+
+### Tests
+- **Desktop runtime override coverage** - added focused desktop CLI coverage for Cargo target overrides and prebuilt runtime binary override resolution
+- **TypeScript config loader regression coverage** - added a focused config-loading test for local helper modules that call `require('fs')` inside a bundled `elit.config.ts`
+
 ## [3.5.8] - 2026-04-13
 
 ### Changed

@@ -57,3 +57,26 @@ bun run mobile:run:android:auto
 - Mobile validation in this repo is Android-focused on Windows. `mobile init` still creates iOS scaffold files because that is how the current CLI behaves.
 - The universal smoke test treats `mobile doctor --json` as informational so machines without a full Android toolchain still get a clear report before build fails.
 - `src/web-main.ts` uses runtime detection to branch its actions and copy, then still finishes with the same `render(...)` call, while desktop and native mobile flows read that render call instead of requiring separate main entries.
+
+## Locked-Down Windows workflow
+
+If Windows Application Control blocks Cargo build scripts on your machine, this example can reuse a prebuilt desktop runtime binary instead of compiling Rust locally.
+
+Build the runtime on another Windows machine that can run Cargo, using the same `v3.5.9` source:
+
+```powershell
+cargo build --manifest-path .\Cargo.toml --bin elit-desktop --no-default-features --features runtime-quickjs --release
+cargo build --manifest-path .\Cargo.toml --bin elit-desktop-native --release
+```
+
+Copy the resulting binaries to a policy-approved path, then set the env vars before running the example:
+
+```powershell
+$env:ELIT_DESKTOP_BINARY_PATH = 'C:\approved\elit-desktop.exe'
+$env:ELIT_DESKTOP_NATIVE_BINARY_PATH = 'C:\approved\elit-desktop-native.exe'
+$env:ELIT_DESKTOP_CARGO_TARGET_DIR = 'C:\approved\elit-cargo-cache'
+npm run desktop:run
+npm run desktop:smoke
+```
+
+`elit.config.ts` already forwards those env vars into the example desktop config, so you do not need to hard-code machine-specific paths into the repo.
