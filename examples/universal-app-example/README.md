@@ -62,7 +62,7 @@ bun run mobile:run:android:auto
 
 If Windows Application Control blocks Cargo build scripts on your machine, this example can reuse a prebuilt desktop runtime binary instead of compiling Rust locally.
 
-Build the runtime on another Windows machine that can run Cargo, using the same `v3.6.4` source:
+Build the runtime on another Windows machine that can run Cargo, using the same `v3.6.5` source:
 
 ```powershell
 cargo build --manifest-path .\Cargo.toml --bin elit-desktop --no-default-features --features runtime-quickjs --release

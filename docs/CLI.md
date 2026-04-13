@@ -283,7 +283,7 @@ Useful options:
 
 Notes:
 
-- `elit wapk pack` includes `node_modules` by default; use `.wapkignore` if you want to exclude dependencies.
+- `elit wapk pack` includes `node_modules` by default; `.wapkignore` now supports ordered negate rules like `!dist`, directory rules like `dist/`, globstar patterns like `**/*.map`, and escaped leading `\!literal` / `\#literal` entries.
 - `--online` creates a shared session on the Elit Run server directly, keeps the CLI alive, and closes the session when you press `Ctrl+C`.
 - Google Drive archives can use the same online handoff with `elit wapk gdrive://<fileId> --online` or `elit wapk run --google-drive-file-id <fileId> ... --online`.
 - By default it looks for Elit Run at `http://localhost:4177`, then `http://localhost:4179`.

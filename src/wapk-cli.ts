@@ -757,7 +757,7 @@ function readLineIgnorePatterns(filePath: string): string[] {
     return readFileSync(filePath, 'utf8')
         .split(/\r?\n/)
         .map((line) => line.trim())
-        .filter((line) => line.length > 0 && !line.startsWith('#'));
+        .filter((line) => line.length > 0 && (!line.startsWith('#') || line.startsWith('\\#')));
 }
 
 function normalizePackageEntry(value: string): string | undefined {
@@ -989,26 +989,139 @@ function resolveLinkedDependencyArchivePrefix(archivePrefix: string, dependencyN
     return `${normalizedPrefix.slice(0, markerIndex + marker.length)}${dependencyName}`;
 }
 
-function shouldIgnore(relativePath: string, ignorePatterns: readonly string[]): boolean {
-    const pathParts = relativePath.split('/');
-    for (const pattern of ignorePatterns) {
-        if (relativePath === pattern || pathParts.includes(pattern)) {
-            return true;
-        }
+function escapeRegex(text: string): string {
+    return text.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
 
-        if (pattern.endsWith('*')) {
-            const prefix = pattern.slice(0, -1);
-            if (relativePath.startsWith(prefix) || pathParts.some((part) => part.startsWith(prefix))) {
-                return true;
+function globPatternToRegex(pattern: string, options: { directoryOnly?: boolean; matchSegmentsOnly?: boolean } = {}): RegExp {
+    let regex = '';
+
+    for (let index = 0; index < pattern.length; index++) {
+        const char = pattern[index];
+
+        if (char === '*') {
+            const nextChar = pattern[index + 1];
+            const nextNextChar = pattern[index + 2];
+
+            if (nextChar === '*') {
+                if (nextNextChar === '/') {
+                    regex += '(?:.*?/)?';
+                    index += 2;
+                    continue;
+                }
+
+                regex += '.*';
+                index += 1;
+                continue;
             }
+
+            regex += '[^/]*';
+            continue;
         }
 
-        if (pattern.startsWith('*.') && relativePath.endsWith(pattern.slice(1))) {
-            return true;
+        if (char === '?') {
+            regex += '[^/]';
+            continue;
         }
+
+        regex += escapeRegex(char);
     }
 
-    return false;
+    const suffix = options.directoryOnly ? '(?:$|/.*)' : '$';
+    const prefix = options.matchSegmentsOnly ? '^(?:.*?/)?' : '^';
+
+    return new RegExp(`${prefix}${regex}${suffix}`);
+}
+
+function normalizeIgnorePattern(pattern: string): {
+    directoryOnly: boolean;
+    matchSegmentsOnly: boolean;
+    negate: boolean;
+    pattern: string;
+} | undefined {
+    let normalizedPattern = pattern.trim();
+    if (!normalizedPattern) {
+        return undefined;
+    }
+
+    let negate = false;
+    if (normalizedPattern.startsWith('\\!') || normalizedPattern.startsWith('\\#')) {
+        normalizedPattern = normalizedPattern.slice(1);
+    } else if (normalizedPattern.startsWith('!')) {
+        negate = true;
+        normalizedPattern = normalizedPattern.slice(1).trim();
+    }
+
+    if (!normalizedPattern) {
+        return undefined;
+    }
+
+    const directoryOnly = normalizedPattern.endsWith('/');
+    if (directoryOnly) {
+        normalizedPattern = normalizedPattern.replace(/\/+$/, '');
+    }
+
+    normalizedPattern = normalizedPattern
+        .replace(/^\.\//, '')
+        .replace(/^\//, '')
+        .replace(/\\/g, '/');
+
+    if (!normalizedPattern) {
+        return undefined;
+    }
+
+    return {
+        directoryOnly,
+        matchSegmentsOnly: !normalizedPattern.includes('/'),
+        negate,
+        pattern: normalizedPattern,
+    };
+}
+
+function matchesIgnorePattern(relativePath: string, pattern: string, isDirectory: boolean): boolean {
+    const normalizedRule = normalizeIgnorePattern(pattern);
+    if (!normalizedRule) {
+        return false;
+    }
+
+    if (normalizedRule.directoryOnly && !isDirectory) {
+        return false;
+    }
+
+    const hasGlob = /[*?]/.test(normalizedRule.pattern);
+    if (!hasGlob) {
+        if (normalizedRule.matchSegmentsOnly) {
+            return relativePath === normalizedRule.pattern || relativePath.split('/').includes(normalizedRule.pattern);
+        }
+
+        return relativePath === normalizedRule.pattern;
+    }
+
+    if (normalizedRule.matchSegmentsOnly) {
+        const segmentRegex = globPatternToRegex(normalizedRule.pattern);
+        return relativePath.split('/').some((segment) => segmentRegex.test(segment));
+    }
+
+    return globPatternToRegex(normalizedRule.pattern, { directoryOnly: normalizedRule.directoryOnly }).test(relativePath);
+}
+
+function shouldIgnore(relativePath: string, ignorePatterns: readonly string[], isDirectory: boolean): boolean {
+    let ignored = false;
+
+    for (const pattern of ignorePatterns) {
+        const normalizedRule = normalizeIgnorePattern(pattern);
+        if (!normalizedRule) {
+            continue;
+        }
+
+        if (!matchesIgnorePattern(relativePath, pattern, isDirectory)) {
+            continue;
+        }
+
+        ignored = !normalizedRule.negate;
+    }
+
+    return ignored;
 }
 
 function collectFiles(directory: string, baseDirectory: string, ignorePatterns: readonly string[]): WapkFileEntry[] {
@@ -1018,7 +1131,7 @@ function collectFiles(directory: string, baseDirectory: string, ignorePatterns: 
     for (const entry of entries) {
         const fullPath = join(directory, entry.name);
         const relativePath = relative(baseDirectory, fullPath).split('\\').join('/');
-        if (shouldIgnore(relativePath, ignorePatterns)) {
+        if (shouldIgnore(relativePath, ignorePatterns, entry.isDirectory())) {
             continue;
         }
 
@@ -2835,7 +2948,7 @@ function printWapkHelp(): void {
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
-        '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them.',
+        '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them, and !pattern to re-include later matches.',
         '  - Run never installs dependencies automatically; archives must include the runtime dependencies they need.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
         '  - Browser-style archives with scripts.start or wapk.script.start run that start script automatically.',

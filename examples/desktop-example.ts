@@ -22,7 +22,7 @@ try {
 } catch { }
 
 // เลือก mode: 'html' | 'url' | 'counter' | 'icon' | 'transparent' | 'elit | 'custom' | 'ipc'
-const EXAMPLE = String('icon');
+const EXAMPLE = String('url');
 
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ if (EXAMPLE === 'url') {
         title: 'ตัวอย่าง - Load URL',
         width: 1280,
         height: 800,
-        url: 'https://example.com',
+        url: 'https://wapk.d-osc.com/',
         devtools: true,
     });
 }
