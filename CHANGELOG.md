@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.3] - 2026-04-13
+
+### Changed
+- **MIT license notice refresh** - updated the bundled MIT license file to keep the project copyright notice current
+  - Refreshed the copyright line to `2024-2026 Elit`
+  - No runtime or API behavior changes were introduced in this release
+
 ## [3.6.2] - 2026-04-13
 
 ### Fixed
