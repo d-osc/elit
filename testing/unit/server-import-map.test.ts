@@ -33,13 +33,20 @@ describe('server import map generation', () => {
         }
     });
 
-    it('uses workspace-local src and dist paths only for the elit workspace root', async () => {
+    it('uses workspace-local dist JavaScript paths for the elit workspace root in both dev and preview', async () => {
         const workspaceRoot = createTempDir('elit-server-workspace-');
 
         writeFileSync(join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'elit' }, null, 2));
 
-        expect(await resolveWorkspaceElitImportBasePath(workspaceRoot, '', 'dev')).toBe('/src');
+        expect(await resolveWorkspaceElitImportBasePath(workspaceRoot, '', 'dev')).toBe('/dist');
         expect(await resolveWorkspaceElitImportBasePath(workspaceRoot, '/base', 'preview')).toBe('/base/dist');
+
+        const devImports = parseImportMap(await createElitImportMap(workspaceRoot, '', 'dev'));
+
+        expect(devImports.elit).toBe('/dist/index.js');
+        expect(devImports['elit/dom']).toBe('/dist/dom.js');
+        expect(JSON.stringify(devImports)).not.toContain('/src/');
+        expect(JSON.stringify(devImports)).not.toContain('.ts');
     });
 
     it('maps installed elit packages through dist exports instead of src paths', async () => {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-04-13
+
+### Fixed
+- **Dev-mode workspace Elit import maps now use built JavaScript output** - the dev server no longer emits workspace-local `elit/*` browser imports that point at `/src/*.ts`
+  - Workspace-root Elit imports now resolve through `/dist/*.js` in both `dev` and `preview` modes
+  - Keeps browser import maps aligned with the published package surface and avoids exposing TypeScript source paths to the browser runtime
+
+### Tests
+- **Server import map regression coverage** - updated the server import map tests to assert that workspace-local Elit imports resolve to `/dist/*.js` and no longer include `/src/` or `.ts` entries in dev mode
+
 ## [3.5.9] - 2026-04-13
 
 ### Changed

@@ -490,7 +490,7 @@ const send404 = (res: ServerResponse, msg = 'Not Found'): void => sendError(res,
 const send403 = (res: ServerResponse, msg = 'Forbidden'): void => sendError(res, 403, msg);
 const send500 = (res: ServerResponse, msg = 'Internal Server Error'): void => sendError(res, 500, msg);
 
-export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePath: string, mode: 'dev' | 'preview'): Promise<string | undefined> {
+export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePath: string, _mode: 'dev' | 'preview'): Promise<string | undefined> {
   const resolvedRootDir = await realpath(resolve(rootDir));
 
   try {
@@ -498,8 +498,7 @@ export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePa
     const packageJson = JSON.parse(packageJsonBuffer.toString()) as { name?: string };
 
     if (packageJson.name === 'elit') {
-      const workspaceDir = mode === 'dev' ? 'src' : 'dist';
-      return basePath ? `${basePath}/${workspaceDir}` : `/${workspaceDir}`;
+      return basePath ? `${basePath}/dist` : '/dist';
     }
   } catch {
     // Fall back to generated package exports when the root is not the Elit package workspace.
@@ -511,7 +510,7 @@ export async function resolveWorkspaceElitImportBasePath(rootDir: string, basePa
 // Import map for all Elit client-side modules (reused in serveFile and serveSSR)
 export const createElitImportMap = async (rootDir: string, basePath: string = '', mode: 'dev' | 'preview' = 'dev'): Promise<string> => {
   const workspaceImportBasePath = await resolveWorkspaceElitImportBasePath(rootDir, basePath, mode);
-  const fileExt = mode === 'dev' ? '.ts' : '.js';
+  const fileExt = '.js';
 
   const elitImports: ImportMapEntry = workspaceImportBasePath
     ? {
