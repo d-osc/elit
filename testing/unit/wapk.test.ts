@@ -303,6 +303,63 @@ describe('wapk helpers', () => {
         }
     });
 
+    it('supports !pattern rules in .wapkignore to re-include previously ignored paths', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'ignore-negation-app',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'index.js'), ['console.log("ignore-negation");', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, 'dist', 'main.js'), ['console.log("built");', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, 'secret.txt'), ['do-not-pack', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, '.wapkignore'), ['dist', '!dist', 'secret.txt', ''].join('\n'));
+
+            const archive = readWapkArchive(await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'ignore-negation-app.wapk'),
+            }));
+
+            expect(archive.files.some((file) => file.path === 'dist/main.js')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'secret.txt')).toBe(false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('supports directory rules, globstar rules, and escaped leading ! in .wapkignore', async () => {
+        const dir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+            fs.mkdirSync(path.join(dir, 'nested'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'ignore-gitlike-app',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'index.js'), ['console.log("root");', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, 'dist', 'main.js'), ['console.log("dist");', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, 'dist', 'main.js.map'), ['{}', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, 'nested', 'bundle.js.map'), ['{}', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, '!keep.txt'), ['keep-me-out', ''].join('\n'));
+            fs.writeFileSync(path.join(dir, '.wapkignore'), ['dist/', '!dist/', '**/*.map', '\\!keep.txt', ''].join('\n'));
+
+            const archive = readWapkArchive(await packWapkDirectory(dir, {
+                outputPath: path.join(dir, 'ignore-gitlike-app.wapk'),
+            }));
+
+            expect(archive.files.some((file) => file.path === 'dist/main.js')).toBe(true);
+            expect(archive.files.some((file) => file.path === 'dist/main.js.map')).toBe(false);
+            expect(archive.files.some((file) => file.path === 'nested/bundle.js.map')).toBe(false);
+            expect(archive.files.some((file) => file.path === '!keep.txt')).toBe(false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it('packs nested standalone package dependencies even when root node_modules is ignored', async () => {
         const dir = createTempDir();
 

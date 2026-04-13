@@ -3,6 +3,21 @@
 WAPK is an application archive format for packaging and running Elit apps as a single file.
 
 `node_modules` are included by default when packing. If you need to exclude dependencies for a smaller archive, add them to `.wapkignore`.
+You can re-include a later path with `!pattern`, for example:
+
+```text
+dist
+!dist
+```
+
+Additional supported patterns:
+
+```text
+dist/        # match a directory name
+**/*.map     # match nested sourcemap files
+\!keep.txt   # treat leading ! as a literal file name
+\#notes.txt  # treat leading # as a literal file name
+```
 
 ## Supported Commands
 

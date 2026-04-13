@@ -866,6 +866,9 @@ createWindow({
 });
 ```
 
+For a runnable minimal file in this repo, see `examples/desktop-simple-example.ts`.
+For a runnable project-style repo, see `examples/desktop-typescript-example/`.
+
 Run it:
 
 ```bash
@@ -955,7 +958,7 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.6.4`:
+Highlights in `v3.6.5`:
 
 - Added `elit pm` for detached background process management of shell commands, file targets, and WAPK apps.
 - Added `pm.apps[]` and `pm.dataDir` in `elit.config.*` for config-first process manager workflows.
@@ -992,6 +995,8 @@ If you are working in this repository, these locations matter most:
 - `examples/full-db`: larger full-stack example with database usage
 - `examples/universal-app-example`: one repo covering web, desktop, and Android mobile smoke flows
 - `examples/android-native-example`: Android-first native mobile validation flow
+- `examples/desktop-typescript-example`: project-style desktop app with `package.json`, `elit.config.ts`, and a TypeScript desktop entry
+- `examples/desktop-simple-example.ts`: minimal desktop window example with inline HTML + IPC buttons
 - `examples/desktop-example.ts`: desktop smoke test and runtime example
 - `packages/create-elit`: scaffold templates used by `npm create elit@latest`
 - `docs/`: the documentation site built with Elit itself
@@ -1008,6 +1013,8 @@ If you are working in this repository, these locations matter most:
 - `examples/correct-config` for the cleanest SSR + API setup
 - `examples/universal-app-example` for a single repo exercising web, desktop, and Android mobile together
 - `examples/android-native-example` for Android-native mobile validation
+- `examples/desktop-typescript-example` for a small desktop project you can install and run directly
+- `examples/desktop-simple-example.ts` for the smallest desktop window example
 - `examples/desktop-example.ts` for desktop runtime usage
 - `USAGE_EXAMPLES.md` for more import combinations
 - `docs/API.md` for broader API detail

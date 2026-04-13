@@ -11,7 +11,7 @@
  */
 
 import { transformSync } from 'esbuild';
-import { readFile, readFileSync } from './fs';
+import { existsSync, readFile, readFileSync, statSync } from './fs';
 import { dirname } from './path';
 import { SourceMapConsumer } from 'source-map';
 import type { RawSourceMap } from 'source-map';
@@ -169,17 +169,22 @@ let currentSourceMapConsumer: SourceMapConsumer | undefined = undefined;
 // Line offset due to wrapper code added before test code
 let wrapperLineOffset: number = 0;
 
-// ============================================================================
-// esbuild Transpiler
-// ============================================================================
+interface TestModuleRecord {
+    exports: any;
+}
 
-export async function transpileFile(filePath: string): Promise<{ code: string; sourceMap?: RawSourceMap }> {
-    const source = await readFile(filePath, 'utf-8');
+const TEST_MODULE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.json'] as const;
 
-    const result = transformSync(source, {
-        loader: filePath.endsWith('.ts') || filePath.endsWith('.tsx') ? 'ts' : 'js',
-        format: 'esm',
-        sourcemap: 'inline',
+function resolveTestLoader(filePath: string): 'ts' | 'js' {
+    return /\.(?:ts|tsx|mts|cts)$/i.test(filePath) ? 'ts' : 'js';
+}
+
+function createTestTransformOptions(filePath: string, format: 'cjs' | 'esm', sourcemap: false | 'inline') {
+    return {
+        loader: resolveTestLoader(filePath),
+        format,
+        sourcemap,
+        sourcefile: filePath,
         target: 'es2020',
         tsconfigRaw: {
             compilerOptions: {
@@ -188,7 +193,137 @@ export async function transpileFile(filePath: string): Promise<{ code: string; s
                 jsxFragmentFactory: 'Fragment',
             },
         },
-    });
+    } as const;
+}
+
+function resolveExistingTestModulePath(basePath: string): string {
+    const nodePath = require('path') as typeof import('node:path');
+
+    if (existsSync(basePath) && statSync(basePath).isFile()) {
+        return basePath;
+    }
+
+    for (const extension of TEST_MODULE_EXTENSIONS) {
+        const candidatePath = `${basePath}${extension}`;
+        if (existsSync(candidatePath) && statSync(candidatePath).isFile()) {
+            return candidatePath;
+        }
+    }
+
+    if (existsSync(basePath) && statSync(basePath).isDirectory()) {
+        const packageJsonPath = nodePath.join(basePath, 'package.json');
+        if (existsSync(packageJsonPath) && statSync(packageJsonPath).isFile()) {
+            try {
+                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8') as string) as Record<string, unknown>;
+                for (const candidateEntry of [packageJson.main, packageJson.module]) {
+                    if (typeof candidateEntry !== 'string' || candidateEntry.trim().length === 0) {
+                        continue;
+                    }
+
+                    try {
+                        return resolveExistingTestModulePath(nodePath.resolve(basePath, candidateEntry));
+                    } catch {
+                        continue;
+                    }
+                }
+            } catch {
+                // Fall back to index files below.
+            }
+        }
+
+        for (const extension of TEST_MODULE_EXTENSIONS) {
+            const candidatePath = nodePath.join(basePath, `index${extension}`);
+            if (existsSync(candidatePath) && statSync(candidatePath).isFile()) {
+                return candidatePath;
+            }
+        }
+    }
+
+    return basePath;
+}
+
+function resolveTestModulePath(fromFilePath: string, specifier: string): string {
+    if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+        return specifier;
+    }
+
+    const nodePath = require('path') as typeof import('node:path');
+    const basePath = specifier.startsWith('.')
+        ? nodePath.resolve(dirname(fromFilePath), specifier)
+        : specifier;
+
+    return resolveExistingTestModulePath(basePath);
+}
+
+function shouldTranspileTestModule(filePath: string): boolean {
+    return /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i.test(filePath);
+}
+
+function createTestModuleRequire(fromFilePath: string, moduleCache: Map<string, TestModuleRecord>) {
+    return (specifier: string) => {
+        if (specifier.startsWith('elit/') || specifier === 'elit') {
+            return require(specifier);
+        }
+
+        const resolvedPath = resolveTestModulePath(fromFilePath, specifier);
+        if (resolvedPath === specifier) {
+            return require(specifier);
+        }
+
+        if (!existsSync(resolvedPath) || !statSync(resolvedPath).isFile()) {
+            return require(resolvedPath);
+        }
+
+        if (!shouldTranspileTestModule(resolvedPath)) {
+            return require(resolvedPath);
+        }
+
+        return loadTranspiledTestModule(resolvedPath, moduleCache);
+    };
+}
+
+function loadTranspiledTestModule(modulePath: string, moduleCache: Map<string, TestModuleRecord>): any {
+    const cached = moduleCache.get(modulePath);
+    if (cached) {
+        return cached.exports;
+    }
+
+    const source = readFileSync(modulePath, 'utf-8') as string;
+    let transpiled: ReturnType<typeof transformSync>;
+    try {
+        transpiled = transformSync(source, createTestTransformOptions(modulePath, 'cjs', false));
+    } catch (error) {
+        throw new Error(`Failed to transpile test dependency ${modulePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const moduleRecord: TestModuleRecord = { exports: {} };
+    const moduleObj = { exports: moduleRecord.exports };
+
+    moduleCache.set(modulePath, moduleRecord);
+
+    try {
+        const fn = new Function('module', 'exports', 'require', '__filename', '__dirname', transpiled.code);
+        const requireFn = createTestModuleRequire(modulePath, moduleCache);
+        fn(moduleObj, moduleObj.exports, requireFn, modulePath, dirname(modulePath));
+    } catch (error) {
+        throw new Error(`Failed to execute test dependency ${modulePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    moduleRecord.exports = moduleObj.exports;
+    if (!modulePath.includes('.test.') && !modulePath.includes('.spec.')) {
+        coveredFiles.add(modulePath);
+    }
+
+    return moduleRecord.exports;
+}
+
+// ============================================================================
+// esbuild Transpiler
+// ============================================================================
+
+export async function transpileFile(filePath: string): Promise<{ code: string; sourceMap?: RawSourceMap }> {
+    const source = await readFile(filePath, 'utf-8');
+
+    const result = transformSync(source, createTestTransformOptions(filePath, 'esm', 'inline'));
 
     // Extract source map from inline source map comment
     let sourceMap: RawSourceMap | undefined;
@@ -927,37 +1062,7 @@ export async function runTests(options: {
             // Get the directory of the test file for resolving relative imports
             const testFileDir = dirname(file);
 
-            // Extract imports before esbuild processing
-            const importRegex = /import\s+{\s*([^}]+)\s*}\s+from\s+['"]([^'"]+)['"]/g;
-            const imports: Record<string, { path: string; named: string }> = {};
-            let importIndex = 0;
-
-            // Remove imports and collect them
-            // Replace imports with nothing (they'll be injected back later)
-            let codeWithoutImports = source.replace(importRegex, (_: string, named: string, path: string) => {
-                const varName = `__import_${importIndex++}`;
-                // Trim whitespace from the named import
-                const trimmedNamed = named.trim();
-                imports[varName] = { path, named: trimmedNamed };
-                // Return a comment to mark where the import was
-                return `// ${trimmedNamed} import injected later\n`;
-            });
-
-            // Transpile the code without imports using esbuild
-            // We don't use esbuild's module format - we'll handle it ourselves
-            const result = transformSync(codeWithoutImports, {
-                loader: file.endsWith('.ts') || file.endsWith('.tsx') ? 'ts' : 'js',
-                format: 'iife',
-                sourcemap: 'inline',
-                target: 'es2020',
-                tsconfigRaw: {
-                    compilerOptions: {
-                        jsx: 'react',
-                        jsxFactory: 'h',
-                        jsxFragmentFactory: 'Fragment',
-                    },
-                },
-            });
+            const result = transformSync(source, createTestTransformOptions(file, 'cjs', 'inline'));
 
             let code = result.code;
 
@@ -972,139 +1077,18 @@ export async function runTests(options: {
                 currentSourceMapConsumer = undefined;
             }
 
-            // Add import helper at the top - resolve relative paths
-            // Transpile and require imported modules
-            const importedValues: Record<string, any> = {};
-            const importParamNames: string[] = [];
-            const importAssignments: string[] = [];
-
-            // Check if imports were extracted
-            if (Object.keys(imports).length > 0) {
-                for (const [, { path, named }] of Object.entries(imports)) {
-                    // Resolve relative imports against the test file's directory
-                    let resolvedPath = path;
-                    if (path.startsWith('.')) {
-                        // Use Node's path.join for proper path resolution
-                        const nodePath = require('path');
-                        resolvedPath = nodePath.resolve(testFileDir, path);
-                    }
-                    // Add .ts extension if not present
-                    if (!resolvedPath.endsWith('.ts') && !resolvedPath.endsWith('.js') && !resolvedPath.endsWith('.mjs') && !resolvedPath.endsWith('.cjs')) {
-                        resolvedPath += '.ts';
-                    }
-
-                    // For TypeScript files, we need to transpile them first
-                    if (resolvedPath.endsWith('.ts')) {
-                        try {
-                            const importSource = await readFile(resolvedPath, 'utf-8') as string;
-                            const transpiled = transformSync(importSource, {
-                                loader: 'ts',
-                                format: 'cjs',
-                                target: 'es2020',
-                                tsconfigRaw: {
-                                    compilerOptions: {
-                                        jsx: 'react',
-                                        jsxFactory: 'h',
-                                        jsxFragmentFactory: 'Fragment',
-                                    },
-                                },
-                            });
-
-                            // Create a temporary module object to capture exports
-                            const moduleExports: any = {};
-                            const moduleObj = { exports: moduleExports };
-
-                            // Execute the transpiled code with proper require function
-                            const fn = new Function('module', 'exports', 'require', '__filename', '__dirname', transpiled.code);
-                            const requireFn = (id: string) => {
-                                // For 'elit/*' imports, use the actual require
-                                if (id.startsWith('elit/') || id === 'elit') {
-                                    return require(id);
-                                }
-                                // For relative imports, recursively resolve them
-                                if (id.startsWith('.')) {
-                                    const nodePath = require('path');
-                                    const absPath = nodePath.resolve(dirname(resolvedPath), id);
-                                    // For now, just use require (could add recursion here)
-                                    return require(absPath);
-                                }
-                                return require(id);
-                            };
-                            fn(moduleObj, moduleExports, requireFn, resolvedPath, dirname(resolvedPath));
-
-                            // Track this file for coverage (only source files, not test files)
-                            if (!resolvedPath.includes('.test.') && !resolvedPath.includes('.spec.')) {
-                                coveredFiles.add(resolvedPath);
-                            }
-
-                            // Extract the named export
-                            // esbuild CommonJS exports can be either directly on exports or on exports.default
-                            let exportedValue = moduleObj.exports[named];
-                            if (exportedValue === undefined && moduleObj.exports.default) {
-                                exportedValue = moduleObj.exports.default[named];
-                            }
-                            // If still undefined, check if the exports object itself has the named property
-                            if (exportedValue === undefined && typeof moduleObj.exports === 'object') {
-                                exportedValue = (moduleObj.exports as any)[named];
-                            }
-
-                            // Store the imported value and create parameter/assignment for it
-                            const paramKey = `__import_${Math.random().toString(36).substring(2, 11)}`;
-                            importedValues[paramKey] = exportedValue;
-                            importParamNames.push(paramKey);
-                            importAssignments.push(`const ${named} = ${paramKey};`);
-                        } catch (err) {
-                            // On error, store null and add error comment
-                            const paramKey = `__import_${Math.random().toString(36).substring(2, 11)}`;
-                            importedValues[paramKey] = null;
-                            importParamNames.push(paramKey);
-                            importAssignments.push(`const ${named} = ${paramKey}; /* Error importing ${resolvedPath}: ${err} */`);
-                        }
-                    } else {
-                        // For JS files, use regular require()
-                        const requiredModule = require(resolvedPath);
-                        const exportedValue = requiredModule[named];
-                        const paramKey = `__import_${Math.random().toString(36).substring(2, 11)}`;
-                        importedValues[paramKey] = exportedValue;
-                        importParamNames.push(paramKey);
-                        importAssignments.push(`const ${named} = ${paramKey};`);
-                    }
-                }
-            }
-
-            // Now we need to extract named exports from required modules
-            // Add a preamble that handles the import statements
-            // Calculate the line offset from the wrapper
-            let preamble = '';
-            if (Object.keys(imports).length > 0) {
-                // Prepend the import assignments directly to the transpiled code
-                // The esbuild IIFE format creates a wrapper, so we need to inject our assignments inside it
-                // Find the start of the IIFE: (() => { or var <something> = (() => {
-                const iifeStartMatch = code.match(/^(\s*(?:var\s+\w+\s*=\s*)?\(\(\)\s*=>\s*\{\n)/);
-                if (iifeStartMatch) {
-                    // Insert our assignments after the IIFE opening
-                    const iifePrefix = iifeStartMatch[1];
-                    const assignments = `${importAssignments.join('\n')}\n`;
-                    preamble = iifePrefix;
-                    code = iifePrefix + assignments + code.slice(iifeStartMatch[1].length);
-                } else {
-                    // Fallback: just prepend without IIFE manipulation
-                    preamble = importAssignments.join('\n') + '\n';
-                    code = preamble + code;
-                }
-            }
-
-            // Count the number of lines added by the wrapper
-            // The preamble adds: "(() => {" plus import and export lines
-            wrapperLineOffset = preamble.split('\n').length;
+            wrapperLineOffset = 0;
 
             // Execute the test code with test globals in context
-            // Add the imported values as parameters to the Function
             setupGlobals();
-            const allParams = ['describe', 'it', 'test', 'expect', 'beforeAll', 'afterAll', 'beforeEach', 'afterEach', 'vi', 'require', 'module', '__filename', '__dirname', ...importParamNames];
-            const allArgs = [describe, it, test, expect, beforeAll, afterAll, beforeEach, afterEach, vi, require, module, file, testFileDir, ...importParamNames.map(p => importedValues[p])];
-            const fn = new Function(...allParams, code);
-            await fn(...allArgs);
+            const moduleCache = new Map<string, TestModuleRecord>();
+            const moduleRecord: TestModuleRecord = { exports: {} };
+            const moduleObj = { exports: moduleRecord.exports };
+            moduleCache.set(file, moduleRecord);
+
+            const fn = new Function('module', 'exports', 'require', '__filename', '__dirname', code);
+            const requireFn = createTestModuleRequire(file, moduleCache);
+            await fn(moduleObj, moduleObj.exports, requireFn, file, testFileDir);
 
             // Run tests
             await executeSuite(currentSuite, timeout, bail);

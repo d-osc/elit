@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.5] - 2026-04-13
+
+### Changed
+- **Release metadata and version reference refresh** - release-facing versioned inputs now track `v3.6.5` across the desktop runtime, docs UI, and example package references
+  - Desktop Cargo metadata now tracks `v3.6.5`
+  - Docs UI version badges and example release references now point at `v3.6.5`
+  - Example package references and lockfiles now track `v3.6.5`
+
+### Fixed
+- **`.wapkignore` now supports ordered gitignore-style exceptions and glob rules** - WAPK packaging can now exclude and re-include paths more predictably when archives need to keep selected build artifacts while dropping generated noise
+  - Added ordered negate support such as `!dist` to re-include a later match
+  - Added directory-only rules like `dist/`, globstar patterns like `**/*.map`, and escaped leading `\!literal` / `\#literal` entries
+  - WAPK archive collection now evaluates ignore rules in order so later matches can override earlier ones
+- **Test runtime module loading no longer rewrites imports with whole-source regex passes** - `elit test` now handles fixtures that contain import-looking strings without corrupting the transformed source
+  - Test files now transpile and execute as full CommonJS modules instead of stripping named imports before transform
+  - Relative test dependencies now resolve recursively through the test loader, avoiding unterminated-string failures from string literals such as `import { value } from "linked-lib";`
+
+### Documentation
+- **WAPK ignore guide refresh** - CLI and WAPK docs now document negate rules, directory rules, globstar patterns, and escaped leading literals for `.wapkignore`
+
+### Tests
+- **WAPK ignore regression coverage** - added focused coverage for negate rules, directory rules, globstar rules, and escaped leading `!` literals, and validated the new matcher behavior through the rebuilt CLI test path
+
 ## [3.6.4] - 2026-04-13
 
 ### Changed
