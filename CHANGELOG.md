@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.4] - 2026-04-13
+
+### Changed
+- **Release metadata and desktop packaging refresh** - versioned release collateral for `v3.6.4` has been synced across the desktop runtime and published package inputs
+  - Desktop Cargo metadata now tracks `v3.6.4`
+  - Published package files now include `Cargo.lock` alongside `Cargo.toml` so desktop runtime builds can reuse the pinned Rust dependency graph
+
+### Documentation
+- **Version reference refresh** - README, docs UI version badges, and example project release references now point at `v3.6.4`
+
 ## [3.6.3] - 2026-04-13
 
 ### Changed
