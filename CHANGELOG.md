@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-04-13
+
+### Fixed
+- **Packaged desktop bootstrap helper resolution** - `elit desktop run` and `elit desktop build` no longer bundle packaged `desktop-auto-render` / `render-context` helpers through ESM artifacts that inject `import { createRequire } from 'module'` into non-Node desktop bundle targets
+  - Desktop bootstrap helper resolution now prefers source files when available and otherwise falls back to packaged CommonJS helpers for bundle-based desktop compilers
+  - Desktop bundle self-reference resolution now prefers built CommonJS `elit/*` artifacts when the package source tree is not shipped with the installed package
+
+### Tests
+- **Desktop helper resolution coverage** - updated desktop CLI coverage to assert that packaged desktop bootstrap helpers can prefer CommonJS helper artifacts while still preserving the existing source-first / ESM fallback behavior
+
 ## [3.6.1] - 2026-04-13
 
 ### Fixed

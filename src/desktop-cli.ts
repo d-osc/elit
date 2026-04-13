@@ -202,10 +202,22 @@ function resolveDesktopEntryDisplayName(entryPath: string, fallbackName: string)
 export function resolveDesktopBootstrapSupportModulePath(
     moduleName: DesktopBootstrapSupportModuleName,
     packageRoot = PACKAGE_ROOT,
+    options: { preferredBuiltFormat?: 'cjs' | 'esm' } = {},
 ): string {
+    const builtCandidates = options.preferredBuiltFormat === 'cjs'
+        ? [
+            resolve(packageRoot, 'dist', `${moduleName}.cjs`),
+            resolve(packageRoot, 'dist', `${moduleName}.js`),
+            resolve(packageRoot, 'dist', `${moduleName}.mjs`),
+        ]
+        : [
+            resolve(packageRoot, 'dist', `${moduleName}.mjs`),
+            resolve(packageRoot, 'dist', `${moduleName}.js`),
+            resolve(packageRoot, 'dist', `${moduleName}.cjs`),
+        ];
     const candidates = [
         resolve(packageRoot, 'src', `${moduleName}.ts`),
-        resolve(packageRoot, 'dist', `${moduleName}.mjs`),
+        ...builtCandidates,
     ];
 
     for (const candidate of candidates) {
@@ -257,12 +269,16 @@ export function resolveDesktopBinaryOverridePath(
     return resolve(cwd, explicitPath);
 }
 
-function createDesktopBootstrapEntry(entryPath: string, appName: string): DesktopBootstrapEntry {
+function createDesktopBootstrapEntry(
+    entryPath: string,
+    appName: string,
+    options: { preferredBuiltFormat?: 'cjs' | 'esm' } = {},
+): DesktopBootstrapEntry {
     const bootstrapId = randomUUID();
     const bootstrapPath = join(dirname(entryPath), `.elit-desktop-bootstrap-${appName}-${bootstrapId}.ts`);
     const preludePath = join(dirname(entryPath), `.elit-desktop-prelude-${appName}-${bootstrapId}.ts`);
-    const desktopAutoRenderPath = resolveDesktopBootstrapSupportModulePath('desktop-auto-render');
-    const renderContextPath = resolveDesktopBootstrapSupportModulePath('render-context');
+    const desktopAutoRenderPath = resolveDesktopBootstrapSupportModulePath('desktop-auto-render', PACKAGE_ROOT, options);
+    const renderContextPath = resolveDesktopBootstrapSupportModulePath('render-context', PACKAGE_ROOT, options);
     const defaultTitle = `${resolveDesktopEntryDisplayName(entryPath, appName)} Desktop`;
 
     writeFileSync(
@@ -314,12 +330,12 @@ function createDesktopBootstrapEntry(entryPath: string, appName: string): Deskto
     };
 }
 
-function createWorkspacePackagePlugin(entryDir: string) {
+function createWorkspacePackagePlugin(entryDir: string, options: { preferBuilt?: boolean; preferredBuiltFormat?: 'cjs' | 'esm' } = {}) {
     return {
         name: 'workspace-package-self-reference',
         setup(build: any) {
             build.onResolve({ filter: /^elit(?:\/.*)?$/ }, (args: { path: string; resolveDir?: string }) => {
-                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || entryDir);
+                const resolved = resolveWorkspacePackageImport(args.path, args.resolveDir || entryDir, options);
                 return resolved ? { path: resolved } : undefined;
             });
         },
@@ -1429,9 +1445,10 @@ async function prepareEntry(
         return { appName, entryPath };
     }
 
-    const bootstrapEntry = createDesktopBootstrapEntry(entryPath, appName);
-
     const output = compileTarget(runtime);
+    const bootstrapEntry = createDesktopBootstrapEntry(entryPath, appName, {
+        preferredBuiltFormat: compiler === 'tsx' ? 'esm' : 'cjs',
+    });
     const compiledPath = join(dirname(entryPath), `.elit-desktop-${appName}-${randomUUID()}${output.extension}`);
 
     try {
@@ -1509,7 +1526,9 @@ async function compileDesktopEntryWithEsbuild(options: {
     output: { extension: string; format: DesktopFormat; platform: 'neutral' | 'node' };
     runtime: DesktopRuntimeName;
 }): Promise<void> {
-    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath));
+    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath), {
+        preferredBuiltFormat: 'cjs',
+    });
 
     await esbuild({
         absWorkingDir: dirname(options.entryPath),
@@ -1534,7 +1553,9 @@ async function compileDesktopEntryWithTsup(options: {
 }): Promise<void> {
     const tsup = await loadOptionalDesktopCompiler<TsupModule>('tsup', options.entryPath, 'tsup');
     const outputBaseName = basename(options.compiledPath, extname(options.compiledPath));
-    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath));
+    const workspacePackagePlugin = createWorkspacePackagePlugin(dirname(options.entryPath), {
+        preferredBuiltFormat: 'cjs',
+    });
 
     await tsup.build({
         bundle: true,

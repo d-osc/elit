@@ -66,7 +66,24 @@ describe('desktop bootstrap support module resolution', () => {
         }
     });
 
-    it('falls back to packaged dist helpers when source files are not shipped', () => {
+    it('can prefer packaged CommonJS helpers when source files are not shipped', () => {
+        const packageRoot = mkdtempSync(join(tmpdir(), 'elit-desktop-cli-'));
+
+        try {
+            mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+
+            const cjsPath = join(packageRoot, 'dist', 'desktop-auto-render.cjs');
+            const esmPath = join(packageRoot, 'dist', 'desktop-auto-render.mjs');
+            writeFileSync(cjsPath, 'exports.installDesktopRenderTracking = () => {}\n');
+            writeFileSync(esmPath, 'export function installDesktopRenderTracking() {}\n');
+
+            expect(resolveDesktopBootstrapSupportModulePath('desktop-auto-render', packageRoot, { preferredBuiltFormat: 'cjs' })).toBe(cjsPath);
+        } finally {
+            rmSync(packageRoot, { force: true, recursive: true });
+        }
+    });
+
+    it('falls back to packaged ESM helpers when CommonJS is not requested', () => {
         const packageRoot = mkdtempSync(join(tmpdir(), 'elit-desktop-cli-'));
 
         try {
