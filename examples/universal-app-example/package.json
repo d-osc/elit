@@ -21,7 +21,7 @@
     "test:win": "powershell -ExecutionPolicy Bypass -File ./test-universal.ps1",
     "test:sh": "bash ./test-universal.sh"
   },
-  "devDependencies": {
-    "elit": "file:../.."
+  "dependencies": {
+    "elit": "^3.6.4"
   }
 }

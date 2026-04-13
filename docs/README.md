@@ -47,10 +47,12 @@ Welcome to the Elit documentation.
 - [Correct Config](../examples/correct-config/) - Config-driven web, server, and build defaults
 - [Full Database App](../examples/full-db/) - Full-stack example with database helpers and API routes
 - [Universal App](../examples/universal-app-example/) - Shared web, desktop, and native entry flow
+- [Desktop TypeScript Example](../examples/desktop-typescript-example/) - Small installable repo for Elit desktop with a TypeScript desktop entry
 
 ### Platform Examples
 
-- [Desktop Entry](../examples/desktop-example.ts) - Minimal desktop mode example
+- [Desktop Simple Entry](../examples/desktop-simple-example.ts) - Minimal desktop window example with inline HTML and IPC buttons
+- [Desktop Entry](../examples/desktop-example.ts) - Broader desktop smoke test and runtime example
 - [Android Native Example](../examples/android-native-example/) - Native Android workflow from Elit UI
 - [WAPK Example](../examples/wapk-example/) - Archive packaging and runtime flow
 

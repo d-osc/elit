@@ -1,0 +1,18 @@
+{
+  "name": "example-desktop-typescript",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Project-style Elit desktop example written in TypeScript",
+  "type": "module",
+  "scripts": {
+    "desktop:run": "elit desktop run",
+    "desktop:build": "elit desktop build"
+  },
+  "dependencies": {
+    "elit": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "typescript": "^5.9.3"
+  }
+}
