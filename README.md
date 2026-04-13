@@ -955,7 +955,7 @@ The package also exports `elit/test`, `elit/test-runtime`, and `elit/test-report
 
 Latest release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-Highlights in `v3.6.2`:
+Highlights in `v3.6.3`:
 
 - Added `elit pm` for detached background process management of shell commands, file targets, and WAPK apps.
 - Added `pm.apps[]` and `pm.dataDir` in `elit.config.*` for config-first process manager workflows.
