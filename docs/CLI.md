@@ -275,6 +275,7 @@ Useful options:
 - `--archive-watch`
 - `--no-archive-watch`
 - `--online`
+- `--allow-sigterm-close`
 - `--online-url <url>`
 - `--google-drive-file-id <id>`
 - `--google-drive-token-env <env>`
@@ -285,6 +286,7 @@ Notes:
 
 - `elit wapk pack` includes `node_modules` by default; `.wapkignore` now supports ordered negate rules like `!dist`, directory rules like `dist/`, globstar patterns like `**/*.map`, and escaped leading `\!literal` / `\#literal` entries.
 - `--online` creates a shared session on the Elit Run server directly, keeps the CLI alive, and closes the session when you press `Ctrl+C`.
+- Online mode ignores `SIGTERM` by default; pass `--allow-sigterm-close` if an external supervisor should close the shared session with `SIGTERM`.
 - Google Drive archives can use the same online handoff with `elit wapk gdrive://<fileId> --online` or `elit wapk run --google-drive-file-id <fileId> ... --online`.
 - By default it looks for Elit Run at `http://localhost:4177`, then `http://localhost:4179`.
 - Use `--online-url <url>` or `ELIT_WAPK_ONLINE_URL` if your Elit Run instance is running elsewhere.

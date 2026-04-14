@@ -96,11 +96,13 @@ function createGoogleDriveOnlineFetchMock(
     options: {
         fileId?: string;
         onlineUrl?: string;
+        shutdownSignals?: Array<{ signal: 'SIGINT' | 'SIGTERM'; delayMs?: number }>;
     } = {},
 ) {
     const originalFetch = global.fetch;
     const fileId = options.fileId ?? 'drive-file-id';
     const launcherUrl = new URL(options.onlineUrl ?? 'http://localhost:4179/');
+    const shutdownSignals = options.shutdownSignals ?? [{ signal: 'SIGINT', delayMs: 0 }];
     let remoteBuffer = Buffer.from(initialBuffer);
     let revision = 0;
     let createPayload: any;
@@ -141,9 +143,11 @@ function createGoogleDriveOnlineFetchMock(
 
         if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/create' && method === 'POST') {
             createPayload = await readJsonBody(init?.body);
-            setTimeout(() => {
-                process.emit('SIGINT');
-            }, 0);
+            for (const shutdownSignal of shutdownSignals) {
+                setTimeout(() => {
+                    process.emit(shutdownSignal.signal);
+                }, shutdownSignal.delayMs ?? 0);
+            }
             return jsonResponse({
                 ok: true,
                 joinKey: 'ABCD-EFGH-IJKL',
@@ -1223,6 +1227,123 @@ describe('wapk helpers', () => {
             process.exitCode = previousExitCode;
             fetchMock?.restore();
             logSpy.mockRestore();
+            errorSpy.mockRestore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('ignores SIGTERM for online sessions until SIGINT arrives', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed-online.wapk');
+        const previousExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        let fetchMock: ReturnType<typeof createGoogleDriveOnlineFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'remote-online-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: 'src/index.js',
+                    run: {
+                        googleDrive: {
+                            fileId: 'drive-file-id',
+                            accessToken: 'token-789',
+                        },
+                        online: true,
+                        onlineUrl: 'http://localhost:4179',
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("configured-google-drive-online");\n');
+
+            await packWapkDirectory(dir, {
+                outputPath: seedArchivePath,
+            });
+
+            fetchMock = createGoogleDriveOnlineFetchMock(fs.readFileSync(seedArchivePath), {
+                onlineUrl: 'http://localhost:4179',
+                shutdownSignals: [
+                    { signal: 'SIGTERM', delayMs: 0 },
+                    { signal: 'SIGINT', delayMs: 0 },
+                ],
+            });
+
+            await runWapkCommand([], dir);
+
+            expect(fetchMock.getClosePayload()).toMatchObject({
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+            expect(warnSpy.calls.some((call) => {
+                const message = call.join(' ');
+                return message.includes('Ignoring SIGTERM while shared session ABCD-EFGH-IJKL is active (pid ')
+                    && message.includes(', ppid ');
+            })).toBe(true);
+            expect(logSpy.calls.some((call) => call.join(' ').includes('Received SIGINT; closing shared session ABCD-EFGH-IJKL'))).toBe(true);
+            expect(errorSpy.callCount).toBe(0);
+        } finally {
+            process.exitCode = previousExitCode;
+            fetchMock?.restore();
+            logSpy.mockRestore();
+            warnSpy.mockRestore();
+            errorSpy.mockRestore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('allows SIGTERM to close online sessions when explicitly enabled', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed-online.wapk');
+        const previousExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        let fetchMock: ReturnType<typeof createGoogleDriveOnlineFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'local-online-app',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("local-online");\n');
+
+            await packWapkDirectory(dir, {
+                outputPath: seedArchivePath,
+            });
+
+            fetchMock = createGoogleDriveOnlineFetchMock(fs.readFileSync(seedArchivePath), {
+                onlineUrl: 'http://localhost:4179',
+                shutdownSignals: [
+                    { signal: 'SIGTERM', delayMs: 0 },
+                ],
+            });
+
+            await runWapkCommand(['run', seedArchivePath, '--online', '--online-url', 'http://localhost:4179', '--allow-sigterm-close'], dir);
+
+            expect(fetchMock.getClosePayload()).toMatchObject({
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+            expect(logSpy.calls.some((call) => {
+                const message = call.join(' ');
+                return message.includes('Received SIGTERM for shared session ABCD-EFGH-IJKL (pid ')
+                    && message.includes(', ppid ')
+                    && message.includes('closing because --allow-sigterm-close is enabled');
+            })).toBe(true);
+            expect(warnSpy.callCount).toBe(0);
+            expect(errorSpy.callCount).toBe(0);
+        } finally {
+            process.exitCode = previousExitCode;
+            fetchMock?.restore();
+            logSpy.mockRestore();
+            warnSpy.mockRestore();
             errorSpy.mockRestore();
             fs.rmSync(dir, { recursive: true, force: true });
         }

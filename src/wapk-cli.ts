@@ -2216,16 +2216,23 @@ function isPmWapkOnlineShutdownEnabled(): boolean {
     return process.env[WAPK_ONLINE_PM_SHUTDOWN_ENV] === '1' && Boolean(process.stdin) && !process.stdin.isTTY;
 }
 
+function getWapkOnlineProcessDetails(): string {
+    return `pid ${process.pid}, ppid ${process.ppid}`;
+}
+
 async function waitForWapkOnlineSessionShutdown(
     launcherUrl: URL,
     session: { joinKey: string; adminToken: string },
     archiveHandle: WapkArchiveHandle,
     lock?: ResolvedWapkCredentials,
+    options: { allowSigtermClose?: boolean } = {},
 ): Promise<number> {
     let snapshotRevision = 0;
     let snapshotSyncPending = false;
     let snapshotSyncPromise: Promise<void> = Promise.resolve();
     let lastSnapshotSyncError: string | null = null;
+    const allowSigtermClose = options.allowSigtermClose === true;
+    const processDetails = getWapkOnlineProcessDetails();
 
     const syncGuestSnapshotUpdates = (): Promise<void> => {
         if (snapshotSyncPending) {
@@ -2264,6 +2271,7 @@ async function waitForWapkOnlineSessionShutdown(
             void syncGuestSnapshotUpdates();
         }, WAPK_ONLINE_KEEPALIVE_INTERVAL_MS);
         const pmManaged = isPmWapkOnlineShutdownEnabled();
+        let ignoredSigTermLogged = false;
         let stdinBuffer = '';
 
         const cleanup = (): void => {
@@ -2286,7 +2294,21 @@ async function waitForWapkOnlineSessionShutdown(
         };
 
         const onSigTerm = (): void => {
-            finish({ kind: 'signal', signal: 'SIGTERM' });
+            if (allowSigtermClose) {
+                finish({ kind: 'signal', signal: 'SIGTERM' });
+                return;
+            }
+
+            if (ignoredSigTermLogged) {
+                return;
+            }
+
+            ignoredSigTermLogged = true;
+            console.warn(
+                pmManaged
+                    ? `[wapk] Ignoring SIGTERM while shared session ${session.joinKey} is active (${processDetails}). Use elit pm stop, restart, or delete to close the session.`
+                    : `[wapk] Ignoring SIGTERM while shared session ${session.joinKey} is active (${processDetails}). Press Ctrl+C to stop sharing, or pass --allow-sigterm-close to close on SIGTERM.`,
+            );
         };
 
         const onStdinData = (chunk: Buffer | string): void => {
@@ -2317,8 +2339,10 @@ async function waitForWapkOnlineSessionShutdown(
 
     if (shutdownTrigger.kind === 'pm') {
         console.log(`\n[wapk] PM requested shutdown for shared session ${session.joinKey}...`);
+    } else if (shutdownTrigger.signal === 'SIGTERM') {
+        console.log(`\n[wapk] Received SIGTERM for shared session ${session.joinKey} (${processDetails}); closing because --allow-sigterm-close is enabled...`);
     } else {
-        console.log(`\n[wapk] Closing shared session ${session.joinKey}...`);
+        console.log(`\n[wapk] Received ${shutdownTrigger.signal}; closing shared session ${session.joinKey}...`);
     }
 
     try {
@@ -2342,6 +2366,7 @@ async function runWapkOnline(
         googleDrive?: WapkGoogleDriveConfig;
         onlineUrl?: string;
         password?: string;
+        allowSigtermClose?: boolean;
     },
 ): Promise<void> {
     const archiveHandle = resolveArchiveHandle(archiveSpecifier, options.googleDrive);
@@ -2377,7 +2402,9 @@ async function runWapkOnline(
     process.exitCode = await waitForWapkOnlineSessionShutdown(launcherUrl, {
         joinKey: response.joinKey,
         adminToken: response.adminToken,
-    }, archiveHandle, onlineArchiveLock);
+    }, archiveHandle, onlineArchiveLock, {
+        allowSigtermClose: options.allowSigtermClose,
+    });
 }
 
 async function writeWapkArchiveFromMemory(
@@ -2937,6 +2964,7 @@ function printWapkHelp(): void {
         '  --archive-watch              Pull external archive changes back into the temp workdir',
         '  --no-archive-watch           Disable external archive read sync',
         '  --online                     Create an Elit Run share session, stay alive, and close on Ctrl+C',
+        '  --allow-sigterm-close        Allow SIGTERM to close an online shared session',
         '  --online-url <url>           Elit Run URL (default: auto-detect localhost:4177 or localhost:4179)',
         '  --google-drive-file-id <id>  Run a remote .wapk directly from Google Drive',
         '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
@@ -2955,6 +2983,7 @@ function printWapkHelp(): void {
         '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',
         '  - Google Drive mode talks to the Drive API directly; no local archive file is required.',
         '  - Online mode creates a shared session on Elit Run directly, keeps the CLI alive, and closes it on Ctrl+C.',
+        '  - Online mode ignores SIGTERM by default; pass --allow-sigterm-close if an external supervisor should close the shared session with SIGTERM.',
         '  - Locked archives in online mode must provide --password so the CLI can build the shared snapshot.',
         '  - Locked archives require the same password for run/extract/inspect.',
         '  - Archives stay unlocked by default unless a password is provided.',
@@ -3011,6 +3040,7 @@ function parseRunArgs(args: string[]): {
     archiveSyncInterval?: number;
     online?: boolean;
     onlineUrl?: string;
+    allowSigtermClose?: boolean;
 } & WapkCredentialsOptions {
     let file: string | undefined;
     let googleDrive: WapkGoogleDriveConfig | undefined;
@@ -3021,6 +3051,7 @@ function parseRunArgs(args: string[]): {
     let archiveSyncInterval: number | undefined;
     let online: boolean | undefined;
     let onlineUrl: string | undefined;
+    let allowSigtermClose: boolean | undefined;
     let password: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
@@ -3073,6 +3104,10 @@ function parseRunArgs(args: string[]): {
                 onlineUrl = readRequiredOptionValue(args, ++index, '--online-url');
                 break;
             }
+            case '--allow-sigterm-close': {
+                allowSigtermClose = true;
+                break;
+            }
             case '--google-drive-file-id': {
                 googleDrive = {
                     ...googleDrive,
@@ -3116,7 +3151,7 @@ function parseRunArgs(args: string[]): {
         }
     }
 
-    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, online, onlineUrl, password };
+    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, online, onlineUrl, allowSigtermClose, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
@@ -3204,6 +3239,7 @@ function resolveConfiguredWapkRunOptions(
     archiveSyncInterval?: number;
     online: boolean;
     onlineUrl?: string;
+    allowSigtermClose: boolean;
     password?: string;
 } {
     const onlineUrl = options.onlineUrl ?? defaults?.onlineUrl;
@@ -3218,6 +3254,7 @@ function resolveConfiguredWapkRunOptions(
         archiveSyncInterval: options.archiveSyncInterval ?? defaults?.archiveSyncInterval,
         online: options.online ?? defaults?.online ?? Boolean(onlineUrl),
         onlineUrl,
+        allowSigtermClose: options.allowSigtermClose === true,
         password: options.password ?? defaults?.password,
     };
 }
@@ -3303,6 +3340,7 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
         await runWapkOnline(archiveSpecifier, {
             googleDrive: runOptions.googleDrive,
             onlineUrl: runOptions.onlineUrl,
+            allowSigtermClose: runOptions.allowSigtermClose,
             password: runOptions.password,
         });
         return;

@@ -52,6 +52,9 @@ npx elit wapk run ./app.wapk
 # Host the archive in Elit Run until Ctrl+C
 npx elit wapk run ./app.wapk --online
 
+# Allow SIGTERM to close an online shared session
+npx elit wapk run ./app.wapk --online --allow-sigterm-close
+
 # Run a locked archive
 npx elit wapk run ./app.wapk --password secret-123
 
