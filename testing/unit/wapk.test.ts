@@ -1279,6 +1279,7 @@ describe('wapk helpers', () => {
                 joinKey: 'ABCD-EFGH-IJKL',
                 adminToken: 'admin-token',
             });
+            expect(logSpy.calls.some((call) => call.join(' ').includes('Join URL:  http://localhost:4179/?join=ABCD-EFGH-IJKL&launchSource=elit-wapk-online'))).toBe(true);
             expect(warnSpy.calls.some((call) => {
                 const message = call.join(' ');
                 return message.includes('Ignoring SIGTERM while shared session ABCD-EFGH-IJKL is active (pid ')

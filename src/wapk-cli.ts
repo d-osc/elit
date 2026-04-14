@@ -163,7 +163,7 @@ const WAPK_AUTH_TAG_LENGTH = 16;
 const WAPK_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 } as const;
 const DEFAULT_GOOGLE_DRIVE_TOKEN_ENV = 'GOOGLE_DRIVE_ACCESS_TOKEN';
 const DEFAULT_WAPK_ONLINE_URL_ENV = 'ELIT_WAPK_ONLINE_URL';
-const DEFAULT_WAPK_ONLINE_URLS = ['https://wapk.d-osc.com/'] as const;
+const DEFAULT_WAPK_ONLINE_URLS = ['http://wapk.d-osc.com/'] as const;
 const WAPK_ONLINE_CREATE_PATH = '/api/shared-session/create';
 const WAPK_ONLINE_READ_PATH = '/api/shared-session/read';
 const WAPK_ONLINE_CLOSE_PATH = '/api/shared-session/close';
@@ -1975,11 +1975,15 @@ function sanitizeOnlineArchiveFileName(label: string | undefined, fallback: stri
     return fileName.toLowerCase().endsWith('.wapk') ? fileName : `${fileName}.wapk`;
 }
 
+const WAPK_ONLINE_JOIN_SOURCE_QUERY_PARAM = 'launchSource';
+const WAPK_ONLINE_JOIN_SOURCE_QUERY_VALUE = 'elit-wapk-online';
+
 function buildOnlineJoinUrl(baseUrl: URL, joinKey: string): string {
     const joinUrl = new URL(baseUrl.toString());
     joinUrl.search = '';
     joinUrl.hash = '';
     joinUrl.searchParams.set('join', joinKey);
+    joinUrl.searchParams.set(WAPK_ONLINE_JOIN_SOURCE_QUERY_PARAM, WAPK_ONLINE_JOIN_SOURCE_QUERY_VALUE);
     return joinUrl.toString();
 }
 
