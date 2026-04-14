@@ -14,6 +14,8 @@ export interface WapkHeader {
     runtime: WapkRuntimeName;
     entry: string;
     scripts: Record<string, string>;
+    appId?: string;
+    publisherId?: string;
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
@@ -119,6 +121,8 @@ interface WapkProjectConfig {
     runtime: WapkRuntimeName;
     entry: string;
     scripts: Record<string, string>;
+    appId?: string;
+    publisherId?: string;
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
@@ -267,6 +271,164 @@ function normalizeNonEmptyString(value: unknown): string | undefined {
     return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeGeneratedIdentifier(value: string): string | undefined {
+    const normalized = value
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    return normalized.length > 0 ? normalized : undefined;
+}
+
+function joinGeneratedIdentifier(...segments: Array<string | undefined>): string | undefined {
+    const normalizedSegments = segments
+        .map((segment) => segment ? normalizeGeneratedIdentifier(segment) : undefined)
+        .filter((segment): segment is string => Boolean(segment));
+
+    return normalizedSegments.length > 0 ? normalizedSegments.join('.') : undefined;
+}
+
+function parseScopedPackageName(value: string | undefined): { scope?: string; packageName?: string } {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return {};
+    }
+
+    if (!normalizedValue.startsWith('@')) {
+        return {
+            packageName: normalizedValue,
+        };
+    }
+
+    const scopeSeparatorIndex = normalizedValue.indexOf('/');
+    if (scopeSeparatorIndex === -1) {
+        return {
+            packageName: normalizedValue,
+        };
+    }
+
+    return {
+        scope: normalizedValue.slice(1, scopeSeparatorIndex),
+        packageName: normalizedValue.slice(scopeSeparatorIndex + 1),
+    };
+}
+
+function readPackageAuthorMetadata(value: unknown): {
+    name?: string;
+    email?: string;
+    url?: string;
+} {
+    if (typeof value === 'string') {
+        const normalizedValue = value.trim();
+        if (!normalizedValue) {
+            return {};
+        }
+
+        const email = normalizedValue.match(/<([^>]+)>/)?.[1];
+        const url = normalizedValue.match(/\(([^)]+)\)/)?.[1];
+        const name = normalizedValue
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\([^)]+\)/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        return {
+            name: normalizeNonEmptyString(name),
+            email: normalizeNonEmptyString(email),
+            url: normalizeNonEmptyString(url),
+        };
+    }
+
+    if (!isRecord(value)) {
+        return {};
+    }
+
+    return {
+        name: normalizeNonEmptyString(value.name),
+        email: normalizeNonEmptyString(value.email),
+        url: normalizeNonEmptyString(value.url),
+    };
+}
+
+function extractPublisherIdFromRepository(value: unknown): string | undefined {
+    const repositoryUrl = typeof value === 'string'
+        ? value
+        : isRecord(value)
+            ? normalizeNonEmptyString(value.url)
+            : undefined;
+
+    const normalizedRepositoryUrl = normalizeNonEmptyString(repositoryUrl);
+    if (!normalizedRepositoryUrl) {
+        return undefined;
+    }
+
+    const shorthandMatch = normalizedRepositoryUrl.match(/^(?:github|gitlab|bitbucket):([^/]+)\/.+$/i);
+    if (shorthandMatch?.[1]) {
+        return normalizeGeneratedIdentifier(shorthandMatch[1]);
+    }
+
+    const sshMatch = normalizedRepositoryUrl.match(/^[^@]+@[^:]+:([^/]+)\/.+$/i);
+    if (sshMatch?.[1]) {
+        return normalizeGeneratedIdentifier(sshMatch[1]);
+    }
+
+    try {
+        const parsed = new URL(normalizedRepositoryUrl.replace(/^git\+/, ''));
+        const firstPathSegment = parsed.pathname
+            .replace(/\.git$/i, '')
+            .split('/')
+            .filter(Boolean)[0];
+        return normalizeGeneratedIdentifier(firstPathSegment ?? parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+        return undefined;
+    }
+}
+
+function extractPublisherIdFromUrl(value: unknown): string | undefined {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return undefined;
+    }
+
+    try {
+        const parsed = new URL(normalizedValue);
+        return normalizeGeneratedIdentifier(parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+        return undefined;
+    }
+}
+
+function extractPublisherIdFromEmail(value: string | undefined): string | undefined {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return undefined;
+    }
+
+    const domain = normalizedValue.split('@')[1];
+    return domain ? normalizeGeneratedIdentifier(domain.replace(/^www\./i, '')) : undefined;
+}
+
+function resolveAutoGeneratedWapkAppId(packageName: string | undefined, fallbackName: string): string | undefined {
+    const scopedPackage = parseScopedPackageName(packageName);
+    return joinGeneratedIdentifier(scopedPackage.scope, scopedPackage.packageName ?? fallbackName);
+}
+
+function resolveAutoGeneratedWapkPublisherId(packageJson: Record<string, unknown> | undefined, fallbackName: string): string | undefined {
+    const scopedPackage = parseScopedPackageName(typeof packageJson?.name === 'string' ? packageJson.name : undefined);
+    if (scopedPackage.scope) {
+        return normalizeGeneratedIdentifier(scopedPackage.scope);
+    }
+
+    const author = readPackageAuthorMetadata(packageJson?.author);
+    return extractPublisherIdFromRepository(packageJson?.repository)
+        ?? extractPublisherIdFromUrl(packageJson?.homepage)
+        ?? extractPublisherIdFromUrl(author.url)
+        ?? extractPublisherIdFromEmail(author.email)
+        ?? normalizeGeneratedIdentifier(author.name ?? fallbackName);
+}
+
 function normalizeStringMap(value: unknown): Record<string, string> | undefined {
     if (!isRecord(value)) {
         return undefined;
@@ -315,6 +477,8 @@ function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
         runtime: normalizeRuntime(value.runtime ?? value.engine),
         entry: typeof value.entry === 'string' ? value.entry : undefined,
         scripts: normalizeStringMap(value.scripts ?? value.script),
+        appId: normalizeNonEmptyString(value.appId),
+        publisherId: normalizeNonEmptyString(value.publisherId),
         port: normalizePort(value.port),
         env: normalizeStringMap(value.env),
         desktop: normalizeDesktopConfig(value.desktop),
@@ -692,6 +856,7 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
     const elitConfig = await loadConfig(directory);
     const elitWapkConfig = normalizeWapkConfig(elitConfig?.wapk);
     const packageJson = readJsonFile(packageJsonPath);
+    const packageJsonWapk = isRecord(packageJson?.wapk) ? packageJson.wapk : undefined;
 
     const packageScripts = normalizeStringMap(packageJson?.scripts) ?? {};
     const selectedScripts = elitWapkConfig.scripts ?? packageScripts;
@@ -732,12 +897,23 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
         throw new Error(`WAPK entry not found: ${entryPath}`);
     }
 
+    const appId = elitWapkConfig.appId
+        ?? normalizeNonEmptyString(packageJson?.appId)
+        ?? normalizeNonEmptyString(packageJsonWapk?.appId)
+        ?? resolveAutoGeneratedWapkAppId(typeof packageJson?.name === 'string' ? packageJson.name : undefined, name);
+    const publisherId = elitWapkConfig.publisherId
+        ?? normalizeNonEmptyString(packageJson?.publisherId)
+        ?? normalizeNonEmptyString(packageJsonWapk?.publisherId)
+        ?? resolveAutoGeneratedWapkPublisherId(packageJson, name);
+
     return {
         name,
         version,
         runtime,
         entry,
         scripts: selectedScripts,
+        appId,
+        publisherId,
         port: elitWapkConfig.port,
         env: elitWapkConfig.env,
         desktop: elitWapkConfig.desktop,
@@ -1315,6 +1491,8 @@ function decodeWapkPayload(buffer: Buffer): Omit<DecodedWapk, 'version' | 'lock'
         runtime: normalizeRuntime(rawHeader.runtime ?? rawHeader.engine) ?? 'node',
         entry: typeof rawHeader.entry === 'string' ? rawHeader.entry : 'index.js',
         scripts: normalizeStringMap(rawHeader.scripts) ?? {},
+        appId: normalizeNonEmptyString(rawHeader.appId),
+        publisherId: normalizeNonEmptyString(rawHeader.publisherId),
         port: normalizePort(rawHeader.port),
         env: normalizeStringMap(rawHeader.env),
         desktop: normalizeDesktopConfig(rawHeader.desktop),
@@ -2744,6 +2922,8 @@ export async function packWapkDirectory(
         runtime: config.runtime,
         entry: config.entry,
         scripts: config.scripts,
+        appId: config.appId,
+        publisherId: config.publisherId,
         port: config.port,
         env: config.env,
         desktop: config.desktop,
@@ -2922,6 +3102,8 @@ function inspectWapkArchive(wapkPath: string, options: WapkCredentialsOptions = 
     console.log(`App:      ${decoded.header.version}`);
     console.log(`Runtime:  ${decoded.header.runtime}`);
     console.log(`Entry:    ${decoded.header.entry}`);
+    console.log(`App ID:   ${decoded.header.appId ?? 'n/a'}`);
+    console.log(`Publisher:${decoded.header.publisherId ? ` ${decoded.header.publisherId}` : ' n/a'}`);
     console.log(`Port:     ${decoded.header.port ?? 'default'}`);
     console.log(`Created:  ${decoded.header.createdAt}`);
 
@@ -2980,6 +3162,7 @@ function printWapkHelp(): void {
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
+        '  - If appId or publisherId is not configured, pack auto-generates stable defaults from package metadata.',
         '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them, and !pattern to re-include later matches.',
         '  - Run never installs dependencies automatically; archives must include the runtime dependencies they need.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
