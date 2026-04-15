@@ -806,6 +806,7 @@ WAPK Options:
   elit wapk run [file.wapk]                 Run a packaged app or the configured default archive
   elit wapk run --google-drive-file-id <id> Run a packaged app directly from Google Drive
   elit wapk pack [directory]                Pack a directory into a .wapk archive
+  elit wapk patch <file.wapk> --from <patch.wapk>  Apply a manifest-driven patch archive
   elit wapk inspect <file.wapk>             Inspect a .wapk archive
   elit wapk extract <file.wapk>             Extract a .wapk archive
   elit wapk --runtime node|bun|deno [file]  Override the packaged runtime

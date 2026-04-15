@@ -277,6 +277,7 @@ Useful flags:
 - `elit wapk gdrive://<fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --online`
 - `elit wapk run ./app.wapk --online --online-url http://localhost:4177`
 - `elit wapk pack .`
+- `elit wapk patch ./app.wapk --from ./patch.wapk`
 - `elit wapk inspect ./app.wapk --password secret-123`
 - `elit wapk extract ./app.wapk`
 - `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
@@ -325,8 +326,10 @@ WAPK mode notes:
 - `elit wapk <file.wapk>` and `elit wapk run <file.wapk>` run packaged apps.
 - `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>` run packaged apps in desktop mode.
 - During run, the archive is expanded into a temporary work directory and changes are synced back to the same `.wapk` file.
+- `elit wapk patch <target.wapk> --from <patch.wapk>` reads `.wapkpatch` from the patch archive and overlays only the matching archive-relative files into the target archive.
 - Use `--sync-interval <ms>` for polling mode, or `--watcher` / `--use-watcher` for event-driven sync.
 - Use `--password` when packing, inspecting, extracting, or running a locked archive.
+- Use `--from-password` when the patch archive is locked with a different password than the target archive.
 - `inspect` without credentials still reports whether the archive is locked, but it does not print the archive contents.
 - Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
 - Configure package metadata in `elit.config.*` under `wapk`, and use `wapk.lock` when you want password-protected archives by default.

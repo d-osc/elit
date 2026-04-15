@@ -31,6 +31,12 @@ npx elit wapk pack . --password secret-123
 # Package current directory with dependencies
 npx elit wapk pack .
 
+# Apply a patch archive into an existing target archive
+npx elit wapk patch ./app.wapk --from ./patch.wapk
+
+# Alias for --from
+npx elit wapk patch ./app.wapk --use ./patch.wapk
+
 # Inspect archive metadata and files
 npx elit wapk inspect ./app.wapk
 
@@ -68,6 +74,26 @@ npx elit desktop wapk ./app.wapk
 npx elit desktop wapk run ./app.wapk
 npx elit desktop wapk run ./app.wapk --runtime bun
 ```
+
+## Patch Manifests
+
+`elit wapk patch <target.wapk> --from <patch.wapk>` reads `.wapkpatch` from the patch archive and overlays only the matching files into the target archive. The target header and lock mode stay the same.
+
+Example `.wapkpatch`:
+
+```text
+index.js
+src/*
+!database/*
+```
+
+Meaning:
+
+- `index.js` patches only the archive-root `index.js`
+- `src/*` patches the whole `src/` subtree
+- `!database/*` excludes files under `database/` from being applied even if an earlier rule matched them
+
+Rules are evaluated in order. Patch manifests accept archive-relative paths plus glob patterns, and the folder form from the example (`dir/*`) applies the whole subtree under that directory.
 
 ## Live Sync Behavior
 
@@ -178,6 +204,7 @@ Notes:
 
 - `inspect` without credentials still shows whether the archive is locked.
 - Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
+- Use `--from-password` when the patch archive is locked with a different password than the target archive.
 - WAPK stays unlocked by default unless you provide `lock.password` or `--password`.
 
 ## Config via elit.config.*

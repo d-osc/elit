@@ -107,6 +107,14 @@ export interface PreparedWapkApp {
     syncIncludesNodeModules: boolean;
 }
 
+export interface WapkPatchResult {
+    archiveLabel: string;
+    patchedPaths: string[];
+    addedPaths: string[];
+    updatedPaths: string[];
+    unchangedPaths: string[];
+}
+
 interface WapkLaunchCommand {
     executable: string;
     args: string[];
@@ -925,15 +933,19 @@ function readIgnorePatterns(directory: string): string[] {
     return readLineIgnorePatterns(join(directory, '.wapkignore'));
 }
 
+function parsePatternLines(content: string): string[] {
+    return content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && (!line.startsWith('#') || line.startsWith('\\#')));
+}
+
 function readLineIgnorePatterns(filePath: string): string[] {
     if (!existsSync(filePath)) {
         return [];
     }
 
-    return readFileSync(filePath, 'utf8')
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0 && (!line.startsWith('#') || line.startsWith('\\#')));
+    return parsePatternLines(readFileSync(filePath, 'utf8'));
 }
 
 function normalizePackageEntry(value: string): string | undefined {
@@ -1298,6 +1310,118 @@ function shouldIgnore(relativePath: string, ignorePatterns: readonly string[], i
     }
 
     return ignored;
+}
+
+function matchesPatchPattern(relativePath: string, pattern: string): boolean {
+    const normalizedRule = normalizeIgnorePattern(pattern);
+    if (!normalizedRule) {
+        return false;
+    }
+
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const subtreeSelector = normalizedRule.pattern.endsWith('/*')
+        && !normalizedRule.pattern.slice(0, -2).includes('*')
+        && !normalizedRule.pattern.slice(0, -2).includes('?');
+
+    if (subtreeSelector) {
+        const directoryPath = normalizedRule.pattern.slice(0, -2);
+        return directoryPath.length > 0 && normalizedPath.startsWith(`${directoryPath}/`);
+    }
+
+    const hasGlob = /[*?]/.test(normalizedRule.pattern);
+
+    if (!hasGlob) {
+        if (normalizedRule.directoryOnly) {
+            return normalizedPath === normalizedRule.pattern
+                || normalizedPath.startsWith(`${normalizedRule.pattern}/`);
+        }
+
+        return normalizedPath === normalizedRule.pattern;
+    }
+
+    return globPatternToRegex(normalizedRule.pattern, {
+        directoryOnly: normalizedRule.directoryOnly,
+        matchSegmentsOnly: false,
+    }).test(normalizedPath);
+}
+
+function shouldPatchArchivePath(relativePath: string, patchPatterns: readonly string[]): boolean {
+    let selected = false;
+
+    for (const pattern of patchPatterns) {
+        const normalizedRule = normalizeIgnorePattern(pattern);
+        if (!normalizedRule) {
+            continue;
+        }
+
+        if (!matchesPatchPattern(relativePath, pattern)) {
+            continue;
+        }
+
+        selected = !normalizedRule.negate;
+    }
+
+    return selected;
+}
+
+function resolvePatchManifestPatterns(files: readonly WapkFileEntry[]): string[] {
+    const patchManifest = files.find((file) => file.path === '.wapkpatch');
+    if (!patchManifest) {
+        throw new Error('Patch archive must include a .wapkpatch manifest file.');
+    }
+
+    const patterns = parsePatternLines(patchManifest.content.toString('utf8'));
+    if (patterns.length === 0) {
+        throw new Error('Patch archive .wapkpatch must define at least one patch rule.');
+    }
+
+    return patterns;
+}
+
+function applyPatchEntriesToFiles(
+    targetFiles: readonly WapkFileEntry[],
+    patchFiles: readonly WapkFileEntry[],
+): Omit<WapkPatchResult, 'archiveLabel'> & { files: WapkFileEntry[] } {
+    const fileMap = new Map<string, WapkFileEntry>(targetFiles.map((file) => [file.path, file]));
+    const fileOrder = targetFiles.map((file) => file.path);
+    const addedPaths: string[] = [];
+    const updatedPaths: string[] = [];
+    const unchangedPaths: string[] = [];
+
+    for (const patchFile of [...patchFiles].sort((left, right) => left.path.localeCompare(right.path))) {
+        const existing = fileMap.get(patchFile.path);
+        const nextEntry: WapkFileEntry = {
+            path: patchFile.path,
+            content: Buffer.from(patchFile.content),
+            mode: patchFile.mode,
+        };
+
+        if (!existing) {
+            addedPaths.push(patchFile.path);
+            fileOrder.push(patchFile.path);
+        } else if (existing.mode === patchFile.mode && existing.content.equals(patchFile.content)) {
+            unchangedPaths.push(patchFile.path);
+        } else {
+            updatedPaths.push(patchFile.path);
+        }
+
+        fileMap.set(patchFile.path, nextEntry);
+    }
+
+    return {
+        files: fileOrder.map((filePath) => {
+            const file = fileMap.get(filePath);
+            if (!file) {
+                throw new Error(`Internal WAPK patch error: missing file entry for ${filePath}`);
+            }
+
+            return file;
+        }),
+        patchedPaths: [...updatedPaths, ...addedPaths],
+        addedPaths,
+        updatedPaths,
+        unchangedPaths,
+    };
 }
 
 function collectFiles(directory: string, baseDirectory: string, ignorePatterns: readonly string[]): WapkFileEntry[] {
@@ -2964,6 +3088,73 @@ export function extractWapkArchive(
     return extractDirectory;
 }
 
+export async function patchWapkArchive(
+    wapkPath: string,
+    options: WapkCredentialsOptions & {
+        from: string;
+        fromPassword?: string;
+    },
+): Promise<WapkPatchResult> {
+    const targetHandle = resolveArchiveHandle(wapkPath);
+    const targetSnapshot = await targetHandle.readSnapshot();
+    const targetEnvelope = parseWapkEnvelope(targetSnapshot.buffer);
+    const targetArchive = decodeWapk(targetSnapshot.buffer, options);
+    const targetLock = targetEnvelope.version === WAPK_LOCKED_VERSION
+        ? resolveArchiveCredentials(options)
+        : undefined;
+    const patchArchive = readWapkArchive(options.from, {
+        password: options.fromPassword ?? options.password,
+    });
+    const patchPatterns = resolvePatchManifestPatterns(patchArchive.files);
+    const selectedPatchFiles = patchArchive.files
+        .filter((file) => file.path !== '.wapkpatch')
+        .filter((file) => shouldPatchArchivePath(file.path, patchPatterns));
+    const patchResult = applyPatchEntriesToFiles(targetArchive.files, selectedPatchFiles);
+
+    console.log(`[wapk] Target: ${targetSnapshot.label ?? targetHandle.label}`);
+    console.log(`[wapk] Patch:  ${options.from}`);
+    console.log(`[wapk] Rules:  ${patchPatterns.length}`);
+
+    if (selectedPatchFiles.length === 0) {
+        console.log('[wapk] No files matched .wapkpatch. Archive was not modified.');
+        return {
+            archiveLabel: targetSnapshot.label ?? targetHandle.label,
+            patchedPaths: [],
+            addedPaths: [],
+            updatedPaths: [],
+            unchangedPaths: [],
+        };
+    }
+
+    if (patchResult.patchedPaths.length === 0) {
+        console.log('[wapk] Matching patch files were already up to date. Archive was not modified.');
+        return {
+            archiveLabel: targetSnapshot.label ?? targetHandle.label,
+            patchedPaths: [],
+            addedPaths: [],
+            updatedPaths: [],
+            unchangedPaths: patchResult.unchangedPaths,
+        };
+    }
+
+    const writeResult = await writeWapkArchiveFromMemory(
+        targetHandle,
+        targetArchive.header,
+        patchResult.files,
+        targetLock,
+    );
+
+    console.log(`[wapk] Applied ${patchResult.patchedPaths.length} patch file${patchResult.patchedPaths.length === 1 ? '' : 's'}.`);
+
+    return {
+        archiveLabel: writeResult.label,
+        patchedPaths: patchResult.patchedPaths,
+        addedPaths: patchResult.addedPaths,
+        updatedPaths: patchResult.updatedPaths,
+        unchangedPaths: patchResult.unchangedPaths,
+    };
+}
+
 export async function prepareWapkApp(
     wapkPath: string,
     options: WapkCredentialsOptions & {
@@ -3139,6 +3330,8 @@ function printWapkHelp(): void {
         '  elit wapk gdrive://<fileId> --online',
         '  elit wapk pack [directory]',
         '  elit wapk pack [directory] --password secret-123',
+        '  elit wapk patch <file.wapk> --from <patch.wapk>',
+        '  elit wapk patch <file.wapk> --use <patch.wapk>',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
         '',
@@ -3156,6 +3349,9 @@ function printWapkHelp(): void {
         '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
         '  --google-drive-access-token <value>  OAuth token for Google Drive API calls',
         '  --google-drive-shared-drive  Include supportsAllDrives=true for shared drives',
+        '  --from <file.wapk>           Patch source archive for elit wapk patch',
+        '  --use <file.wapk>            Alias for --from',
+        '  --from-password <value>      Password for unlocking the patch archive',
         '  --include-deps               Legacy compatibility flag; node_modules are packed by default',
         '  --password <value>           Password for locking or unlocking the archive',
         '  -h, --help                   Show this help',
@@ -3164,6 +3360,8 @@ function printWapkHelp(): void {
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
         '  - If appId or publisherId is not configured, pack auto-generates stable defaults from package metadata.',
         '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them, and !pattern to re-include later matches.',
+        '  - Patch reads .wapkpatch from the patch archive and applies only matching archive-relative paths.',
+        '  - Patch keeps the target archive metadata and lock mode; use --from-password when the patch archive uses a different password.',
         '  - Run never installs dependencies automatically; archives must include the runtime dependencies they need.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
         '  - Browser-style archives with scripts.start or wapk.script.start run that start script automatically.',
@@ -3373,6 +3571,53 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
     return { directory, includeDeps, password };
 }
 
+function parsePatchArgs(
+    args: string[],
+): { file: string; from: string; fromPassword?: string } & WapkCredentialsOptions {
+    let file: string | undefined;
+    let from: string | undefined;
+    let password: string | undefined;
+    let fromPassword: string | undefined;
+
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
+
+        switch (arg) {
+            case '--from':
+            case '--use': {
+                if (from) {
+                    throw new Error('WAPK patch accepts exactly one patch archive via --from or --use.');
+                }
+                from = readRequiredOptionValue(args, ++index, arg);
+                break;
+            }
+            case '--password': {
+                password = readRequiredOptionValue(args, ++index, '--password');
+                break;
+            }
+            case '--from-password': {
+                fromPassword = readRequiredOptionValue(args, ++index, '--from-password');
+                break;
+            }
+            default:
+                if (arg.startsWith('-')) {
+                    throw new Error(`Unknown WAPK option: ${arg}`);
+                }
+                if (file) {
+                    throw new Error('Usage: elit wapk patch <file.wapk> --from <patch.wapk>');
+                }
+                file = arg;
+                break;
+        }
+    }
+
+    if (!file || !from) {
+        throw new Error('Usage: elit wapk patch <file.wapk> --from <patch.wapk>');
+    }
+
+    return { file, from, password, fromPassword };
+}
+
 async function readConfiguredWapkRunDefaults(cwd: string): Promise<WapkRunConfig | undefined> {
     const config = await loadConfig(cwd);
     const runConfig = normalizeWapkRunConfig(config?.wapk?.run);
@@ -3482,6 +3727,16 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
         await packWapkDirectory(options.directory, {
             includeDeps: options.includeDeps,
             password: options.password,
+        });
+        return;
+    }
+
+    if (args[0] === 'patch') {
+        const options = parsePatchArgs(args.slice(1));
+        await patchWapkArchive(options.file, {
+            from: options.from,
+            password: options.password,
+            fromPassword: options.fromPassword,
         });
         return;
     }

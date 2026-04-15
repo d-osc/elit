@@ -263,6 +263,7 @@ Forms:
 - `elit wapk`
 - `elit wapk run`
 - `elit wapk pack [directory]`
+- `elit wapk patch <file.wapk> --from <patch.wapk>`
 - `elit wapk inspect <file.wapk>`
 - `elit wapk extract <file.wapk>`
 
@@ -280,11 +281,15 @@ Useful options:
 - `--google-drive-file-id <id>`
 - `--google-drive-token-env <env>`
 - `--google-drive-access-token <token>`
+- `--from <patch.wapk>` on `patch`
+- `--use <patch.wapk>` on `patch` as an alias for `--from`
+- `--from-password <value>` on `patch` when the patch archive is locked separately
 - `--include-deps` on `pack` as a legacy compatibility flag
 
 Notes:
 
 - `elit wapk pack` includes `node_modules` by default; `.wapkignore` now supports ordered negate rules like `!dist`, directory rules like `dist/`, globstar patterns like `**/*.map`, and escaped leading `\!literal` / `\#literal` entries.
+- `elit wapk patch` reads `.wapkpatch` from the patch archive and overlays only the matching archive-relative files into the target archive.
 - `--online` creates a shared session on the Elit Run server directly, keeps the CLI alive, and closes the session when you press `Ctrl+C`.
 - Online mode ignores `SIGTERM` by default; pass `--allow-sigterm-close` if an external supervisor should close the shared session with `SIGTERM`.
 - Google Drive archives can use the same online handoff with `elit wapk gdrive://<fileId> --online` or `elit wapk run --google-drive-file-id <fileId> ... --online`.

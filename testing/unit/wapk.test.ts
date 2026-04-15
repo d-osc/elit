@@ -591,6 +591,165 @@ describe('wapk helpers', () => {
         }
     });
 
+    it('patches a WAPK archive using .wapkpatch include and exclude rules', async () => {
+        const targetDir = createTempDir();
+        const patchDir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'database'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'src', 'nested'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'database', 'nested'), { recursive: true });
+            fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
+                name: 'target-app',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(targetDir, 'index.js'), 'console.log("base-index");\n');
+            fs.writeFileSync(path.join(targetDir, 'src', 'feature.js'), 'console.log("base-feature");\n');
+            fs.writeFileSync(path.join(targetDir, 'src', 'nested', 'child.js'), 'console.log("base-nested-feature");\n');
+            fs.writeFileSync(path.join(targetDir, 'database', 'seed.json'), '{"from":"target"}\n');
+            fs.writeFileSync(path.join(targetDir, 'database', 'nested', 'seed.json'), '{"from":"target-nested"}\n');
+
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'app.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'database'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'src', 'nested'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'database', 'nested'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'patch-app',
+                version: '9.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['index.js', 'src/*', '!database/*', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'index.js'), 'console.log("patched-index");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'feature.js'), 'console.log("patched-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'added.js'), 'console.log("added-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'nested', 'child.js'), 'console.log("patched-nested-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'database', 'seed.json'), '{"from":"patch"}\n');
+            fs.writeFileSync(path.join(patchDir, 'database', 'nested', 'seed.json'), '{"from":"patch-nested"}\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'patch.wapk'),
+            });
+
+            await runWapkCommand(['patch', archivePath, '--from', patchArchivePath], targetDir);
+
+            const archive = readWapkArchive(archivePath);
+            expect(archive.header.name).toBe('target-app');
+            expect(archive.files.find((file) => file.path === 'index.js')?.content.toString('utf8')).toBe('console.log("patched-index");\n');
+            expect(archive.files.find((file) => file.path === 'src/feature.js')?.content.toString('utf8')).toBe('console.log("patched-feature");\n');
+            expect(archive.files.find((file) => file.path === 'src/added.js')?.content.toString('utf8')).toBe('console.log("added-feature");\n');
+            expect(archive.files.find((file) => file.path === 'src/nested/child.js')?.content.toString('utf8')).toBe('console.log("patched-nested-feature");\n');
+            expect(archive.files.find((file) => file.path === 'database/seed.json')?.content.toString('utf8')).toBe('{"from":"target"}\n');
+            expect(archive.files.find((file) => file.path === 'database/nested/seed.json')?.content.toString('utf8')).toBe('{"from":"target-nested"}\n');
+            expect(archive.files.some((file) => file.path === '.wapkpatch')).toBe(false);
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('preserves target archive locking when patching a locked archive', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'locked-target.wapk'),
+                password: 'target-secret',
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'patch-locked-target',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['src/index.js', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("patched-locked-target");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'patch-locked-target.wapk'),
+            });
+
+            await runWapkCommand(['patch', archivePath, '--from', patchArchivePath, '--password', 'target-secret'], targetDir);
+
+            expect(() => readWapkArchive(archivePath)).toThrow('password-protected');
+            expect(readWapkArchive(archivePath, {
+                password: 'target-secret',
+            }).files.find((file) => file.path === 'src/index.js')?.content.toString('utf8')).toBe('console.log("patched-locked-target");\n');
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('supports --use and --from-password when the patch archive is locked', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'target.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'locked-patch',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['src/index.js', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("patched-from-locked-patch");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'locked-patch.wapk'),
+                password: 'patch-secret',
+            });
+
+            await runWapkCommand(['patch', archivePath, '--use', patchArchivePath, '--from-password', 'patch-secret'], targetDir);
+
+            expect(readWapkArchive(archivePath).files.find((file) => file.path === 'src/index.js')?.content.toString('utf8')).toBe('console.log("patched-from-locked-patch");\n');
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('requires .wapkpatch in the patch archive', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'target.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'missing-manifest-patch',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("missing-manifest");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'missing-manifest.wapk'),
+            });
+
+            await expect(runWapkCommand(['patch', archivePath, '--from', patchArchivePath], targetDir)).rejects.toThrow(
+                'Patch archive must include a .wapkpatch manifest file.',
+            );
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
     it('reads wapk config from elit.config.mts', async () => {
         const dir = createTempDir();
 
