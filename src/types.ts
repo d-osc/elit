@@ -72,6 +72,7 @@ export type ElementFactory = {
 
 import type { Server } from 'http';
 import type { WebSocketServer } from 'ws';
+import type { ElitSMTPServerConfig, ElitSMTPServerHandle } from './smtp-server';
 
 // Forward declarations to avoid circular dependency
 export type Router = import('./server').ServerRouter;
@@ -124,6 +125,8 @@ export interface ClientConfig {
     api?: Router;
     /** WebSocket endpoints specific to this client */
     ws?: WebSocketEndpointConfig[];
+    /** SMTP listeners specific to this client */
+    smtp?: ElitSMTPServerConfig | ElitSMTPServerConfig[];
     /** Server mode: 'dev' uses source files, 'preview' uses built files (default: 'dev') */
     mode?: 'dev' | 'preview';
 }
@@ -185,6 +188,8 @@ export interface DevServerOptions {
     api?: Router;
     /** WebSocket endpoints */
     ws?: WebSocketEndpointConfig[];
+    /** SMTP listeners started alongside the HTTP server */
+    smtp?: ElitSMTPServerConfig | ElitSMTPServerConfig[];
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
     /** Proxy configuration for API requests */
@@ -206,6 +211,8 @@ export interface DevServer {
     server: Server;
     /** WebSocket server for HMR */
     wss: WebSocketServer;
+    /** Managed SMTP listeners started from dev or preview config */
+    smtpServers: ElitSMTPServerHandle[];
     /** Server URL */
     url: string;
     /** Shared state manager */
@@ -307,6 +314,8 @@ export interface PreviewOptions {
     api?: Router;
     /** WebSocket endpoints */
     ws?: WebSocketEndpointConfig[];
+    /** SMTP listeners started alongside the preview server */
+    smtp?: ElitSMTPServerConfig | ElitSMTPServerConfig[];
     /** SSR render function - returns HTML VNode or string */
     ssr?: () => Child | string;
     /** Proxy configuration for API requests */

@@ -63,6 +63,7 @@ Use this table as the import map for generated code.
 | `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
 | `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
 | `elit/server` | HTTP router, dev server, middleware, WebSocket endpoints, shared server state | `ServerRouter`, `createDevServer`, `cors`, `logger`, `rateLimit`, `compress`, `security`, `StateManager` |
+| `elit/smtp-server` | SMTP listeners and config-friendly wrappers built on top of `smtp-server` | `SMTPServer`, `createSmtpServer`, `startSmtpServer` |
 | `elit/build` | Programmatic build API | `build` |
 | `elit/desktop` | Native desktop window APIs | `createWindow`, `createWindowServer`, `onMessage`, `windowQuit`, `windowSetTitle`, `windowEval` |
 | `elit/database` | VM-backed file database | `Database`, `create`, `read`, `save`, `update`, `rename`, `remove` |
@@ -277,6 +278,7 @@ Useful flags:
 - `elit wapk gdrive://<fileId> --google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN --online`
 - `elit wapk run ./app.wapk --online --online-url http://localhost:4177`
 - `elit wapk pack .`
+- `elit wapk patch ./app.wapk --from ./patch.wapk`
 - `elit wapk inspect ./app.wapk --password secret-123`
 - `elit wapk extract ./app.wapk`
 - `elit desktop wapk ./app.wapk --runtime node|bun|deno --watcher`
@@ -325,8 +327,10 @@ WAPK mode notes:
 - `elit wapk <file.wapk>` and `elit wapk run <file.wapk>` run packaged apps.
 - `elit desktop wapk <file.wapk>` and `elit desktop wapk run <file.wapk>` run packaged apps in desktop mode.
 - During run, the archive is expanded into a temporary work directory and changes are synced back to the same `.wapk` file.
+- `elit wapk patch <target.wapk> --from <patch.wapk>` reads `.wapkpatch` from the patch archive and overlays only the matching archive-relative files into the target archive.
 - Use `--sync-interval <ms>` for polling mode, or `--watcher` / `--use-watcher` for event-driven sync.
 - Use `--password` when packing, inspecting, extracting, or running a locked archive.
+- Use `--from-password` when the patch archive is locked with a different password than the target archive.
 - `inspect` without credentials still reports whether the archive is locked, but it does not print the archive contents.
 - Locked archives stay encrypted when live sync writes changes back into the same `.wapk` file.
 - Configure package metadata in `elit.config.*` under `wapk`, and use `wapk.lock` when you want password-protected archives by default.
@@ -581,6 +585,8 @@ Notes:
 
 - `dev.ws` and `preview.ws` register global WebSocket endpoints.
 - `clients[].ws` registers client-specific endpoints and prefixes each path with that client's `basePath`.
+- `dev.smtp` and `preview.smtp` start SMTP listeners alongside the HTTP server.
+- `clients[].smtp` starts SMTP listeners for a specific client branch, but SMTP listeners always bind to their own `host` and `port` instead of using `basePath`.
 - The internal Elit HMR and shared-state socket uses `/__elit_ws`, so do not reuse that path for custom endpoints.
 
 Important details:

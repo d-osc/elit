@@ -304,6 +304,10 @@ export interface WapkConfig {
     engine?: string;
     entry?: string;
     scripts?: Record<string, string>;
+    /** Stable logical app identifier embedded into the WAPK header */
+    appId?: string;
+    /** Stable publisher or owner identifier embedded into the WAPK header */
+    publisherId?: string;
     port?: number;
     env?: Record<string, string | number | boolean>;
     desktop?: Record<string, unknown>;

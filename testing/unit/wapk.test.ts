@@ -96,11 +96,13 @@ function createGoogleDriveOnlineFetchMock(
     options: {
         fileId?: string;
         onlineUrl?: string;
+        shutdownSignals?: Array<{ signal: 'SIGINT' | 'SIGTERM'; delayMs?: number }>;
     } = {},
 ) {
     const originalFetch = global.fetch;
     const fileId = options.fileId ?? 'drive-file-id';
     const launcherUrl = new URL(options.onlineUrl ?? 'http://localhost:4179/');
+    const shutdownSignals = options.shutdownSignals ?? [{ signal: 'SIGINT', delayMs: 0 }];
     let remoteBuffer = Buffer.from(initialBuffer);
     let revision = 0;
     let createPayload: any;
@@ -141,9 +143,11 @@ function createGoogleDriveOnlineFetchMock(
 
         if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/create' && method === 'POST') {
             createPayload = await readJsonBody(init?.body);
-            setTimeout(() => {
-                process.emit('SIGINT');
-            }, 0);
+            for (const shutdownSignal of shutdownSignals) {
+                setTimeout(() => {
+                    process.emit(shutdownSignal.signal);
+                }, shutdownSignal.delayMs ?? 0);
+            }
             return jsonResponse({
                 ok: true,
                 joinKey: 'ABCD-EFGH-IJKL',
@@ -584,6 +588,165 @@ describe('wapk helpers', () => {
             expect(fs.readFileSync(path.join(extractedDir, 'src', 'main.js'), 'utf8')).toBe('console.log("extract");\n');
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('patches a WAPK archive using .wapkpatch include and exclude rules', async () => {
+        const targetDir = createTempDir();
+        const patchDir = createTempDir();
+
+        try {
+            fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'database'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'src', 'nested'), { recursive: true });
+            fs.mkdirSync(path.join(targetDir, 'database', 'nested'), { recursive: true });
+            fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
+                name: 'target-app',
+                version: '1.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(targetDir, 'index.js'), 'console.log("base-index");\n');
+            fs.writeFileSync(path.join(targetDir, 'src', 'feature.js'), 'console.log("base-feature");\n');
+            fs.writeFileSync(path.join(targetDir, 'src', 'nested', 'child.js'), 'console.log("base-nested-feature");\n');
+            fs.writeFileSync(path.join(targetDir, 'database', 'seed.json'), '{"from":"target"}\n');
+            fs.writeFileSync(path.join(targetDir, 'database', 'nested', 'seed.json'), '{"from":"target-nested"}\n');
+
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'app.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'database'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'src', 'nested'), { recursive: true });
+            fs.mkdirSync(path.join(patchDir, 'database', 'nested'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'patch-app',
+                version: '9.0.0',
+                main: 'index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['index.js', 'src/*', '!database/*', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'index.js'), 'console.log("patched-index");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'feature.js'), 'console.log("patched-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'added.js'), 'console.log("added-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'src', 'nested', 'child.js'), 'console.log("patched-nested-feature");\n');
+            fs.writeFileSync(path.join(patchDir, 'database', 'seed.json'), '{"from":"patch"}\n');
+            fs.writeFileSync(path.join(patchDir, 'database', 'nested', 'seed.json'), '{"from":"patch-nested"}\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'patch.wapk'),
+            });
+
+            await runWapkCommand(['patch', archivePath, '--from', patchArchivePath], targetDir);
+
+            const archive = readWapkArchive(archivePath);
+            expect(archive.header.name).toBe('target-app');
+            expect(archive.files.find((file) => file.path === 'index.js')?.content.toString('utf8')).toBe('console.log("patched-index");\n');
+            expect(archive.files.find((file) => file.path === 'src/feature.js')?.content.toString('utf8')).toBe('console.log("patched-feature");\n');
+            expect(archive.files.find((file) => file.path === 'src/added.js')?.content.toString('utf8')).toBe('console.log("added-feature");\n');
+            expect(archive.files.find((file) => file.path === 'src/nested/child.js')?.content.toString('utf8')).toBe('console.log("patched-nested-feature");\n');
+            expect(archive.files.find((file) => file.path === 'database/seed.json')?.content.toString('utf8')).toBe('{"from":"target"}\n');
+            expect(archive.files.find((file) => file.path === 'database/nested/seed.json')?.content.toString('utf8')).toBe('{"from":"target-nested"}\n');
+            expect(archive.files.some((file) => file.path === '.wapkpatch')).toBe(false);
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('preserves target archive locking when patching a locked archive', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'locked-target.wapk'),
+                password: 'target-secret',
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'patch-locked-target',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['src/index.js', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("patched-locked-target");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'patch-locked-target.wapk'),
+            });
+
+            await runWapkCommand(['patch', archivePath, '--from', patchArchivePath, '--password', 'target-secret'], targetDir);
+
+            expect(() => readWapkArchive(archivePath)).toThrow('password-protected');
+            expect(readWapkArchive(archivePath, {
+                password: 'target-secret',
+            }).files.find((file) => file.path === 'src/index.js')?.content.toString('utf8')).toBe('console.log("patched-locked-target");\n');
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('supports --use and --from-password when the patch archive is locked', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'target.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'locked-patch',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, '.wapkpatch'), ['src/index.js', ''].join('\n'));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("patched-from-locked-patch");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'locked-patch.wapk'),
+                password: 'patch-secret',
+            });
+
+            await runWapkCommand(['patch', archivePath, '--use', patchArchivePath, '--from-password', 'patch-secret'], targetDir);
+
+            expect(readWapkArchive(archivePath).files.find((file) => file.path === 'src/index.js')?.content.toString('utf8')).toBe('console.log("patched-from-locked-patch");\n');
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
+        }
+    });
+
+    it('requires .wapkpatch in the patch archive', async () => {
+        const targetDir = createTempWapkProject();
+        const patchDir = createTempDir();
+
+        try {
+            const archivePath = await packWapkDirectory(targetDir, {
+                outputPath: path.join(targetDir, 'target.wapk'),
+            });
+
+            fs.mkdirSync(path.join(patchDir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(patchDir, 'package.json'), JSON.stringify({
+                name: 'missing-manifest-patch',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(patchDir, 'src', 'index.js'), 'console.log("missing-manifest");\n');
+
+            const patchArchivePath = await packWapkDirectory(patchDir, {
+                outputPath: path.join(patchDir, 'missing-manifest.wapk'),
+            });
+
+            await expect(runWapkCommand(['patch', archivePath, '--from', patchArchivePath], targetDir)).rejects.toThrow(
+                'Patch archive must include a .wapkpatch manifest file.',
+            );
+        } finally {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+            fs.rmSync(patchDir, { recursive: true, force: true });
         }
     });
 
@@ -1223,6 +1386,124 @@ describe('wapk helpers', () => {
             process.exitCode = previousExitCode;
             fetchMock?.restore();
             logSpy.mockRestore();
+            errorSpy.mockRestore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('ignores SIGTERM for online sessions until SIGINT arrives', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed-online.wapk');
+        const previousExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        let fetchMock: ReturnType<typeof createGoogleDriveOnlineFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'elit.config.json'), JSON.stringify({
+                wapk: {
+                    name: 'remote-online-app',
+                    version: '1.0.0',
+                    runtime: 'node',
+                    entry: 'src/index.js',
+                    run: {
+                        googleDrive: {
+                            fileId: 'drive-file-id',
+                            accessToken: 'token-789',
+                        },
+                        online: true,
+                        onlineUrl: 'http://localhost:4179',
+                    },
+                },
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("configured-google-drive-online");\n');
+
+            await packWapkDirectory(dir, {
+                outputPath: seedArchivePath,
+            });
+
+            fetchMock = createGoogleDriveOnlineFetchMock(fs.readFileSync(seedArchivePath), {
+                onlineUrl: 'http://localhost:4179',
+                shutdownSignals: [
+                    { signal: 'SIGTERM', delayMs: 0 },
+                    { signal: 'SIGINT', delayMs: 0 },
+                ],
+            });
+
+            await runWapkCommand([], dir);
+
+            expect(fetchMock.getClosePayload()).toMatchObject({
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+            expect(logSpy.calls.some((call) => call.join(' ').includes('Join URL:  http://localhost:4179/?join=ABCD-EFGH-IJKL&launchSource=elit-wapk-online'))).toBe(true);
+            expect(warnSpy.calls.some((call) => {
+                const message = call.join(' ');
+                return message.includes('Ignoring SIGTERM while shared session ABCD-EFGH-IJKL is active (pid ')
+                    && message.includes(', ppid ');
+            })).toBe(true);
+            expect(logSpy.calls.some((call) => call.join(' ').includes('Received SIGINT; closing shared session ABCD-EFGH-IJKL'))).toBe(true);
+            expect(errorSpy.callCount).toBe(0);
+        } finally {
+            process.exitCode = previousExitCode;
+            fetchMock?.restore();
+            logSpy.mockRestore();
+            warnSpy.mockRestore();
+            errorSpy.mockRestore();
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('allows SIGTERM to close online sessions when explicitly enabled', async () => {
+        const dir = createTempDir();
+        const seedArchivePath = path.join(dir, 'seed-online.wapk');
+        const previousExitCode = process.exitCode;
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        let fetchMock: ReturnType<typeof createGoogleDriveOnlineFetchMock> | undefined;
+
+        try {
+            fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+            fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+                name: 'local-online-app',
+                version: '1.0.0',
+                main: 'src/index.js',
+            }, null, 2));
+            fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'console.log("local-online");\n');
+
+            await packWapkDirectory(dir, {
+                outputPath: seedArchivePath,
+            });
+
+            fetchMock = createGoogleDriveOnlineFetchMock(fs.readFileSync(seedArchivePath), {
+                onlineUrl: 'http://localhost:4179',
+                shutdownSignals: [
+                    { signal: 'SIGTERM', delayMs: 0 },
+                ],
+            });
+
+            await runWapkCommand(['run', seedArchivePath, '--online', '--online-url', 'http://localhost:4179', '--allow-sigterm-close'], dir);
+
+            expect(fetchMock.getClosePayload()).toMatchObject({
+                joinKey: 'ABCD-EFGH-IJKL',
+                adminToken: 'admin-token',
+            });
+            expect(logSpy.calls.some((call) => {
+                const message = call.join(' ');
+                return message.includes('Received SIGTERM for shared session ABCD-EFGH-IJKL (pid ')
+                    && message.includes(', ppid ')
+                    && message.includes('closing because --allow-sigterm-close is enabled');
+            })).toBe(true);
+            expect(warnSpy.callCount).toBe(0);
+            expect(errorSpy.callCount).toBe(0);
+        } finally {
+            process.exitCode = previousExitCode;
+            fetchMock?.restore();
+            logSpy.mockRestore();
+            warnSpy.mockRestore();
             errorSpy.mockRestore();
             fs.rmSync(dir, { recursive: true, force: true });
         }

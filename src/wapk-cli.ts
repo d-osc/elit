@@ -14,6 +14,8 @@ export interface WapkHeader {
     runtime: WapkRuntimeName;
     entry: string;
     scripts: Record<string, string>;
+    appId?: string;
+    publisherId?: string;
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
@@ -105,6 +107,14 @@ export interface PreparedWapkApp {
     syncIncludesNodeModules: boolean;
 }
 
+export interface WapkPatchResult {
+    archiveLabel: string;
+    patchedPaths: string[];
+    addedPaths: string[];
+    updatedPaths: string[];
+    unchangedPaths: string[];
+}
+
 interface WapkLaunchCommand {
     executable: string;
     args: string[];
@@ -119,6 +129,8 @@ interface WapkProjectConfig {
     runtime: WapkRuntimeName;
     entry: string;
     scripts: Record<string, string>;
+    appId?: string;
+    publisherId?: string;
     port?: number;
     env?: Record<string, string>;
     desktop?: Record<string, unknown>;
@@ -163,7 +175,7 @@ const WAPK_AUTH_TAG_LENGTH = 16;
 const WAPK_SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 } as const;
 const DEFAULT_GOOGLE_DRIVE_TOKEN_ENV = 'GOOGLE_DRIVE_ACCESS_TOKEN';
 const DEFAULT_WAPK_ONLINE_URL_ENV = 'ELIT_WAPK_ONLINE_URL';
-const DEFAULT_WAPK_ONLINE_URLS = ['https://wapk.d-osc.com/'] as const;
+const DEFAULT_WAPK_ONLINE_URLS = ['http://wapk.d-osc.com/'] as const;
 const WAPK_ONLINE_CREATE_PATH = '/api/shared-session/create';
 const WAPK_ONLINE_READ_PATH = '/api/shared-session/read';
 const WAPK_ONLINE_CLOSE_PATH = '/api/shared-session/close';
@@ -267,6 +279,164 @@ function normalizeNonEmptyString(value: unknown): string | undefined {
     return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeGeneratedIdentifier(value: string): string | undefined {
+    const normalized = value
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    return normalized.length > 0 ? normalized : undefined;
+}
+
+function joinGeneratedIdentifier(...segments: Array<string | undefined>): string | undefined {
+    const normalizedSegments = segments
+        .map((segment) => segment ? normalizeGeneratedIdentifier(segment) : undefined)
+        .filter((segment): segment is string => Boolean(segment));
+
+    return normalizedSegments.length > 0 ? normalizedSegments.join('.') : undefined;
+}
+
+function parseScopedPackageName(value: string | undefined): { scope?: string; packageName?: string } {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return {};
+    }
+
+    if (!normalizedValue.startsWith('@')) {
+        return {
+            packageName: normalizedValue,
+        };
+    }
+
+    const scopeSeparatorIndex = normalizedValue.indexOf('/');
+    if (scopeSeparatorIndex === -1) {
+        return {
+            packageName: normalizedValue,
+        };
+    }
+
+    return {
+        scope: normalizedValue.slice(1, scopeSeparatorIndex),
+        packageName: normalizedValue.slice(scopeSeparatorIndex + 1),
+    };
+}
+
+function readPackageAuthorMetadata(value: unknown): {
+    name?: string;
+    email?: string;
+    url?: string;
+} {
+    if (typeof value === 'string') {
+        const normalizedValue = value.trim();
+        if (!normalizedValue) {
+            return {};
+        }
+
+        const email = normalizedValue.match(/<([^>]+)>/)?.[1];
+        const url = normalizedValue.match(/\(([^)]+)\)/)?.[1];
+        const name = normalizedValue
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\([^)]+\)/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        return {
+            name: normalizeNonEmptyString(name),
+            email: normalizeNonEmptyString(email),
+            url: normalizeNonEmptyString(url),
+        };
+    }
+
+    if (!isRecord(value)) {
+        return {};
+    }
+
+    return {
+        name: normalizeNonEmptyString(value.name),
+        email: normalizeNonEmptyString(value.email),
+        url: normalizeNonEmptyString(value.url),
+    };
+}
+
+function extractPublisherIdFromRepository(value: unknown): string | undefined {
+    const repositoryUrl = typeof value === 'string'
+        ? value
+        : isRecord(value)
+            ? normalizeNonEmptyString(value.url)
+            : undefined;
+
+    const normalizedRepositoryUrl = normalizeNonEmptyString(repositoryUrl);
+    if (!normalizedRepositoryUrl) {
+        return undefined;
+    }
+
+    const shorthandMatch = normalizedRepositoryUrl.match(/^(?:github|gitlab|bitbucket):([^/]+)\/.+$/i);
+    if (shorthandMatch?.[1]) {
+        return normalizeGeneratedIdentifier(shorthandMatch[1]);
+    }
+
+    const sshMatch = normalizedRepositoryUrl.match(/^[^@]+@[^:]+:([^/]+)\/.+$/i);
+    if (sshMatch?.[1]) {
+        return normalizeGeneratedIdentifier(sshMatch[1]);
+    }
+
+    try {
+        const parsed = new URL(normalizedRepositoryUrl.replace(/^git\+/, ''));
+        const firstPathSegment = parsed.pathname
+            .replace(/\.git$/i, '')
+            .split('/')
+            .filter(Boolean)[0];
+        return normalizeGeneratedIdentifier(firstPathSegment ?? parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+        return undefined;
+    }
+}
+
+function extractPublisherIdFromUrl(value: unknown): string | undefined {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return undefined;
+    }
+
+    try {
+        const parsed = new URL(normalizedValue);
+        return normalizeGeneratedIdentifier(parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+        return undefined;
+    }
+}
+
+function extractPublisherIdFromEmail(value: string | undefined): string | undefined {
+    const normalizedValue = normalizeNonEmptyString(value);
+    if (!normalizedValue) {
+        return undefined;
+    }
+
+    const domain = normalizedValue.split('@')[1];
+    return domain ? normalizeGeneratedIdentifier(domain.replace(/^www\./i, '')) : undefined;
+}
+
+function resolveAutoGeneratedWapkAppId(packageName: string | undefined, fallbackName: string): string | undefined {
+    const scopedPackage = parseScopedPackageName(packageName);
+    return joinGeneratedIdentifier(scopedPackage.scope, scopedPackage.packageName ?? fallbackName);
+}
+
+function resolveAutoGeneratedWapkPublisherId(packageJson: Record<string, unknown> | undefined, fallbackName: string): string | undefined {
+    const scopedPackage = parseScopedPackageName(typeof packageJson?.name === 'string' ? packageJson.name : undefined);
+    if (scopedPackage.scope) {
+        return normalizeGeneratedIdentifier(scopedPackage.scope);
+    }
+
+    const author = readPackageAuthorMetadata(packageJson?.author);
+    return extractPublisherIdFromRepository(packageJson?.repository)
+        ?? extractPublisherIdFromUrl(packageJson?.homepage)
+        ?? extractPublisherIdFromUrl(author.url)
+        ?? extractPublisherIdFromEmail(author.email)
+        ?? normalizeGeneratedIdentifier(author.name ?? fallbackName);
+}
+
 function normalizeStringMap(value: unknown): Record<string, string> | undefined {
     if (!isRecord(value)) {
         return undefined;
@@ -315,6 +485,8 @@ function normalizeWapkConfig(value: unknown): Partial<WapkProjectConfig> {
         runtime: normalizeRuntime(value.runtime ?? value.engine),
         entry: typeof value.entry === 'string' ? value.entry : undefined,
         scripts: normalizeStringMap(value.scripts ?? value.script),
+        appId: normalizeNonEmptyString(value.appId),
+        publisherId: normalizeNonEmptyString(value.publisherId),
         port: normalizePort(value.port),
         env: normalizeStringMap(value.env),
         desktop: normalizeDesktopConfig(value.desktop),
@@ -692,6 +864,7 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
     const elitConfig = await loadConfig(directory);
     const elitWapkConfig = normalizeWapkConfig(elitConfig?.wapk);
     const packageJson = readJsonFile(packageJsonPath);
+    const packageJsonWapk = isRecord(packageJson?.wapk) ? packageJson.wapk : undefined;
 
     const packageScripts = normalizeStringMap(packageJson?.scripts) ?? {};
     const selectedScripts = elitWapkConfig.scripts ?? packageScripts;
@@ -732,12 +905,23 @@ async function readWapkProjectConfig(directory: string): Promise<WapkProjectConf
         throw new Error(`WAPK entry not found: ${entryPath}`);
     }
 
+    const appId = elitWapkConfig.appId
+        ?? normalizeNonEmptyString(packageJson?.appId)
+        ?? normalizeNonEmptyString(packageJsonWapk?.appId)
+        ?? resolveAutoGeneratedWapkAppId(typeof packageJson?.name === 'string' ? packageJson.name : undefined, name);
+    const publisherId = elitWapkConfig.publisherId
+        ?? normalizeNonEmptyString(packageJson?.publisherId)
+        ?? normalizeNonEmptyString(packageJsonWapk?.publisherId)
+        ?? resolveAutoGeneratedWapkPublisherId(packageJson, name);
+
     return {
         name,
         version,
         runtime,
         entry,
         scripts: selectedScripts,
+        appId,
+        publisherId,
         port: elitWapkConfig.port,
         env: elitWapkConfig.env,
         desktop: elitWapkConfig.desktop,
@@ -749,15 +933,19 @@ function readIgnorePatterns(directory: string): string[] {
     return readLineIgnorePatterns(join(directory, '.wapkignore'));
 }
 
+function parsePatternLines(content: string): string[] {
+    return content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && (!line.startsWith('#') || line.startsWith('\\#')));
+}
+
 function readLineIgnorePatterns(filePath: string): string[] {
     if (!existsSync(filePath)) {
         return [];
     }
 
-    return readFileSync(filePath, 'utf8')
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0 && (!line.startsWith('#') || line.startsWith('\\#')));
+    return parsePatternLines(readFileSync(filePath, 'utf8'));
 }
 
 function normalizePackageEntry(value: string): string | undefined {
@@ -1124,6 +1312,118 @@ function shouldIgnore(relativePath: string, ignorePatterns: readonly string[], i
     return ignored;
 }
 
+function matchesPatchPattern(relativePath: string, pattern: string): boolean {
+    const normalizedRule = normalizeIgnorePattern(pattern);
+    if (!normalizedRule) {
+        return false;
+    }
+
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+    const subtreeSelector = normalizedRule.pattern.endsWith('/*')
+        && !normalizedRule.pattern.slice(0, -2).includes('*')
+        && !normalizedRule.pattern.slice(0, -2).includes('?');
+
+    if (subtreeSelector) {
+        const directoryPath = normalizedRule.pattern.slice(0, -2);
+        return directoryPath.length > 0 && normalizedPath.startsWith(`${directoryPath}/`);
+    }
+
+    const hasGlob = /[*?]/.test(normalizedRule.pattern);
+
+    if (!hasGlob) {
+        if (normalizedRule.directoryOnly) {
+            return normalizedPath === normalizedRule.pattern
+                || normalizedPath.startsWith(`${normalizedRule.pattern}/`);
+        }
+
+        return normalizedPath === normalizedRule.pattern;
+    }
+
+    return globPatternToRegex(normalizedRule.pattern, {
+        directoryOnly: normalizedRule.directoryOnly,
+        matchSegmentsOnly: false,
+    }).test(normalizedPath);
+}
+
+function shouldPatchArchivePath(relativePath: string, patchPatterns: readonly string[]): boolean {
+    let selected = false;
+
+    for (const pattern of patchPatterns) {
+        const normalizedRule = normalizeIgnorePattern(pattern);
+        if (!normalizedRule) {
+            continue;
+        }
+
+        if (!matchesPatchPattern(relativePath, pattern)) {
+            continue;
+        }
+
+        selected = !normalizedRule.negate;
+    }
+
+    return selected;
+}
+
+function resolvePatchManifestPatterns(files: readonly WapkFileEntry[]): string[] {
+    const patchManifest = files.find((file) => file.path === '.wapkpatch');
+    if (!patchManifest) {
+        throw new Error('Patch archive must include a .wapkpatch manifest file.');
+    }
+
+    const patterns = parsePatternLines(patchManifest.content.toString('utf8'));
+    if (patterns.length === 0) {
+        throw new Error('Patch archive .wapkpatch must define at least one patch rule.');
+    }
+
+    return patterns;
+}
+
+function applyPatchEntriesToFiles(
+    targetFiles: readonly WapkFileEntry[],
+    patchFiles: readonly WapkFileEntry[],
+): Omit<WapkPatchResult, 'archiveLabel'> & { files: WapkFileEntry[] } {
+    const fileMap = new Map<string, WapkFileEntry>(targetFiles.map((file) => [file.path, file]));
+    const fileOrder = targetFiles.map((file) => file.path);
+    const addedPaths: string[] = [];
+    const updatedPaths: string[] = [];
+    const unchangedPaths: string[] = [];
+
+    for (const patchFile of [...patchFiles].sort((left, right) => left.path.localeCompare(right.path))) {
+        const existing = fileMap.get(patchFile.path);
+        const nextEntry: WapkFileEntry = {
+            path: patchFile.path,
+            content: Buffer.from(patchFile.content),
+            mode: patchFile.mode,
+        };
+
+        if (!existing) {
+            addedPaths.push(patchFile.path);
+            fileOrder.push(patchFile.path);
+        } else if (existing.mode === patchFile.mode && existing.content.equals(patchFile.content)) {
+            unchangedPaths.push(patchFile.path);
+        } else {
+            updatedPaths.push(patchFile.path);
+        }
+
+        fileMap.set(patchFile.path, nextEntry);
+    }
+
+    return {
+        files: fileOrder.map((filePath) => {
+            const file = fileMap.get(filePath);
+            if (!file) {
+                throw new Error(`Internal WAPK patch error: missing file entry for ${filePath}`);
+            }
+
+            return file;
+        }),
+        patchedPaths: [...updatedPaths, ...addedPaths],
+        addedPaths,
+        updatedPaths,
+        unchangedPaths,
+    };
+}
+
 function collectFiles(directory: string, baseDirectory: string, ignorePatterns: readonly string[]): WapkFileEntry[] {
     const files: WapkFileEntry[] = [];
     const entries = readdirSync(directory, { withFileTypes: true });
@@ -1315,6 +1615,8 @@ function decodeWapkPayload(buffer: Buffer): Omit<DecodedWapk, 'version' | 'lock'
         runtime: normalizeRuntime(rawHeader.runtime ?? rawHeader.engine) ?? 'node',
         entry: typeof rawHeader.entry === 'string' ? rawHeader.entry : 'index.js',
         scripts: normalizeStringMap(rawHeader.scripts) ?? {},
+        appId: normalizeNonEmptyString(rawHeader.appId),
+        publisherId: normalizeNonEmptyString(rawHeader.publisherId),
         port: normalizePort(rawHeader.port),
         env: normalizeStringMap(rawHeader.env),
         desktop: normalizeDesktopConfig(rawHeader.desktop),
@@ -1975,11 +2277,15 @@ function sanitizeOnlineArchiveFileName(label: string | undefined, fallback: stri
     return fileName.toLowerCase().endsWith('.wapk') ? fileName : `${fileName}.wapk`;
 }
 
+const WAPK_ONLINE_JOIN_SOURCE_QUERY_PARAM = 'launchSource';
+const WAPK_ONLINE_JOIN_SOURCE_QUERY_VALUE = 'elit-wapk-online';
+
 function buildOnlineJoinUrl(baseUrl: URL, joinKey: string): string {
     const joinUrl = new URL(baseUrl.toString());
     joinUrl.search = '';
     joinUrl.hash = '';
     joinUrl.searchParams.set('join', joinKey);
+    joinUrl.searchParams.set(WAPK_ONLINE_JOIN_SOURCE_QUERY_PARAM, WAPK_ONLINE_JOIN_SOURCE_QUERY_VALUE);
     return joinUrl.toString();
 }
 
@@ -2216,16 +2522,23 @@ function isPmWapkOnlineShutdownEnabled(): boolean {
     return process.env[WAPK_ONLINE_PM_SHUTDOWN_ENV] === '1' && Boolean(process.stdin) && !process.stdin.isTTY;
 }
 
+function getWapkOnlineProcessDetails(): string {
+    return `pid ${process.pid}, ppid ${process.ppid}`;
+}
+
 async function waitForWapkOnlineSessionShutdown(
     launcherUrl: URL,
     session: { joinKey: string; adminToken: string },
     archiveHandle: WapkArchiveHandle,
     lock?: ResolvedWapkCredentials,
+    options: { allowSigtermClose?: boolean } = {},
 ): Promise<number> {
     let snapshotRevision = 0;
     let snapshotSyncPending = false;
     let snapshotSyncPromise: Promise<void> = Promise.resolve();
     let lastSnapshotSyncError: string | null = null;
+    const allowSigtermClose = options.allowSigtermClose === true;
+    const processDetails = getWapkOnlineProcessDetails();
 
     const syncGuestSnapshotUpdates = (): Promise<void> => {
         if (snapshotSyncPending) {
@@ -2264,6 +2577,7 @@ async function waitForWapkOnlineSessionShutdown(
             void syncGuestSnapshotUpdates();
         }, WAPK_ONLINE_KEEPALIVE_INTERVAL_MS);
         const pmManaged = isPmWapkOnlineShutdownEnabled();
+        let ignoredSigTermLogged = false;
         let stdinBuffer = '';
 
         const cleanup = (): void => {
@@ -2286,7 +2600,21 @@ async function waitForWapkOnlineSessionShutdown(
         };
 
         const onSigTerm = (): void => {
-            finish({ kind: 'signal', signal: 'SIGTERM' });
+            if (allowSigtermClose) {
+                finish({ kind: 'signal', signal: 'SIGTERM' });
+                return;
+            }
+
+            if (ignoredSigTermLogged) {
+                return;
+            }
+
+            ignoredSigTermLogged = true;
+            console.warn(
+                pmManaged
+                    ? `[wapk] Ignoring SIGTERM while shared session ${session.joinKey} is active (${processDetails}). Use elit pm stop, restart, or delete to close the session.`
+                    : `[wapk] Ignoring SIGTERM while shared session ${session.joinKey} is active (${processDetails}). Press Ctrl+C to stop sharing, or pass --allow-sigterm-close to close on SIGTERM.`,
+            );
         };
 
         const onStdinData = (chunk: Buffer | string): void => {
@@ -2317,8 +2645,10 @@ async function waitForWapkOnlineSessionShutdown(
 
     if (shutdownTrigger.kind === 'pm') {
         console.log(`\n[wapk] PM requested shutdown for shared session ${session.joinKey}...`);
+    } else if (shutdownTrigger.signal === 'SIGTERM') {
+        console.log(`\n[wapk] Received SIGTERM for shared session ${session.joinKey} (${processDetails}); closing because --allow-sigterm-close is enabled...`);
     } else {
-        console.log(`\n[wapk] Closing shared session ${session.joinKey}...`);
+        console.log(`\n[wapk] Received ${shutdownTrigger.signal}; closing shared session ${session.joinKey}...`);
     }
 
     try {
@@ -2342,6 +2672,7 @@ async function runWapkOnline(
         googleDrive?: WapkGoogleDriveConfig;
         onlineUrl?: string;
         password?: string;
+        allowSigtermClose?: boolean;
     },
 ): Promise<void> {
     const archiveHandle = resolveArchiveHandle(archiveSpecifier, options.googleDrive);
@@ -2377,7 +2708,9 @@ async function runWapkOnline(
     process.exitCode = await waitForWapkOnlineSessionShutdown(launcherUrl, {
         joinKey: response.joinKey,
         adminToken: response.adminToken,
-    }, archiveHandle, onlineArchiveLock);
+    }, archiveHandle, onlineArchiveLock, {
+        allowSigtermClose: options.allowSigtermClose,
+    });
 }
 
 async function writeWapkArchiveFromMemory(
@@ -2713,6 +3046,8 @@ export async function packWapkDirectory(
         runtime: config.runtime,
         entry: config.entry,
         scripts: config.scripts,
+        appId: config.appId,
+        publisherId: config.publisherId,
         port: config.port,
         env: config.env,
         desktop: config.desktop,
@@ -2751,6 +3086,73 @@ export function extractWapkArchive(
     extractFiles(archive.files, extractDirectory);
     console.log(`Extracted ${archive.files.length} files to: ${extractDirectory}`);
     return extractDirectory;
+}
+
+export async function patchWapkArchive(
+    wapkPath: string,
+    options: WapkCredentialsOptions & {
+        from: string;
+        fromPassword?: string;
+    },
+): Promise<WapkPatchResult> {
+    const targetHandle = resolveArchiveHandle(wapkPath);
+    const targetSnapshot = await targetHandle.readSnapshot();
+    const targetEnvelope = parseWapkEnvelope(targetSnapshot.buffer);
+    const targetArchive = decodeWapk(targetSnapshot.buffer, options);
+    const targetLock = targetEnvelope.version === WAPK_LOCKED_VERSION
+        ? resolveArchiveCredentials(options)
+        : undefined;
+    const patchArchive = readWapkArchive(options.from, {
+        password: options.fromPassword ?? options.password,
+    });
+    const patchPatterns = resolvePatchManifestPatterns(patchArchive.files);
+    const selectedPatchFiles = patchArchive.files
+        .filter((file) => file.path !== '.wapkpatch')
+        .filter((file) => shouldPatchArchivePath(file.path, patchPatterns));
+    const patchResult = applyPatchEntriesToFiles(targetArchive.files, selectedPatchFiles);
+
+    console.log(`[wapk] Target: ${targetSnapshot.label ?? targetHandle.label}`);
+    console.log(`[wapk] Patch:  ${options.from}`);
+    console.log(`[wapk] Rules:  ${patchPatterns.length}`);
+
+    if (selectedPatchFiles.length === 0) {
+        console.log('[wapk] No files matched .wapkpatch. Archive was not modified.');
+        return {
+            archiveLabel: targetSnapshot.label ?? targetHandle.label,
+            patchedPaths: [],
+            addedPaths: [],
+            updatedPaths: [],
+            unchangedPaths: [],
+        };
+    }
+
+    if (patchResult.patchedPaths.length === 0) {
+        console.log('[wapk] Matching patch files were already up to date. Archive was not modified.');
+        return {
+            archiveLabel: targetSnapshot.label ?? targetHandle.label,
+            patchedPaths: [],
+            addedPaths: [],
+            updatedPaths: [],
+            unchangedPaths: patchResult.unchangedPaths,
+        };
+    }
+
+    const writeResult = await writeWapkArchiveFromMemory(
+        targetHandle,
+        targetArchive.header,
+        patchResult.files,
+        targetLock,
+    );
+
+    console.log(`[wapk] Applied ${patchResult.patchedPaths.length} patch file${patchResult.patchedPaths.length === 1 ? '' : 's'}.`);
+
+    return {
+        archiveLabel: writeResult.label,
+        patchedPaths: patchResult.patchedPaths,
+        addedPaths: patchResult.addedPaths,
+        updatedPaths: patchResult.updatedPaths,
+        unchangedPaths: patchResult.unchangedPaths,
+    };
 }
 
 export async function prepareWapkApp(
@@ -2891,6 +3293,8 @@ function inspectWapkArchive(wapkPath: string, options: WapkCredentialsOptions = 
     console.log(`App:      ${decoded.header.version}`);
     console.log(`Runtime:  ${decoded.header.runtime}`);
     console.log(`Entry:    ${decoded.header.entry}`);
+    console.log(`App ID:   ${decoded.header.appId ?? 'n/a'}`);
+    console.log(`Publisher:${decoded.header.publisherId ? ` ${decoded.header.publisherId}` : ' n/a'}`);
     console.log(`Port:     ${decoded.header.port ?? 'default'}`);
     console.log(`Created:  ${decoded.header.createdAt}`);
 
@@ -2926,6 +3330,8 @@ function printWapkHelp(): void {
         '  elit wapk gdrive://<fileId> --online',
         '  elit wapk pack [directory]',
         '  elit wapk pack [directory] --password secret-123',
+        '  elit wapk patch <file.wapk> --from <patch.wapk>',
+        '  elit wapk patch <file.wapk> --use <patch.wapk>',
         '  elit wapk inspect <file.wapk>',
         '  elit wapk extract <file.wapk>',
         '',
@@ -2937,24 +3343,32 @@ function printWapkHelp(): void {
         '  --archive-watch              Pull external archive changes back into the temp workdir',
         '  --no-archive-watch           Disable external archive read sync',
         '  --online                     Create an Elit Run share session, stay alive, and close on Ctrl+C',
+        '  --allow-sigterm-close        Allow SIGTERM to close an online shared session',
         '  --online-url <url>           Elit Run URL (default: auto-detect localhost:4177 or localhost:4179)',
         '  --google-drive-file-id <id>  Run a remote .wapk directly from Google Drive',
         '  --google-drive-token-env <name>  Env var containing the Google Drive OAuth token',
         '  --google-drive-access-token <value>  OAuth token for Google Drive API calls',
         '  --google-drive-shared-drive  Include supportsAllDrives=true for shared drives',
+        '  --from <file.wapk>           Patch source archive for elit wapk patch',
+        '  --use <file.wapk>            Alias for --from',
+        '  --from-password <value>      Password for unlocking the patch archive',
         '  --include-deps               Legacy compatibility flag; node_modules are packed by default',
         '  --password <value>           Password for locking or unlocking the archive',
         '  -h, --help                   Show this help',
         '',
         'Notes:',
         '  - Pack reads wapk from elit.config.* and falls back to package.json.',
+        '  - If appId or publisherId is not configured, pack auto-generates stable defaults from package metadata.',
         '  - Pack includes node_modules by default; use .wapkignore if you need to exclude them, and !pattern to re-include later matches.',
+        '  - Patch reads .wapkpatch from the patch archive and applies only matching archive-relative paths.',
+        '  - Patch keeps the target archive metadata and lock mode; use --from-password when the patch archive uses a different password.',
         '  - Run never installs dependencies automatically; archives must include the runtime dependencies they need.',
         '  - Run mode can read config.wapk.run for default file/runtime/live-sync options.',
         '  - Browser-style archives with scripts.start or wapk.script.start run that start script automatically.',
         '  - Run mode keeps files in RAM and syncs changes both to and from the archive source.',
         '  - Google Drive mode talks to the Drive API directly; no local archive file is required.',
         '  - Online mode creates a shared session on Elit Run directly, keeps the CLI alive, and closes it on Ctrl+C.',
+        '  - Online mode ignores SIGTERM by default; pass --allow-sigterm-close if an external supervisor should close the shared session with SIGTERM.',
         '  - Locked archives in online mode must provide --password so the CLI can build the shared snapshot.',
         '  - Locked archives require the same password for run/extract/inspect.',
         '  - Archives stay unlocked by default unless a password is provided.',
@@ -3011,6 +3425,7 @@ function parseRunArgs(args: string[]): {
     archiveSyncInterval?: number;
     online?: boolean;
     onlineUrl?: string;
+    allowSigtermClose?: boolean;
 } & WapkCredentialsOptions {
     let file: string | undefined;
     let googleDrive: WapkGoogleDriveConfig | undefined;
@@ -3021,6 +3436,7 @@ function parseRunArgs(args: string[]): {
     let archiveSyncInterval: number | undefined;
     let online: boolean | undefined;
     let onlineUrl: string | undefined;
+    let allowSigtermClose: boolean | undefined;
     let password: string | undefined;
 
     for (let index = 0; index < args.length; index++) {
@@ -3073,6 +3489,10 @@ function parseRunArgs(args: string[]): {
                 onlineUrl = readRequiredOptionValue(args, ++index, '--online-url');
                 break;
             }
+            case '--allow-sigterm-close': {
+                allowSigtermClose = true;
+                break;
+            }
             case '--google-drive-file-id': {
                 googleDrive = {
                     ...googleDrive,
@@ -3116,7 +3536,7 @@ function parseRunArgs(args: string[]): {
         }
     }
 
-    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, online, onlineUrl, password };
+    return { file, googleDrive, runtime, syncInterval, useWatcher, watchArchive, archiveSyncInterval, online, onlineUrl, allowSigtermClose, password };
 }
 
 function parsePackArgs(args: string[]): { directory: string; includeDeps: boolean } & WapkCredentialsOptions {
@@ -3149,6 +3569,53 @@ function parsePackArgs(args: string[]): { directory: string; includeDeps: boolea
     }
 
     return { directory, includeDeps, password };
+}
+
+function parsePatchArgs(
+    args: string[],
+): { file: string; from: string; fromPassword?: string } & WapkCredentialsOptions {
+    let file: string | undefined;
+    let from: string | undefined;
+    let password: string | undefined;
+    let fromPassword: string | undefined;
+
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
+
+        switch (arg) {
+            case '--from':
+            case '--use': {
+                if (from) {
+                    throw new Error('WAPK patch accepts exactly one patch archive via --from or --use.');
+                }
+                from = readRequiredOptionValue(args, ++index, arg);
+                break;
+            }
+            case '--password': {
+                password = readRequiredOptionValue(args, ++index, '--password');
+                break;
+            }
+            case '--from-password': {
+                fromPassword = readRequiredOptionValue(args, ++index, '--from-password');
+                break;
+            }
+            default:
+                if (arg.startsWith('-')) {
+                    throw new Error(`Unknown WAPK option: ${arg}`);
+                }
+                if (file) {
+                    throw new Error('Usage: elit wapk patch <file.wapk> --from <patch.wapk>');
+                }
+                file = arg;
+                break;
+        }
+    }
+
+    if (!file || !from) {
+        throw new Error('Usage: elit wapk patch <file.wapk> --from <patch.wapk>');
+    }
+
+    return { file, from, password, fromPassword };
 }
 
 async function readConfiguredWapkRunDefaults(cwd: string): Promise<WapkRunConfig | undefined> {
@@ -3204,6 +3671,7 @@ function resolveConfiguredWapkRunOptions(
     archiveSyncInterval?: number;
     online: boolean;
     onlineUrl?: string;
+    allowSigtermClose: boolean;
     password?: string;
 } {
     const onlineUrl = options.onlineUrl ?? defaults?.onlineUrl;
@@ -3218,6 +3686,7 @@ function resolveConfiguredWapkRunOptions(
         archiveSyncInterval: options.archiveSyncInterval ?? defaults?.archiveSyncInterval,
         online: options.online ?? defaults?.online ?? Boolean(onlineUrl),
         onlineUrl,
+        allowSigtermClose: options.allowSigtermClose === true,
         password: options.password ?? defaults?.password,
     };
 }
@@ -3258,6 +3727,16 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
         await packWapkDirectory(options.directory, {
             includeDeps: options.includeDeps,
             password: options.password,
+        });
+        return;
+    }
+
+    if (args[0] === 'patch') {
+        const options = parsePatchArgs(args.slice(1));
+        await patchWapkArchive(options.file, {
+            from: options.from,
+            password: options.password,
+            fromPassword: options.fromPassword,
         });
         return;
     }
@@ -3303,6 +3782,7 @@ export async function runWapkCommand(args: string[], cwd: string = process.cwd()
         await runWapkOnline(archiveSpecifier, {
             googleDrive: runOptions.googleDrive,
             onlineUrl: runOptions.onlineUrl,
+            allowSigtermClose: runOptions.allowSigtermClose,
             password: runOptions.password,
         });
         return;

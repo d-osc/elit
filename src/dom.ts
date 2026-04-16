@@ -516,6 +516,9 @@ export class DomNode {
             return html;
         }
 
+        // Raw text elements: script and style must not have their content HTML-escaped
+        const isRawText = tagName === 'script' || tagName === 'style';
+
         if (children && children.length > 0) {
             const resolvedChildren = children.map((c: Child) => {
                 const resolved = this.resolveStateValue(c);
@@ -534,11 +537,11 @@ export class DomNode {
                     if (Array.isArray(child)) {
                         for (const c of child) {
                             if (!shouldSkipChild(c)) {
-                                html += this.renderToString(c, { pretty, indent: indent + 1 });
+                                html += isRawText && typeof c === 'string' ? c : this.renderToString(c, { pretty, indent: indent + 1 });
                             }
                         }
                     } else {
-                        html += this.renderToString(child, { pretty, indent: indent + 1 });
+                        html += isRawText && typeof child === 'string' ? child : this.renderToString(child, { pretty, indent: indent + 1 });
                     }
                 }
                 html += indentStr;
@@ -549,11 +552,11 @@ export class DomNode {
                     if (Array.isArray(child)) {
                         for (const c of child) {
                             if (!shouldSkipChild(c)) {
-                                html += this.renderToString(c, { pretty: false, indent: 0 });
+                                html += isRawText && typeof c === 'string' ? c : this.renderToString(c, { pretty: false, indent: 0 });
                             }
                         }
                     } else {
-                        html += this.renderToString(child, { pretty: false, indent: 0 });
+                        html += isRawText && typeof child === 'string' ? child : this.renderToString(child, { pretty: false, indent: 0 });
                     }
                 }
             }

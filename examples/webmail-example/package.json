@@ -1,0 +1,13 @@
+{
+  "name": "example-webmail",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "elit dev",
+    "build": "elit build",
+    "preview": "elit preview"
+  },
+  "dependencies": {
+    "elit": "file:../.."
+  }
+}
