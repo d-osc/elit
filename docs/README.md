@@ -45,6 +45,7 @@ Welcome to the Elit documentation.
 ### Project Examples
 
 - [Correct Config](../examples/correct-config/) - Config-driven web, server, and build defaults
+- [Webmail Example](../examples/webmail-example/) - Inbox UI, local SMTP sandbox, and `elit.config.ts` wiring in one example repo
 - [Full Database App](../examples/full-db/) - Full-stack example with database helpers and API routes
 - [Universal App](../examples/universal-app-example/) - Shared web, desktop, and native entry flow
 - [Desktop TypeScript Example](../examples/desktop-typescript-example/) - Small installable repo for Elit desktop with a TypeScript desktop entry

@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `--from-password` so a locked patch archive can be applied to a target archive with different credentials
   - Patch selection now reads archive-relative rules from `.wapkpatch`, including ordered excludes like `!database/*`
   - Folder selectors like `src/*` now apply to the whole subtree so patch archives can target directories more naturally
+- **`elit/smtp-server` subpath package** - new built-in SMTP server module for receiving inbound email inside an elit project
+  - `createSmtpServer(options)` and `startSmtpServer(options)` provide a zero-dependency embedded SMTP listener
+  - `dev.smtp` and `preview.smtp` config keys wire the server lifecycle to the elit dev/preview process automatically
+  - `clients[].smtp` supports per-client SMTP configuration in multi-tenant setups
+- **Webmail example** - new `examples/webmail-example/` showing a full in-browser webmail client built with elit
+  - Includes `elit.config.ts` with SMTP sandbox wired to `dev.smtp` / `preview.smtp` on `127.0.0.1:2525`
+  - REST API via `ServerRouter`: `GET/POST /api/accounts`, `GET /api/messages`, `GET /api/messages/:id`, `POST /api/messages/send`, `POST /api/messages/draft`, `POST /api/demo/inbound`
+  - Browser UI renders inbox list, message preview, compose form, reply flow, and save-draft — all using reactive states + `bindValue` for form field binding
+  - Register email account panel lets users add named accounts; the From field in compose reflects registered accounts
+  - SSR shell (`client.ts`) delivers the initial HTML frame; styles live in a dedicated `styles.ts` module
 
 ### Documentation
 - **WAPK patch guide refresh** - README, CLI docs, and the WAPK guide now document the `elit wapk patch` flow, the `.wapkpatch` manifest name, and patch archive password handling

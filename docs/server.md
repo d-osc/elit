@@ -135,6 +135,7 @@ await server.close();
 
 - `server`: the underlying HTTP server
 - `wss`: the internal WebSocket server used for HMR and shared state
+- `smtpServers`: managed SMTP listeners started from `dev.smtp`, `preview.smtp`, or `clients[].smtp`
 - `url`: the resolved base URL
 - `state`: a `StateManager` instance
 - `close()`: async shutdown helper
@@ -184,6 +185,47 @@ Key behavior:
 - `clients[].proxy` is checked before global proxy rules.
 - `clients[].basePath` prefixes each client's API, worker, and WebSocket routes.
 - `preview` supports the same `clients`, `api`, `proxy`, `worker`, `ws`, and `ssr` patterns as `dev`.
+
+## SMTP Listeners
+
+You can run SMTP listeners from config with `dev.smtp`, `preview.smtp`, or `clients[].smtp`, or start one manually with `elit/smtp-server`.
+
+```typescript
+import { createSmtpServer } from 'elit/smtp-server';
+
+const smtp = createSmtpServer({
+  port: 2525,
+  host: '127.0.0.1',
+  disabledCommands: ['STARTTLS', 'AUTH'],
+  onData(stream, _session, callback) {
+    stream.on('end', callback);
+    stream.resume();
+  },
+});
+
+smtp.server.on('error', (error) => {
+  console.error(error);
+});
+
+smtp.listen();
+```
+
+```typescript
+export default {
+  preview: {
+    root: './dist',
+    smtp: {
+      port: 2525,
+      host: '127.0.0.1',
+      disabledCommands: ['STARTTLS', 'AUTH'],
+      onData(stream, _session, callback) {
+        stream.on('end', callback);
+        stream.resume();
+      },
+    },
+  },
+};
+```
 
 ## WebSocket Endpoints
 

@@ -47,6 +47,7 @@ export const browserCompatibleConfig = {
 export const nodeOnlyConfig = {
     entry: {
         server: 'src/server.ts',
+        'smtp-server': 'src/smtp-server.ts',
         build: 'src/build.ts',
         http: 'src/http.ts',
         https: 'src/https.ts',
@@ -75,7 +76,7 @@ export const nodeOnlyConfig = {
     treeshake: false,
     sourcemap: false,
     target: 'es2020',
-    external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode', 'bun', 'monocart-coverage-reports', 'esbuild', 'source-map'],
+    external: ['http', 'https', 'net', 'tls', 'crypto', 'stream', 'util', 'events', 'buffer', 'querystring', 'url', 'path', 'fs', 'os', 'child_process', 'worker_threads', 'zlib', 'assert', 'dns', 'dgram', 'readline', 'repl', 'tty', 'v8', 'vm', 'perf_hooks', 'async_hooks', 'timers', 'string_decoder', 'process', 'module', 'cluster', 'constants', 'domain', 'punycode', 'bun', 'monocart-coverage-reports', 'esbuild', 'smtp-server', 'source-map'],
     outExtension({ format }) {
         return {
             js: getJsExtension(format),

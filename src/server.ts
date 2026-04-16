@@ -16,6 +16,8 @@ import { existsSync, readFile, stat, realpath } from './fs';
 import { join, extname, relative, resolve, normalize, sep } from './path';
 import { lookup } from './mime-types';
 import { isBun, isDeno } from './runtime';
+import { createSmtpServer, normalizeSmtpServerConfigs } from './smtp-server';
+import type { ElitSMTPServerHandle, ResolvedElitSMTPServerConfig } from './smtp-server';
 import type { DevServerOptions, DevServer, HMRMessage, Child, VNode, ProxyConfig, WebSocketEndpointConfig } from './types';
 import { dom } from './dom';
 
@@ -1416,7 +1418,7 @@ export class StateManager {
 
 // ===== Development Server =====
 
-const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'fallbackRoot' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'ws'> = {
+const defaultOptions: Omit<Required<DevServerOptions>, 'api' | 'clients' | 'root' | 'fallbackRoot' | 'basePath' | 'ssr' | 'proxy' | 'index' | 'env' | 'domain' | 'ws' | 'smtp'> = {
   port: 3000,
   host: 'localhost',
   https: false,
@@ -1441,6 +1443,73 @@ interface NormalizedClient {
   ws: NormalizedWebSocketEndpoint[];
   proxyHandler?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
   mode: 'dev' | 'preview';
+}
+
+function createSmtpBindingKey(config: Pick<ResolvedElitSMTPServerConfig, 'host' | 'port'>): string {
+  return `${config.host}:${config.port}`;
+}
+
+function createSmtpServerLabel(config: ResolvedElitSMTPServerConfig): string {
+  return config.label || createSmtpBindingKey(config);
+}
+
+function formatSmtpServerAddress(address: { address: string; port: number } | string | null, fallback: Pick<ResolvedElitSMTPServerConfig, 'host' | 'port'>): string {
+  if (typeof address === 'string') {
+    return address;
+  }
+
+  if (address) {
+    return `${address.address}:${address.port}`;
+  }
+
+  return createSmtpBindingKey(fallback);
+}
+
+function collectSmtpServerConfigs(config: DevServerOptions, usesClientArray: boolean): ResolvedElitSMTPServerConfig[] {
+  const modeLabel = config.mode || 'dev';
+  const smtpConfigs = normalizeSmtpServerConfigs(config.smtp).map((smtpConfig, index) => ({
+    ...smtpConfig,
+    label: smtpConfig.label || `${modeLabel}.smtp[${index}]`
+  }));
+
+  if (!usesClientArray || !config.clients) {
+    return smtpConfigs;
+  }
+
+  for (let clientIndex = 0; clientIndex < config.clients.length; clientIndex += 1) {
+    const client = config.clients[clientIndex];
+    const clientDescriptor = client.basePath || client.root;
+    const clientPrefix = clientDescriptor
+      ? `${modeLabel}.clients[${clientIndex}] (${clientDescriptor})`
+      : `${modeLabel}.clients[${clientIndex}]`;
+
+    smtpConfigs.push(...normalizeSmtpServerConfigs(client.smtp).map((smtpConfig, smtpIndex) => ({
+      ...smtpConfig,
+      label: smtpConfig.label || `${clientPrefix}.smtp[${smtpIndex}]`
+    })));
+  }
+
+  return smtpConfigs;
+}
+
+function assertUniqueSmtpServerBindings(configs: ResolvedElitSMTPServerConfig[]): void {
+  const seenBindings = new Map<string, string>();
+
+  for (const smtpConfig of configs) {
+    if (smtpConfig.port === 0) {
+      continue;
+    }
+
+    const bindingKey = createSmtpBindingKey(smtpConfig);
+    const currentLabel = createSmtpServerLabel(smtpConfig);
+    const previousLabel = seenBindings.get(bindingKey);
+
+    if (previousLabel) {
+      throw new Error(`Duplicate SMTP server binding "${bindingKey}" configured for ${previousLabel} and ${currentLabel}`);
+    }
+
+    seenBindings.set(bindingKey, currentLabel);
+  }
 }
 
 function shouldUseClientFallbackRoot(primaryRoot: string, fallbackRoot: string | undefined, indexPath?: string): boolean {
@@ -1624,6 +1693,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
   const globalWebSocketEndpoints = usesClientArray ? normalizeWebSocketEndpoints(config.ws) : [];
   const normalizedWebSocketEndpoints = [...normalizedClients.flatMap(client => client.ws), ...globalWebSocketEndpoints];
   const seenWebSocketPaths = new Set<string>();
+  const smtpServerConfigs = collectSmtpServerConfigs(config, usesClientArray);
 
   for (const endpoint of normalizedWebSocketEndpoints) {
     if (endpoint.path === ELIT_INTERNAL_WS_PATH) {
@@ -1636,6 +1706,27 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
     seenWebSocketPaths.add(endpoint.path);
   }
+
+  assertUniqueSmtpServerBindings(smtpServerConfigs);
+
+  const smtpServers: ElitSMTPServerHandle[] = smtpServerConfigs.map((smtpConfig) => {
+    const smtpServer = createSmtpServer(smtpConfig);
+    const smtpLabel = createSmtpServerLabel(smtpServer.config);
+
+    smtpServer.server.on('error', (error) => {
+      console.error(`[SMTP] ${smtpLabel} error:`, error);
+    });
+
+    if (config.logging) {
+      smtpServer.server.server.once('listening', () => {
+        console.log(`[SMTP] ${smtpLabel} listening on ${formatSmtpServerAddress(smtpServer.address() as any, smtpServer.config)}`);
+      });
+    }
+
+    smtpServer.listen();
+
+    return smtpServer;
+  });
 
   // Create global proxy handler if proxy config exists
   const globalProxyHandler = config.proxy ? createProxyHandler(config.proxy) : null;
@@ -2350,6 +2441,15 @@ export default css;
     if (config.logging) console.log('\n[Server] Shutting down...');
     transformCache.clear();
     if (watcher) await watcher.close();
+    if (smtpServers.length > 0) {
+      await Promise.all(smtpServers.map(async (smtpServer) => {
+        try {
+          await smtpServer.close();
+        } catch (error) {
+          console.error(`[SMTP] ${createSmtpServerLabel(smtpServer.config)} close error:`, error);
+        }
+      }));
+    }
     if (webSocketServers.length > 0) {
       webSocketServers.forEach(wsServer => wsServer.close());
       wsClients.clear();
@@ -2369,6 +2469,7 @@ export default css;
   return {
     server: server as any,
     wss: wss as any,
+    smtpServers,
     url: primaryUrl,
     state: stateManager,
     close

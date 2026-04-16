@@ -63,6 +63,7 @@ Use this table as the import map for generated code.
 | `elit/style` | CSS generation and injection | `CreateStyle`, `styles`, `renderStyle`, `injectStyle`, `addClass`, `addTag` |
 | `elit/router` | Client-side routing | `createRouter`, `createRouterView`, `routerLink` |
 | `elit/server` | HTTP router, dev server, middleware, WebSocket endpoints, shared server state | `ServerRouter`, `createDevServer`, `cors`, `logger`, `rateLimit`, `compress`, `security`, `StateManager` |
+| `elit/smtp-server` | SMTP listeners and config-friendly wrappers built on top of `smtp-server` | `SMTPServer`, `createSmtpServer`, `startSmtpServer` |
 | `elit/build` | Programmatic build API | `build` |
 | `elit/desktop` | Native desktop window APIs | `createWindow`, `createWindowServer`, `onMessage`, `windowQuit`, `windowSetTitle`, `windowEval` |
 | `elit/database` | VM-backed file database | `Database`, `create`, `read`, `save`, `update`, `rename`, `remove` |
@@ -584,6 +585,8 @@ Notes:
 
 - `dev.ws` and `preview.ws` register global WebSocket endpoints.
 - `clients[].ws` registers client-specific endpoints and prefixes each path with that client's `basePath`.
+- `dev.smtp` and `preview.smtp` start SMTP listeners alongside the HTTP server.
+- `clients[].smtp` starts SMTP listeners for a specific client branch, but SMTP listeners always bind to their own `host` and `port` instead of using `basePath`.
 - The internal Elit HMR and shared-state socket uses `/__elit_ws`, so do not reuse that path for custom endpoints.
 
 Important details:

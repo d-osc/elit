@@ -60,6 +60,7 @@ interface ElitConfig {
 - `clients[]` for multiple apps on one port
 - `api` for `ServerRouter`
 - `ws` for WebSocket endpoint config
+- `smtp` for SMTP listeners powered by `smtp-server`
 - `proxy` for backend forwarding
 - `worker` for worker script registration
 - `ssr` for string or VNode server rendering
@@ -82,6 +83,25 @@ Important behavior:
 - Query strings do not affect matching, but are exposed in `query`.
 - `clients[].ws` is automatically prefixed by the client's `basePath`.
 - `/__elit_ws` is reserved for Elit's internal HMR and shared-state socket.
+
+### SMTP Listener Shape
+
+`dev.smtp`, `preview.smtp`, and `clients[].smtp` accept either one object or an array.
+
+```typescript
+interface ElitSMTPServerConfig extends SMTPServerOptions {
+  port?: number;
+  host?: string;
+  label?: string;
+}
+```
+
+Important behavior:
+
+- `port` defaults to `2525`.
+- `host` defaults to `127.0.0.1`.
+- `clients[].smtp` does not use the client's `basePath`; SMTP listeners bind directly to their own socket host and port.
+- Elit rejects duplicate SMTP bindings like two listeners on the same `host:port` pair.
 
 ## Build
 
