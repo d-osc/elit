@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.6] - 2026-04-16
+
+### Added
+- **WAPK archive patch workflow** - `elit wapk patch` can now overlay selected files from one archive into another through a manifest-driven patch archive
+  - Added `elit wapk patch <target.wapk> --from <patch.wapk>` plus `--use` as an alias for `--from`
+  - Added `--from-password` so a locked patch archive can be applied to a target archive with different credentials
+  - Patch selection now reads archive-relative rules from `.wapkpatch`, including ordered excludes like `!database/*`
+  - Folder selectors like `src/*` now apply to the whole subtree so patch archives can target directories more naturally
+
+### Documentation
+- **WAPK patch guide refresh** - README, CLI docs, and the WAPK guide now document the `elit wapk patch` flow, the `.wapkpatch` manifest name, and patch archive password handling
+
+### Tests
+- **WAPK patch regression coverage** - added focused coverage for manifest-driven patching, subtree selector behavior, locked target archives, locked patch archives, and missing `.wapkpatch` validation
+
 ## [3.6.5] - 2026-04-13
 
 ### Changed
