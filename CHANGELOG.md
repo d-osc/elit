@@ -10,26 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.6.7] - 2026-04-17
 
 ### Added
-- **`create-elit` starter catalog and new templates** - project scaffolding now supports explicit starter selection for small single-page apps, database-backed todo workspaces, and auth/chat apps
-  - Added `basic-example` as a lightweight single-page starter with a reactive counter, polished CSS-in-JS UI, and mobile/desktop/WAPK config
-  - Added `todo-fullstack-example` as a fullstack todo starter with CRUD routes and file-backed persistence through `elit/database`
-  - Added explicit `auth-fullstack-example` starter naming plus short aliases `basic`, `todo`, and `auth`
-- **Template discovery flags for `create-elit`** - the scaffolder can now print starter choices directly from the CLI before project creation
-  - Added `--list-templates`, `--list`, and `-l`
-  - Added `--help` and `-h` usage output that includes the available starter list
+- **Standalone dev/preview server build flow** - production builds can now emit runnable Node server bundles for dev and preview workflows without depending on the source tree at runtime
+  - Added `elit build-dev` and `elit build-preview` convenience commands
+  - Added `--standalone-dev`, `--standalone-preview`, `--dev-out-file`, and `--preview-out-file` build flags
+  - Added typed programmatic `elit/dev-build` and `elit/preview-build` subpath exports for standalone server generation
+- **Public process-manager subpath** - `elit/pm` is now exposed as a first-class package entry for typed process-manager helpers and programmatic access
 
 ### Changed
-- **Template scaffold layout and hidden file support** - starter assets now live in dedicated per-template directories and can emit hidden manifest files during copy
-  - `create-elit` now maps template-safe filenames like `gitignore`, `wapkignore`, and `wapkpatch` back to `.gitignore`, `.wapkignore`, and `.wapkpatch`
-  - Starter-specific READMEs and config files now ship with each template so generated apps are documented from day one
+- **Standalone build pipeline integration** - the normal build flow can now emit standalone dev/preview bundles from CLI flags or config-driven `dev.standalone` / `preview.standalone` settings
+  - Standalone server generation reuses the regular build pipeline and emits runnable Node `index.js` outputs into the target build roots
+  - Build, dev-build, preview-build, desktop, and shared type ownership is now split into dedicated modules while compatibility barrels remain in place for existing imports
+- **Release metadata refresh** - release-facing Cargo, docs, and example version references now track `v3.6.7`
 
 ### Fixed
-- **Database VM debug noise reduction** - `elit/database` no longer prints internal `console.log` traces while resolving modules or executing fallback VM code
-  - Removed internal debug logging from `createRequire(...)`, `moduleLinker(...)`, and fallback `run(...)` paths in `src/database.ts`
-  - Preserves captured user-code logs while keeping runtime output cleaner for database-backed flows
+- **WAPK archive config-artifact filtering** - `elit wapk pack` no longer leaks transient `.elit-config-*` bundles created while loading TypeScript/MTS config files, and legacy `wapk.config.json` stays excluded from packaged archives
+  - Prevents temporary config-loader output from being shipped when projects use `elit.config.ts` or `elit.config.mts`
+  - Keeps package metadata resolution anchored to current `wapk` config fields and `package.json`, not legacy `wapk.config.json`
 
-### Documentation
-- **`create-elit` template guide refresh** - `packages/create-elit/README.md` now documents the named starter set, template listing flags, and example commands for selecting a specific starter
+### Tests
+- **WAPK regression coverage refresh** - updated WAPK coverage for temp config-bundle exclusion, legacy config ignore behavior, and online shared-session shutdown flows under the in-repo test runner
+  - Simplified assertions to match the custom runner's spy and matcher API while preserving the same runtime expectations
 
 ## [3.6.6] - 2026-04-16
 
