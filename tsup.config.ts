@@ -17,16 +17,16 @@ const getJsExtension = (format: string) => {
 
 export const browserCompatibleConfig = {
     entry: {
-        index: 'src/index.ts',
-        dom: 'src/dom.ts',
-        el: 'src/el.ts',
-        router: 'src/router.ts',
-        state: 'src/state.ts',
-        style: 'src/style.ts',
-        types: 'src/types.ts',
-        hmr: 'src/hmr.ts',
-        native: 'src/native.ts',
-        universal: 'src/universal.ts'
+        index: 'src/client/index.ts',
+        dom: 'src/client/dom/index.ts',
+        el: 'src/client/el/index.ts',
+        router: 'src/client/router/index.ts',
+        state: 'src/client/state/index.ts',
+        style: 'src/client/style/index.ts',
+        types: 'src/shares/types.ts',
+        hmr: 'src/client/hmr/index.ts',
+        native: 'src/native/native/index.ts',
+        universal: 'src/shares/universal.ts'
     },
     format: createBundleFormats(),
     dts: true,
@@ -46,27 +46,29 @@ export const browserCompatibleConfig = {
 
 export const nodeOnlyConfig = {
     entry: {
-        server: 'src/server.ts',
-        'smtp-server': 'src/smtp-server.ts',
-        build: 'src/build.ts',
-        http: 'src/http.ts',
-        https: 'src/https.ts',
-        ws: 'src/ws.ts',
-        wss: 'src/wss.ts',
-        fs: 'src/fs.ts',
-        'mime-types': 'src/mime-types.ts',
-        chokidar: 'src/chokidar.ts',
-        path: 'src/path.ts',
-        database: 'src/database.ts',
-        config: 'src/config.ts',
-        coverage: 'src/coverage.ts',
-        'test-runtime': 'src/test-runtime.ts',
-        'test-reporter': 'src/test-reporter.ts',
-        test: 'src/test.ts',
-        desktop: 'src/desktop.ts',
-        'desktop-auto-render': 'src/desktop-auto-render.ts',
-        'render-context': 'src/render-context.ts',
-        runtime: 'src/runtime.ts'
+        server: 'src/server/server/index.ts',
+        'smtp-server': 'src/server/smtp-server/index.ts',
+        build: 'src/tools/build/index.ts',
+        http: 'src/server/http/index.ts',
+        https: 'src/server/https/index.ts',
+        ws: 'src/server/ws/index.ts',
+        wss: 'src/server/wss/index.ts',
+        fs: 'src/server/fs/index.ts',
+        'mime-types': 'src/shares/mime-types/index.ts',
+        chokidar: 'src/server/chokidar/index.ts',
+        path: 'src/server/path/index.ts',
+        database: 'src/server/database/index.ts',
+        config: 'src/shares/config/index.ts',
+        coverage: 'src/test/coverage/index.ts',
+        'test-runtime': 'src/test/runtime/index.ts',
+        'test-reporter': 'src/test/reporter/index.ts',
+        test: 'src/test/test/index.ts',
+        desktop: 'src/tools/desktop/index.ts',
+        'desktop-auto-render': 'src/shares/desktop-auto-render/index.ts',
+        'render-context': 'src/shares/render-context/index.ts',
+        runtime: 'src/shares/runtime.ts',
+        'preview-build': 'src/tools/preview-build/index.ts',
+        'dev-build': 'src/tools/dev-build/index.ts'
     },
     format: createBundleFormats(),
     dts: true,
@@ -92,9 +94,10 @@ export const nodeOnlyConfig = {
     }
 } satisfies Options;
 
+
 export const cliConfig = {
     entry: {
-        cli: 'src/cli.ts'
+        cli: 'src/cli/index.ts'
     },
     format: createCliFormats(),
     dts: true,

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage: src/components/index.ts</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+        .breadcrumb a { color: #58a6ff; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .code-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 10px 15px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend { display: flex; gap: 15px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .legend-box.covered { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; }
+        .legend-box.uncovered { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; }
+        .code-table { width: 100%; border-collapse: collapse; }
+        .code-table td { padding: 0; }
+        .line-number {
+            width: 50px;
+            text-align: right;
+            padding: 0 15px;
+            color: #8b949e;
+            font-size: 12px;
+            user-select: none;
+            border-right: 1px solid #30363d;
+        }
+        .line-content {
+            padding: 0 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 20px;
+            white-space: pre;
+        }
+        tr.covered .line-content { background: rgba(63, 185, 80, 0.1); }
+        tr.uncovered .line-content { background: rgba(248, 81, 73, 0.15); }
+        tr.uncovered .line-number { color: #f85149; }
+        tr:hover td { background: rgba(88, 166, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">← Back to Coverage Report</a>
+        </div>
+
+        <h1>src/components/index.ts</h1>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/0</div>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>Source Code</span>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box covered"></div><span>Covered</span></div>
+                    <div class="legend-item"><div class="legend-box uncovered"></div><span>Uncovered</span></div>
+                </div>
+            </div>
+            <table class="code-table">
+                
+                        <tr class="">
+                            <td class="line-number">1</td>
+                            <td class="line-content">export { Header } from &#039;./Header&#039;;</td>
+                        </tr>
+                    
+                        <tr class="">
+                            <td class="line-number">2</td>
+                            <td class="line-content">export { Footer } from &#039;./Footer&#039;;</td>
+                        </tr>
+                    
+                        <tr class="">
+                            <td class="line-number">3</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+            </table>
+        </div>
+    </div>
+</body>
+</html>

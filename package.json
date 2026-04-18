@@ -285,6 +285,7 @@
     "dist/*.d.ts",
     "dist/*.js",
     "desktop",
+    "vendor",
     "Cargo.toml",
     "Cargo.lock",
     "README.md",

@@ -1,0 +1,10 @@
+node_modules
+tests
+src
+dev-dist
+tsconfig.json
+.elit-config-*
+*.wapk
+package-lock.json
+dist/main.js.map
+public

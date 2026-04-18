@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runPreparedWapkApp, runWapkCommand, shouldUseShellExecution } from '../../src/wapk-cli';
+import { createWapkLiveSync, extractWapkArchive, packWapkDirectory, prepareWapkApp, readWapkArchive, runPreparedWapkApp, runWapkCommand, shouldUseShellExecution } from '../../src/wapk';
 
 function createTempDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'elit-wapk-'));

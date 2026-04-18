@@ -11,7 +11,7 @@ import {
     resolveDesktopCargoTargetBaseDir,
     resolveConfiguredDesktopEntry,
     resolveDesktopBootstrapSupportModulePath,
-} from '../../src/desktop-cli';
+} from '../../src/desktop';
 
 describe('desktop cli mode helpers', () => {
     it('defaults to hybrid when no native desktop entry is configured', () => {

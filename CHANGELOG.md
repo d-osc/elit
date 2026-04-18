@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.7] - 2026-04-17
+
+### Added
+- **`create-elit` starter catalog and new templates** - project scaffolding now supports explicit starter selection for small single-page apps, database-backed todo workspaces, and auth/chat apps
+  - Added `basic-example` as a lightweight single-page starter with a reactive counter, polished CSS-in-JS UI, and mobile/desktop/WAPK config
+  - Added `todo-fullstack-example` as a fullstack todo starter with CRUD routes and file-backed persistence through `elit/database`
+  - Added explicit `auth-fullstack-example` starter naming plus short aliases `basic`, `todo`, and `auth`
+- **Template discovery flags for `create-elit`** - the scaffolder can now print starter choices directly from the CLI before project creation
+  - Added `--list-templates`, `--list`, and `-l`
+  - Added `--help` and `-h` usage output that includes the available starter list
+
+### Changed
+- **Template scaffold layout and hidden file support** - starter assets now live in dedicated per-template directories and can emit hidden manifest files during copy
+  - `create-elit` now maps template-safe filenames like `gitignore`, `wapkignore`, and `wapkpatch` back to `.gitignore`, `.wapkignore`, and `.wapkpatch`
+  - Starter-specific READMEs and config files now ship with each template so generated apps are documented from day one
+
+### Fixed
+- **Database VM debug noise reduction** - `elit/database` no longer prints internal `console.log` traces while resolving modules or executing fallback VM code
+  - Removed internal debug logging from `createRequire(...)`, `moduleLinker(...)`, and fallback `run(...)` paths in `src/database.ts`
+  - Preserves captured user-code logs while keeping runtime output cleaner for database-backed flows
+
+### Documentation
+- **`create-elit` template guide refresh** - `packages/create-elit/README.md` now documents the named starter set, template listing flags, and example commands for selecting a specific starter
+
 ## [3.6.6] - 2026-04-16
 
 ### Added

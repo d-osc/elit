@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createWapkLiveSync, packWapkDirectory, prepareWapkApp, readWapkArchive } from '../../src/wapk-cli';
+import { createWapkLiveSync, packWapkDirectory, prepareWapkApp, readWapkArchive } from '../../src/wapk';
 
 const DRIVE_FILE_ID_ENV = 'ELIT_TEST_GOOGLE_DRIVE_FILE_ID';
 const DRIVE_SHARED_ENV = 'ELIT_TEST_GOOGLE_DRIVE_SHARED_DRIVE';

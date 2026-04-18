@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 import { div, h1 } from '../../src/el';
 import { renderNativeJson } from '../../src/native';
-import { loadNativeEntryValue, resolveNativeEntryExport, resolveNativeExportValue } from '../../src/native-cli';
+import { loadNativeEntryValue, resolveNativeEntryExport, resolveNativeExportValue } from '../../src/native';
 import { renderAndroidCompose } from '../../src/native';
 import styles from '../../src/style';
 

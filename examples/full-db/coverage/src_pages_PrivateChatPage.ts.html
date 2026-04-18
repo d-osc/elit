@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage: src/pages/PrivateChatPage.ts</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+        .breadcrumb a { color: #58a6ff; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .code-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 10px 15px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend { display: flex; gap: 15px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .legend-box.covered { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; }
+        .legend-box.uncovered { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; }
+        .code-table { width: 100%; border-collapse: collapse; }
+        .code-table td { padding: 0; }
+        .line-number {
+            width: 50px;
+            text-align: right;
+            padding: 0 15px;
+            color: #8b949e;
+            font-size: 12px;
+            user-select: none;
+            border-right: 1px solid #30363d;
+        }
+        .line-content {
+            padding: 0 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 20px;
+            white-space: pre;
+        }
+        tr.covered .line-content { background: rgba(63, 185, 80, 0.1); }
+        tr.uncovered .line-content { background: rgba(248, 81, 73, 0.15); }
+        tr.uncovered .line-number { color: #f85149; }
+        tr:hover td { background: rgba(88, 166, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">← Back to Coverage Report</a>
+        </div>
+
+        <h1>src/pages/PrivateChatPage.ts</h1>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">169/169</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">28/28</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">18/18</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">191/191</div>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>Source Code</span>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box covered"></div><span>Covered</span></div>
+                    <div class="legend-item"><div class="legend-box uncovered"></div><span>Uncovered</span></div>
+                </div>
+            </div>
+            <table class="code-table">
+                
+                        <tr class="covered">
+                            <td class="line-number">1</td>
+                            <td class="line-content">import { div, h2, p, input, button, span } from &#039;elit/el&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">2</td>
+                            <td class="line-content">import { createState, reactive } from &#039;elit/state&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">3</td>
+                            <td class="line-content">import type { Router } from &#039;elit&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">4</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">5</td>
+                            <td class="line-content">interface ChatMessage {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">6</td>
+                            <td class="line-content">  id: string;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">7</td>
+                            <td class="line-content">  roomId: string;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">8</td>
+                            <td class="line-content">  userId: string;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">9</td>
+                            <td class="line-content">  userName: string;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">10</td>
+                            <td class="line-content">  text: string;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">11</td>
+                            <td class="line-content">  timestamp: number;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">12</td>
+                            <td class="line-content">}</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">13</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">14</td>
+                            <td class="line-content">export function PrivateChatPage(router: Router, otherUserId: string) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">15</td>
+                            <td class="line-content">  // Check if user is logged in</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">16</td>
+                            <td class="line-content">  const token = localStorage.getItem(&#039;token&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">17</td>
+                            <td class="line-content">  const user = localStorage.getItem(&#039;user&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">18</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">19</td>
+                            <td class="line-content">  if (!token || !user) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">20</td>
+                            <td class="line-content">    router.push(&#039;/login&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">21</td>
+                            <td class="line-content">    return div({ className: &#039;chat-page&#039; }, p(&#039;Redirecting to login...&#039;));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">22</td>
+                            <td class="line-content">  }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">23</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">24</td>
+                            <td class="line-content">  const userData = JSON.parse(user);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">25</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">26</td>
+                            <td class="line-content">  // Create room ID (sorted IDs to ensure same room for both users)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">27</td>
+                            <td class="line-content">  const roomId = [userData.id, otherUserId].sort().join(&#039;_&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">28</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">29</td>
+                            <td class="line-content">  // Use regular state for messages</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">30</td>
+                            <td class="line-content">  const messages = createState&lt;ChatMessage[]&gt;([]);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">31</td>
+                            <td class="line-content">  const otherUser = createState&lt;{ id: string; name: string; email: string; bio: string; avatar: string} | null&gt;(null);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">32</td>
+                            <td class="line-content">  const newMessage = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">33</td>
+                            <td class="line-content">  const error = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">34</td>
+                            <td class="line-content">  const isLoading = createState(false);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">35</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">36</td>
+                            <td class="line-content">  // Load other user info</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">37</td>
+                            <td class="line-content">  const loadOtherUser = async () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">38</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">39</td>
+                            <td class="line-content">      const response = await fetch(`/api/users/${otherUserId}`, {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">40</td>
+                            <td class="line-content">        method: &#039;GET&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">41</td>
+                            <td class="line-content">        headers: {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">42</td>
+                            <td class="line-content">          &#039;Authorization&#039;: `Bearer ${token}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">43</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">44</td>
+                            <td class="line-content">      });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">45</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">46</td>
+                            <td class="line-content">      if (response.ok) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">47</td>
+                            <td class="line-content">        const data = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">48</td>
+                            <td class="line-content">        otherUser.value = data.user;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">49</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">50</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">51</td>
+                            <td class="line-content">      console.error(&#039;Failed to load user:&#039;, err);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">52</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">53</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">54</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">55</td>
+                            <td class="line-content">  // Load messages</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">56</td>
+                            <td class="line-content">  const loadMessages = async () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">57</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">58</td>
+                            <td class="line-content">      const response = await fetch(`/api/chat/messages?roomId=${roomId}`, {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">59</td>
+                            <td class="line-content">        method: &#039;GET&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">60</td>
+                            <td class="line-content">        headers: {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">61</td>
+                            <td class="line-content">          &#039;Authorization&#039;: `Bearer ${token}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">62</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">63</td>
+                            <td class="line-content">      });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">64</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">65</td>
+                            <td class="line-content">      if (response.ok) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">66</td>
+                            <td class="line-content">        const data = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">67</td>
+                            <td class="line-content">        messages.value = data.messages || [];</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">68</td>
+                            <td class="line-content">        console.log(&#039;Loaded messages:&#039;, messages.value);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">69</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">70</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">71</td>
+                            <td class="line-content">      console.error(&#039;Failed to load messages:&#039;, err);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">72</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">73</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">74</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">75</td>
+                            <td class="line-content">  // Initial load</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">76</td>
+                            <td class="line-content">  loadOtherUser();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">77</td>
+                            <td class="line-content">  loadMessages();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">78</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">79</td>
+                            <td class="line-content">  // Connect to SSE for real-time messages</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">80</td>
+                            <td class="line-content">  const eventSource = new EventSource(`/api/chat/events?roomId=${roomId}`);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">81</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">82</td>
+                            <td class="line-content">  eventSource.onmessage = (e) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">83</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">84</td>
+                            <td class="line-content">      const event = JSON.parse(e.data);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">85</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">86</td>
+                            <td class="line-content">      if (event.type === &#039;new-message&#039;) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">87</td>
+                            <td class="line-content">        const newMsg = event.data as ChatMessage;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">88</td>
+                            <td class="line-content">        // Only add if message belongs to this room</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">89</td>
+                            <td class="line-content">        if (newMsg.roomId === roomId) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">90</td>
+                            <td class="line-content">          messages.value = [...messages.value, newMsg];</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">91</td>
+                            <td class="line-content">          console.log(&#039;New message received:&#039;, newMsg);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">92</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">93</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">94</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">95</td>
+                            <td class="line-content">      console.error(&#039;Failed to parse SSE data:&#039;, err);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">96</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">97</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">98</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">99</td>
+                            <td class="line-content">  eventSource.onerror = (err) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">100</td>
+                            <td class="line-content">    console.error(&#039;SSE error:&#039;, err);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">101</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">102</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">103</td>
+                            <td class="line-content">  console.log(&#039;PrivateChatPage mounted for room:&#039;, roomId);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">104</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">105</td>
+                            <td class="line-content">  // Setup button state management - will run after DOM is rendered</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">106</td>
+                            <td class="line-content">  const setupButtonState = () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">107</td>
+                            <td class="line-content">    const sendBtn = document.querySelector(&#039;.chat-send-button&#039;) as HTMLButtonElement;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">108</td>
+                            <td class="line-content">    if (!sendBtn) return;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">109</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">110</td>
+                            <td class="line-content">    const updateButtonState = () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">111</td>
+                            <td class="line-content">      sendBtn.disabled = isLoading.value || !newMessage.value.trim();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">112</td>
+                            <td class="line-content">      sendBtn.textContent = isLoading.value ? &#039;Sending...&#039; : &#039;Send&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">113</td>
+                            <td class="line-content">    };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">114</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">115</td>
+                            <td class="line-content">    // Subscribe to state changes to update button</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">116</td>
+                            <td class="line-content">    isLoading.subscribe(updateButtonState);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">117</td>
+                            <td class="line-content">    newMessage.subscribe(updateButtonState);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">118</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">119</td>
+                            <td class="line-content">    // Initial state</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">120</td>
+                            <td class="line-content">    updateButtonState();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">121</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">122</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">123</td>
+                            <td class="line-content">  // Schedule setup after render</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">124</td>
+                            <td class="line-content">  setTimeout(setupButtonState, 0);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">125</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">126</td>
+                            <td class="line-content">  const handleSendMessage = async (e: Event) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">127</td>
+                            <td class="line-content">    e.preventDefault();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">128</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">129</td>
+                            <td class="line-content">    const messageText = newMessage.value.trim();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">130</td>
+                            <td class="line-content">    if (!messageText) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">131</td>
+                            <td class="line-content">      error.value = &#039;Please enter a message&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">132</td>
+                            <td class="line-content">      return;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">133</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">134</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">135</td>
+                            <td class="line-content">    console.log(&#039;Sending message:&#039;, messageText, &#039;to room:&#039;, roomId);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">136</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">137</td>
+                            <td class="line-content">    // Clear input via DOM (not state to avoid re-render)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">138</td>
+                            <td class="line-content">    const inputEl = document.querySelector(&#039;.chat-input&#039;) as HTMLInputElement;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">139</td>
+                            <td class="line-content">    if (inputEl) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">140</td>
+                            <td class="line-content">      inputEl.value = &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">141</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">142</td>
+                            <td class="line-content">    newMessage.value = &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">143</td>
+                            <td class="line-content">    error.value = &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">144</td>
+                            <td class="line-content">    isLoading.value = true;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">145</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">146</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">147</td>
+                            <td class="line-content">      const response = await fetch(&#039;/api/chat/send&#039;, {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">148</td>
+                            <td class="line-content">        method: &#039;POST&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">149</td>
+                            <td class="line-content">        headers: {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">150</td>
+                            <td class="line-content">          &#039;Content-Type&#039;: &#039;application/json&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">151</td>
+                            <td class="line-content">          &#039;Authorization&#039;: `Bearer ${token}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">152</td>
+                            <td class="line-content">        },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">153</td>
+                            <td class="line-content">        body: JSON.stringify({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">154</td>
+                            <td class="line-content">          roomId: roomId,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">155</td>
+                            <td class="line-content">          message: messageText</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">156</td>
+                            <td class="line-content">        })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">157</td>
+                            <td class="line-content">      });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">158</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">159</td>
+                            <td class="line-content">      console.log(&#039;Response status:&#039;, response.status);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">160</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">161</td>
+                            <td class="line-content">      if (response.ok) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">162</td>
+                            <td class="line-content">        const data = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">163</td>
+                            <td class="line-content">        console.log(&#039;Response data:&#039;, data);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">164</td>
+                            <td class="line-content">        // Message will be added via SSE, don&#039;t add locally to avoid duplicates</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">165</td>
+                            <td class="line-content">      } else {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">166</td>
+                            <td class="line-content">        const errorData = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">167</td>
+                            <td class="line-content">        console.error(&#039;Error response:&#039;, errorData);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">168</td>
+                            <td class="line-content">        error.value = errorData.error || &#039;Failed to send message&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">169</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">170</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">171</td>
+                            <td class="line-content">      isLoading.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">172</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">173</td>
+                            <td class="line-content">      console.error(&#039;Network error:&#039;, err);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">174</td>
+                            <td class="line-content">      error.value = &#039;Network error. Please try again.&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">175</td>
+                            <td class="line-content">      isLoading.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">176</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">177</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">178</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">179</td>
+                            <td class="line-content">  return div({ className: &#039;chat-page&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">180</td>
+                            <td class="line-content">    div({ className: &#039;chat-container&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">181</td>
+                            <td class="line-content">      // Header</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">182</td>
+                            <td class="line-content">      div({ className: &#039;chat-header&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">183</td>
+                            <td class="line-content">        button({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">184</td>
+                            <td class="line-content">          className: &#039;btn btn-secondary btn-sm&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">185</td>
+                            <td class="line-content">          onclick: () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">186</td>
+                            <td class="line-content">            eventSource.close();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">187</td>
+                            <td class="line-content">            router.push(&#039;/chat/list&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">188</td>
+                            <td class="line-content">          }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">189</td>
+                            <td class="line-content">        }, &#039;← Back&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">190</td>
+                            <td class="line-content">        reactive(otherUser, (u) =&gt;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">191</td>
+                            <td class="line-content">          u ? div({ className: &#039;chat-header-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">192</td>
+                            <td class="line-content">            h2({ className: &#039;chat-title&#039; }, u.name),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">193</td>
+                            <td class="line-content">            p({ className: &#039;chat-subtitle&#039; }, u.email)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">194</td>
+                            <td class="line-content">          ) : div({ className: &#039;chat-header-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">195</td>
+                            <td class="line-content">            h2({ className: &#039;chat-title&#039; }, &#039;Chat&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">196</td>
+                            <td class="line-content">            p({ className: &#039;chat-subtitle&#039; }, &#039;Loading...&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">197</td>
+                            <td class="line-content">          )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">198</td>
+                            <td class="line-content">        )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">199</td>
+                            <td class="line-content">      ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">200</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">201</td>
+                            <td class="line-content">      // Messages Area</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">202</td>
+                            <td class="line-content">      div({ className: &#039;chat-messages&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">203</td>
+                            <td class="line-content">        reactive(messages, (msgs: ChatMessage[]) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">204</td>
+                            <td class="line-content">          if (msgs.length === 0) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">205</td>
+                            <td class="line-content">            return div({ className: &#039;chat-empty&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">206</td>
+                            <td class="line-content">              p({ className: &#039;chat-empty-text&#039; }, &#039;No messages yet. Say hello!&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">207</td>
+                            <td class="line-content">            );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">208</td>
+                            <td class="line-content">          }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">209</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">210</td>
+                            <td class="line-content">          return div({ className: &#039;chat-messages-list&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">211</td>
+                            <td class="line-content">            ...msgs.map((msg: ChatMessage) =&gt;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">212</td>
+                            <td class="line-content">              div({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">213</td>
+                            <td class="line-content">                className: `chat-message ${msg.userId === userData.id ? &#039;chat-message-user&#039; : &#039;chat-message-other&#039;}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">214</td>
+                            <td class="line-content">              },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">215</td>
+                            <td class="line-content">                div({ className: &#039;chat-message-content&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">216</td>
+                            <td class="line-content">                  span({ className: &#039;chat-message-sender&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">217</td>
+                            <td class="line-content">                    msg.userId === userData.id ? &#039;You&#039; : msg.userName</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">218</td>
+                            <td class="line-content">                  ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">219</td>
+                            <td class="line-content">                  p({ className: &#039;chat-message-text&#039; }, msg.text)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">220</td>
+                            <td class="line-content">                ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">221</td>
+                            <td class="line-content">                span({ className: &#039;chat-message-time&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">222</td>
+                            <td class="line-content">                  new Date(msg.timestamp).toLocaleTimeString()</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">223</td>
+                            <td class="line-content">                )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">224</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">225</td>
+                            <td class="line-content">            )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">226</td>
+                            <td class="line-content">          );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">227</td>
+                            <td class="line-content">        }),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">228</td>
+                            <td class="line-content">        reactive(isLoading, (loading) =&gt; loading ? div({ className: &#039;chat-typing&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">229</td>
+                            <td class="line-content">          span({ className: &#039;typing-dot&#039; }, &#039;.&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">230</td>
+                            <td class="line-content">          span({ className: &#039;typing-dot&#039; }, &#039;.&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">231</td>
+                            <td class="line-content">          span({ className: &#039;typing-dot&#039; }, &#039;.&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">232</td>
+                            <td class="line-content">        ) : null)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">233</td>
+                            <td class="line-content">      ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">234</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">235</td>
+                            <td class="line-content">      // Error Display</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">236</td>
+                            <td class="line-content">      reactive(error, (err) =&gt; err ? div({ className: &#039;auth-error&#039; }, err) : null),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">237</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">238</td>
+                            <td class="line-content">      // Input Area - button disabled state managed via subscription</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">239</td>
+                            <td class="line-content">      div({ className: &#039;chat-input-area&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">240</td>
+                            <td class="line-content">        input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">241</td>
+                            <td class="line-content">          type: &#039;text&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">242</td>
+                            <td class="line-content">          className: &#039;chat-input&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">243</td>
+                            <td class="line-content">          placeholder: &#039;Type your message...&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">244</td>
+                            <td class="line-content">          oninput: (e: Event) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">245</td>
+                            <td class="line-content">            newMessage.value = (e.target as HTMLInputElement).value;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">246</td>
+                            <td class="line-content">            console.log(&#039;Input changed:&#039;, newMessage.value);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">247</td>
+                            <td class="line-content">            error.value = &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">248</td>
+                            <td class="line-content">          },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">249</td>
+                            <td class="line-content">          onkeydown: (e: KeyboardEvent) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">250</td>
+                            <td class="line-content">            if (e.key === &#039;Enter&#039; &amp;&amp; newMessage.value.trim()) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">251</td>
+                            <td class="line-content">              console.log(&#039;Enter pressed&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">252</td>
+                            <td class="line-content">              e.preventDefault();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">253</td>
+                            <td class="line-content">              handleSendMessage(e);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">254</td>
+                            <td class="line-content">            }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">255</td>
+                            <td class="line-content">          }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">256</td>
+                            <td class="line-content">        }),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">257</td>
+                            <td class="line-content">        button({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">258</td>
+                            <td class="line-content">          className: &#039;btn btn-primary chat-send-button&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">259</td>
+                            <td class="line-content">          onclick: (e: MouseEvent) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">260</td>
+                            <td class="line-content">            console.log(&#039;Button clicked, newMessage:&#039;, newMessage.value);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">261</td>
+                            <td class="line-content">            e.preventDefault();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">262</td>
+                            <td class="line-content">            handleSendMessage(new Event(&#039;submit&#039;));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">263</td>
+                            <td class="line-content">          }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">264</td>
+                            <td class="line-content">        }, &#039;Send&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">265</td>
+                            <td class="line-content">      )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">266</td>
+                            <td class="line-content">    )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">267</td>
+                            <td class="line-content">  );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">268</td>
+                            <td class="line-content">}</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">269</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+            </table>
+        </div>
+    </div>
+</body>
+</html>

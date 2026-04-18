@@ -2,7 +2,7 @@
 
 import { join } from 'node:path';
 
-import { buildPmCommand, parsePmStartArgs, resolvePmStartDefinitions } from '../../src/pm-cli';
+import { buildPmCommand, parsePmStartArgs, resolvePmStartDefinitions } from '../../src/pm';
 
 function createWapkPmRecord(overrides = {}) {
     return {

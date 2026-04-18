@@ -1,0 +1,26 @@
+{
+  "name": "ELIT_PROJECT_NAME",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "elit dev",
+    "build": "elit build",
+    "preview": "elit preview",
+    "mobile:init": "elit mobile init . --app-id com.elit.mobileexample --app-name ElitMobileExample --web-dir dist",
+    "mobile:sync": "elit mobile sync --cwd . --web-dir dist",
+    "mobile:doctor": "elit mobile doctor --cwd . --json",
+    "mobile:run:android": "elit mobile run android --cwd .",
+    "mobile:run:ios": "elit mobile run ios --cwd .",
+    "mobile:build:android": "elit mobile build android --cwd .",
+    "mobile:build:ios": "elit mobile build ios --cwd .",
+    "desktop:run": "elit desktop run",
+    "desktop:build": "elit desktop build",
+    "test": "elit test",
+    "test:watch": "elit test --watch",
+    "test:coverage": "elit test --coverage"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.9",
+    "elit": "^ELIT_VERSION"
+  }
+}
