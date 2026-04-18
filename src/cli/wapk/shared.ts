@@ -144,7 +144,10 @@ export const WAPK_UNLOCKED_VERSION = 1;
 export const WAPK_LOCKED_VERSION = 2;
 export const WAPK_VERSION = WAPK_LOCKED_VERSION;
 export const DEFAULT_WAPK_PORT = 3000;
-export const DEFAULT_IGNORE = [] as const;
+export const DEFAULT_IGNORE = [
+    '.elit-config-*',
+    'wapk.config.json',
+] as const;
 
 export const WAPK_RUNTIMES: WapkRuntimeName[] = ['node', 'bun', 'deno'];
 export const RUNTIME_SYNC_IGNORE = new Set(['.git']);

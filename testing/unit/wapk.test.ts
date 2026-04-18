@@ -155,6 +155,14 @@ function createGoogleDriveOnlineFetchMock(
             });
         }
 
+        if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/read' && method === 'POST') {
+            return jsonResponse({
+                ok: true,
+                revision: 0,
+                changed: false,
+            });
+        }
+
         if (url.origin === launcherUrl.origin && url.pathname === '/api/shared-session/close' && method === 'POST') {
             closePayload = await readJsonBody(init?.body);
             return jsonResponse({ ok: true });
@@ -270,7 +278,7 @@ describe('wapk helpers', () => {
 
             expect(archive.header.name).toBe('build-entry-app');
             expect(archive.header.entry).toBe('src/main.ts');
-            expect(archive.header.scripts).toMatchObject({ start: 'npm run preview' });
+            expect(archive.header.scripts?.start).toBe('npm run preview');
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -583,7 +591,7 @@ describe('wapk helpers', () => {
             const extractedDir = extractWapkArchive(archivePath, outputDir);
 
             expect(archive.header.port).toBe(4321);
-            expect(archive.header.desktop).toMatchObject({ width: 900 });
+            expect(archive.header.desktop?.width).toBe(900);
             expect(extractedDir).toBe(path.join(outputDir, 'extract-app'));
             expect(fs.readFileSync(path.join(extractedDir, 'src', 'main.js'), 'utf8')).toBe('console.log("extract");\n');
         } finally {
@@ -830,7 +838,7 @@ describe('wapk helpers', () => {
 
             const archive = readWapkArchive(archivePath, { password: 'secret-123' });
             expect(archive.version).toBe(2);
-            expect(archive.lock).toMatchObject({ password: true });
+            expect(archive.lock?.password).toBe(true);
             expect(archive.files.some((file) => file.path === 'src/index.js')).toBe(true);
 
             const extractedDir = extractWapkArchive(
@@ -871,7 +879,7 @@ describe('wapk helpers', () => {
 
             expect(archive.version).toBe(2);
             expect(archive.header.name).toBe('config-lock-app');
-            expect(archive.lock).toMatchObject({ password: true });
+            expect(archive.lock?.password).toBe(true);
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -904,7 +912,7 @@ describe('wapk helpers', () => {
                 password: 'watcher-password',
             });
             expect(prepared.useWatcher).toBe(true);
-            expect(prepared.lock).toMatchObject({ password: 'watcher-password' });
+            expect(prepared.lock?.password).toBe('watcher-password');
 
             // Create live sync controller
             const liveSync = createWapkLiveSync(prepared);
@@ -1367,26 +1375,18 @@ describe('wapk helpers', () => {
 
             await runWapkCommand([], dir);
 
-            expect(fetchMock.getCreatePayload()).toMatchObject({
-                snapshot: {
-                    hostLabel: 'remote-online-app',
-                    locked: true,
-                    header: {
-                        name: 'remote-online-app',
-                    },
-                },
-            });
-            expect(fetchMock.getClosePayload()).toMatchObject({
-                joinKey: 'ABCD-EFGH-IJKL',
-                adminToken: 'admin-token',
-            });
-            expect(logSpy.calls.some((call) => call.join(' ').includes('Share key: ABCD-EFGH-IJKL'))).toBe(true);
-            expect(errorSpy.callCount).toBe(0);
+            expect(fetchMock.getCreatePayload()?.snapshot?.hostLabel).toBe('remote-online-app');
+            expect(fetchMock.getCreatePayload()?.snapshot?.locked).toBe(true);
+            expect(fetchMock.getCreatePayload()?.snapshot?.header?.name).toBe('remote-online-app');
+            expect(fetchMock.getClosePayload()?.joinKey).toBe('ABCD-EFGH-IJKL');
+            expect(fetchMock.getClosePayload()?.adminToken).toBe('admin-token');
+            expect(logSpy._calls.some((call) => call.join(' ').includes('Share key: ABCD-EFGH-IJKL'))).toBe(true);
+            expect(errorSpy._calls).toHaveLength(0);
         } finally {
             process.exitCode = previousExitCode;
             fetchMock?.restore();
-            logSpy.mockRestore();
-            errorSpy.mockRestore();
+            logSpy.restore();
+            errorSpy.restore();
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
@@ -1434,24 +1434,22 @@ describe('wapk helpers', () => {
 
             await runWapkCommand([], dir);
 
-            expect(fetchMock.getClosePayload()).toMatchObject({
-                joinKey: 'ABCD-EFGH-IJKL',
-                adminToken: 'admin-token',
-            });
-            expect(logSpy.calls.some((call) => call.join(' ').includes('Join URL:  http://localhost:4179/?join=ABCD-EFGH-IJKL&launchSource=elit-wapk-online'))).toBe(true);
-            expect(warnSpy.calls.some((call) => {
+            expect(fetchMock.getClosePayload()?.joinKey).toBe('ABCD-EFGH-IJKL');
+            expect(fetchMock.getClosePayload()?.adminToken).toBe('admin-token');
+            expect(logSpy._calls.some((call) => call.join(' ').includes('Join URL:  http://localhost:4179/?join=ABCD-EFGH-IJKL&launchSource=elit-wapk-online'))).toBe(true);
+            expect(warnSpy._calls.some((call) => {
                 const message = call.join(' ');
                 return message.includes('Ignoring SIGTERM while shared session ABCD-EFGH-IJKL is active (pid ')
                     && message.includes(', ppid ');
             })).toBe(true);
-            expect(logSpy.calls.some((call) => call.join(' ').includes('Received SIGINT; closing shared session ABCD-EFGH-IJKL'))).toBe(true);
-            expect(errorSpy.callCount).toBe(0);
+            expect(logSpy._calls.some((call) => call.join(' ').includes('Received SIGINT; closing shared session ABCD-EFGH-IJKL'))).toBe(true);
+            expect(errorSpy._calls).toHaveLength(0);
         } finally {
             process.exitCode = previousExitCode;
             fetchMock?.restore();
-            logSpy.mockRestore();
-            warnSpy.mockRestore();
-            errorSpy.mockRestore();
+            logSpy.restore();
+            warnSpy.restore();
+            errorSpy.restore();
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
@@ -1487,24 +1485,22 @@ describe('wapk helpers', () => {
 
             await runWapkCommand(['run', seedArchivePath, '--online', '--online-url', 'http://localhost:4179', '--allow-sigterm-close'], dir);
 
-            expect(fetchMock.getClosePayload()).toMatchObject({
-                joinKey: 'ABCD-EFGH-IJKL',
-                adminToken: 'admin-token',
-            });
-            expect(logSpy.calls.some((call) => {
+            expect(fetchMock.getClosePayload()?.joinKey).toBe('ABCD-EFGH-IJKL');
+            expect(fetchMock.getClosePayload()?.adminToken).toBe('admin-token');
+            expect(logSpy._calls.some((call) => {
                 const message = call.join(' ');
                 return message.includes('Received SIGTERM for shared session ABCD-EFGH-IJKL (pid ')
                     && message.includes(', ppid ')
                     && message.includes('closing because --allow-sigterm-close is enabled');
             })).toBe(true);
-            expect(warnSpy.callCount).toBe(0);
-            expect(errorSpy.callCount).toBe(0);
+            expect(warnSpy._calls).toHaveLength(0);
+            expect(errorSpy._calls).toHaveLength(0);
         } finally {
             process.exitCode = previousExitCode;
             fetchMock?.restore();
-            logSpy.mockRestore();
-            warnSpy.mockRestore();
-            errorSpy.mockRestore();
+            logSpy.restore();
+            warnSpy.restore();
+            errorSpy.restore();
             fs.rmSync(dir, { recursive: true, force: true });
         }
     });
