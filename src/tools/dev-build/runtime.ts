@@ -1,0 +1,1 @@
+export { standaloneDevNeedsEsbuildRuntime } from '../../dev-build/runtime';

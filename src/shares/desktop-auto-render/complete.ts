@@ -1,0 +1,1 @@
+export { completeDesktopAutoRender } from '../../desktop/auto-render/complete';

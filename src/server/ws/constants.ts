@@ -1,0 +1,30 @@
+/**
+ * WebSocket ready state
+ */
+export enum ReadyState {
+  CONNECTING = 0,
+  OPEN = 1,
+  CLOSING = 2,
+  CLOSED = 3,
+}
+
+/**
+ * WebSocket close codes
+ */
+export const CLOSE_CODES = {
+  NORMAL: 1000,
+  GOING_AWAY: 1001,
+  PROTOCOL_ERROR: 1002,
+  UNSUPPORTED_DATA: 1003,
+  NO_STATUS: 1005,
+  ABNORMAL: 1006,
+  INVALID_DATA: 1007,
+  POLICY_VIOLATION: 1008,
+  MESSAGE_TOO_BIG: 1009,
+  EXTENSION_REQUIRED: 1010,
+  INTERNAL_ERROR: 1011,
+  SERVICE_RESTART: 1012,
+  TRY_AGAIN_LATER: 1013,
+  BAD_GATEWAY: 1014,
+  TLS_HANDSHAKE_FAIL: 1015,
+} as const;

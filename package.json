@@ -143,6 +143,12 @@
       "import": "./dist/runtime.mjs",
       "require": "./dist/runtime.cjs"
     },
+    "./pm": {
+      "types": "./dist/pm.d.ts",
+      "browser": "./dist/pm.js",
+      "import": "./dist/pm.mjs",
+      "require": "./dist/pm.cjs"
+    },
     "./database": {
       "types": "./dist/database.d.ts",
       "browser": "./dist/database.js",
@@ -285,6 +291,7 @@
     "dist/*.d.ts",
     "dist/*.js",
     "desktop",
+    "vendor",
     "Cargo.toml",
     "Cargo.lock",
     "README.md",

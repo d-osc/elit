@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage: elit.config.ts</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+        .breadcrumb a { color: #58a6ff; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .code-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 10px 15px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend { display: flex; gap: 15px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .legend-box.covered { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; }
+        .legend-box.uncovered { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; }
+        .code-table { width: 100%; border-collapse: collapse; }
+        .code-table td { padding: 0; }
+        .line-number {
+            width: 50px;
+            text-align: right;
+            padding: 0 15px;
+            color: #8b949e;
+            font-size: 12px;
+            user-select: none;
+            border-right: 1px solid #30363d;
+        }
+        .line-content {
+            padding: 0 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 20px;
+            white-space: pre;
+        }
+        tr.covered .line-content { background: rgba(63, 185, 80, 0.1); }
+        tr.uncovered .line-content { background: rgba(248, 81, 73, 0.15); }
+        tr.uncovered .line-number { color: #f85149; }
+        tr:hover td { background: rgba(88, 166, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">← Back to Coverage Report</a>
+        </div>
+
+        <h1>elit.config.ts</h1>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/64</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/4</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/1</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/66</div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="summary">
+            <div class="summary-title">Uncovered Lines</div>
+            <div style="font-size: 13px; color: #f85149;">6-27,29-30,32,35-40,43,45-71,73,75-79,81</div>
+        </div>
+        
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>Source Code</span>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box covered"></div><span>Covered</span></div>
+                    <div class="legend-item"><div class="legend-box uncovered"></div><span>Uncovered</span></div>
+                </div>
+            </div>
+            <table class="code-table">
+                
+                        <tr class="covered">
+                            <td class="line-number">1</td>
+                            <td class="line-content">import { server } from &#039;./src/server&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">2</td>
+                            <td class="line-content">import { client } from &#039;./src/client&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">3</td>
+                            <td class="line-content">import { resolve } from &#039;elit/path&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">4</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">5</td>
+                            <td class="line-content">export default {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">6</td>
+                            <td class="line-content">  dev: {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">7</td>
+                            <td class="line-content">    port: 3003,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">8</td>
+                            <td class="line-content">    host: &#039;localhost&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">9</td>
+                            <td class="line-content">    open: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">10</td>
+                            <td class="line-content">    logging: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">11</td>
+                            <td class="line-content">    clients: [{</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">12</td>
+                            <td class="line-content">      root: &#039;.&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">13</td>
+                            <td class="line-content">      basePath: &#039;&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">14</td>
+                            <td class="line-content">      ssr: () =&gt; client,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">15</td>
+                            <td class="line-content">      api: server</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">16</td>
+                            <td class="line-content">    }]</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">17</td>
+                            <td class="line-content">  },</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">18</td>
+                            <td class="line-content">  build: [{</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">19</td>
+                            <td class="line-content">    entry: &#039;./src/main.ts&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">20</td>
+                            <td class="line-content">    outDir: &#039;./dist&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">21</td>
+                            <td class="line-content">    outFile: &#039;main.js&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">22</td>
+                            <td class="line-content">    format: &#039;esm&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">23</td>
+                            <td class="line-content">    minify: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">24</td>
+                            <td class="line-content">    sourcemap: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">25</td>
+                            <td class="line-content">    target: &#039;es2020&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">26</td>
+                            <td class="line-content">    external: [],</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">27</td>
+                            <td class="line-content">    copy: [</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">28</td>
+                            <td class="line-content">      {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">29</td>
+                            <td class="line-content">        from: &#039;./public/index.html&#039;, to: &#039;./index.html&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">30</td>
+                            <td class="line-content">        transform: (content: string, config: { basePath: any; }) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">31</td>
+                            <td class="line-content">          // Replace script src</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">32</td>
+                            <td class="line-content">          let html = content.replace(&#039;src=&quot;../src/main.ts&quot;&#039;, &#039;src=&quot;main.js&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">33</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">34</td>
+                            <td class="line-content">          // Inject base tag if basePath is configured</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">35</td>
+                            <td class="line-content">          if (config.basePath) {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">36</td>
+                            <td class="line-content">            const baseTag = `&lt;base href=&quot;${config.basePath}/&quot;&gt;`;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">37</td>
+                            <td class="line-content">            html = html.replace(</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">38</td>
+                            <td class="line-content">              &#039;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">39</td>
+                            <td class="line-content">              `&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;\n  ${baseTag}`</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">40</td>
+                            <td class="line-content">            );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">41</td>
+                            <td class="line-content">          }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">42</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">43</td>
+                            <td class="line-content">          return html;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">44</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">45</td>
+                            <td class="line-content">      },</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">46</td>
+                            <td class="line-content">      { from: &#039;./public/favicon.svg&#039;, to: &#039;./favicon.svg&#039; }</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">47</td>
+                            <td class="line-content">    ]</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">48</td>
+                            <td class="line-content">  }],</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">49</td>
+                            <td class="line-content">  preview: {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">50</td>
+                            <td class="line-content">    port: 3000,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">51</td>
+                            <td class="line-content">    host: &#039;localhost&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">52</td>
+                            <td class="line-content">    open: false,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">53</td>
+                            <td class="line-content">    logging: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">54</td>
+                            <td class="line-content">    root: &#039;./dist&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">55</td>
+                            <td class="line-content">    basePath: &#039;&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">56</td>
+                            <td class="line-content">    index: &#039;./index.html&#039;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">57</td>
+                            <td class="line-content">  },</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">58</td>
+                            <td class="line-content">  test: {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">59</td>
+                            <td class="line-content">    include: [&#039;**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}&#039;],</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">60</td>
+                            <td class="line-content">    exclude: [&#039;node_modules&#039;, &#039;dist&#039;, &#039;benchmark&#039;, &#039;docs&#039;, &#039;coverage&#039;],</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">61</td>
+                            <td class="line-content">    testTimeout: 5000,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">62</td>
+                            <td class="line-content">    bail: false,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">63</td>
+                            <td class="line-content">    globals: true,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">64</td>
+                            <td class="line-content">    watch: false,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">65</td>
+                            <td class="line-content">    reporter: &#039;verbose&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">66</td>
+                            <td class="line-content">    coverage: {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">67</td>
+                            <td class="line-content">      enabled: false,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">68</td>
+                            <td class="line-content">      provider: &#039;v8&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">69</td>
+                            <td class="line-content">      reporter: [&#039;text&#039;, &#039;html&#039;, &#039;lcov&#039;, &#039;json&#039;, &#039;coverage-final.json&#039;, &#039;clover&#039;],</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">70</td>
+                            <td class="line-content">      include: [&#039;**/*.ts&#039;], // รวมทุกไฟล์ TypeScript ในโปรเจกต์</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">71</td>
+                            <td class="line-content">      exclude: [&#039;**/*.test.ts&#039;, &#039;**/*.spec.ts&#039;, &#039;**/node_modules/**&#039;, &#039;**/dist/**&#039;, &#039;**/coverage/**&#039;]</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">72</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">73</td>
+                            <td class="line-content">  },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">74</td>
+                            <td class="line-content">  // Add scripts for running tests</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">75</td>
+                            <td class="line-content">  scripts: {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">76</td>
+                            <td class="line-content">    &#039;test&#039;: &#039;elit test&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">77</td>
+                            <td class="line-content">    &#039;test:run&#039;: &#039;elit test --run&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">78</td>
+                            <td class="line-content">    &#039;test:unit&#039;: &#039;elit test --run&#039;,</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">79</td>
+                            <td class="line-content">    &#039;test:watch&#039;: &#039;elit test --watch&#039;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">80</td>
+                            <td class="line-content">  }</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">81</td>
+                            <td class="line-content">};</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">82</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+            </table>
+        </div>
+    </div>
+</body>
+</html>

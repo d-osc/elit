@@ -1,12 +1,50 @@
 #!/usr/bin/env node
 
-import { mkdir, writeFile, copyFile, readFile, readdir } from 'fs/promises';
-import { join, resolve, dirname } from 'path';
+import { mkdir, writeFile, readFile, readdir } from 'fs/promises';
+import { join, resolve, dirname, basename } from 'path';
 import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const hiddenTemplateFiles: Record<string, string> = {
+  gitignore: '.gitignore',
+  wapkignore: '.wapkignore',
+  wapkpatch: '.wapkpatch'
+};
+
+interface TemplateDefinition {
+  id: string;
+  aliases: string[];
+  description: string;
+  isDefault?: boolean;
+}
+
+const templates: TemplateDefinition[] = [
+  {
+    id: 'todo-fullstack-example',
+    aliases: ['todo', 'todo-fullstack-example'],
+    description: 'Database-backed todo workspace starter'
+  },
+  {
+    id: 'basic-example',
+    aliases: ['basic', 'basic-example'],
+    description: 'Lightweight single-page starter',
+    isDefault: true
+  },
+  {
+    id: 'auth-fullstack-example',
+    aliases: ['auth', 'auth-fullstack-example'],
+    description: 'Authentication and chat starter'
+  }
+];
+
+const defaultTemplate = templates.find((template) => template.isDefault)?.id ?? templates[0].id;
+
+const templateAliases = Object.fromEntries(
+  templates.flatMap((template) => template.aliases.map((alias) => [alias, template.id]))
+) as Record<string, string>;
 
 // Get the version from create-elit's package.json
 async function getElitVersion(): Promise<string> {
@@ -29,9 +67,102 @@ function log(message: string, color: keyof typeof colors = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function getProjectName(): string {
+function logAvailableTemplates() {
+  log('Available templates:', 'yellow');
+
+  for (const template of templates) {
+    const primaryAlias = template.aliases[0];
+    const defaultSuffix = template.id === defaultTemplate ? ' (default)' : '';
+    const fullName = template.aliases[1] ? ` [${template.aliases[1]}]` : '';
+
+    log(`  ${primaryAlias}${defaultSuffix} - ${template.description}${fullName}`, 'dim');
+  }
+}
+
+function logHelp() {
+  log('Usage:', 'yellow');
+  log('  create-elit [project-name] [options]', 'dim');
+  log('', 'reset');
+  log('Options:', 'yellow');
+  log('  -t, --template <name>   Choose a template', 'dim');
+  log('  -l, --list-templates    Show available templates', 'dim');
+  log('  -h, --help              Show this help message', 'dim');
+  log('', 'reset');
+  logAvailableTemplates();
+}
+
+function resolveTemplateName(templateName: string): string {
+  const normalized = templateAliases[templateName];
+
+  if (!normalized) {
+    log(`Error: Unknown template "${templateName}".`, 'red');
+    logAvailableTemplates();
+    process.exit(1);
+  }
+
+  return normalized;
+}
+
+function getCliOptions(): {
+  projectName: string;
+  templateName: string;
+  listTemplates: boolean;
+  showHelp: boolean;
+} {
   const args = process.argv.slice(2);
-  return args[0] || 'my-elit-app';
+  let projectName = 'my-elit-app';
+  let templateName = defaultTemplate;
+  let listTemplates = false;
+  let showHelp = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === '--list-templates' || arg === '--list' || arg === '-l') {
+      listTemplates = true;
+      continue;
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      showHelp = true;
+      continue;
+    }
+
+    if (arg === '--template' || arg === '-t') {
+      const nextArg = args[index + 1];
+
+      if (!nextArg || nextArg.startsWith('-')) {
+        log('Error: Missing value for --template.', 'red');
+        logAvailableTemplates();
+        process.exit(1);
+      }
+
+      templateName = resolveTemplateName(nextArg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--template=')) {
+      templateName = resolveTemplateName(arg.slice('--template='.length));
+      continue;
+    }
+
+    if (arg.startsWith('-t=')) {
+      templateName = resolveTemplateName(arg.slice('-t='.length));
+      continue;
+    }
+
+    if (!arg.startsWith('-') && projectName === 'my-elit-app') {
+      projectName = arg;
+    }
+  }
+
+  return {
+    projectName,
+    templateName,
+    listTemplates,
+    showHelp
+  };
 }
 
 // Recursively copy directory
@@ -69,17 +200,17 @@ async function copyAndReplaceFile(
     content = content.split(placeholder).join(value);
   }
 
-  // If the file is 'gitignore', save it as '.gitignore'
-  const finalDest = dest.endsWith('gitignore') && !dest.endsWith('.gitignore')
-    ? join(dirname(dest), '.gitignore')
+  const hiddenFileName = hiddenTemplateFiles[basename(dest)];
+  const finalDest = hiddenFileName
+    ? join(dirname(dest), hiddenFileName)
     : dest;
 
   await writeFile(finalDest, content, 'utf-8');
 }
 
-async function createProject(projectName: string) {
+async function createProject(projectName: string, templateName: string) {
   const projectPath = resolve(process.cwd(), projectName);
-  const templatesPath = resolve(__dirname, 'templates');
+  const templatesPath = resolve(__dirname, 'templates', templateName);
 
   // Check if directory exists
   if (existsSync(projectPath)) {
@@ -87,7 +218,14 @@ async function createProject(projectName: string) {
     process.exit(1);
   }
 
+  if (!existsSync(templatesPath)) {
+    log(`Error: Template "${templateName}" is not available in this build.`, 'red');
+    logAvailableTemplates();
+    process.exit(1);
+  }
+
   log(`Creating a new Elit app in ${projectPath}...`, 'cyan');
+  log(`Using template: ${templateName}`, 'dim');
 
   // Get the version of elit (same as create-elit version)
   const elitVersion = await getElitVersion();
@@ -98,7 +236,7 @@ async function createProject(projectName: string) {
     'ELIT_VERSION': elitVersion
   };
 
-  // Copy templates directory and replace placeholders
+  // Copy the selected template directory and replace placeholders
   await copyDirectory(templatesPath, projectPath, replacements);
 
   log('\nSuccess! Created ' + projectName, 'green');
@@ -117,11 +255,21 @@ async function createProject(projectName: string) {
 }
 
 // Main execution
-const projectName = getProjectName();
+const { projectName, templateName, listTemplates, showHelp } = getCliOptions();
 
 log('\n🚀 Create Elit App\n', 'cyan');
 
-createProject(projectName).catch((err) => {
+if (showHelp) {
+  logHelp();
+  process.exit(0);
+}
+
+if (listTemplates) {
+  logAvailableTemplates();
+  process.exit(0);
+}
+
+createProject(projectName, templateName).catch((err) => {
   log(`Error: ${err.message}`, 'red');
   process.exit(1);
 });

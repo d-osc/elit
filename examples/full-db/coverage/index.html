@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage Report</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #58a6ff;
+        }
+        .overall-bar {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+        }
+        .overall-bar-inner {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .overall-bar-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #8b949e;
+            min-width: 140px;
+        }
+        .overall-bar-visual {
+            flex: 1;
+            height: 24px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .overall-bar-fill {
+            height: 100%;
+            background: #3fb950;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: width 0.3s ease;
+        }
+        .overall-bar-text {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .files-info {
+            font-size: 13px;
+            color: #8b949e;
+            margin-top: 8px;
+        }
+        .files-info span { color: #58a6ff; font-weight: 600; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .file-list {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .file-header {
+            display: grid;
+            grid-template-columns: 1fr 80px 80px 80px 80px;
+            padding: 12px 15px;
+            background: #21262d;
+            font-size: 12px;
+            font-weight: 600;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        .file-row {
+            display: grid;
+            grid-template-columns: 1fr 80px 80px 80px 80px;
+            padding: 10px 15px;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+        }
+        .file-row:hover { background: #21262d; }
+        .file-row:last-child { border-bottom: none; }
+        .file-name { color: #58a6ff; text-decoration: none; cursor: pointer; }
+        .file-name:hover { text-decoration: underline; }
+        .percentage { font-weight: 600; }
+        .percentage.high { color: #3fb950; }
+        .percentage.medium { color: #d29922; }
+        .percentage.low { color: #f85149; }
+        .metric-detail { font-size: 11px; color: #8b949e; margin-top: 2px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+        .badge.covered { background: #238636; color: #fff; }
+        .badge.uncovered { background: #da3633; color: #fff; }
+        .coverage-cell { text-align: center; }
+        .coverage-percent { font-weight: 600; }
+        .coverage-percent.high { color: #3fb950; }
+        .coverage-percent.medium { color: #d29922; }
+        .coverage-percent.low { color: #f85149; }
+        .coverage-count { font-size: 11px; color: #8b949e; margin-top: 2px; }
+        .search-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .search-input:focus {
+            border-color: #58a6ff;
+        }
+        .search-input::placeholder {
+            color: #8b949e;
+        }
+        .hidden { display: none !important; }
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            color: #8b949e;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Coverage Report</h1>
+
+        <div class="overall-bar">
+            <div class="overall-bar-inner">
+                <div class="overall-bar-label">Overall Coverage</div>
+                <div class="overall-bar-visual">
+                    <div class="overall-bar-fill" style="width: 100%"></div>
+                    <div class="overall-bar-text">100.00%</div>
+                </div>
+            </div>
+            <div class="files-info"><span>11</span> of 11 files covered</div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">1174/1174</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">189/189</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">90/90</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">1351/1351</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="🔍 Search files..." autocomplete="off">
+        </div>
+
+        <div class="file-list">
+            <div class="file-header">
+                <div>File</div>
+                <div style="text-align: center">Stmts</div>
+                <div style="text-align: center">Branch</div>
+                <div style="text-align: center">Funcs</div>
+                <div style="text-align: center">Lines</div>
+            </div>
+            <div id="file-rows">
+            
+                    <div class="file-row" onclick="window.location.href='src_client.ts.html'">
+                        <div>
+                            <span class="file-name">src/client.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">10/10</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent low">0.00%</div>
+                            <div class="coverage-count">0/0</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent low">0.00%</div>
+                            <div class="coverage-count">0/0</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">13/13</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_components_Footer.ts.html'">
+                        <div>
+                            <span class="file-name">src/components/Footer.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">13/13</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent low">0.00%</div>
+                            <div class="coverage-count">0/0</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent low">0.00%</div>
+                            <div class="coverage-count">0/0</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">17/17</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_components_Header.ts.html'">
+                        <div>
+                            <span class="file-name">src/components/Header.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">41/41</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">6/6</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">4/4</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">51/51</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_ChatListPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/ChatListPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">90/90</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">11/11</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">8/8</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">105/105</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_ChatPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/ChatPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">120/120</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">20/20</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">11/11</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">135/135</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_ForgotPasswordPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/ForgotPasswordPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">75/75</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">15/15</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">4/4</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">88/88</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_HomePage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/HomePage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">130/130</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">11/11</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">4/4</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">147/147</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_LoginPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/LoginPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">126/126</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">23/23</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">5/5</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">144/144</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_PrivateChatPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/PrivateChatPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">169/169</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">28/28</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">18/18</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">191/191</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_ProfilePage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/ProfilePage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">239/239</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">45/45</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">29/29</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">276/276</div>
+                        </div>
+                    </div>
+                
+                    <div class="file-row" onclick="window.location.href='src_pages_RegisterPage.ts.html'">
+                        <div>
+                            <span class="file-name">src/pages/RegisterPage.ts</span>
+                            <span class="badge covered">Covered</span>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">161/161</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">30/30</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">7/7</div>
+                        </div>
+                        <div class="coverage-cell">
+                            <div class="coverage-percent high">100.00%</div>
+                            <div class="coverage-count">184/184</div>
+                        </div>
+                    </div>
+                
+            </div>
+            <div id="no-results" class="no-results hidden">No files found matching your search</div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const fileRows = document.getElementById('file-rows');
+        const noResults = document.getElementById('no-results');
+        const fileRowElements = fileRows.querySelectorAll('.file-row');
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            fileRowElements.forEach(function(row) {
+                const fileName = row.querySelector('.file-name').textContent.toLowerCase();
+                if (fileName.includes(searchTerm)) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+
+            if (visibleCount === 0) {
+                noResults.classList.remove('hidden');
+            } else {
+                noResults.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

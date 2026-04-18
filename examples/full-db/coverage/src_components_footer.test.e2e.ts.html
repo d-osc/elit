@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage: src/components/footer.test.e2e.ts</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+        .breadcrumb a { color: #58a6ff; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .code-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 10px 15px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend { display: flex; gap: 15px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .legend-box.covered { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; }
+        .legend-box.uncovered { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; }
+        .code-table { width: 100%; border-collapse: collapse; }
+        .code-table td { padding: 0; }
+        .line-number {
+            width: 50px;
+            text-align: right;
+            padding: 0 15px;
+            color: #8b949e;
+            font-size: 12px;
+            user-select: none;
+            border-right: 1px solid #30363d;
+        }
+        .line-content {
+            padding: 0 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 20px;
+            white-space: pre;
+        }
+        tr.covered .line-content { background: rgba(63, 185, 80, 0.1); }
+        tr.uncovered .line-content { background: rgba(248, 81, 73, 0.15); }
+        tr.uncovered .line-number { color: #f85149; }
+        tr:hover td { background: rgba(88, 166, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">← Back to Coverage Report</a>
+        </div>
+
+        <h1>src/components/footer.test.e2e.ts</h1>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/201</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/26</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/3</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value low">0.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill low" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-count">0/239</div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="summary">
+            <div class="summary-title">Uncovered Lines</div>
+            <div style="font-size: 13px; color: #f85149;">12-14,16-25,27-29,31,34-38,40-43,45-46,48-50,52-53,56,59-62,64-65,68-69,72-75,77-78,80-83,85-86,89-90,93-97,99-102,105-117,119-124,126-129,131,133-140,142-144,147-150,152-153,156-158,160-161,164,167-168,171-174,176-178,181-183,185-186,189-192,194-196,199-202,205-208,210-211,214-216,219-221,223-225,228-229,232-233,236-237,239-241,244-246,248-250,253-254,257-261,263-265,267-269,271-274,276-279,281-284,287-289,291-292,294-298,300-303,306-307,310-312,315-316,318-319,321-329,331-335,339-340,342-344,347-351</div>
+        </div>
+        
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>Source Code</span>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box covered"></div><span>Covered</span></div>
+                    <div class="legend-item"><div class="legend-box uncovered"></div><span>Uncovered</span></div>
+                </div>
+            </div>
+            <table class="code-table">
+                
+                        <tr class="covered">
+                            <td class="line-number">1</td>
+                            <td class="line-content">/**</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">2</td>
+                            <td class="line-content"> * Footer Component E2E Tests</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">3</td>
+                            <td class="line-content"> *</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">4</td>
+                            <td class="line-content"> * End-to-end automation tests for the Footer component.</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">5</td>
+                            <td class="line-content"> * These tests verify the footer works correctly in a full integration scenario.</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">6</td>
+                            <td class="line-content"> */</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">7</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">8</td>
+                            <td class="line-content">import { Footer } from &#039;./Footer&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">9</td>
+                            <td class="line-content">import type { VNode } from &#039;elit/types&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">10</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">11</td>
+                            <td class="line-content">// Helper function to render VNode to HTML string (simplified SSR)</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">12</td>
+                            <td class="line-content">function renderToString(vNode: VNode | string | number | undefined | null): string {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">13</td>
+                            <td class="line-content">    if (vNode == null || vNode === false) return &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">14</td>
+                            <td class="line-content">    if (typeof vNode !== &#039;object&#039;) return String(vNode);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">15</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">16</td>
+                            <td class="line-content">    const { tagName, props, children } = vNode;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">17</td>
+                            <td class="line-content">    const attrs = props ? Object.entries(props)</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">18</td>
+                            <td class="line-content">        .filter(([k, v]) =&gt; v != null &amp;&amp; v !== false &amp;&amp; k !== &#039;children&#039; &amp;&amp; k !== &#039;ref&#039; &amp;&amp; !k.startsWith(&#039;on&#039;))</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">19</td>
+                            <td class="line-content">        .map(([k, v]) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">20</td>
+                            <td class="line-content">            if (k === &#039;className&#039; || k === &#039;class&#039;) return `class=&quot;${Array.isArray(v) ? v.join(&#039; &#039;) : v}&quot;`;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">21</td>
+                            <td class="line-content">            if (k === &#039;style&#039;) return `style=&quot;${typeof v === &#039;string&#039; ? v : Object.entries(v).map(([sk, sv]) =&gt; `${sk.replace(/([A-Z])/g, &#039;-$1&#039;).toLowerCase()}:${sv}`).join(&#039;;&#039;)}&quot;`;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">22</td>
+                            <td class="line-content">            if (v === true) return k;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">23</td>
+                            <td class="line-content">            return `${k}=&quot;${v}&quot;`;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">24</td>
+                            <td class="line-content">        })</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">25</td>
+                            <td class="line-content">        .join(&#039; &#039;) : &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">26</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">27</td>
+                            <td class="line-content">    const childrenStr = children &amp;&amp; children.length &gt; 0</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">28</td>
+                            <td class="line-content">        ? children.map(c =&gt; renderToString(c as any)).join(&#039;&#039;)</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">29</td>
+                            <td class="line-content">        : &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">30</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">31</td>
+                            <td class="line-content">    return `&lt;${tagName}${attrs ? &#039; &#039; + attrs : &#039;&#039;}&gt;${childrenStr}&lt;/${tagName}&gt;`;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">32</td>
+                            <td class="line-content">}</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">33</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">34</td>
+                            <td class="line-content">describe(&#039;Footer Component E2E&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">35</td>
+                            <td class="line-content">    describe(&#039;server-side rendering&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">36</td>
+                            <td class="line-content">        it(&#039;should render footer to HTML string&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">37</td>
+                            <td class="line-content">            const footerVNode = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">38</td>
+                            <td class="line-content">            const footerHtml = renderToString(footerVNode);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">39</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">40</td>
+                            <td class="line-content">            expect(footerHtml).toBeDefined();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">41</td>
+                            <td class="line-content">            expect(typeof footerHtml).toBe(&#039;string&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">42</td>
+                            <td class="line-content">            expect(footerHtml.length).toBeGreaterThan(0);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">43</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">44</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">45</td>
+                            <td class="line-content">        it(&#039;should render footer with correct tag name&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">46</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">47</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">48</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">49</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;class=&quot;footer&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">50</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">51</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">52</td>
+                            <td class="line-content">        it(&#039;should render footer with all sections&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">53</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">54</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">55</td>
+                            <td class="line-content">            // Should contain the content wrapper</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">56</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-content&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">57</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">58</td>
+                            <td class="line-content">            // Should contain three sections</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">59</td>
+                            <td class="line-content">            const sectionMatches = footerHtml.match(/footer-section/g);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">60</td>
+                            <td class="line-content">            expect(sectionMatches).toBeDefined();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">61</td>
+                            <td class="line-content">            expect(sectionMatches?.length).toBe(3);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">62</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">63</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">64</td>
+                            <td class="line-content">        it(&#039;should render all links with correct attributes&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">65</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">66</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">67</td>
+                            <td class="line-content">            // GitHub link with external target</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">68</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;href=&quot;https://github.com&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">69</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;target=&quot;_blank&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">70</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">71</td>
+                            <td class="line-content">            // Documentation and Support links</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">72</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;href=&quot;#&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">73</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&gt;Documentation&lt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">74</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&gt;Support&lt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">75</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">76</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">77</td>
+                            <td class="line-content">        it(&#039;should render copyright with current year&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">78</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">79</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">80</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;©&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">81</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;2026&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">82</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;All rights reserved&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">83</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">84</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">85</td>
+                            <td class="line-content">        it(&#039;should render valid HTML structure&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">86</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">87</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">88</td>
+                            <td class="line-content">            // Check for proper opening and closing tags</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">89</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">90</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;/footer&gt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">91</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">92</td>
+                            <td class="line-content">            // Verify footer open tag appears before close tag</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">93</td>
+                            <td class="line-content">            const openIndex = footerHtml.indexOf(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">94</td>
+                            <td class="line-content">            const closeIndex = footerHtml.indexOf(&#039;&lt;/footer&gt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">95</td>
+                            <td class="line-content">            expect(openIndex).toBeLessThan(closeIndex);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">96</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">97</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">98</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">99</td>
+                            <td class="line-content">    describe(&#039;integration with page layout&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">100</td>
+                            <td class="line-content">        it(&#039;should be compatible with page rendering&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">101</td>
+                            <td class="line-content">            const footerVNode = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">102</td>
+                            <td class="line-content">            const footerHtml = renderToString(footerVNode);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">103</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">104</td>
+                            <td class="line-content">            // Simulate page integration</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">105</td>
+                            <td class="line-content">            const pageHtml = `</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">106</td>
+                            <td class="line-content">                &lt;!DOCTYPE html&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">107</td>
+                            <td class="line-content">                &lt;html&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">108</td>
+                            <td class="line-content">                &lt;head&gt;&lt;title&gt;Test Page&lt;/title&gt;&lt;/head&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">109</td>
+                            <td class="line-content">                &lt;body&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">110</td>
+                            <td class="line-content">                    &lt;main&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">111</td>
+                            <td class="line-content">                        &lt;h1&gt;Page Content&lt;/h1&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">112</td>
+                            <td class="line-content">                        &lt;p&gt;This is the main content.&lt;/p&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">113</td>
+                            <td class="line-content">                    &lt;/main&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">114</td>
+                            <td class="line-content">                    ${footerHtml}</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">115</td>
+                            <td class="line-content">                &lt;/body&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">116</td>
+                            <td class="line-content">                &lt;/html&gt;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">117</td>
+                            <td class="line-content">            `;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">118</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">119</td>
+                            <td class="line-content">            expect(pageHtml).toContain(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">120</td>
+                            <td class="line-content">            expect(pageHtml).toContain(&#039;class=&quot;footer&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">121</td>
+                            <td class="line-content">            expect(pageHtml).toContain(&#039;Page Content&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">122</td>
+                            <td class="line-content">            expect(pageHtml).toContain(&#039;&lt;/footer&gt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">123</td>
+                            <td class="line-content">            expect(pageHtml).toContain(&#039;&lt;/body&gt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">124</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">125</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">126</td>
+                            <td class="line-content">        it(&#039;should not interfere with other page elements&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">127</td>
+                            <td class="line-content">            const header = &#039;&lt;header&gt;&lt;nav&gt;Navigation&lt;/nav&gt;&lt;/header&gt;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">128</td>
+                            <td class="line-content">            const main = &#039;&lt;main&gt;&lt;article&gt;Article Content&lt;/article&gt;&lt;/main&gt;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">129</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">130</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">131</td>
+                            <td class="line-content">            const fullPage = header + main + footerHtml;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">132</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">133</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;&lt;header&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">134</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;&lt;main&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">135</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">136</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;Navigation&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">137</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;Article Content&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">138</td>
+                            <td class="line-content">            expect(fullPage).toContain(&#039;My Elit App&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">139</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">140</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">141</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">142</td>
+                            <td class="line-content">    describe(&#039;accessibility (a11y)&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">143</td>
+                            <td class="line-content">        it(&#039;should have meaningful link text&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">144</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">145</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">146</td>
+                            <td class="line-content">            // Check that all links have descriptive text</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">147</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&gt;GitHub&lt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">148</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&gt;Documentation&lt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">149</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&gt;Support&lt;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">150</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">151</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">152</td>
+                            <td class="line-content">        it(&#039;should have external link indicator for GitHub&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">153</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">154</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">155</td>
+                            <td class="line-content">            // External links should have target=&quot;_blank&quot;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">156</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;href=&quot;https://github.com&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">157</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;target=&quot;_blank&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">158</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">159</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">160</td>
+                            <td class="line-content">        it(&#039;should use semantic HTML elements&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">161</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">162</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">163</td>
+                            <td class="line-content">            // Footer should use &lt;footer&gt; tag</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">164</td>
+                            <td class="line-content">            expect(footerHtml).toMatch(/&lt;footer/);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">165</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">166</td>
+                            <td class="line-content">            // Paragraphs should use &lt;p&gt; tags</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">167</td>
+                            <td class="line-content">            const pTagCount = (footerHtml.match(/&lt;p/g) || []).length;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">168</td>
+                            <td class="line-content">            expect(pTagCount).toBeGreaterThan(0);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">169</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">170</td>
+                            <td class="line-content">            // Links should use &lt;a&gt; tags</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">171</td>
+                            <td class="line-content">            const aTagCount = (footerHtml.match(/&lt;a/g) || []).length;</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">172</td>
+                            <td class="line-content">            expect(aTagCount).toBe(3);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">173</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">174</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">175</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">176</td>
+                            <td class="line-content">    describe(&#039;SEO and metadata&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">177</td>
+                            <td class="line-content">        it(&#039;should contain copyright information for SEO&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">178</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">179</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">180</td>
+                            <td class="line-content">            // Copyright info is important for SEO</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">181</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;©&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">182</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;My Elit App&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">183</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">184</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">185</td>
+                            <td class="line-content">        it(&#039;should have descriptive text content&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">186</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">187</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">188</td>
+                            <td class="line-content">            // Check for descriptive content</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">189</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Elit Framework&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">190</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Built with&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">191</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">192</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">193</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">194</td>
+                            <td class="line-content">    describe(&#039;cross-browser compatibility&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">195</td>
+                            <td class="line-content">        it(&#039;should render standard HTML compatible with all browsers&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">196</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">197</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">198</td>
+                            <td class="line-content">            // Check for standard HTML5 elements</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">199</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">200</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;div&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">201</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;p&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">202</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;&lt;a&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">203</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">204</td>
+                            <td class="line-content">            // No browser-specific features</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">205</td>
+                            <td class="line-content">            expect(footerHtml).not.toContain(&#039;-webkit-&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">206</td>
+                            <td class="line-content">            expect(footerHtml).not.toContain(&#039;-moz-&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">207</td>
+                            <td class="line-content">            expect(footerHtml).not.toContain(&#039;-ms-&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">208</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">209</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">210</td>
+                            <td class="line-content">        it(&#039;should use standard attributes&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">211</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">212</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">213</td>
+                            <td class="line-content">            // Standard HTML attributes</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">214</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;class=&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">215</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;href=&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">216</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;target=&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">217</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">218</td>
+                            <td class="line-content">            // No non-standard attributes</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">219</td>
+                            <td class="line-content">            expect(footerHtml).not.toContain(&#039;data-&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">220</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">221</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">222</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">223</td>
+                            <td class="line-content">    describe(&#039;performance&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">224</td>
+                            <td class="line-content">        it(&#039;should render quickly (performance benchmark)&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">225</td>
+                            <td class="line-content">            const startTime = performance.now();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">226</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">227</td>
+                            <td class="line-content">            // Render multiple times to test performance</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">228</td>
+                            <td class="line-content">            for (let i = 0; i &lt; 100; i++) {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">229</td>
+                            <td class="line-content">                renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">230</td>
+                            <td class="line-content">            }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">231</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">232</td>
+                            <td class="line-content">            const endTime = performance.now();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">233</td>
+                            <td class="line-content">            const duration = endTime - startTime;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">234</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">235</td>
+                            <td class="line-content">            // Should complete 100 renders in less than 100ms (1ms per render)</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">236</td>
+                            <td class="line-content">            expect(duration).toBeLessThan(100);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">237</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">238</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">239</td>
+                            <td class="line-content">        it(&#039;should produce reasonable HTML size&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">240</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">241</td>
+                            <td class="line-content">            const sizeInBytes = new Blob([footerHtml]).size;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">242</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">243</td>
+                            <td class="line-content">            // Footer HTML should be reasonably small (&lt; 2KB)</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">244</td>
+                            <td class="line-content">            expect(sizeInBytes).toBeLessThan(2048);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">245</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">246</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">247</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">248</td>
+                            <td class="line-content">    describe(&#039;content integrity&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">249</td>
+                            <td class="line-content">        it(&#039;should not contain broken or empty content&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">250</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">251</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">252</td>
+                            <td class="line-content">            // No empty links or headings</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">253</td>
+                            <td class="line-content">            expect(footerHtml).not.toMatch(/&lt;a[^&gt;]*&gt;&lt;\/a&gt;/);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">254</td>
+                            <td class="line-content">            expect(footerHtml).not.toMatch(/&lt;p[^&gt;]*&gt;&lt;\/p&gt;/);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">255</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">256</td>
+                            <td class="line-content">            // All text content should be present</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">257</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;My Elit App&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">258</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;GitHub&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">259</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Documentation&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">260</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Support&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">261</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">262</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">263</td>
+                            <td class="line-content">        it(&#039;should have consistent content across renders&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">264</td>
+                            <td class="line-content">            const render1 = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">265</td>
+                            <td class="line-content">            const render2 = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">266</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">267</td>
+                            <td class="line-content">            expect(render1).toBe(render2);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">268</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">269</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">270</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">271</td>
+                            <td class="line-content">    describe(&#039;component behavior&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">272</td>
+                            <td class="line-content">        it(&#039;should create consistent VNode structure&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">273</td>
+                            <td class="line-content">            const footer1 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">274</td>
+                            <td class="line-content">            const footer2 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">275</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">276</td>
+                            <td class="line-content">            expect(footer1.tagName).toBe(footer2.tagName);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">277</td>
+                            <td class="line-content">            expect(footer1.props).toEqual(footer2.props);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">278</td>
+                            <td class="line-content">            expect(footer1.children?.length).toBe(footer2.children?.length);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">279</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">280</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">281</td>
+                            <td class="line-content">        it(&#039;should not mutate between calls&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">282</td>
+                            <td class="line-content">            const footer1 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">283</td>
+                            <td class="line-content">            const footer2 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">284</td>
+                            <td class="line-content">            const footer3 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">285</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">286</td>
+                            <td class="line-content">            // All instances should be equal</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">287</td>
+                            <td class="line-content">            expect(JSON.stringify(footer1)).toBe(JSON.stringify(footer2));</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">288</td>
+                            <td class="line-content">            expect(JSON.stringify(footer2)).toBe(JSON.stringify(footer3));</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">289</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">290</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">291</td>
+                            <td class="line-content">        it(&#039;should handle all prop types correctly&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">292</td>
+                            <td class="line-content">            const footer = Footer();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">293</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">294</td>
+                            <td class="line-content">            expect(footer.props).toBeDefined();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">295</td>
+                            <td class="line-content">            expect(typeof footer.props).toBe(&#039;object&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">296</td>
+                            <td class="line-content">            expect(footer.props?.className).toBe(&#039;footer&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">297</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">298</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">299</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">300</td>
+                            <td class="line-content">    describe(&#039;data flow&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">301</td>
+                            <td class="line-content">        it(&#039;should have complete data from component to rendered output&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">302</td>
+                            <td class="line-content">            const footer = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">303</td>
+                            <td class="line-content">            const footerHtml = renderToString(footer);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">304</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">305</td>
+                            <td class="line-content">            // Title section</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">306</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;My Elit App&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">307</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Built with Elit Framework&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">308</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">309</td>
+                            <td class="line-content">            // Links section</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">310</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;GitHub&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">311</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Documentation&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">312</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;Support&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">313</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">314</td>
+                            <td class="line-content">            // Copyright section</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">315</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;© 2026 My Elit App. All rights reserved.&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">316</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">317</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">318</td>
+                            <td class="line-content">        it(&#039;should preserve all CSS classes through render&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">319</td>
+                            <td class="line-content">            const footerHtml = renderToString(Footer());</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">320</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">321</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;class=&quot;footer&quot;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">322</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-content&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">323</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-section&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">324</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-title&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">325</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-text&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">326</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-link&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">327</td>
+                            <td class="line-content">            expect(footerHtml).toContain(&#039;footer-copyright&#039;);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">328</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">329</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">330</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">331</td>
+                            <td class="line-content">    describe(&#039;edge cases&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">332</td>
+                            <td class="line-content">        it(&#039;should handle multiple renders without side effects&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">333</td>
+                            <td class="line-content">            const renders = [];</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">334</td>
+                            <td class="line-content">            for (let i = 0; i &lt; 10; i++) {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">335</td>
+                            <td class="line-content">                renders.push(renderToString(Footer()));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">336</td>
+                            <td class="line-content">            }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">337</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">338</td>
+                            <td class="line-content">            // All renders should be identical</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">339</td>
+                            <td class="line-content">            expect(renders.every(r =&gt; r === renders[0])).toBe(true);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">340</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">341</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">342</td>
+                            <td class="line-content">        it(&#039;should maintain referential integrity&#039;, () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">343</td>
+                            <td class="line-content">            const footer1 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">344</td>
+                            <td class="line-content">            const footer2 = Footer();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">345</td>
+                            <td class="line-content"></td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">346</td>
+                            <td class="line-content">            // Tags and props should be equal by value</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">347</td>
+                            <td class="line-content">            expect(footer1.tagName).toBe(footer2.tagName);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">348</td>
+                            <td class="line-content">            expect(footer1.props).toEqual(footer2.props);</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">349</td>
+                            <td class="line-content">        });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">350</td>
+                            <td class="line-content">    });</td>
+                        </tr>
+                    
+                        <tr class="uncovered">
+                            <td class="line-number">351</td>
+                            <td class="line-content">});</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">352</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+            </table>
+        </div>
+    </div>
+</body>
+</html>

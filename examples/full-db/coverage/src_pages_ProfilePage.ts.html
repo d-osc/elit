@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Coverage: src/pages/ProfilePage.ts</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23grad)'/%3E%3Crect x='28' y='25' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='46' width='32' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='67' width='44' height='8' rx='4' fill='white'/%3E%3Crect x='28' y='25' width='8' height='50' rx='4' fill='white'/%3E%3Ccircle cx='72' cy='50' r='6' fill='white' opacity='0.5'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        a { color: #58a6ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #58a6ff;
+        }
+        .breadcrumb {
+            font-size: 14px;
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+        .breadcrumb a { color: #58a6ff; }
+        .summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .metric {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-value.high { color: #3fb950; }
+        .metric-value.medium { color: #d29922; }
+        .metric-value.low { color: #f85149; }
+        .progress-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .progress-fill.high { background: #3fb950; }
+        .progress-fill.medium { background: #d29922; }
+        .progress-fill.low { background: #f85149; }
+        .metric-count { font-size: 11px; color: #8b949e; margin-top: 5px; }
+        .code-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .code-header {
+            padding: 10px 15px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+        }
+        .legend { display: flex; gap: 15px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .legend-box.covered { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; }
+        .legend-box.uncovered { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; }
+        .code-table { width: 100%; border-collapse: collapse; }
+        .code-table td { padding: 0; }
+        .line-number {
+            width: 50px;
+            text-align: right;
+            padding: 0 15px;
+            color: #8b949e;
+            font-size: 12px;
+            user-select: none;
+            border-right: 1px solid #30363d;
+        }
+        .line-content {
+            padding: 0 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 20px;
+            white-space: pre;
+        }
+        tr.covered .line-content { background: rgba(63, 185, 80, 0.1); }
+        tr.uncovered .line-content { background: rgba(248, 81, 73, 0.15); }
+        tr.uncovered .line-number { color: #f85149; }
+        tr:hover td { background: rgba(88, 166, 255, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="index.html">← Back to Coverage Report</a>
+        </div>
+
+        <h1>src/pages/ProfilePage.ts</h1>
+
+        <div class="summary">
+            <div class="summary-title">Coverage Metrics</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Statements</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">239/239</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Branches</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">45/45</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Functions</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">29/29</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Lines</div>
+                    <div class="metric-value high">100.00%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill high" style="width: 100%"></div>
+                    </div>
+                    <div class="metric-count">276/276</div>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>Source Code</span>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box covered"></div><span>Covered</span></div>
+                    <div class="legend-item"><div class="legend-box uncovered"></div><span>Uncovered</span></div>
+                </div>
+            </div>
+            <table class="code-table">
+                
+                        <tr class="covered">
+                            <td class="line-number">1</td>
+                            <td class="line-content">import { div, h2, h3, p, button, span, input, label } from &#039;elit/el&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">2</td>
+                            <td class="line-content">import { createState, reactive, reactiveAs } from &#039;elit/state&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">3</td>
+                            <td class="line-content">import type { Router } from &#039;elit&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">4</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">5</td>
+                            <td class="line-content">export function ProfilePage(router: Router) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">6</td>
+                            <td class="line-content">  const isEditing = createState(false);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">7</td>
+                            <td class="line-content">  const name = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">8</td>
+                            <td class="line-content">  const email = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">9</td>
+                            <td class="line-content">  const bio = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">10</td>
+                            <td class="line-content">  const location = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">11</td>
+                            <td class="line-content">  const website = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">12</td>
+                            <td class="line-content">  const isLoading = createState(false);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">13</td>
+                            <td class="line-content">  const isLoaded = createState(false);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">14</td>
+                            <td class="line-content">  const error = createState(&#039;&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">15</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">16</td>
+                            <td class="line-content">  const stats = {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">17</td>
+                            <td class="line-content">    projects: 0,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">18</td>
+                            <td class="line-content">    followers: 0,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">19</td>
+                            <td class="line-content">    following: 0,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">20</td>
+                            <td class="line-content">    stars: 0</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">21</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">22</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">23</td>
+                            <td class="line-content">  // Load profile data</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">24</td>
+                            <td class="line-content">  const loadProfile = async () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">25</td>
+                            <td class="line-content">    const token = localStorage.getItem(&#039;token&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">26</td>
+                            <td class="line-content">    if (!token) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">27</td>
+                            <td class="line-content">      router.push(&#039;/login&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">28</td>
+                            <td class="line-content">      return;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">29</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">30</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">31</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">32</td>
+                            <td class="line-content">      const response = await fetch(&#039;/api/profile&#039;, {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">33</td>
+                            <td class="line-content">        method: &#039;GET&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">34</td>
+                            <td class="line-content">        headers: {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">35</td>
+                            <td class="line-content">          &#039;Authorization&#039;: `Bearer ${token}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">36</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">37</td>
+                            <td class="line-content">      });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">38</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">39</td>
+                            <td class="line-content">      if (!response.ok) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">40</td>
+                            <td class="line-content">        if (response.status === 401) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">41</td>
+                            <td class="line-content">          localStorage.removeItem(&#039;token&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">42</td>
+                            <td class="line-content">          localStorage.removeItem(&#039;user&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">43</td>
+                            <td class="line-content">          router.push(&#039;/login&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">44</td>
+                            <td class="line-content">          return;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">45</td>
+                            <td class="line-content">        }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">46</td>
+                            <td class="line-content">        throw new Error(&#039;Failed to load profile&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">47</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">48</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">49</td>
+                            <td class="line-content">      const data = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">50</td>
+                            <td class="line-content">      const user = data.user;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">51</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">52</td>
+                            <td class="line-content">      name.value = user.name;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">53</td>
+                            <td class="line-content">      email.value = user.email;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">54</td>
+                            <td class="line-content">      bio.value = user.bio;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">55</td>
+                            <td class="line-content">      location.value = user.location;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">56</td>
+                            <td class="line-content">      website.value = user.website;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">57</td>
+                            <td class="line-content">      stats.projects = user.stats.projects;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">58</td>
+                            <td class="line-content">      stats.followers = user.stats.followers;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">59</td>
+                            <td class="line-content">      stats.following = user.stats.following;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">60</td>
+                            <td class="line-content">      stats.stars = user.stats.stars;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">61</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">62</td>
+                            <td class="line-content">      isLoaded.value = true;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">63</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">64</td>
+                            <td class="line-content">      error.value = &#039;Failed to load profile&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">65</td>
+                            <td class="line-content">      isLoaded.value = true;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">66</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">67</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">68</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">69</td>
+                            <td class="line-content">  // Load profile on mount</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">70</td>
+                            <td class="line-content">  loadProfile();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">71</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">72</td>
+                            <td class="line-content">  const handleSave = async () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">73</td>
+                            <td class="line-content">    isLoading.value = true;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">74</td>
+                            <td class="line-content">    error.value = &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">75</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">76</td>
+                            <td class="line-content">    const token = localStorage.getItem(&#039;token&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">77</td>
+                            <td class="line-content">    if (!token) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">78</td>
+                            <td class="line-content">      error.value = &#039;Not authenticated&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">79</td>
+                            <td class="line-content">      isLoading.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">80</td>
+                            <td class="line-content">      return;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">81</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">82</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">83</td>
+                            <td class="line-content">    try {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">84</td>
+                            <td class="line-content">      const response = await fetch(&#039;/api/profile&#039;, {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">85</td>
+                            <td class="line-content">        method: &#039;PUT&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">86</td>
+                            <td class="line-content">        headers: {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">87</td>
+                            <td class="line-content">          &#039;Content-Type&#039;: &#039;application/json&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">88</td>
+                            <td class="line-content">          &#039;Authorization&#039;: `Bearer ${token}`</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">89</td>
+                            <td class="line-content">        },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">90</td>
+                            <td class="line-content">        body: JSON.stringify({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">91</td>
+                            <td class="line-content">          name: name.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">92</td>
+                            <td class="line-content">          bio: bio.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">93</td>
+                            <td class="line-content">          location: location.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">94</td>
+                            <td class="line-content">          website: website.value</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">95</td>
+                            <td class="line-content">        })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">96</td>
+                            <td class="line-content">      });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">97</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">98</td>
+                            <td class="line-content">      if (!response.ok) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">99</td>
+                            <td class="line-content">        throw new Error(&#039;Failed to update profile&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">100</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">101</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">102</td>
+                            <td class="line-content">      const data = await response.json();</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">103</td>
+                            <td class="line-content">      const updatedUser = data.user;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">104</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">105</td>
+                            <td class="line-content">      // Update local storage</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">106</td>
+                            <td class="line-content">      localStorage.setItem(&#039;user&#039;, JSON.stringify(updatedUser));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">107</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">108</td>
+                            <td class="line-content">      isLoading.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">109</td>
+                            <td class="line-content">      isEditing.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">110</td>
+                            <td class="line-content">    } catch (err) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">111</td>
+                            <td class="line-content">      error.value = &#039;Failed to save profile&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">112</td>
+                            <td class="line-content">      isLoading.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">113</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">114</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">115</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">116</td>
+                            <td class="line-content">  const handleCancel = () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">117</td>
+                            <td class="line-content">    // Reset to original values from localStorage</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">118</td>
+                            <td class="line-content">    const user = JSON.parse(localStorage.getItem(&#039;user&#039;) || &#039;{}&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">119</td>
+                            <td class="line-content">    if (user.name) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">120</td>
+                            <td class="line-content">      name.value = user.name;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">121</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">122</td>
+                            <td class="line-content">    if (user.email) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">123</td>
+                            <td class="line-content">      email.value = user.email;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">124</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">125</td>
+                            <td class="line-content">    if (user.bio) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">126</td>
+                            <td class="line-content">      bio.value = user.bio;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">127</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">128</td>
+                            <td class="line-content">    if (user.location) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">129</td>
+                            <td class="line-content">      location.value = user.location;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">130</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">131</td>
+                            <td class="line-content">    if (user.website) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">132</td>
+                            <td class="line-content">      website.value = user.website;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">133</td>
+                            <td class="line-content">    }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">134</td>
+                            <td class="line-content">    isEditing.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">135</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">136</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">137</td>
+                            <td class="line-content">  const handleLogout = () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">138</td>
+                            <td class="line-content">    localStorage.removeItem(&#039;token&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">139</td>
+                            <td class="line-content">    localStorage.removeItem(&#039;user&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">140</td>
+                            <td class="line-content">    // Dispatch custom event to notify Header</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">141</td>
+                            <td class="line-content">    window.dispatchEvent(new Event(&#039;elit:storage&#039;));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">142</td>
+                            <td class="line-content">    router.push(&#039;/&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">143</td>
+                            <td class="line-content">  };</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">144</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">145</td>
+                            <td class="line-content">  return div({ className: &#039;profile-page&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">146</td>
+                            <td class="line-content">    // Error display</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">147</td>
+                            <td class="line-content">    reactive(error, (err) =&gt; err ? div({ className: &#039;auth-error&#039; }, err) : null),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">148</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">149</td>
+                            <td class="line-content">    // Profile Header</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">150</td>
+                            <td class="line-content">    div({ className: &#039;profile-header-section&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">151</td>
+                            <td class="line-content">      div({ className: &#039;profile-cover&#039; }),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">152</td>
+                            <td class="line-content">      div({ className: &#039;profile-avatar-section&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">153</td>
+                            <td class="line-content">        div({ className: &#039;profile-avatar&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">154</td>
+                            <td class="line-content">          reactive(name, (nm) =&gt; nm ? nm.charAt(0).toUpperCase() : &#039;?&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">155</td>
+                            <td class="line-content">        ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">156</td>
+                            <td class="line-content">        button({ className: &#039;avatar-edit-button&#039; }, &#039;📷&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">157</td>
+                            <td class="line-content">      ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">158</td>
+                            <td class="line-content">    ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">159</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">160</td>
+                            <td class="line-content">    // Profile Content</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">161</td>
+                            <td class="line-content">    reactive(isLoaded, (loaded) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">162</td>
+                            <td class="line-content">      if (!loaded) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">163</td>
+                            <td class="line-content">        return div({ className: &#039;profile-content&#039; }, p(&#039;Loading...&#039;));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">164</td>
+                            <td class="line-content">      }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">165</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">166</td>
+                            <td class="line-content">      return div({ className: &#039;profile-content&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">167</td>
+                            <td class="line-content">        // Left column</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">168</td>
+                            <td class="line-content">        div({ className: &#039;profile-sidebar&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">169</td>
+                            <td class="line-content">          div({ className: &#039;profile-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">170</td>
+                            <td class="line-content">            reactive(isEditing, (editing) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">171</td>
+                            <td class="line-content">              if (editing) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">172</td>
+                            <td class="line-content">                return div({ className: &#039;edit-form&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">173</td>
+                            <td class="line-content">                  div({ className: &#039;form-group&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">174</td>
+                            <td class="line-content">                    label({ className: &#039;form-label&#039; }, &#039;Display Name&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">175</td>
+                            <td class="line-content">                    input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">176</td>
+                            <td class="line-content">                      type: &#039;text&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">177</td>
+                            <td class="line-content">                      className: &#039;form-input&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">178</td>
+                            <td class="line-content">                      value: name.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">179</td>
+                            <td class="line-content">                      oninput: (e: Event) =&gt; { name.value = (e.target as HTMLInputElement).value; }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">180</td>
+                            <td class="line-content">                    })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">181</td>
+                            <td class="line-content">                  ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">182</td>
+                            <td class="line-content">                  div({ className: &#039;form-group&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">183</td>
+                            <td class="line-content">                    label({ className: &#039;form-label&#039; }, &#039;Email&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">184</td>
+                            <td class="line-content">                    input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">185</td>
+                            <td class="line-content">                      type: &#039;email&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">186</td>
+                            <td class="line-content">                      className: &#039;form-input&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">187</td>
+                            <td class="line-content">                      value: email.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">188</td>
+                            <td class="line-content">                      disabled: true</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">189</td>
+                            <td class="line-content">                    })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">190</td>
+                            <td class="line-content">                  )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">191</td>
+                            <td class="line-content">                );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">192</td>
+                            <td class="line-content">              }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">193</td>
+                            <td class="line-content">              return div({ className: &#039;profile-info-display&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">194</td>
+                            <td class="line-content">                reactive(name, (nm) =&gt; h3({ className: &#039;profile-name&#039; }, nm)),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">195</td>
+                            <td class="line-content">                reactive(email, (em) =&gt; p({ className: &#039;profile-email&#039; }, em))</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">196</td>
+                            <td class="line-content">              );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">197</td>
+                            <td class="line-content">            }),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">198</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">199</td>
+                            <td class="line-content">            div({ className: &#039;profile-meta&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">200</td>
+                            <td class="line-content">              div({ className: &#039;meta-item&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">201</td>
+                            <td class="line-content">                span({ className: &#039;meta-icon&#039; }, &#039;📍&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">202</td>
+                            <td class="line-content">                reactive(isEditing, (editing) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">203</td>
+                            <td class="line-content">                  if (editing) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">204</td>
+                            <td class="line-content">                    return input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">205</td>
+                            <td class="line-content">                      type: &#039;text&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">206</td>
+                            <td class="line-content">                      className: &#039;form-input form-input-sm&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">207</td>
+                            <td class="line-content">                      value: location.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">208</td>
+                            <td class="line-content">                      oninput: (e: Event) =&gt; { location.value = (e.target as HTMLInputElement).value; }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">209</td>
+                            <td class="line-content">                    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">210</td>
+                            <td class="line-content">                  }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">211</td>
+                            <td class="line-content">                  return span({ className: &#039;meta-text&#039; }, location.value || &#039;No location&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">212</td>
+                            <td class="line-content">                })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">213</td>
+                            <td class="line-content">              ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">214</td>
+                            <td class="line-content">              div({ className: &#039;meta-item&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">215</td>
+                            <td class="line-content">                span({ className: &#039;meta-icon&#039; }, &#039;🔗&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">216</td>
+                            <td class="line-content">                reactive(isEditing, (editing) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">217</td>
+                            <td class="line-content">                  if (editing) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">218</td>
+                            <td class="line-content">                    return input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">219</td>
+                            <td class="line-content">                      type: &#039;url&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">220</td>
+                            <td class="line-content">                      className: &#039;form-input form-input-sm&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">221</td>
+                            <td class="line-content">                      value: website.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">222</td>
+                            <td class="line-content">                      oninput: (e: Event) =&gt; { website.value = (e.target as HTMLInputElement).value; }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">223</td>
+                            <td class="line-content">                    });</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">224</td>
+                            <td class="line-content">                  }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">225</td>
+                            <td class="line-content">                  return span({ className: &#039;meta-text&#039; }, website.value || &#039;No website&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">226</td>
+                            <td class="line-content">                })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">227</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">228</td>
+                            <td class="line-content">            ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">229</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">230</td>
+                            <td class="line-content">            // Use reactiveAs with a stable div wrapper to handle structure changes</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">231</td>
+                            <td class="line-content">            reactiveAs(&#039;div&#039;, isEditing, (editing) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">232</td>
+                            <td class="line-content">              if (editing) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">233</td>
+                            <td class="line-content">                return div({ className: &#039;edit-actions&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">234</td>
+                            <td class="line-content">                  button({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">235</td>
+                            <td class="line-content">                    className: &#039;btn btn-secondary&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">236</td>
+                            <td class="line-content">                    onclick: () =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">237</td>
+                            <td class="line-content">                      console.log(&#039;Cancel button clicked&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">238</td>
+                            <td class="line-content">                      const user = JSON.parse(localStorage.getItem(&#039;user&#039;) || &#039;{}&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">239</td>
+                            <td class="line-content">                      console.log(&#039;User from localStorage:&#039;, user);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">240</td>
+                            <td class="line-content">                      name.value = user.name || &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">241</td>
+                            <td class="line-content">                      email.value = user.email || &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">242</td>
+                            <td class="line-content">                      bio.value = user.bio || &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">243</td>
+                            <td class="line-content">                      location.value = user.location || &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">244</td>
+                            <td class="line-content">                      website.value = user.website || &#039;&#039;;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">245</td>
+                            <td class="line-content">                      console.log(&#039;States reset, setting isEditing to false&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">246</td>
+                            <td class="line-content">                      isEditing.value = false;</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">247</td>
+                            <td class="line-content">                      console.log(&#039;isEditing.value:&#039;, isEditing.value);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">248</td>
+                            <td class="line-content">                    },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">249</td>
+                            <td class="line-content">                    disabled: isLoading.value</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">250</td>
+                            <td class="line-content">                  }, &#039;Cancel&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">251</td>
+                            <td class="line-content">                  button({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">252</td>
+                            <td class="line-content">                    className: &#039;btn btn-primary&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">253</td>
+                            <td class="line-content">                    onclick: handleSave,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">254</td>
+                            <td class="line-content">                    disabled: isLoading.value</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">255</td>
+                            <td class="line-content">                  }, isLoading.value ? &#039;Saving...&#039; : &#039;Save Changes&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">256</td>
+                            <td class="line-content">                );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">257</td>
+                            <td class="line-content">              }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">258</td>
+                            <td class="line-content">              return button({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">259</td>
+                            <td class="line-content">                className: &#039;btn btn-primary btn-block&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">260</td>
+                            <td class="line-content">                onclick: () =&gt; isEditing.value = true</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">261</td>
+                            <td class="line-content">              }, &#039;Edit Profile&#039;);</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">262</td>
+                            <td class="line-content">            }, { className: &#039;profile-action-wrapper&#039; })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">263</td>
+                            <td class="line-content">          )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">264</td>
+                            <td class="line-content">        ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">265</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">266</td>
+                            <td class="line-content">        // Right column</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">267</td>
+                            <td class="line-content">        div({ className: &#039;profile-main&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">268</td>
+                            <td class="line-content">          // Stats Card</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">269</td>
+                            <td class="line-content">          div({ className: &#039;stats-grid&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">270</td>
+                            <td class="line-content">            div({ className: &#039;stat-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">271</td>
+                            <td class="line-content">              span({ className: &#039;stat-icon&#039; }, &#039;📁&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">272</td>
+                            <td class="line-content">              div({ className: &#039;stat-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">273</td>
+                            <td class="line-content">                span({ className: &#039;stat-value&#039; }, stats.projects.toString()),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">274</td>
+                            <td class="line-content">                span({ className: &#039;stat-label&#039; }, &#039;Projects&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">275</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">276</td>
+                            <td class="line-content">            ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">277</td>
+                            <td class="line-content">            div({ className: &#039;stat-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">278</td>
+                            <td class="line-content">              span({ className: &#039;stat-icon&#039; }, &#039;⭐&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">279</td>
+                            <td class="line-content">              div({ className: &#039;stat-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">280</td>
+                            <td class="line-content">                span({ className: &#039;stat-value&#039; }, stats.stars.toString()),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">281</td>
+                            <td class="line-content">                span({ className: &#039;stat-label&#039; }, &#039;Stars&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">282</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">283</td>
+                            <td class="line-content">            ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">284</td>
+                            <td class="line-content">            div({ className: &#039;stat-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">285</td>
+                            <td class="line-content">              span({ className: &#039;stat-icon&#039; }, &#039;👥&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">286</td>
+                            <td class="line-content">              div({ className: &#039;stat-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">287</td>
+                            <td class="line-content">                span({ className: &#039;stat-value&#039; }, stats.followers.toString()),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">288</td>
+                            <td class="line-content">                span({ className: &#039;stat-label&#039; }, &#039;Followers&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">289</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">290</td>
+                            <td class="line-content">            ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">291</td>
+                            <td class="line-content">            div({ className: &#039;stat-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">292</td>
+                            <td class="line-content">              span({ className: &#039;stat-icon&#039; }, &#039;👣&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">293</td>
+                            <td class="line-content">              div({ className: &#039;stat-info&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">294</td>
+                            <td class="line-content">                span({ className: &#039;stat-value&#039; }, stats.following.toString()),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">295</td>
+                            <td class="line-content">                span({ className: &#039;stat-label&#039; }, &#039;Following&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">296</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">297</td>
+                            <td class="line-content">            )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">298</td>
+                            <td class="line-content">          ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">299</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">300</td>
+                            <td class="line-content">          // About Card</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">301</td>
+                            <td class="line-content">          div({ className: &#039;profile-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">302</td>
+                            <td class="line-content">            h3({ className: &#039;card-title&#039; }, &#039;About&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">303</td>
+                            <td class="line-content">            reactive(isEditing, (editing) =&gt; {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">304</td>
+                            <td class="line-content">              if (editing) {</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">305</td>
+                            <td class="line-content">                return div({ className: &#039;form-group&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">306</td>
+                            <td class="line-content">                  label({ className: &#039;form-label&#039; }, &#039;Bio&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">307</td>
+                            <td class="line-content">                  input({</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">308</td>
+                            <td class="line-content">                    type: &#039;text&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">309</td>
+                            <td class="line-content">                    className: &#039;form-input&#039;,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">310</td>
+                            <td class="line-content">                    value: bio.value,</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">311</td>
+                            <td class="line-content">                    oninput: (e: Event) =&gt; { bio.value = (e.target as HTMLInputElement).value; }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">312</td>
+                            <td class="line-content">                  })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">313</td>
+                            <td class="line-content">                );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">314</td>
+                            <td class="line-content">              }</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">315</td>
+                            <td class="line-content">              return reactive(bio, (b) =&gt; p({ className: &#039;profile-bio&#039; }, b || &#039;No bio yet&#039;));</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">316</td>
+                            <td class="line-content">            })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">317</td>
+                            <td class="line-content">          ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">318</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">319</td>
+                            <td class="line-content">          // Activity Card</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">320</td>
+                            <td class="line-content">          div({ className: &#039;profile-card&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">321</td>
+                            <td class="line-content">            h3({ className: &#039;card-title&#039; }, &#039;Recent Activity&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">322</td>
+                            <td class="line-content">            div({ className: &#039;activity-list&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">323</td>
+                            <td class="line-content">              div({ className: &#039;activity-item&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">324</td>
+                            <td class="line-content">                span({ className: &#039;activity-icon&#039; }, &#039;🚀&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">325</td>
+                            <td class="line-content">                div({ className: &#039;activity-content&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">326</td>
+                            <td class="line-content">                  p({ className: &#039;activity-title&#039; }, &#039;Account created&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">327</td>
+                            <td class="line-content">                  p({ className: &#039;activity-time&#039; }, &#039;Just now&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">328</td>
+                            <td class="line-content">                )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">329</td>
+                            <td class="line-content">              )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">330</td>
+                            <td class="line-content">            )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">331</td>
+                            <td class="line-content">          ),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">332</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">333</td>
+                            <td class="line-content">          // Actions</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">334</td>
+                            <td class="line-content">          div({ className: &#039;profile-actions&#039; },</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">335</td>
+                            <td class="line-content">            button({ className: &#039;btn btn-outline btn-block&#039; }, &#039;View Public Profile&#039;),</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">336</td>
+                            <td class="line-content">            button({ className: &#039;btn btn-secondary btn-block&#039;, onclick: handleLogout }, &#039;Logout&#039;)</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">337</td>
+                            <td class="line-content">          )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">338</td>
+                            <td class="line-content">        )</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">339</td>
+                            <td class="line-content">      );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">340</td>
+                            <td class="line-content">    })</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">341</td>
+                            <td class="line-content">  );</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">342</td>
+                            <td class="line-content">}</td>
+                        </tr>
+                    
+                        <tr class="covered">
+                            <td class="line-number">343</td>
+                            <td class="line-content"> </td>
+                        </tr>
+                    
+            </table>
+        </div>
+    </div>
+</body>
+</html>

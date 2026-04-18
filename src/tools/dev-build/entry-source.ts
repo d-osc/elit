@@ -1,0 +1,1 @@
+export { createStandaloneDevEntrySource } from '../../dev-build/entry-source';

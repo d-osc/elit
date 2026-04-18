@@ -1,0 +1,1 @@
+export { buildStandaloneDevServer } from '../../dev-build/build';

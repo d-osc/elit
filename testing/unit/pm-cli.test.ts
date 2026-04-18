@@ -2,7 +2,7 @@
 
 import { join } from 'node:path';
 
-import { buildPmCommand, parsePmStartArgs, resolvePmStartDefinitions } from '../../src/pm-cli';
+import { buildPmCommand, parsePmStartArgs, resolvePmStartDefinitions } from '../../src/pm';
 
 function createWapkPmRecord(overrides = {}) {
     return {
@@ -67,19 +67,15 @@ describe('pm cli wapk support', () => {
             '--archive-watch',
         ]);
 
-        expect(parsed.wapkRun).toMatchObject({
-            googleDrive: {
-                fileId: 'drive-file-id',
-                accessTokenEnv: 'GOOGLE_DRIVE_ACCESS_TOKEN',
-                supportsAllDrives: true,
-            },
-            online: true,
-            onlineUrl: 'http://localhost:4179',
-            syncInterval: 150,
-            archiveSyncInterval: 200,
-            useWatcher: true,
-            watchArchive: true,
-        });
+        expect(parsed.wapkRun?.googleDrive?.fileId).toBe('drive-file-id');
+        expect(parsed.wapkRun?.googleDrive?.accessTokenEnv).toBe('GOOGLE_DRIVE_ACCESS_TOKEN');
+        expect(parsed.wapkRun?.googleDrive?.supportsAllDrives).toBe(true);
+        expect(parsed.wapkRun?.online).toBe(true);
+        expect(parsed.wapkRun?.onlineUrl).toBe('http://localhost:4179');
+        expect(parsed.wapkRun?.syncInterval).toBe(150);
+        expect(parsed.wapkRun?.archiveSyncInterval).toBe(200);
+        expect(parsed.wapkRun?.useWatcher).toBe(true);
+        expect(parsed.wapkRun?.watchArchive).toBe(true);
     });
 
     it('treats Google Drive source flags as an explicit WAPK target even when a process name is provided', () => {
@@ -100,11 +96,9 @@ describe('pm cli wapk support', () => {
         );
 
         expect(definitions).toHaveLength(1);
-        expect(definitions[0]).toMatchObject({
-            name: 'remote-app',
-            type: 'wapk',
-            wapk: 'gdrive://drive-file-id',
-        });
+        expect(definitions[0]?.name).toBe('remote-app');
+        expect(definitions[0]?.type).toBe('wapk');
+        expect(definitions[0]?.wapk).toBe('gdrive://drive-file-id');
     });
 
     it('resolves configured PM apps from wapkRun.googleDrive without a local archive path', () => {
@@ -139,59 +133,63 @@ describe('pm cli wapk support', () => {
         );
 
         expect(definitions).toHaveLength(1);
-        expect(definitions[0]).toMatchObject({
-            name: 'drive-app',
-            type: 'wapk',
-            wapk: 'gdrive://drive-file-id',
-            wapkRun: {
-                googleDrive: {
-                    accessTokenEnv: 'GOOGLE_DRIVE_ACCESS_TOKEN',
-                    supportsAllDrives: true,
-                },
-                syncInterval: 150,
-                useWatcher: true,
-                watchArchive: true,
-            },
-        });
+        expect(definitions[0]?.name).toBe('drive-app');
+        expect(definitions[0]?.type).toBe('wapk');
+        expect(definitions[0]?.wapk).toBe('gdrive://drive-file-id');
+        expect(definitions[0]?.wapkRun?.googleDrive?.accessTokenEnv).toBe('GOOGLE_DRIVE_ACCESS_TOKEN');
+        expect(definitions[0]?.wapkRun?.googleDrive?.supportsAllDrives).toBe(true);
+        expect(definitions[0]?.wapkRun?.syncInterval).toBe(150);
+        expect(definitions[0]?.wapkRun?.useWatcher).toBe(true);
+        expect(definitions[0]?.wapkRun?.watchArchive).toBe(true);
     });
 
     it('builds PM commands that forward WAPK online, Google Drive, and live-sync flags', () => {
-        const command = buildPmCommand(createWapkPmRecord());
+        const originalCliEntry = process.argv[1];
+        process.argv[1] = join(process.cwd(), 'dist', 'cli.cjs');
 
-        expect(command.args).toEqual(expect.arrayContaining([
-            'wapk',
-            'run',
-            'gdrive://drive-file-id',
-            '--password',
-            'secret-123',
-            '--online',
-            '--online-url',
-            'http://localhost:4179',
-            '--sync-interval',
-            '150',
-            '--watcher',
-            '--archive-watch',
-            '--archive-sync-interval',
-            '200',
-            '--google-drive-token-env',
-            'GOOGLE_DRIVE_ACCESS_TOKEN',
-            '--google-drive-access-token',
-            'secret-token',
-            '--google-drive-shared-drive',
-        ]));
-        expect(command.args).not.toContain('--runtime');
-        expect(command.env).toEqual({ ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN: '1' });
-        expect(command.runtime).toBeUndefined();
-        expect(command.preview).toContain('elit wapk run gdrive://drive-file-id');
-        expect(command.preview).toContain('--online');
-        expect(command.preview).toContain('--online-url http://localhost:4179');
-        expect(command.preview).toContain('--sync-interval 150');
-        expect(command.preview).toContain('--watcher');
-        expect(command.preview).toContain('--archive-watch');
-        expect(command.preview).toContain('--archive-sync-interval 200');
-        expect(command.preview).toContain('--google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN');
-        expect(command.preview).toContain('--google-drive-access-token ******');
-        expect(command.preview).toContain('--password ******');
+        try {
+            const command = buildPmCommand(createWapkPmRecord());
+            const requiredArgs = [
+                'wapk',
+                'run',
+                'gdrive://drive-file-id',
+                '--password',
+                'secret-123',
+                '--online',
+                '--online-url',
+                'http://localhost:4179',
+                '--sync-interval',
+                '150',
+                '--watcher',
+                '--archive-watch',
+                '--archive-sync-interval',
+                '200',
+                '--google-drive-token-env',
+                'GOOGLE_DRIVE_ACCESS_TOKEN',
+                '--google-drive-access-token',
+                'secret-token',
+                '--google-drive-shared-drive',
+            ];
+
+            for (const requiredArg of requiredArgs) {
+                expect(command.args.includes(requiredArg)).toBe(true);
+            }
+            expect(command.args).not.toContain('--runtime');
+            expect(command.env).toEqual({ ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN: '1' });
+            expect(command.runtime).toBeUndefined();
+            expect(command.preview).toContain('elit wapk run gdrive://drive-file-id');
+            expect(command.preview).toContain('--online');
+            expect(command.preview).toContain('--online-url http://localhost:4179');
+            expect(command.preview).toContain('--sync-interval 150');
+            expect(command.preview).toContain('--watcher');
+            expect(command.preview).toContain('--archive-watch');
+            expect(command.preview).toContain('--archive-sync-interval 200');
+            expect(command.preview).toContain('--google-drive-token-env GOOGLE_DRIVE_ACCESS_TOKEN');
+            expect(command.preview).toContain('--google-drive-access-token ******');
+            expect(command.preview).toContain('--password ******');
+        } finally {
+            process.argv[1] = originalCliEntry;
+        }
     });
 
     it('keeps online WAPK config when resolving a configured PM app', () => {
@@ -221,14 +219,10 @@ describe('pm cli wapk support', () => {
         );
 
         expect(definitions).toHaveLength(1);
-        expect(definitions[0]).toMatchObject({
-            name: 'online-app',
-            type: 'wapk',
-            wapk: join(workspaceRoot, 'dist', 'app.wapk'),
-            wapkRun: {
-                online: true,
-                onlineUrl: 'http://localhost:4179',
-            },
-        });
+        expect(definitions[0]?.name).toBe('online-app');
+        expect(definitions[0]?.type).toBe('wapk');
+        expect(definitions[0]?.wapk).toBe(join(workspaceRoot, 'dist', 'app.wapk'));
+        expect(definitions[0]?.wapkRun?.online).toBe(true);
+        expect(definitions[0]?.wapkRun?.onlineUrl).toBe('http://localhost:4179');
     });
 });

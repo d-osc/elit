@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1769323971153" clover="3.2.0">
+  <project timestamp="1769323971153" name="Coverage">
+    <metrics complexity="0" elements="3000" coveredelements="1453"
+             conditionals="348" coveredconditionals="189"
+             statements="2509" coveredstatements="1174"
+             methods="143" coveredmethods="90"
+             classes="18" coveredclasses="11"
+             files="18" loc="2887" ncloc="1536"
+             packages="18" classes="18" />
+    <package name="root">
+      <metrics complexity="0" elements="3000" coveredelements="1453"
+               conditionals="348" coveredconditionals="189"
+               statements="2509" coveredstatements="1174"
+               methods="143" coveredmethods="90"
+               classes="18" coveredclasses="11"
+               files="18" loc="2887" ncloc="1536" />
+
+    <file name="databases/users.ts">
+      <class name="databases/users.ts">
+        <metrics complexity="0" elements="32" coveredelements="0"
+                 methods="0" coveredmethods="0"
+                 statements="32" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="elit.config.ts">
+      <class name="elit.config.ts">
+        <metrics complexity="0" elements="69" coveredelements="0"
+                 methods="1" coveredmethods="0"
+                 statements="64" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="src/client.ts">
+      <class name="src/client.ts">
+        <metrics complexity="0" elements="10" coveredelements="10"
+                 methods="0" coveredmethods="0"
+                 statements="10" coveredstatements="10" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/components/Footer.ts">
+      <class name="src/components/Footer.ts">
+        <metrics complexity="0" elements="13" coveredelements="13"
+                 methods="0" coveredmethods="0"
+                 statements="13" coveredstatements="13" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/components/Header.ts">
+      <class name="src/components/Header.ts">
+        <metrics complexity="0" elements="51" coveredelements="51"
+                 methods="4" coveredmethods="4"
+                 statements="41" coveredstatements="41" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/components/index.ts">
+      <class name="src/components/index.ts">
+        <metrics complexity="0" elements="0" coveredelements="0"
+                 methods="0" coveredmethods="0"
+                 statements="0" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="src/main.ts">
+      <class name="src/main.ts">
+        <metrics complexity="0" elements="9" coveredelements="0"
+                 methods="0" coveredmethods="0"
+                 statements="9" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="src/pages/ChatListPage.ts">
+      <class name="src/pages/ChatListPage.ts">
+        <metrics complexity="0" elements="109" coveredelements="109"
+                 methods="8" coveredmethods="8"
+                 statements="90" coveredstatements="90" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/ChatPage.ts">
+      <class name="src/pages/ChatPage.ts">
+        <metrics complexity="0" elements="151" coveredelements="151"
+                 methods="11" coveredmethods="11"
+                 statements="120" coveredstatements="120" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/ForgotPasswordPage.ts">
+      <class name="src/pages/ForgotPasswordPage.ts">
+        <metrics complexity="0" elements="94" coveredelements="94"
+                 methods="4" coveredmethods="4"
+                 statements="75" coveredstatements="75" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/HomePage.ts">
+      <class name="src/pages/HomePage.ts">
+        <metrics complexity="0" elements="145" coveredelements="145"
+                 methods="4" coveredmethods="4"
+                 statements="130" coveredstatements="130" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/LoginPage.ts">
+      <class name="src/pages/LoginPage.ts">
+        <metrics complexity="0" elements="154" coveredelements="154"
+                 methods="5" coveredmethods="5"
+                 statements="126" coveredstatements="126" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/PrivateChatPage.ts">
+      <class name="src/pages/PrivateChatPage.ts">
+        <metrics complexity="0" elements="215" coveredelements="215"
+                 methods="18" coveredmethods="18"
+                 statements="169" coveredstatements="169" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/ProfilePage.ts">
+      <class name="src/pages/ProfilePage.ts">
+        <metrics complexity="0" elements="313" coveredelements="313"
+                 methods="29" coveredmethods="29"
+                 statements="239" coveredstatements="239" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/pages/RegisterPage.ts">
+      <class name="src/pages/RegisterPage.ts">
+        <metrics complexity="0" elements="198" coveredelements="198"
+                 methods="7" coveredmethods="7"
+                 statements="161" coveredstatements="161" />
+      </class>
+      <line num="1" type="stmt" count="1" />
+    </file>
+    <file name="src/router.ts">
+      <class name="src/router.ts">
+        <metrics complexity="0" elements="13" coveredelements="0"
+                 methods="0" coveredmethods="0"
+                 statements="12" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="src/server.ts">
+      <class name="src/server.ts">
+        <metrics complexity="0" elements="571" coveredelements="0"
+                 methods="52" coveredmethods="0"
+                 statements="396" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    <file name="src/styles.ts">
+      <class name="src/styles.ts">
+        <metrics complexity="0" elements="853" coveredelements="0"
+                 methods="0" coveredmethods="0"
+                 statements="822" coveredstatements="0" />
+      </class>
+      <line num="1" type="stmt" count="0" />
+    </file>
+    </package>
+  </project>
+</coverage>

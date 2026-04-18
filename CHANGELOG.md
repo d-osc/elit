@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.7] - 2026-04-17
+
+### Added
+- **Standalone dev/preview server build flow** - production builds can now emit runnable Node server bundles for dev and preview workflows without depending on the source tree at runtime
+  - Added `elit build-dev` and `elit build-preview` convenience commands
+  - Added `--standalone-dev`, `--standalone-preview`, `--dev-out-file`, and `--preview-out-file` build flags
+  - Added typed programmatic `elit/dev-build` and `elit/preview-build` subpath exports for standalone server generation
+- **Public process-manager subpath** - `elit/pm` is now exposed as a first-class package entry for typed process-manager helpers and programmatic access
+
+### Changed
+- **Standalone build pipeline integration** - the normal build flow can now emit standalone dev/preview bundles from CLI flags or config-driven `dev.standalone` / `preview.standalone` settings
+  - Standalone server generation reuses the regular build pipeline and emits runnable Node `index.js` outputs into the target build roots
+  - Build, dev-build, preview-build, desktop, and shared type ownership is now split into dedicated modules while compatibility barrels remain in place for existing imports
+- **Release metadata refresh** - release-facing Cargo, docs, and example version references now track `v3.6.7`
+
+### Fixed
+- **WAPK archive config-artifact filtering** - `elit wapk pack` no longer leaks transient `.elit-config-*` bundles created while loading TypeScript/MTS config files, and legacy `wapk.config.json` stays excluded from packaged archives
+  - Prevents temporary config-loader output from being shipped when projects use `elit.config.ts` or `elit.config.mts`
+  - Keeps package metadata resolution anchored to current `wapk` config fields and `package.json`, not legacy `wapk.config.json`
+
+### Tests
+- **WAPK regression coverage refresh** - updated WAPK coverage for temp config-bundle exclusion, legacy config ignore behavior, and online shared-session shutdown flows under the in-repo test runner
+  - Simplified assertions to match the custom runner's spy and matcher API while preserving the same runtime expectations
+
 ## [3.6.6] - 2026-04-16
 
 ### Added

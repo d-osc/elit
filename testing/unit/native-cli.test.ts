@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 import { div, h1 } from '../../src/el';
 import { renderNativeJson } from '../../src/native';
-import { loadNativeEntryValue, resolveNativeEntryExport, resolveNativeExportValue } from '../../src/native-cli';
+import { loadNativeEntryValue, resolveNativeEntryExport, resolveNativeExportValue } from '../../src/native';
 import { renderAndroidCompose } from '../../src/native';
 import styles from '../../src/style';
 
@@ -56,7 +56,9 @@ export const screen = () => div({ className: 'card' }, 'Bundled style');
             const entry = await loadNativeEntryValue(entryPath, 'screen');
             const compose = renderAndroidCompose(entry, { functionName: 'BundledStyleScreen' });
 
-            expect(compose).toContain('Column(modifier = Modifier.padding(16.dp).background(color = Color(');
+            expect(compose).toContain('Column(modifier = Modifier');
+            expect(compose).toContain('.padding(16.dp)');
+            expect(compose).toContain('.background(color = Color(');
             expect(compose).toContain('RoundedCornerShape(20.dp)');
         } finally {
             unlinkSync(entryPath);

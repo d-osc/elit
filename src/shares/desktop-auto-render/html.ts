@@ -1,0 +1,1 @@
+export { buildDesktopAutoHtml } from '../../desktop/auto-render/html';

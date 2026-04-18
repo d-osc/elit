@@ -1,0 +1,1 @@
+export { installDesktopMessageHandler } from '../../desktop/auto-render/message-handler';

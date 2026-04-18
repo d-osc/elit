@@ -15,7 +15,7 @@ import {
     renderIosProjectFileSource,
     renderIosRuntimeConfigSource,
     renderIosWebViewSource,
-} from '../../src/mobile-cli';
+} from '../../src/mobile';
 
 describe('mobile native templates', () => {
     it('renders a managed Android activity with imports for external native packages', () => {

@@ -15,7 +15,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "elit": ["../src/index.ts"]
+      "elit": ["../src/libs/clients/index.ts"]
     }
   },
   "include": ["src"]
