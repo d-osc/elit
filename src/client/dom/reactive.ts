@@ -1,4 +1,4 @@
-import type { Child, State } from '../../shares/types';
+import type { Child, State } from '../../core/types';
 
 export type ReactiveNodeEntry = {
     node: Text | null;

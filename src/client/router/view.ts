@@ -1,4 +1,4 @@
-import type { VNode } from '../../shares/types';
+import type { VNode } from '../../core/types';
 import { matchRoute, wrapComponent } from './helpers';
 import type { Router, RouterOptions } from './types';
 

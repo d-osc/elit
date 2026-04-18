@@ -2,11 +2,11 @@
  * Elit - DomNode Core Class
  */
 
-import type { VNode, Child, Children, Props, State, StateOptions, VirtualListController, JsonNode, VNodeJson } from '../../shares/types';
-import { addLink, addMeta, addStyle, batchRender, cleanupUnusedElements, render, renderChunked, renderToDOM, renderToHead, setTitle } from './dom-render';
+import type { VNode, Child, Children, Props, State, StateOptions, VirtualListController, JsonNode, VNodeJson } from '../../core/types';
+import { addLink, addMeta, addStyle, batchRender, cleanupUnusedElements, render as renderDom, renderChunked, renderToDOM, renderToHead, setTitle } from './dom-render';
 import { jsonToVNode, renderJson, renderJsonToString, renderVNode, renderVNodeToString, vNodeJsonToVNode } from './json';
 import type { ReactiveNodes } from './reactive';
-import { renderToHTMLDocument, renderToString } from './string-render';
+import { renderToHTMLDocument, renderToString as renderToStringDom } from './string-render';
 import { computed, createState, createVirtualList, effect, lazy } from './state-utils';
 
 export class DomNode {
@@ -22,7 +22,7 @@ export class DomNode {
     }
 
     render(rootElement: string | HTMLElement, vNode: VNode): HTMLElement {
-        return render(rootElement, vNode);
+        return renderDom(rootElement, vNode);
     }
 
     batchRender(rootElement: string | HTMLElement, vNodes: VNode[]): HTMLElement {
@@ -94,7 +94,7 @@ export class DomNode {
 
     // Server-Side Rendering - convert VNode to HTML string
     renderToString(vNode: Child, options: { pretty?: boolean; indent?: number } = {}): string {
-        return renderToString(vNode, options);
+        return renderToStringDom(vNode, options);
     }
 
     jsonToVNode(json: JsonNode | string | number | boolean | null | undefined | State<any>): Child {

@@ -3,7 +3,7 @@ import { request as httpsRequest } from '../https';
 
 import { json } from './responses';
 
-import type { ProxyConfig } from '../../shares/types';
+import type { ProxyConfig } from '../types';
 
 function rewritePath(path: string, pathRewrite?: Record<string, string>): string {
   if (!pathRewrite) return path;

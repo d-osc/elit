@@ -1,4 +1,4 @@
-import type { State, StateOptions, VirtualListController, VNode } from '../../shares/types';
+import type { State, StateOptions, VirtualListController, VNode } from '../../core/types';
 import { renderToDOM } from './dom-render';
 
 export function createState<T>(initialValue: T, options: StateOptions = {}): State<T> {

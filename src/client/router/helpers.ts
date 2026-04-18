@@ -1,4 +1,4 @@
-import type { Child, VNode } from '../../shares/types';
+import type { Child, VNode } from '../../core/types';
 import type { Route, RouteLocation, RouteParams } from './types';
 
 export function matchRoute(pattern: string, path: string): RouteParams | null {

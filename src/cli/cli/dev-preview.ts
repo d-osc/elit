@@ -1,6 +1,6 @@
 import { ELIT_CONFIG_FILES, loadConfig, loadEnv, mergeConfig } from '../../shares/config';
 import { createDevServer } from '../../server/server';
-import type { DevServerOptions, PreviewOptions } from '../../shares/types';
+import type { DevServerOptions, PreviewOptions } from '../../server/types';
 
 import { parseArgs, setupShutdownHandlers, type ArgHandler } from './shared';
 

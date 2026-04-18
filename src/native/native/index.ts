@@ -1,5 +1,5 @@
 import { type NativeStyleResolveOptions } from '../../client/style';
-import type { Child } from '../../shares/types';
+import type { Child } from '../../core/types';
 import type {
     NativePlatform,
     NativePropObject,

@@ -1,4 +1,4 @@
-import type { Child, Props, State, VNode } from '../../shares/types';
+import type { Child, Props, State, VNode } from '../../core/types';
 import { dom } from '../dom';
 import { renderToFragment, scheduleRAFUpdate, updateElementProps } from './reactive-utils';
 

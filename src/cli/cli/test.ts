@@ -27,7 +27,7 @@ export async function runTest(args: string[]): Promise<void> {
     const options: TestOptions = config?.test
         ? { ...config.test, ...cliOptions } as TestOptions
         : cliOptions;
-    const { runJestTests, runWatchMode } = await import('../../tester/test');
+    const { runJestTests, runWatchMode } = await import('../../test/test');
 
     if (options.watch) {
         await runWatchMode({

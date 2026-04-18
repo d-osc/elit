@@ -12,8 +12,8 @@ import {
     getCapturedRenderedVNode,
     restoreRenderRuntimeTarget,
     setRenderRuntimeTarget,
-} from '../../shares/render-context';
-import type { Child } from '../../shares/types';
+} from '../../desktop/render-context';
+import type { Child } from '../../core/types';
 import { resolveWorkspacePackageImport } from '../../shares/workspace-package';
 import { DEFAULT_ENTRY_EXPORTS, type LoadedNativeEntryResult, type NativeEntryRuntimeTarget } from './shared';
 

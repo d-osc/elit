@@ -1,4 +1,4 @@
-import type { Props, State } from '../../shares/types';
+import type { Props, State } from '../../core/types';
 
 export type NativeBindingKind = 'value' | 'checked';
 

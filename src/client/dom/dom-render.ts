@@ -1,5 +1,5 @@
-import { captureRenderedVNode, detectRenderRuntimeTarget } from '../../shares/render-context';
-import type { Child, Children, Props, VNode } from '../../shares/types';
+import { captureRenderedVNode, detectRenderRuntimeTarget } from '../../desktop/render-context';
+import type { Child, Children, Props, VNode } from '../../core/types';
 import { ensureElement, hasDocumentApi, isState, resolveElement, resolveTextareaValue, shouldSkipChild } from './helpers';
 
 function isSvgElement(tagName: string, parent: HTMLElement | SVGElement | DocumentFragment): boolean {

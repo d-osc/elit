@@ -1,4 +1,4 @@
-import type { Child, VNode } from '../../shares/types';
+import type { Child, VNode } from '../../core/types';
 import type { Router, RouterLinkProps } from './types';
 
 export const routerLink = (router: Router, props: RouterLinkProps, ...children: Child[]): VNode => {

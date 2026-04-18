@@ -23,7 +23,7 @@ export const browserCompatibleConfig = {
         router: 'src/client/router/index.ts',
         state: 'src/client/state/index.ts',
         style: 'src/client/style/index.ts',
-        types: 'src/shares/types.ts',
+        types: 'src/types.ts',
         hmr: 'src/client/hmr/index.ts',
         native: 'src/native/native/index.ts',
         universal: 'src/shares/universal.ts'
@@ -48,7 +48,7 @@ export const nodeOnlyConfig = {
     entry: {
         server: 'src/server/server/index.ts',
         'smtp-server': 'src/server/smtp-server/index.ts',
-        build: 'src/tools/build/index.ts',
+        build: 'src/build/index.ts',
         http: 'src/server/http/index.ts',
         https: 'src/server/https/index.ts',
         ws: 'src/server/ws/index.ts',
@@ -63,12 +63,13 @@ export const nodeOnlyConfig = {
         'test-runtime': 'src/test/runtime/index.ts',
         'test-reporter': 'src/test/reporter/index.ts',
         test: 'src/test/test/index.ts',
-        desktop: 'src/tools/desktop/index.ts',
-        'desktop-auto-render': 'src/shares/desktop-auto-render/index.ts',
-        'render-context': 'src/shares/render-context/index.ts',
+        desktop: 'src/desktop/index.ts',
+        'desktop-auto-render': 'src/desktop/auto-render/index.ts',
+        'render-context': 'src/desktop/render-context/index.ts',
         runtime: 'src/shares/runtime.ts',
-        'preview-build': 'src/tools/preview-build/index.ts',
-        'dev-build': 'src/tools/dev-build/index.ts'
+        pm: 'src/pm.ts',
+        'preview-build': 'src/preview-build/index.ts',
+        'dev-build': 'src/dev-build/index.ts'
     },
     format: createBundleFormats(),
     dts: true,
@@ -97,7 +98,7 @@ export const nodeOnlyConfig = {
 
 export const cliConfig = {
     entry: {
-        cli: 'src/cli/index.ts'
+        cli: 'src/cli.ts'
     },
     format: createCliFormats(),
     dts: true,
@@ -109,6 +110,11 @@ export const cliConfig = {
     platform: 'node',
     external: ['bun', 'esbuild', 'source-map', 'v8'],
     target: 'es2020',
+    banner() {
+        return {
+            js: '#!/usr/bin/env node'
+        };
+    },
     outExtension({ format }) {
         return {
             js: getJsExtension(format),

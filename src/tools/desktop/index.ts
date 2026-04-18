@@ -1,4 +1,4 @@
-import type { ServeWindowOptions, ServeWindowResult, WindowOptions } from './types';
+import type { ServeWindowOptions, ServeWindowResult, WindowOptions } from '../../desktop/types';
 
 export type {
     DesktopRuntimeName,
@@ -7,7 +7,7 @@ export type {
     ServeWindowResultExposed,
     ServeWindowResultPipe,
     WindowOptions,
-} from './types';
+} from '../../desktop/types';
 export {
     createWindow,
     createWindowServer,
@@ -22,7 +22,7 @@ export {
     windowSetSize,
     windowSetTitle,
     windowUnmaximize,
-} from './api';
+} from '../../desktop/api';
 
 declare global {
     function createWindow(opts: WindowOptions): void;

@@ -3,7 +3,7 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
 import { renderMaterializedNativeTree } from '../../native/native';
-import type { DesktopRenderOptions } from '../../shares/render-context';
+import type { DesktopRenderOptions } from '../../desktop/render-context';
 import { loadNativeEntryResult } from '../native';
 import type {
     DesktopNativeInteractionOutput,

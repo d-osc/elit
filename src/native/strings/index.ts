@@ -1,4 +1,4 @@
-import type { NativeNode } from './types';
+import type { NativeNode } from '../types';
 
 export function escapeKotlinString(value: string): string {
     return value

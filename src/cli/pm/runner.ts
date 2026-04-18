@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { createWriteStream, mkdirSync } from 'node:fs';
 import { EOL } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 

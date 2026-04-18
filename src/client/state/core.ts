@@ -1,4 +1,4 @@
-import type { State, StateOptions, VNode, VirtualListController } from '../../shares/types';
+import type { State, StateOptions, VNode, VirtualListController } from '../../core/types';
 import { dom } from '../dom';
 
 export const createState = <T>(initial: T, options?: StateOptions): State<T> =>

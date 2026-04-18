@@ -1,7 +1,8 @@
 import { dom } from '../../client/dom';
 import { lookup } from '../../shares/mime-types';
 import { isBun, isDeno } from '../../shares/runtime';
-import type { DevServer, DevServerOptions, HMRMessage, VNode } from '../../shares/types';
+import type { VNode } from '../../core/types';
+import type { DevServer, DevServerOptions, HMRMessage } from '../types';
 
 import { watch } from '../chokidar';
 import { readFile, realpath, stat } from '../fs';

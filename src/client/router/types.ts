@@ -1,4 +1,4 @@
-import type { Child, Props, State, VNode } from '../../shares/types';
+import type { Child, Props, State, VNode } from '../../core/types';
 
 export interface Route {
     path: string;

@@ -1,4 +1,4 @@
-import type { State } from '../../shares/types';
+import type { State } from '../../core/types';
 import { createState } from './core';
 
 const ELIT_INTERNAL_WS_PATH = '/__elit_ws';

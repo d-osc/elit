@@ -1,4 +1,4 @@
-import type { Child, Props, VNode } from '../../shares/types';
+import type { Child, Props, VNode } from '../../core/types';
 import { dom } from '../dom';
 
 export const scheduleRAFUpdate = (rafId: number | null, updateFn: () => void): number => {

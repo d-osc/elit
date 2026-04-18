@@ -1,4 +1,4 @@
-import type { Child } from '../../shares/types';
+import type { Child } from '../../core/types';
 import type {
     NativeElementNode,
     NativeNode,

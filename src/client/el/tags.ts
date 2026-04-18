@@ -1,4 +1,4 @@
-import type { ElementFactory } from '../../shares/types';
+import type { ElementFactory } from '../../core/types';
 
 export const tags = [
     'html', 'head', 'body', 'title', 'base', 'link', 'meta', 'style',

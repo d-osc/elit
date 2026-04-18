@@ -1,5 +1,5 @@
 // Client-side only exports
-export type * from '../shares/types';
+export type * from '../types';
 export * from './dom';
 export * from './state';
 export * from './style';

@@ -1,4 +1,4 @@
-import type { Child, Props } from '../../shares/types';
+import type { Child, Props } from '../../core/types';
 import { isState, resolveTextareaValue, shouldSkipChild } from './helpers';
 
 const SELF_CLOSING_TAGS = new Set([

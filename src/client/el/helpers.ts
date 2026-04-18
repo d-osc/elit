@@ -1,4 +1,4 @@
-import type { Child } from '../../shares/types';
+import type { Child } from '../../core/types';
 
 export const hasDocument = typeof document !== 'undefined';
 

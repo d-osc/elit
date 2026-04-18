@@ -1,4 +1,4 @@
-import type { Props, State } from '../../shares/types';
+import type { Props, State } from '../../core/types';
 
 export function resolveElement(rootElement: string | HTMLElement): HTMLElement | null {
     return typeof rootElement === 'string'

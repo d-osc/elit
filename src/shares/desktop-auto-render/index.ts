@@ -1,2 +1,1 @@
-export { completeDesktopAutoRender } from './complete';
-export { installDesktopRenderTracking } from './tracking';
+export * from '../../desktop/auto-render';

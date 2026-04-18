@@ -1,8 +1,9 @@
 import { loadConfig, loadEnv, mergeConfig, resolveConfigPath } from '../../shares/config';
-import type { BuildOptions, BuildResult, DevServerOptions, PreviewOptions } from '../../shares/types';
-import { build } from '../../tools/build';
-import { buildStandaloneDevServer } from '../../tools/dev-build';
-import { buildStandalonePreviewServer } from '../../tools/preview-build';
+import type { BuildOptions, BuildResult } from '../../build/contracts';
+import type { DevServerOptions, PreviewOptions } from '../../server/types';
+import { build } from '../../build';
+import { buildStandaloneDevServer } from '../../dev-build';
+import { buildStandalonePreviewServer } from '../../preview-build';
 
 import { parseArgs, type ArgHandler } from './shared';
 

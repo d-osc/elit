@@ -1,6 +1,6 @@
 import type { NativePlatform } from '../../native/native';
-import type { DesktopRenderOptions } from '../../shares/render-context';
-import type { Child } from '../../shares/types';
+import type { DesktopRenderOptions } from '../../desktop/render-context';
+import type { Child } from '../../core/types';
 
 export type NativeTarget = 'android' | 'ios' | 'ir';
 export type NativeEntryRuntimeTarget = 'mobile' | 'desktop';

@@ -3,7 +3,8 @@ import { join, resolve, sep } from '../path';
 import { normalizeSmtpServerConfigs } from '../smtp-server';
 import type { IncomingMessage, ServerResponse } from '../http';
 import type { ResolvedElitSMTPServerConfig } from '../smtp-server';
-import type { Child, DevServerOptions, WebSocketEndpointConfig } from '../../shares/types';
+import type { Child } from '../../core/types';
+import type { DevServerOptions, WebSocketEndpointConfig } from '../types';
 
 import type { ServerRouter } from './router';
 

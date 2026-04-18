@@ -1,5 +1,5 @@
 import { ELIT_NATIVE_BINDING, type NativeBindingMetadata } from '../../client/state';
-import type { Child, Props, VNode } from '../../shares/types';
+import type { Child, Props, VNode } from '../../core/types';
 import type {
     NativeBindingReference,
     NativeElementNode,

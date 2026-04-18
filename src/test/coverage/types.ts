@@ -1,4 +1,4 @@
-import type { TestCoverageReporter } from '../../shares/types';
+import type { TestCoverageReporter } from '../contracts';
 
 export interface CoverageOptions {
     reportsDirectory: string;
