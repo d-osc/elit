@@ -17,6 +17,8 @@ export const DEFAULT_LOG_LINES = 40;
 export const DEFAULT_PM_STOP_POLL_MS = 100;
 export const DEFAULT_PM_STOP_GRACE_PERIOD_MS = 5000;
 export const DEFAULT_PM_KILL_TIMEOUT = DEFAULT_PM_STOP_GRACE_PERIOD_MS;
+export const DEFAULT_PM_EXP_BACKOFF_MAX_DELAY = 15000;
+export const DEFAULT_PM_MEMORY_CHECK_INTERVAL = 500;
 export const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
 export const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
 export const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
@@ -57,6 +59,9 @@ export interface PmSavedAppDefinition {
     password?: string;
     wapkRun?: WapkRunConfig;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
     waitReady: boolean;
     listenTimeout: number;
     autorestart: boolean;
@@ -88,6 +93,9 @@ export interface ParsedPmStartArgs {
     maxRestarts?: number;
     password?: string;
     restartPolicy?: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
     waitReady?: boolean;
     listenTimeout?: number;
     minUptime?: number;
@@ -122,6 +130,9 @@ export interface ResolvedPmAppDefinition {
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
     waitReady: boolean;
     listenTimeout: number;
     minUptime: number;
@@ -153,6 +164,9 @@ export interface PmRecord {
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
     waitReady: boolean;
     listenTimeout: number;
     minUptime: number;
@@ -206,6 +220,6 @@ export interface ParsedPmRunnerArgs {
 }
 
 export interface PmRestartRequest {
-    kind: 'watch' | 'health' | 'startup';
+    kind: 'watch' | 'health' | 'startup' | 'memory' | 'cron';
     detail: string;
 }

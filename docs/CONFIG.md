@@ -188,6 +188,9 @@ pm: {
       instances: 2,
       runtime: 'node',
       restartPolicy: 'on-failure',
+      maxMemory: '256M',
+      cronRestart: '0 4 * * *',
+      expBackoffRestartDelay: 200,
       waitReady: true,
       listenTimeout: 5000,
       killTimeout: 12000,
@@ -257,7 +260,9 @@ Notes:
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
 - `instances` starts multiple managed children for one app name, and `elit pm scale <name> <count>` updates that count later.
+- `maxMemory` accepts raw bytes or strings like `256M`, `cronRestart` accepts a cron string or `@every 30s`, and `expBackoffRestartDelay` doubles unstable restart delays up to `15000ms`.
 - `waitReady` keeps the app in `starting` until its `healthCheck` succeeds, while `listenTimeout` caps how long startup may wait.
+- `elit pm reload <name>` now waits for each replacement instance to become `online` before moving to the next one, so readiness-aware HTTP groups can roll with less disruption.
 - `killTimeout` sets the per-app grace window before Elit forcefully terminates a stop or restart.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.

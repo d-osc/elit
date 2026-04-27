@@ -68,6 +68,12 @@ export interface PmAppConfig {
     wapkRun?: WapkRunConfig;
     /** Restart strategy used after the child process exits */
     restartPolicy?: PmRestartPolicy;
+    /** Restart the process when it uses more than this many bytes, or a size string like 256M */
+    maxMemory?: number | string;
+    /** Restart schedule using a cron expression or @every <duration> */
+    cronRestart?: string;
+    /** Exponential restart backoff base delay in milliseconds for unstable restarts */
+    expBackoffRestartDelay?: number;
     /** Wait for the health check to succeed before marking the process online */
     waitReady?: boolean;
     /** Maximum startup wait time in milliseconds when waitReady is enabled */

@@ -60,6 +60,45 @@ export function normalizeIntegerOption(value: string, optionName: string, min = 
     return parsed;
 }
 
+export function normalizePmMemoryLimit(value: unknown, optionName = '--max-memory'): number | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value === 'number') {
+        const normalized = Math.trunc(value);
+        if (!Number.isFinite(normalized) || normalized < 1) {
+            throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+        }
+
+        return normalized;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+    }
+
+    const normalized = value.trim();
+    const match = /^(\d+)(b|kb|mb|gb|tb|k|m|g|t)?$/i.exec(normalized);
+    if (!match) {
+        throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+    }
+
+    const amount = normalizeIntegerOption(match[1] ?? '', optionName, 1);
+    const unit = (match[2] ?? 'b').toLowerCase();
+    const multiplier = unit === 'b'
+        ? 1
+        : unit === 'k' || unit === 'kb'
+            ? 1024
+            : unit === 'm' || unit === 'mb'
+                ? 1024 ** 2
+                : unit === 'g' || unit === 'gb'
+                    ? 1024 ** 3
+                    : 1024 ** 4;
+
+    return amount * multiplier;
+}
+
 export function normalizeNonEmptyString(value: unknown): string | undefined {
     if (typeof value !== 'string') {
         return undefined;

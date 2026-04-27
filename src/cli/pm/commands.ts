@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { EOL } from 'node:os';
 
@@ -21,8 +20,10 @@ import {
     ensurePmDirectories,
     findPmRecordMatch,
     findPmGroupMatches,
+    getPmRecordPath,
     listPmRecordMatches,
     readPmDumpFile,
+    readPmRecord,
     resolvePmPaths,
     syncPmRecordLiveness,
     writePmRecord,
@@ -31,7 +32,7 @@ import {
     toSavedPmAppConfig,
     writePmDumpFile,
 } from './records';
-import { sendPmSignal, startManagedProcess } from './process';
+import { samplePmProcessMetrics, sendPmSignal, startManagedProcess } from './process';
 import { runPmRunner, stopPmMatches } from './runner';
 
 const PM_SIGNAL_NAMES = new Set<NodeJS.Signals>([
@@ -235,6 +236,35 @@ function groupPmMatchesByBaseName(matches: PmRecordMatch[]): PmRecordMatch[][] {
         .map(([, group]) => sortPmMatchesByInstance(group));
 }
 
+async function waitForPmRecordOnline(filePath: string, timeoutMs: number): Promise<PmRecord> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        if (!existsSync(filePath)) {
+            break;
+        }
+
+        const record = readPmRecord(filePath);
+        if (record.status === 'online') {
+            return record;
+        }
+
+        if (record.status === 'errored' || record.status === 'exited' || record.status === 'stopped') {
+            throw new Error(record.error ?? `Process ${record.name} failed while reloading.`);
+        }
+
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+    }
+
+    throw new Error(`Timed out waiting for the reloaded process to become online after ${timeoutMs}ms.`);
+}
+
+function resolvePmReloadReadyTimeout(record: Pick<PmRecord, 'waitReady' | 'listenTimeout' | 'restartDelay'>): number {
+    return record.waitReady
+        ? Math.max(record.listenTimeout + 1000, 2000)
+        : Math.max(record.restartDelay + 1000, 2000);
+}
+
 function padCell(value: string, width: number): string {
     return value.length >= width ? value : `${value}${' '.repeat(width - value.length)}`;
 }
@@ -285,74 +315,13 @@ function resolvePmUptimeMs(record: PmRecord): number | undefined {
     return Math.max(0, Date.now() - startedTime);
 }
 
-function sampleWindowsPmProcessMetrics(pid: number): Pick<PmLiveMetrics, 'cpuPercent' | 'memoryRssBytes'> {
-    const script = [
-        '$ErrorActionPreference = "Stop"',
-        `$sample = Get-CimInstance -ClassName Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess = ${pid}" | Select-Object -First 1`,
-        'if (-not $sample) { exit 2 }',
-        '$cpu = [double]$sample.PercentProcessorTime',
-        `$memory = if ($sample.PSObject.Properties.Match('WorkingSetPrivate').Count -gt 0) { [int64]$sample.WorkingSetPrivate } else { [int64](Get-Process -Id ${pid} -ErrorAction Stop).WorkingSet64 }`,
-        'Write-Output ($cpu.ToString([System.Globalization.CultureInfo]::InvariantCulture) + "," + $memory)',
-    ].join('; ');
-
-    const result = spawnSync(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
-        {
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-            windowsHide: true,
-        },
-    );
-
-    if (result.error || result.status !== 0) {
-        return {};
-    }
-
-    const [cpuText, memoryText] = result.stdout.trim().split(',');
-    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
-    const memoryRssBytes = Number.parseInt(memoryText ?? '', 10);
-
-    return {
-        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
-        memoryRssBytes: Number.isFinite(memoryRssBytes) ? memoryRssBytes : undefined,
-    };
-}
-
-function samplePosixPmProcessMetrics(pid: number): Pick<PmLiveMetrics, 'cpuPercent' | 'memoryRssBytes'> {
-    const result = spawnSync(
-        'ps',
-        ['-p', String(pid), '-o', '%cpu=', '-o', 'rss='],
-        {
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-            windowsHide: true,
-        },
-    );
-
-    if (result.error || result.status !== 0) {
-        return {};
-    }
-
-    const [cpuText, memoryText] = result.stdout.trim().split(/\s+/, 2);
-    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
-    const rssKilobytes = Number.parseInt(memoryText ?? '', 10);
-
-    return {
-        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
-        memoryRssBytes: Number.isFinite(rssKilobytes) ? rssKilobytes * 1024 : undefined,
-    };
-}
-
 function resolvePmLiveMetrics(record: PmRecord): PmLiveMetrics {
     const uptimeMs = resolvePmUptimeMs(record);
     if (!isPmRecordActive(record) || !record.childPid) {
         return { uptimeMs };
     }
 
-    const sampledMetrics = process.platform === 'win32'
-        ? sampleWindowsPmProcessMetrics(record.childPid)
-        : samplePosixPmProcessMetrics(record.childPid);
+    const sampledMetrics = samplePmProcessMetrics(record.childPid);
 
     return {
         ...sampledMetrics,
@@ -581,6 +550,9 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'child pid', record.childPid ? String(record.childPid) : '-');
     pushPmDetail(lines, 'restart count', `${record.restartCount}/${record.maxRestarts}`);
     pushPmDetail(lines, 'restart policy', record.restartPolicy);
+    pushPmDetail(lines, 'max memory', record.maxMemoryBytes ? formatPmMemory(record.maxMemoryBytes) : '-');
+    pushPmDetail(lines, 'cron restart', record.cronRestart ?? '-');
+    pushPmDetail(lines, 'exp backoff', record.expBackoffRestartDelay ? formatPmDuration(record.expBackoffRestartDelay) : '-');
     pushPmDetail(lines, 'wait ready', record.waitReady ? 'enabled' : 'disabled');
     pushPmDetail(lines, 'listen timeout', record.waitReady ? formatPmDuration(record.listenTimeout) : '-');
     pushPmDetail(lines, 'restart delay', formatPmDuration(record.restartDelay));
@@ -741,7 +713,11 @@ async function runPmReload(args: string[]): Promise<void> {
             try {
                 await stopPmMatches([match]);
                 const definition = rebuildPmRecordDefinition(match.record);
-                await startManagedProcess(definition, paths);
+                const startedRecord = await startManagedProcess(definition, paths);
+                await waitForPmRecordOnline(
+                    getPmRecordPath(paths, startedRecord.id),
+                    resolvePmReloadReadyTimeout(startedRecord),
+                );
                 reloaded.push(match.record.name);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);

@@ -229,6 +229,9 @@ Useful options:
 - `--archive-watch` and `--no-archive-watch` for WAPK archive pull sync
 - `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
+- `--max-memory <bytes|size>`
+- `--cron-restart <expr>`
+- `--exp-backoff-restart-delay <ms>`
 - `--wait-ready`
 - `--listen-timeout <ms>`
 - `--min-uptime <ms>`
@@ -250,10 +253,11 @@ Notes:
 
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
-- `pm reload <name|all>` performs a rolling stop/start across each matched instance.
+- `pm reload <name|all>` performs a rolling stop/start across each matched instance and waits for the replacement to return `online` before continuing.
 - `pm scale <name> <count>` changes the number of managed instances for a process group.
 - `pm reset <name|all>` clears restart counters plus saved exit/error metadata.
 - `pm send-signal <signal> <name|all>` forwards a signal like `SIGUSR2` or `TERM` to the current managed child process.
+- `maxMemory` accepts raw bytes or size strings like `256M`, `cronRestart` accepts a 5-field cron string or `@every 30s`, and `expBackoffRestartDelay` doubles unstable restart delays up to `15000ms`.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
 - `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.

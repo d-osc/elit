@@ -92,6 +92,71 @@ function inferRuntimeFromFile(filePath: string): PmRuntimeName {
     return 'node';
 }
 
+function sampleWindowsPmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    const script = [
+        '$ErrorActionPreference = "Stop"',
+        `$sample = Get-CimInstance -ClassName Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess = ${pid}" | Select-Object -First 1`,
+        'if (-not $sample) { exit 2 }',
+        '$cpu = [double]$sample.PercentProcessorTime',
+        `$memory = if ($sample.PSObject.Properties.Match('WorkingSetPrivate').Count -gt 0) { [int64]$sample.WorkingSetPrivate } else { [int64](Get-Process -Id ${pid} -ErrorAction Stop).WorkingSet64 }`,
+        'Write-Output ($cpu.ToString([System.Globalization.CultureInfo]::InvariantCulture) + "," + $memory)',
+    ].join('; ');
+
+    const result = spawnSync(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+        {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        },
+    );
+
+    if (result.error || result.status !== 0) {
+        return {};
+    }
+
+    const [cpuText, memoryText] = result.stdout.trim().split(',');
+    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
+    const memoryRssBytes = Number.parseInt(memoryText ?? '', 10);
+
+    return {
+        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
+        memoryRssBytes: Number.isFinite(memoryRssBytes) ? memoryRssBytes : undefined,
+    };
+}
+
+function samplePosixPmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    const result = spawnSync(
+        'ps',
+        ['-p', String(pid), '-o', '%cpu=', '-o', 'rss='],
+        {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        },
+    );
+
+    if (result.error || result.status !== 0) {
+        return {};
+    }
+
+    const [cpuText, memoryText] = result.stdout.trim().split(/\s+/, 2);
+    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
+    const rssKilobytes = Number.parseInt(memoryText ?? '', 10);
+
+    return {
+        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
+        memoryRssBytes: Number.isFinite(rssKilobytes) ? rssKilobytes * 1024 : undefined,
+    };
+}
+
+export function samplePmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    return process.platform === 'win32'
+        ? sampleWindowsPmProcessMetrics(pid)
+        : samplePosixPmProcessMetrics(pid);
+}
+
 export function isPmOnlineWapkRecord(record: Pick<PmRecord, 'type' | 'wapkRun'>): boolean {
     return record.type === 'wapk' && isPmWapkOnlineRunConfig(record.wapkRun);
 }
@@ -219,6 +284,9 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         maxRestarts: definition.maxRestarts,
         password: definition.password,
         restartPolicy: definition.restartPolicy,
+        maxMemoryBytes: definition.maxMemoryBytes,
+        cronRestart: definition.cronRestart,
+        expBackoffRestartDelay: definition.expBackoffRestartDelay,
         waitReady: definition.waitReady,
         listenTimeout: definition.listenTimeout,
         minUptime: definition.minUptime,

@@ -6,6 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { watch as createWatcher } from '../../server/chokidar';
 import {
     DEFAULT_PM_DUMP_FILE,
+    DEFAULT_PM_EXP_BACKOFF_MAX_DELAY,
+    DEFAULT_PM_MEMORY_CHECK_INTERVAL,
     DEFAULT_PM_STOP_POLL_MS,
     PM_WAPK_ONLINE_SHUTDOWN_COMMAND,
     PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS,
@@ -22,7 +24,8 @@ import {
     readLatestPmRecord,
     writePmRecord,
 } from './records';
-import { buildPmCommand, isPmOnlineWapkRecord, terminateProcessTree } from './process';
+import { parsePmRestartSchedule, resolveNextPmScheduleOccurrence } from './schedule';
+import { buildPmCommand, isPmOnlineWapkRecord, samplePmProcessMetrics, terminateProcessTree } from './process';
 
 function writePmLog(stream: { write: (value: string) => unknown; writableEnded?: boolean; destroyed?: boolean }, message: string): void {
     if (stream.writableEnded || stream.destroyed) {
@@ -320,6 +323,98 @@ function createPmHealthMonitor(
     };
 }
 
+function createPmMemoryMonitor(
+    record: PmRecord,
+    pid: number | undefined,
+    onFailure: (message: string) => void,
+) {
+    if (!record.maxMemoryBytes || !pid) {
+        return {
+            stop() {},
+        };
+    }
+
+    const memoryLimit = record.maxMemoryBytes;
+    let stopped = false;
+    const timer = setInterval(() => {
+        if (stopped) {
+            return;
+        }
+
+        const memoryRssBytes = samplePmProcessMetrics(pid).memoryRssBytes;
+        if (memoryRssBytes === undefined || memoryRssBytes <= memoryLimit) {
+            return;
+        }
+
+        stopped = true;
+        onFailure(`memory usage ${memoryRssBytes} exceeded limit ${memoryLimit}`);
+    }, DEFAULT_PM_MEMORY_CHECK_INTERVAL);
+    timer.unref?.();
+
+    return {
+        stop() {
+            stopped = true;
+            clearInterval(timer);
+        },
+    };
+}
+
+function createPmScheduleMonitor(
+    record: PmRecord,
+    onTrigger: (message: string) => void,
+    onLog: (message: string) => void,
+) {
+    if (!record.cronRestart) {
+        return {
+            stop() {},
+        };
+    }
+
+    const schedule = parsePmRestartSchedule(record.cronRestart, 'pm cronRestart');
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const armTimer = (from: Date = new Date()): void => {
+        const nextOccurrence = resolveNextPmScheduleOccurrence(schedule, from);
+        if (!nextOccurrence) {
+            onLog(`schedule has no next occurrence: ${record.cronRestart}`);
+            return;
+        }
+
+        const delayMs = Math.max(0, nextOccurrence.getTime() - Date.now());
+        timer = setTimeout(() => {
+            timer = null;
+            if (stopped) {
+                return;
+            }
+
+            onTrigger(`restart schedule matched: ${record.cronRestart}`);
+        }, delayMs);
+        timer.unref?.();
+    };
+
+    armTimer();
+
+    return {
+        stop() {
+            stopped = true;
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+        },
+    };
+}
+
+function resolvePmRestartDelay(record: PmRecord, restartCount: number, shouldApplyBackoff: boolean): number {
+    if (!shouldApplyBackoff || !record.expBackoffRestartDelay) {
+        return record.restartDelay;
+    }
+
+    const exponent = Math.max(0, restartCount - 1);
+    return Math.min(record.expBackoffRestartDelay * (2 ** exponent), DEFAULT_PM_EXP_BACKOFF_MAX_DELAY);
+}
+
 function readPlannedRestartRequest(state: { request: PmRestartRequest | null }) {
     return state.request;
 }
@@ -485,13 +580,13 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             }));
             writePmLog(stdoutLog, `started ${command.preview}${child.pid ? ` (pid ${child.pid})` : ''}`);
 
-            const requestPlannedRestart = (kind: 'watch' | 'health' | 'startup', detail: string): void => {
+            const requestPlannedRestart = (kind: PmRestartRequest['kind'], detail: string): void => {
                 if (stopRequested || restartState.request) {
                     return;
                 }
 
                 restartState.request = { kind, detail };
-                writePmLog(kind === 'watch' ? stdoutLog : stderrLog, `${kind} restart requested: ${detail}`);
+                writePmLog(kind === 'watch' || kind === 'cron' ? stdoutLog : stderrLog, `${kind} restart requested: ${detail}`);
                 persist((current) => ({
                     ...current,
                     status: 'restarting',
@@ -501,6 +596,12 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             };
 
             let healthMonitor = {
+                stop() {},
+            };
+            let memoryMonitor = {
+                stop() {},
+            };
+            let scheduleMonitor = {
                 stop() {},
             };
 
@@ -532,6 +633,16 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 (changedPath) => requestPlannedRestart('watch', changedPath),
                 (message) => writePmLog(stderrLog, `watch error: ${message}`),
             );
+            memoryMonitor = createPmMemoryMonitor(
+                latest,
+                child.pid,
+                (message) => requestPlannedRestart('memory', message),
+            );
+            scheduleMonitor = createPmScheduleMonitor(
+                latest,
+                (message) => requestPlannedRestart('cron', message),
+                (message) => writePmLog(stdoutLog, message),
+            );
             if (!waitingForReady) {
                 startHealthMonitor();
             }
@@ -549,6 +660,8 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             await watchController.close();
             readinessMonitor.stop();
             healthMonitor.stop();
+            memoryMonitor.stop();
+            scheduleMonitor.stop();
             clearActiveChildStopTimer();
 
             activeChild = null;
@@ -620,15 +733,16 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 error: undefined,
                 updatedAt: new Date().toISOString(),
             }));
+            const resolvedRestartDelay = resolvePmRestartDelay(current, nextRestartCount, shouldCountRestart && !wasStable);
             if (plannedRestart) {
                 writePmLog(
-                    plannedRestart.kind === 'health' ? stderrLog : stdoutLog,
-                    `restarting in ${current.restartDelay}ms after ${plannedRestart.kind}: ${plannedRestart.detail}`,
+                    plannedRestart.kind === 'health' || plannedRestart.kind === 'memory' || plannedRestart.kind === 'startup' ? stderrLog : stdoutLog,
+                    `restarting in ${resolvedRestartDelay}ms after ${plannedRestart.kind}: ${plannedRestart.detail}`,
                 );
             } else {
-                writePmLog(stdoutLog, `restarting in ${current.restartDelay}ms`);
+                writePmLog(stdoutLog, `restarting in ${resolvedRestartDelay}ms`);
             }
-            await delay(current.restartDelay);
+            await delay(resolvedRestartDelay);
         }
     } finally {
         stopRequested = true;

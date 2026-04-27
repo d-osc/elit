@@ -351,8 +351,9 @@ PM mode notes:
 - `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
 - `waitReady` uses the configured health check as a startup gate, and `listenTimeout` decides how long PM can stay in `starting` before it treats startup as failed.
 - `instances` starts a process group like `api`, `api:2`, `api:3`, and `elit pm scale <name> <count>` grows or shrinks that group later.
+- `maxMemory` restarts a process after it exceeds a memory limit, `cronRestart` accepts cron expressions or `@every 30s` shorthand, and `expBackoffRestartDelay` adds PM2-style unstable restart backoff.
 - `killTimeout` gives each PM app its own grace window before Elit escalates stop or restart to a forceful kill.
-- `elit pm reload <name|all>` now performs a rolling stop/start across each matched instance in a process group.
+- `elit pm reload <name|all>` now performs a rolling stop/start across each matched instance in a process group and waits for each replacement to become `online` before it moves on.
 - `elit pm reset <name|all>` clears restart counters and saved exit metadata without deleting the process record.
 - `elit pm send-signal <signal> <name|all>` forwards a signal such as `SIGUSR2` or `TERM` to the active managed child process.
 - Use `elit pm list`, `elit pm list --json`, `elit pm show`, `elit pm describe --json`, `elit pm stop`, `elit pm restart`, `elit pm reload`, `elit pm reset`, `elit pm send-signal`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.

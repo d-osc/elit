@@ -443,6 +443,53 @@ describe('pm cli process inspection', () => {
         expect(configDefinitions[0]?.listenTimeout).toBe(7000);
     });
 
+    it('resolves maxMemory, cronRestart, and expBackoffRestartDelay from pm start arguments and config definitions', () => {
+        const workspaceRoot = join(process.cwd(), 'pm-restart-policy-config');
+        const cliDefinitions = resolvePmStartDefinitions(
+            parsePmStartArgs([
+                '--script', 'npm run api',
+                '--name', 'api',
+                '--max-memory', '128M',
+                '--cron-restart', '@every 1s',
+                '--exp-backoff-restart-delay', '250',
+            ]),
+            null,
+            workspaceRoot,
+        );
+        const configDefinitions = resolvePmStartDefinitions(
+            {
+                name: 'worker',
+                env: {},
+                watchPaths: [],
+                watchIgnore: [],
+            },
+            {
+                pm: {
+                    apps: [
+                        {
+                            name: 'worker',
+                            file: './src/worker.ts',
+                            runtime: 'bun',
+                            maxMemory: '256M',
+                            cronRestart: '*/5 * * * *',
+                            expBackoffRestartDelay: 400,
+                        },
+                    ],
+                },
+            },
+            workspaceRoot,
+        );
+
+        expect(cliDefinitions).toHaveLength(1);
+        expect(cliDefinitions[0]?.maxMemoryBytes).toBe(128 * 1024 * 1024);
+        expect(cliDefinitions[0]?.cronRestart).toBe('@every 1s');
+        expect(cliDefinitions[0]?.expBackoffRestartDelay).toBe(250);
+        expect(configDefinitions).toHaveLength(1);
+        expect(configDefinitions[0]?.maxMemoryBytes).toBe(256 * 1024 * 1024);
+        expect(configDefinitions[0]?.cronRestart).toBe('*/5 * * * *');
+        expect(configDefinitions[0]?.expBackoffRestartDelay).toBe(400);
+    });
+
     it('resolves killTimeout from pm start arguments and config definitions', () => {
         const workspaceRoot = join(process.cwd(), 'pm-kill-timeout-config');
         const cliDefinitions = resolvePmStartDefinitions(
@@ -718,11 +765,25 @@ describe('pm control commands', () => {
         const entryFile = join(workspaceRoot, 'reload-app.js');
         mkdirSync(appsDir, { recursive: true });
         writeFileSync(entryFile, [
-            'setInterval(() => {}, 1000);',
-            'const shutdown = () => process.exit(0);',
+            'const http = require("node:http");',
+            'let server;',
+            'setTimeout(() => {',
+            '  server = http.createServer((req, res) => {',
+            '    res.statusCode = req.url === "/health" ? 200 : 404;',
+            '    res.end("ok");',
+            '  });',
+            '  server.listen(Number(process.env.PORT), "127.0.0.1");',
+            '}, 150);',
+            'const shutdown = () => {',
+            '  if (server) { server.close(() => process.exit(0)); return; }',
+            '  process.exit(0);',
+            '};',
             'process.on("SIGTERM", shutdown);',
             'process.on("SIGINT", shutdown);',
         ].join('\n'));
+
+        const portA = 43950 + Math.floor(Math.random() * 200);
+        const portB = portA + 1;
 
         const records = [
             createPmInstanceRecord(workspaceRoot, 'api', 1, 2, {
@@ -734,9 +795,21 @@ describe('pm control commands', () => {
                 restartPolicy: 'never',
                 maxRestarts: 0,
                 minUptime: 0,
+                env: {
+                    PORT: String(portA),
+                },
                 watch: false,
                 watchPaths: [],
                 watchIgnore: [],
+                waitReady: true,
+                listenTimeout: 1500,
+                healthCheck: {
+                    url: `http://127.0.0.1:${portA}/health`,
+                    gracePeriod: 0,
+                    interval: 100,
+                    timeout: 100,
+                    maxFailures: 1,
+                },
             }),
             createPmInstanceRecord(workspaceRoot, 'api', 2, 2, {
                 type: 'file',
@@ -747,9 +820,21 @@ describe('pm control commands', () => {
                 restartPolicy: 'never',
                 maxRestarts: 0,
                 minUptime: 0,
+                env: {
+                    PORT: String(portB),
+                },
                 watch: false,
                 watchPaths: [],
                 watchIgnore: [],
+                waitReady: true,
+                listenTimeout: 1500,
+                healthCheck: {
+                    url: `http://127.0.0.1:${portB}/health`,
+                    gracePeriod: 0,
+                    interval: 100,
+                    timeout: 100,
+                    maxFailures: 1,
+                },
             }),
         ];
         for (const record of records) {
@@ -763,20 +848,19 @@ describe('pm control commands', () => {
         try {
             await runPmCommand(['reload', 'api']);
 
-            const baseRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'api', 5000);
-            const secondRecord = await waitForRecord(
-                workspaceRoot,
-                (current) => current.status === 'online' && Boolean(current.childPid),
-                sanitizePmProcessName('api:2'),
-                5000,
-            );
+            const baseRecord = readWorkspacePmRecord(workspaceRoot, 'api');
+            const secondRecord = readWorkspacePmRecord(workspaceRoot, sanitizePmProcessName('api:2'));
 
             expect(logSpy._calls.length).toBe(1);
             expect(String(logSpy._calls[0]?.[0] ?? '')).toContain('reloaded api, api:2');
             expect(baseRecord.name).toBe('api');
             expect(baseRecord.instances).toBe(2);
+            expect(baseRecord.status).toBe('online');
+            expect(Boolean(baseRecord.childPid)).toBe(true);
             expect(secondRecord.name).toBe('api:2');
             expect(secondRecord.instances).toBe(2);
+            expect(secondRecord.status).toBe('online');
+            expect(Boolean(secondRecord.childPid)).toBe(true);
 
             await runPmCommand(['stop', 'api']);
         } finally {
@@ -921,5 +1005,161 @@ describe('pm runner readiness', () => {
             rmSync(workspaceRoot, { recursive: true, force: true });
         }
     });
+
+    it('restarts when the process exceeds maxMemoryBytes', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-memory-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'memory-app.js');
+        writeFileSync(entryFile, [
+            'setInterval(() => {}, 1000);',
+            'process.on("SIGTERM", () => process.exit(0));',
+            'process.on("SIGINT", () => process.exit(0));',
+        ].join('\n'));
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'memory-app',
+            name: 'memory-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'never',
+            maxRestarts: 0,
+            minUptime: 0,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            maxMemoryBytes: 1,
+            logFiles: {
+                out: join(logsDir, 'memory-app.out.log'),
+                err: join(logsDir, 'memory-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'memory-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        const loopPromise = runManagedProcessLoop(recordPath, record);
+
+        try {
+            const erroredRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'errored', 'memory-app', 5000);
+            expect(erroredRecord.error).toContain('memory');
+            await loopPromise;
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    });
+
+    it('uses exponential backoff delay for unstable restarts', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-backoff-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'crash-app.js');
+        writeFileSync(entryFile, 'process.exit(1);');
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'backoff-app',
+            name: 'backoff-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'always',
+            restartDelay: 10,
+            expBackoffRestartDelay: 200,
+            maxRestarts: 2,
+            minUptime: 0,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            logFiles: {
+                out: join(logsDir, 'backoff-app.out.log'),
+                err: join(logsDir, 'backoff-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'backoff-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        await runManagedProcessLoop(recordPath, record);
+
+        const finalRecord = readWorkspacePmRecord(workspaceRoot, 'backoff-app');
+        const stdoutLog = readFileSync(join(logsDir, 'backoff-app.out.log'), 'utf8');
+
+        try {
+            expect(finalRecord.status).toBe('errored');
+            expect(stdoutLog).toContain('restarting in 200ms');
+            expect(stdoutLog).toContain('restarting in 400ms');
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 12000);
+
+    it('restarts on cronRestart schedules', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-cron-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'cron-app.js');
+        writeFileSync(entryFile, [
+            'setInterval(() => {}, 1000);',
+            'process.on("SIGTERM", () => process.exit(0));',
+            'process.on("SIGINT", () => process.exit(0));',
+        ].join('\n'));
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'cron-app',
+            name: 'cron-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'never',
+            cronRestart: '@every 1s',
+            maxRestarts: 0,
+            minUptime: 0,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            logFiles: {
+                out: join(logsDir, 'cron-app.out.log'),
+                err: join(logsDir, 'cron-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'cron-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        const loopPromise = runManagedProcessLoop(recordPath, record);
+
+        try {
+            const erroredRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'errored', 'cron-app', 5000);
+            expect(erroredRecord.error).toContain('cron');
+            await loopPromise;
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 12000);
 });
 
