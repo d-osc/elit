@@ -197,6 +197,9 @@ Forms:
 - `elit pm start`
 - `elit pm start my-app`
 - `elit pm list`
+- `elit pm list --json`
+- `elit pm show <name>`
+- `elit pm describe <name> --json`
 - `elit pm stop <name|all>`
 - `elit pm restart <name|all>`
 - `elit pm delete <name|all>`
@@ -241,6 +244,9 @@ Notes:
 - `pm start <name>` resolves one configured app by name.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
+- `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.
+- `pm list --json` and `pm jlist` return machine-readable process records for tooling and CI, including `liveMetrics` when the child process is running.
+- `pm show <name>` prints the stored runtime metadata for one process, and `pm describe <name> --json` exposes the same record plus `liveMetrics` as JSON.
 - PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
 - `pm stop`, `pm restart`, and `pm delete` close PM-managed online WAPK share sessions before the process exits.
 - Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.
@@ -324,6 +330,8 @@ elit pm start --script "npm start" --name my-app --runtime node
 elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure
 elit pm start ./src/worker.ts --name worker --runtime bun
 elit pm start --wapk ./app.wapk --name packaged-app
+elit pm list --json
+elit pm show my-app
 elit pm save
 elit pm resurrect
 elit pm logs my-app --lines 100
