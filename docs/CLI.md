@@ -236,6 +236,7 @@ Useful options:
 - `--health-max-failures <count>`
 - `--no-autorestart`
 - `--restart-delay <ms>`
+- `--kill-timeout <ms>`
 - `--max-restarts <count>`
 
 Notes:
@@ -247,6 +248,7 @@ Notes:
 - `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.
 - `pm list --json` and `pm jlist` return machine-readable process records for tooling and CI, including `liveMetrics` when the child process is running.
 - `pm show <name>` prints the stored runtime metadata for one process, and `pm describe <name> --json` exposes the same record plus `liveMetrics` as JSON.
+- `killTimeout` controls how long PM waits before escalating a stop or restart to forceful termination.
 - PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
 - `pm stop`, `pm restart`, and `pm delete` close PM-managed online WAPK share sessions before the process exits.
 - Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.

@@ -56,6 +56,8 @@ export interface PmAppConfig {
     autorestart?: boolean;
     /** Delay between restart attempts in milliseconds */
     restartDelay?: number;
+    /** Grace period before a stop or restart escalates to forceful termination */
+    killTimeout?: number;
     /** Maximum restart attempts before marking the process as errored */
     maxRestarts?: number;
     /** Password forwarded to elit wapk run for locked archives */

@@ -262,6 +262,7 @@ Useful flags:
 - `elit native generate ios ./src/native-screen.ts --out ./ios/HomeScreen.swift --no-preview`
 - `elit native generate ir ./src/native-screen.ts --platform android --export screen`
 - `elit pm start --script "npm start" --name my-app --runtime node`
+- `elit pm start --script "npm start" --name my-app --kill-timeout 12000`
 - `elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure`
 - `elit pm start ./src/worker.ts --name worker --runtime bun`
 - `elit pm start --wapk ./app.wapk --name packaged-app`
@@ -345,6 +346,7 @@ PM mode notes:
 - `elit pm start --script "npm start"`, `elit pm start --file ./app.ts`, and `elit pm start --wapk ./app.wapk` all run through the same detached process manager.
 - WAPK PM targets can also point at `gdrive://<fileId>` or use `pm.apps[].wapkRun.googleDrive` plus forwarded WAPK run flags like `online`, `onlineUrl`, `syncInterval`, `watcher`, and `watchArchive`.
 - `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
+- `killTimeout` gives each PM app its own grace window before Elit escalates stop or restart to a forceful kill.
 - Use `elit pm list`, `elit pm list --json`, `elit pm show`, `elit pm describe --json`, `elit pm stop`, `elit pm restart`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
 - PM-managed WAPK online hosts close their Elit Run shared session when you use `elit pm stop`, `elit pm restart`, or `elit pm delete`.
 - Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.

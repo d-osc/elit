@@ -6,7 +6,6 @@ import { dirname, join, resolve } from 'node:path';
 import { watch as createWatcher } from '../../server/chokidar';
 import {
     DEFAULT_PM_DUMP_FILE,
-    DEFAULT_PM_STOP_GRACE_PERIOD_MS,
     DEFAULT_PM_STOP_POLL_MS,
     PM_WAPK_ONLINE_SHUTDOWN_COMMAND,
     PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS,
@@ -43,6 +42,14 @@ function waitForExit(code: number | null, signal: string | null): number {
 
 async function delay(milliseconds: number): Promise<void> {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+}
+
+function resolvePmStopTimeout(record: PmRecord): number {
+    if (isPmOnlineWapkRecord(record)) {
+        return Math.max(record.killTimeout, PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS);
+    }
+
+    return record.killTimeout;
 }
 
 export async function waitForProcessTermination(pid: number | undefined, timeoutMs: number): Promise<boolean> {
@@ -238,26 +245,32 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
         }
     };
 
+    const scheduleForcedActiveChildStop = (timeoutMs: number, reason: string): void => {
+        if (!activeChild?.pid || process.platform === 'win32') {
+            return;
+        }
+
+        clearActiveChildStopTimer();
+        activeChildStopTimer = setTimeout(() => {
+            if (activeChild?.pid && isProcessAlive(activeChild.pid)) {
+                writePmLog(stderrLog, `${reason} after ${timeoutMs}ms; forcing process termination`);
+                terminateProcessTree(activeChild.pid, { force: true });
+            }
+        }, timeoutMs);
+        activeChildStopTimer.unref?.();
+    };
+
     const stopActiveChild = (): void => {
         if (!activeChild?.pid || !isProcessAlive(activeChild.pid)) {
             return;
         }
 
         const current = readLatestPmRecord(filePath, record);
+        const stopTimeout = resolvePmStopTimeout(current);
         if (isPmOnlineWapkRecord(current) && activeChild.stdin && !activeChild.stdin.destroyed && activeChild.stdin.writable) {
             try {
                 activeChild.stdin.end(`${PM_WAPK_ONLINE_SHUTDOWN_COMMAND}\n`);
-                clearActiveChildStopTimer();
-                activeChildStopTimer = setTimeout(() => {
-                    if (activeChild?.pid && isProcessAlive(activeChild.pid)) {
-                        writePmLog(
-                            stderrLog,
-                            `graceful WAPK online shutdown timed out after ${PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS}ms; forcing process termination`,
-                        );
-                        terminateProcessTree(activeChild.pid);
-                    }
-                }, PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS);
-                activeChildStopTimer.unref?.();
+                scheduleForcedActiveChildStop(stopTimeout, 'graceful WAPK online shutdown timed out');
                 return;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -266,6 +279,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
         }
 
         terminateProcessTree(activeChild.pid);
+        scheduleForcedActiveChildStop(stopTimeout, 'graceful shutdown timed out');
     };
 
     const requestManagedStop = (reason: string): void => {
@@ -569,19 +583,20 @@ export async function stopPmMatches(matches: PmRecordMatch[]): Promise<number> {
         };
         writePmRecord(match.filePath, updated);
 
-        const runnerStopped = await waitForProcessTermination(match.record.runnerPid, DEFAULT_PM_STOP_GRACE_PERIOD_MS);
+        const stopTimeout = resolvePmStopTimeout(match.record);
+        const runnerStopped = await waitForProcessTermination(match.record.runnerPid, stopTimeout);
         const childStopped = await waitForProcessTermination(
             match.record.childPid,
-            runnerStopped ? DEFAULT_PM_STOP_POLL_MS : DEFAULT_PM_STOP_GRACE_PERIOD_MS,
+            runnerStopped ? DEFAULT_PM_STOP_POLL_MS : stopTimeout,
         );
 
         if (!runnerStopped && match.record.runnerPid && isProcessAlive(match.record.runnerPid)) {
-            terminateProcessTree(match.record.runnerPid);
+            terminateProcessTree(match.record.runnerPid, { force: true });
             await waitForProcessTermination(match.record.runnerPid, DEFAULT_PM_STOP_POLL_MS);
         }
 
         if (!childStopped && match.record.childPid && isProcessAlive(match.record.childPid)) {
-            terminateProcessTree(match.record.childPid);
+            terminateProcessTree(match.record.childPid, { force: true });
             await waitForProcessTermination(match.record.childPid, DEFAULT_PM_STOP_POLL_MS);
         }
 

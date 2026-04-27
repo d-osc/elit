@@ -212,6 +212,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         wapkRun: definition.wapkRun,
         autorestart: definition.autorestart,
         restartDelay: definition.restartDelay,
+        killTimeout: definition.killTimeout,
         maxRestarts: definition.maxRestarts,
         password: definition.password,
         restartPolicy: definition.restartPolicy,
@@ -240,7 +241,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
     };
 }
 
-export function terminateProcessTree(pid: number): void {
+export function terminateProcessTree(pid: number, options?: { force?: boolean }): void {
     if (process.platform === 'win32') {
         const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
             stdio: 'ignore',
@@ -255,7 +256,7 @@ export function terminateProcessTree(pid: number): void {
     }
 
     try {
-        process.kill(pid, 'SIGTERM');
+        process.kill(pid, options?.force ? 'SIGKILL' : 'SIGTERM');
     } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code !== 'ESRCH') {

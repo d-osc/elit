@@ -413,6 +413,7 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'restart count', `${record.restartCount}/${record.maxRestarts}`);
     pushPmDetail(lines, 'restart policy', record.restartPolicy);
     pushPmDetail(lines, 'restart delay', formatPmDuration(record.restartDelay));
+    pushPmDetail(lines, 'kill timeout', formatPmDuration(record.killTimeout));
     pushPmDetail(lines, 'min uptime', formatPmDuration(record.minUptime));
     pushPmDetail(lines, 'autorestart', record.autorestart ? 'enabled' : 'disabled');
     pushPmDetail(lines, 'watch', record.watch ? 'enabled' : 'disabled');

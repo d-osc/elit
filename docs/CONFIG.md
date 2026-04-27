@@ -187,6 +187,7 @@ pm: {
       script: 'npm start',
       runtime: 'node',
       restartPolicy: 'on-failure',
+      killTimeout: 12000,
       minUptime: 5000,
       watch: true,
       watchPaths: ['./src', './package.json'],
@@ -252,6 +253,7 @@ Notes:
 - `pm.apps[].wapkRun.file` or `pm.apps[].wapkRun.googleDrive.fileId` can define the WAPK archive source even when `wapk` is omitted.
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
+- `killTimeout` sets the per-app grace window before Elit forcefully terminates a stop or restart.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.
 - `online` and `onlineUrl` inside `wapkRun` turn a PM-managed WAPK app into an Elit Run host instead of a local runtime.

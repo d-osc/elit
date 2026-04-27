@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import type { ElitConfig, PmAppConfig } from '../../shares/config';
 import {
+    DEFAULT_PM_KILL_TIMEOUT,
     DEFAULT_MAX_RESTARTS,
     DEFAULT_MIN_UPTIME,
     DEFAULT_RESTART_DELAY,
@@ -197,6 +198,7 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         wapkRun,
         autorestart,
         restartDelay: parsed.restartDelay ?? base?.restartDelay ?? DEFAULT_RESTART_DELAY,
+        killTimeout: parsed.killTimeout ?? base?.killTimeout ?? DEFAULT_PM_KILL_TIMEOUT,
         maxRestarts: parsed.maxRestarts ?? base?.maxRestarts ?? DEFAULT_MAX_RESTARTS,
         password,
         restartPolicy,
@@ -390,6 +392,9 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             case '--restart-delay':
                 parsed.restartDelay = normalizeIntegerOption(readRequiredValue(args, ++index, '--restart-delay'), '--restart-delay');
                 break;
+            case '--kill-timeout':
+                parsed.killTimeout = normalizeIntegerOption(readRequiredValue(args, ++index, '--kill-timeout'), '--kill-timeout', 1);
+                break;
             case '--max-restarts':
                 parsed.maxRestarts = normalizeIntegerOption(readRequiredValue(args, ++index, '--max-restarts'), '--max-restarts');
                 break;
@@ -481,6 +486,7 @@ export function printPmHelp(): void {
         '  --health-max-failures <n>   Consecutive failures before restart (default 3)',
         '  --no-autorestart            Disable automatic restart',
         '  --restart-delay <ms>        Delay between restart attempts (default 1000)',
+        '  --kill-timeout <ms>         Grace period before force-killing a stop or restart (default 5000)',
         '  --max-restarts <count>      Maximum restart attempts (default 10)',
         '',
         'Config:',
@@ -504,6 +510,7 @@ export function printPmHelp(): void {
         '  - elit pm save persists running apps to pm.dumpFile or ./.elit/pm/dump.json.',
         '  - elit pm resurrect restarts whatever was last saved by elit pm save.',
         '  - elit pm start <name> starts a configured app by name.',
+        '  - killTimeout controls how long PM waits before force-killing an app that ignores stop or restart requests.',
         '  - elit pm list shows live cpu, memory, and uptime columns when the child process is running.',
         '  - elit pm list --json and elit pm jlist print machine-readable process state.',
         '  - elit pm list --json, elit pm show --json, and elit pm describe --json include liveMetrics when available.',

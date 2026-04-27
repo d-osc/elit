@@ -15,6 +15,7 @@ export const DEFAULT_HEALTHCHECK_MAX_FAILURES = 3;
 export const DEFAULT_LOG_LINES = 40;
 export const DEFAULT_PM_STOP_POLL_MS = 100;
 export const DEFAULT_PM_STOP_GRACE_PERIOD_MS = 5000;
+export const DEFAULT_PM_KILL_TIMEOUT = DEFAULT_PM_STOP_GRACE_PERIOD_MS;
 export const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
 export const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
 export const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
@@ -54,6 +55,7 @@ export interface PmSavedAppDefinition {
     restartPolicy: PmRestartPolicy;
     autorestart: boolean;
     restartDelay: number;
+    killTimeout: number;
     maxRestarts: number;
     minUptime: number;
     watch: boolean;
@@ -75,6 +77,7 @@ export interface ParsedPmStartArgs {
     env: Record<string, string>;
     autorestart?: boolean;
     restartDelay?: number;
+    killTimeout?: number;
     maxRestarts?: number;
     password?: string;
     restartPolicy?: PmRestartPolicy;
@@ -103,6 +106,7 @@ export interface ResolvedPmAppDefinition {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    killTimeout: number;
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
@@ -128,6 +132,7 @@ export interface PmRecord {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    killTimeout: number;
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;

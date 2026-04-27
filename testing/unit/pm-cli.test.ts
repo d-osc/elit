@@ -74,6 +74,7 @@ function createManagedPmRecord(workspaceRoot, overrides = {}) {
         wapkRun: undefined,
         autorestart: true,
         restartDelay: 1000,
+        killTimeout: 12000,
         maxRestarts: 5,
         password: undefined,
         restartPolicy: 'on-failure',
@@ -292,6 +293,45 @@ describe('pm cli wapk support', () => {
 });
 
 describe('pm cli process inspection', () => {
+    it('resolves killTimeout from pm start arguments and config definitions', () => {
+        const workspaceRoot = join(process.cwd(), 'pm-kill-timeout-config');
+        const cliDefinitions = resolvePmStartDefinitions(
+            parsePmStartArgs([
+                '--script', 'npm run api',
+                '--name', 'api',
+                '--kill-timeout', '12000',
+            ]),
+            null,
+            workspaceRoot,
+        );
+        const configDefinitions = resolvePmStartDefinitions(
+            {
+                name: 'worker',
+                env: {},
+                watchPaths: [],
+                watchIgnore: [],
+            },
+            {
+                pm: {
+                    apps: [
+                        {
+                            name: 'worker',
+                            file: './src/worker.ts',
+                            runtime: 'bun',
+                            killTimeout: 9000,
+                        },
+                    ],
+                },
+            },
+            workspaceRoot,
+        );
+
+        expect(cliDefinitions).toHaveLength(1);
+        expect(cliDefinitions[0]?.killTimeout).toBe(12000);
+        expect(configDefinitions).toHaveLength(1);
+        expect(configDefinitions[0]?.killTimeout).toBe(9000);
+    });
+
     it('prints machine-readable JSON for pm list --json', async () => {
         const { workspaceRoot, record } = createPmWorkspace();
         const originalCwd = process.cwd();
@@ -318,6 +358,7 @@ describe('pm cli process inspection', () => {
             expect(parsed[0]?.status).toBe(record.status);
             expect(parsed[0]?.commandPreview).toBe(record.commandPreview);
             expect(parsed[0]?.restartPolicy).toBe(record.restartPolicy);
+            expect(parsed[0]?.killTimeout).toBe(record.killTimeout);
             expect(parsed[0]?.liveMetrics?.uptimeMs).toBeGreaterThan(0);
         } finally {
             process.chdir(originalCwd);
@@ -347,6 +388,8 @@ describe('pm cli process inspection', () => {
             expect(output).toContain('uptime:');
             expect(output).toContain('command:');
             expect(output).toContain(record.commandPreview);
+            expect(output).toContain('kill timeout:');
+            expect(output).toContain('12s');
             expect(output).toContain('watch paths:');
             expect(output).toContain(record.watchPaths[0]);
             expect(output).toContain('health check:');
@@ -380,6 +423,7 @@ describe('pm cli process inspection', () => {
             expect(parsed?.name).toBe(record.name);
             expect(parsed?.lastExitCode).toBe(record.lastExitCode);
             expect(parsed?.error).toBe(record.error);
+            expect(parsed?.killTimeout).toBe(record.killTimeout);
             expect(parsed?.liveMetrics?.uptimeMs).toBeGreaterThan(0);
         } finally {
             process.chdir(originalCwd);
