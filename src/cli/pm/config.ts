@@ -18,6 +18,7 @@ import {
     mergePmWapkRunConfig,
     normalizeEnvMap,
     normalizePmMemoryLimit,
+    normalizePmMemoryAction,
     normalizeHealthCheckConfig,
     normalizeIntegerOption,
     normalizePmRestartPolicy,
@@ -170,11 +171,20 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
     const mergedWapkRun = mergePmWapkRunConfig(base?.wapkRun, parsed.wapkRun);
     const runtime = normalizePmRuntime(parsed.runtime ?? mergedWapkRun?.runtime ?? base?.runtime, '--runtime');
     const maxMemoryBytes = parsed.maxMemoryBytes ?? normalizePmMemoryLimit(base?.maxMemory, 'pm.apps[].maxMemory');
+    const memoryAction = parsed.memoryAction ?? normalizePmMemoryAction(base?.memoryAction, 'pm.apps[].memoryAction') ?? 'restart';
     const cronRestart = parsed.cronRestart ?? normalizePmRestartSchedule(base?.cronRestart, 'pm.apps[].cronRestart');
     const expBackoffRestartDelay = parsed.expBackoffRestartDelay
         ?? (base?.expBackoffRestartDelay === undefined
             ? undefined
             : normalizeIntegerOption(String(base.expBackoffRestartDelay), 'pm.apps[].expBackoffRestartDelay', 1));
+    const expBackoffRestartMaxDelay = parsed.expBackoffRestartMaxDelay
+        ?? (base?.expBackoffRestartMaxDelay === undefined
+            ? undefined
+            : normalizeIntegerOption(String(base.expBackoffRestartMaxDelay), 'pm.apps[].expBackoffRestartMaxDelay', 1));
+    const restartWindow = parsed.restartWindow
+        ?? (base?.restartWindow === undefined
+            ? undefined
+            : normalizeIntegerOption(String(base.restartWindow), 'pm.apps[].restartWindow', 1));
 
     let restartPolicy = normalizePmRestartPolicy(parsed.restartPolicy ?? base?.restartPolicy, '--restart-policy')
         ?? ((base?.autorestart ?? true) ? 'always' : 'never');
@@ -241,8 +251,11 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         password,
         restartPolicy,
         maxMemoryBytes,
+        memoryAction,
         cronRestart,
         expBackoffRestartDelay,
+        expBackoffRestartMaxDelay,
+        restartWindow,
         waitReady,
         listenTimeout: parsed.listenTimeout ?? base?.listenTimeout ?? DEFAULT_PM_LISTEN_TIMEOUT,
         minUptime: parsed.minUptime ?? base?.minUptime ?? DEFAULT_MIN_UPTIME,
@@ -403,11 +416,20 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             case '--max-memory':
                 parsed.maxMemoryBytes = normalizePmMemoryLimit(readRequiredValue(args, ++index, '--max-memory'), '--max-memory');
                 break;
+            case '--memory-action':
+                parsed.memoryAction = normalizePmMemoryAction(readRequiredValue(args, ++index, '--memory-action'), '--memory-action');
+                break;
             case '--cron-restart':
                 parsed.cronRestart = normalizePmRestartSchedule(readRequiredValue(args, ++index, '--cron-restart'), '--cron-restart');
                 break;
             case '--exp-backoff-restart-delay':
                 parsed.expBackoffRestartDelay = normalizeIntegerOption(readRequiredValue(args, ++index, '--exp-backoff-restart-delay'), '--exp-backoff-restart-delay', 1);
+                break;
+            case '--exp-backoff-restart-max-delay':
+                parsed.expBackoffRestartMaxDelay = normalizeIntegerOption(readRequiredValue(args, ++index, '--exp-backoff-restart-max-delay'), '--exp-backoff-restart-max-delay', 1);
+                break;
+            case '--restart-window':
+                parsed.restartWindow = normalizeIntegerOption(readRequiredValue(args, ++index, '--restart-window'), '--restart-window', 1);
                 break;
             case '--wait-ready':
                 parsed.waitReady = true;
@@ -541,9 +563,12 @@ export function printPmHelp(): void {
         '  --no-archive-watch          Disable archive-source read sync for WAPK apps',
         '  --archive-sync-interval <ms>  Forward WAPK archive read-sync interval (>= 50ms)',
         '  --restart-policy <mode>     Restart policy: always, on-failure, never',
-        '  --max-memory <bytes|size>   Restart when memory usage exceeds a limit like 268435456 or 256M',
+        '  --max-memory <bytes|size>   Trigger a memory action after a limit like 268435456 or 256M',
+        '  --memory-action <mode>      Action on max-memory: restart, stop',
         '  --cron-restart <expr>       Restart on a cron schedule or @every <duration>',
         '  --exp-backoff-restart-delay <ms>  Exponential unstable-restart backoff base delay',
+        '  --exp-backoff-restart-max-delay <ms>  Maximum unstable-restart backoff delay (default 15000)',
+        '  --restart-window <ms>       Rolling time window used when counting restart attempts',
         '  --wait-ready                Keep the process in starting state until its health check succeeds',
         '  --listen-timeout <ms>       Startup wait limit when --wait-ready is enabled (default 3000)',
         '  --min-uptime <ms>           Reset crash counter after this healthy uptime',
@@ -586,7 +611,7 @@ export function printPmHelp(): void {
         '  - elit pm scale <name> <count> changes the number of managed instances for a running app group.',
         '  - elit pm reset <name|all> clears restart count, last exit code, and saved error metadata.',
         '  - elit pm send-signal <signal> <name|all> forwards a POSIX-style signal such as SIGUSR2 or TERM.',
-        '  - maxMemory restarts a process after it exceeds a memory limit, cronRestart accepts cron or @every schedules, and expBackoffRestartDelay doubles unstable restart delays up to 15000ms.',
+        '  - maxMemory works with memoryAction=restart|stop, cronRestart accepts cron or @every schedules, expBackoffRestartDelay doubles unstable restart delays, expBackoffRestartMaxDelay caps them, and restartWindow limits how long restart attempts keep counting toward maxRestarts.',
         '  - killTimeout controls how long PM waits before force-killing an app that ignores stop or restart requests.',
         '  - waitReady uses the configured health check as a startup gate and errors if it never becomes healthy within listenTimeout.',
         '  - elit pm list shows live cpu, memory, and uptime columns when the child process is running.',

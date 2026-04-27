@@ -443,15 +443,18 @@ describe('pm cli process inspection', () => {
         expect(configDefinitions[0]?.listenTimeout).toBe(7000);
     });
 
-    it('resolves maxMemory, cronRestart, and expBackoffRestartDelay from pm start arguments and config definitions', () => {
+    it('resolves memory and restart window controls from pm start arguments and config definitions', () => {
         const workspaceRoot = join(process.cwd(), 'pm-restart-policy-config');
         const cliDefinitions = resolvePmStartDefinitions(
             parsePmStartArgs([
                 '--script', 'npm run api',
                 '--name', 'api',
                 '--max-memory', '128M',
+                '--memory-action', 'stop',
                 '--cron-restart', '@every 1s',
                 '--exp-backoff-restart-delay', '250',
+                '--exp-backoff-restart-max-delay', '900',
+                '--restart-window', '1500',
             ]),
             null,
             workspaceRoot,
@@ -471,8 +474,11 @@ describe('pm cli process inspection', () => {
                             file: './src/worker.ts',
                             runtime: 'bun',
                             maxMemory: '256M',
+                            memoryAction: 'stop',
                             cronRestart: '*/5 * * * *',
                             expBackoffRestartDelay: 400,
+                            expBackoffRestartMaxDelay: 1200,
+                            restartWindow: 6000,
                         },
                     ],
                 },
@@ -482,12 +488,18 @@ describe('pm cli process inspection', () => {
 
         expect(cliDefinitions).toHaveLength(1);
         expect(cliDefinitions[0]?.maxMemoryBytes).toBe(128 * 1024 * 1024);
+        expect(cliDefinitions[0]?.memoryAction).toBe('stop');
         expect(cliDefinitions[0]?.cronRestart).toBe('@every 1s');
         expect(cliDefinitions[0]?.expBackoffRestartDelay).toBe(250);
+        expect(cliDefinitions[0]?.expBackoffRestartMaxDelay).toBe(900);
+        expect(cliDefinitions[0]?.restartWindow).toBe(1500);
         expect(configDefinitions).toHaveLength(1);
         expect(configDefinitions[0]?.maxMemoryBytes).toBe(256 * 1024 * 1024);
+        expect(configDefinitions[0]?.memoryAction).toBe('stop');
         expect(configDefinitions[0]?.cronRestart).toBe('*/5 * * * *');
         expect(configDefinitions[0]?.expBackoffRestartDelay).toBe(400);
+        expect(configDefinitions[0]?.expBackoffRestartMaxDelay).toBe(1200);
+        expect(configDefinitions[0]?.restartWindow).toBe(6000);
     });
 
     it('resolves killTimeout from pm start arguments and config definitions', () => {
@@ -589,6 +601,8 @@ describe('pm cli process inspection', () => {
             expect(output).toContain(record.commandPreview);
             expect(output).toContain('wait ready:');
             expect(output).toContain('disabled');
+            expect(output).toContain('memory action:');
+            expect(output).toContain('restart');
             expect(output).toContain('kill timeout:');
             expect(output).toContain('12s');
             expect(output).toContain('watch paths:');
@@ -1058,6 +1072,60 @@ describe('pm runner readiness', () => {
         }
     });
 
+    it('stops when memoryAction is set to stop', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-memory-stop-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'memory-stop-app.js');
+        writeFileSync(entryFile, [
+            'setInterval(() => {}, 1000);',
+            'process.on("SIGTERM", () => process.exit(0));',
+            'process.on("SIGINT", () => process.exit(0));',
+        ].join('\n'));
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'memory-stop-app',
+            name: 'memory-stop-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'always',
+            maxRestarts: 5,
+            minUptime: 0,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            maxMemoryBytes: 1,
+            memoryAction: 'stop',
+            logFiles: {
+                out: join(logsDir, 'memory-stop-app.out.log'),
+                err: join(logsDir, 'memory-stop-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'memory-stop-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        await runManagedProcessLoop(recordPath, record);
+
+        const finalRecord = readWorkspacePmRecord(workspaceRoot, 'memory-stop-app');
+        try {
+            expect(finalRecord.status).toBe('errored');
+            expect(finalRecord.restartCount).toBe(0);
+            expect(finalRecord.error).toContain('memory');
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    });
+
     it('uses exponential backoff delay for unstable restarts', async () => {
         const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-backoff-'));
         const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
@@ -1105,6 +1173,112 @@ describe('pm runner readiness', () => {
             expect(finalRecord.status).toBe('errored');
             expect(stdoutLog).toContain('restarting in 200ms');
             expect(stdoutLog).toContain('restarting in 400ms');
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 12000);
+
+    it('caps exponential backoff delay with expBackoffRestartMaxDelay', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-backoff-cap-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'backoff-cap-app.js');
+        writeFileSync(entryFile, 'process.exit(1);');
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'backoff-cap-app',
+            name: 'backoff-cap-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'always',
+            restartDelay: 10,
+            expBackoffRestartDelay: 200,
+            expBackoffRestartMaxDelay: 250,
+            maxRestarts: 2,
+            minUptime: 0,
+            restartCount: 0,
+            lastRestartAt: undefined,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            logFiles: {
+                out: join(logsDir, 'backoff-cap-app.out.log'),
+                err: join(logsDir, 'backoff-cap-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'backoff-cap-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        await runManagedProcessLoop(recordPath, record);
+
+        const finalRecord = readWorkspacePmRecord(workspaceRoot, 'backoff-cap-app');
+        const stdoutLog = readFileSync(join(logsDir, 'backoff-cap-app.out.log'), 'utf8');
+        try {
+            expect(finalRecord.status).toBe('errored');
+            expect(finalRecord.restartCount).toBe(3);
+            expect(stdoutLog).toContain('restarting in 200ms');
+            expect(stdoutLog).toContain('restarting in 250ms');
+        } finally {
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 12000);
+
+    it('resets restart counts when the last restart falls outside restartWindow', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-window-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const entryFile = join(workspaceRoot, 'window-app.js');
+        writeFileSync(entryFile, 'process.exit(1);');
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'window-app',
+            name: 'window-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartPolicy: 'always',
+            restartDelay: 10,
+            maxRestarts: 1,
+            restartWindow: 100,
+            minUptime: 0,
+            restartCount: 8,
+            lastRestartAt: new Date(Date.now() - 2000).toISOString(),
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            healthCheck: undefined,
+            logFiles: {
+                out: join(logsDir, 'window-app.out.log'),
+                err: join(logsDir, 'window-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'window-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        await runManagedProcessLoop(recordPath, record);
+
+        const finalRecord = readWorkspacePmRecord(workspaceRoot, 'window-app');
+        const stdoutLog = readFileSync(join(logsDir, 'window-app.out.log'), 'utf8');
+        try {
+            expect(finalRecord.status).toBe('errored');
+            expect(finalRecord.restartCount).toBe(2);
+            expect(stdoutLog).toContain('restarting in 10ms');
         } finally {
             await removeWorkspace(workspaceRoot).catch(() => undefined);
         }

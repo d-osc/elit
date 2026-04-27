@@ -551,8 +551,11 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'restart count', `${record.restartCount}/${record.maxRestarts}`);
     pushPmDetail(lines, 'restart policy', record.restartPolicy);
     pushPmDetail(lines, 'max memory', record.maxMemoryBytes ? formatPmMemory(record.maxMemoryBytes) : '-');
+    pushPmDetail(lines, 'memory action', record.memoryAction ?? '-');
     pushPmDetail(lines, 'cron restart', record.cronRestart ?? '-');
     pushPmDetail(lines, 'exp backoff', record.expBackoffRestartDelay ? formatPmDuration(record.expBackoffRestartDelay) : '-');
+    pushPmDetail(lines, 'exp backoff max', record.expBackoffRestartMaxDelay ? formatPmDuration(record.expBackoffRestartMaxDelay) : '-');
+    pushPmDetail(lines, 'restart window', record.restartWindow ? formatPmDuration(record.restartWindow) : '-');
     pushPmDetail(lines, 'wait ready', record.waitReady ? 'enabled' : 'disabled');
     pushPmDetail(lines, 'listen timeout', record.waitReady ? formatPmDuration(record.listenTimeout) : '-');
     pushPmDetail(lines, 'restart delay', formatPmDuration(record.restartDelay));

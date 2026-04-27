@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
+import type { PmMemoryAction, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
 
 export const DEFAULT_PM_DATA_DIR = join('.elit', 'pm');
 export const DEFAULT_PM_DUMP_FILE = 'dump.json';
@@ -19,6 +19,7 @@ export const DEFAULT_PM_STOP_GRACE_PERIOD_MS = 5000;
 export const DEFAULT_PM_KILL_TIMEOUT = DEFAULT_PM_STOP_GRACE_PERIOD_MS;
 export const DEFAULT_PM_EXP_BACKOFF_MAX_DELAY = 15000;
 export const DEFAULT_PM_MEMORY_CHECK_INTERVAL = 500;
+export const DEFAULT_PM_RESTART_WINDOW = 0;
 export const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
 export const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
 export const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
@@ -60,8 +61,11 @@ export interface PmSavedAppDefinition {
     wapkRun?: WapkRunConfig;
     restartPolicy: PmRestartPolicy;
     maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
     cronRestart?: string;
     expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
     waitReady: boolean;
     listenTimeout: number;
     autorestart: boolean;
@@ -94,8 +98,11 @@ export interface ParsedPmStartArgs {
     password?: string;
     restartPolicy?: PmRestartPolicy;
     maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
     cronRestart?: string;
     expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
     waitReady?: boolean;
     listenTimeout?: number;
     minUptime?: number;
@@ -131,8 +138,11 @@ export interface ResolvedPmAppDefinition {
     password?: string;
     restartPolicy: PmRestartPolicy;
     maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
     cronRestart?: string;
     expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
     waitReady: boolean;
     listenTimeout: number;
     minUptime: number;
@@ -165,8 +175,11 @@ export interface PmRecord {
     password?: string;
     restartPolicy: PmRestartPolicy;
     maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
     cronRestart?: string;
     expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
     waitReady: boolean;
     listenTimeout: number;
     minUptime: number;
@@ -185,6 +198,7 @@ export interface PmRecord {
     runnerPid?: number;
     childPid?: number;
     restartCount: number;
+    lastRestartAt?: string;
     lastExitCode?: number;
     error?: string;
     logFiles: {
@@ -220,6 +234,6 @@ export interface ParsedPmRunnerArgs {
 }
 
 export interface PmRestartRequest {
-    kind: 'watch' | 'health' | 'startup' | 'memory' | 'cron';
+    kind: 'watch' | 'health' | 'startup' | 'memory' | 'memory-stop' | 'cron';
     detail: string;
 }

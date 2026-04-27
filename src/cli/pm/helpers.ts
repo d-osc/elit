@@ -3,6 +3,7 @@ import { extname, join, resolve } from 'node:path';
 
 import type {
     PmHealthCheckConfig,
+    PmMemoryAction,
     PmRestartPolicy,
     PmRuntimeName,
     WapkGoogleDriveConfig,
@@ -50,6 +51,23 @@ export function normalizePmRestartPolicy(value: unknown, optionName = '--restart
     }
 
     throw new Error(`${optionName} must be one of: always, on-failure, never`);
+}
+
+export function normalizePmMemoryAction(value: unknown, optionName = '--memory-action'): PmMemoryAction | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be one of: restart, stop`);
+    }
+
+    const action = value.trim().toLowerCase();
+    if (action === 'restart' || action === 'stop') {
+        return action;
+    }
+
+    throw new Error(`${optionName} must be one of: restart, stop`);
 }
 
 export function normalizeIntegerOption(value: string, optionName: string, min = 0): number {

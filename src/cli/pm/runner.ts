@@ -326,7 +326,7 @@ function createPmHealthMonitor(
 function createPmMemoryMonitor(
     record: PmRecord,
     pid: number | undefined,
-    onFailure: (message: string) => void,
+    onFailure: (kind: 'memory' | 'memory-stop', message: string) => void,
 ) {
     if (!record.maxMemoryBytes || !pid) {
         return {
@@ -347,7 +347,7 @@ function createPmMemoryMonitor(
         }
 
         stopped = true;
-        onFailure(`memory usage ${memoryRssBytes} exceeded limit ${memoryLimit}`);
+        onFailure(record.memoryAction === 'stop' ? 'memory-stop' : 'memory', `memory usage ${memoryRssBytes} exceeded limit ${memoryLimit}`);
     }, DEFAULT_PM_MEMORY_CHECK_INTERVAL);
     timer.unref?.();
 
@@ -412,7 +412,22 @@ function resolvePmRestartDelay(record: PmRecord, restartCount: number, shouldApp
     }
 
     const exponent = Math.max(0, restartCount - 1);
-    return Math.min(record.expBackoffRestartDelay * (2 ** exponent), DEFAULT_PM_EXP_BACKOFF_MAX_DELAY);
+    return Math.min(record.expBackoffRestartDelay * (2 ** exponent), record.expBackoffRestartMaxDelay ?? DEFAULT_PM_EXP_BACKOFF_MAX_DELAY);
+}
+
+function resolvePmRestartCountBase(record: PmRecord, wasStable: boolean, restartKind: PmRestartRequest['kind'] | undefined): number {
+    if (wasStable) {
+        return 0;
+    }
+
+    if (record.restartWindow && record.lastRestartAt) {
+        const lastRestartTime = Date.parse(record.lastRestartAt);
+        if (!Number.isNaN(lastRestartTime) && Date.now() - lastRestartTime > record.restartWindow) {
+            return 0;
+        }
+    }
+
+    return restartKind === 'watch' ? record.restartCount ?? 0 : (record.restartCount ?? 0);
 }
 
 function readPlannedRestartRequest(state: { request: PmRestartRequest | null }) {
@@ -636,7 +651,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             memoryMonitor = createPmMemoryMonitor(
                 latest,
                 child.pid,
-                (message) => requestPlannedRestart('memory', message),
+                (kind, message) => requestPlannedRestart(kind, message),
             );
             scheduleMonitor = createPmScheduleMonitor(
                 latest,
@@ -681,7 +696,9 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 break;
             }
 
-            const shouldRestartForExit = plannedRestart
+            const shouldRestartForExit = plannedRestart?.kind === 'memory-stop'
+                ? false
+                : plannedRestart
                 ? true
                 : current.restartPolicy === 'always'
                     ? true
@@ -692,11 +709,15 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             if (!shouldRestartForExit) {
                 persist((latestRecord) => ({
                     ...latestRecord,
-                    status: exitCode === 0 && !exitResult.error ? 'exited' : 'errored',
+                    status: plannedRestart?.kind === 'memory-stop'
+                        ? 'errored'
+                        : exitCode === 0 && !exitResult.error ? 'exited' : 'errored',
                     childPid: undefined,
                     runnerPid: undefined,
                     lastExitCode: exitCode,
-                    error: exitCode === 0 && !exitResult.error ? undefined : exitResult.error ?? `Process exited with code ${exitCode}.`,
+                    error: plannedRestart?.kind === 'memory-stop'
+                        ? plannedRestart.detail
+                        : exitCode === 0 && !exitResult.error ? undefined : exitResult.error ?? `Process exited with code ${exitCode}.`,
                     stoppedAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 }));
@@ -704,7 +725,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             }
 
             const shouldCountRestart = plannedRestart?.kind !== 'watch';
-            const baseRestartCount = wasStable ? 0 : (current.restartCount ?? 0);
+            const baseRestartCount = resolvePmRestartCountBase(current, wasStable, plannedRestart?.kind);
             const nextRestartCount = shouldCountRestart ? baseRestartCount + 1 : current.restartCount ?? 0;
             if (nextRestartCount > current.maxRestarts) {
                 persist((latestRecord) => ({
@@ -713,6 +734,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     childPid: undefined,
                     runnerPid: undefined,
                     restartCount: nextRestartCount,
+                    lastRestartAt: new Date().toISOString(),
                     lastExitCode: exitCode,
                     error: plannedRestart
                         ? `Reached max restart attempts (${current.maxRestarts}) after ${plannedRestart.kind} restart requests.`
@@ -730,13 +752,14 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 childPid: undefined,
                 lastExitCode: exitCode,
                 restartCount: nextRestartCount,
+                lastRestartAt: new Date().toISOString(),
                 error: undefined,
                 updatedAt: new Date().toISOString(),
             }));
-            const resolvedRestartDelay = resolvePmRestartDelay(current, nextRestartCount, shouldCountRestart && !wasStable);
+            const resolvedRestartDelay = resolvePmRestartDelay(current, nextRestartCount, shouldCountRestart && !wasStable && plannedRestart?.kind !== 'watch');
             if (plannedRestart) {
                 writePmLog(
-                    plannedRestart.kind === 'health' || plannedRestart.kind === 'memory' || plannedRestart.kind === 'startup' ? stderrLog : stdoutLog,
+                    plannedRestart.kind === 'health' || plannedRestart.kind === 'memory' || plannedRestart.kind === 'memory-stop' || plannedRestart.kind === 'startup' ? stderrLog : stdoutLog,
                     `restarting in ${resolvedRestartDelay}ms after ${plannedRestart.kind}: ${plannedRestart.detail}`,
                 );
             } else {

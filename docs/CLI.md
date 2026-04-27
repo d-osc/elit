@@ -230,8 +230,11 @@ Useful options:
 - `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
 - `--max-memory <bytes|size>`
+- `--memory-action restart|stop`
 - `--cron-restart <expr>`
 - `--exp-backoff-restart-delay <ms>`
+- `--exp-backoff-restart-max-delay <ms>`
+- `--restart-window <ms>`
 - `--wait-ready`
 - `--listen-timeout <ms>`
 - `--min-uptime <ms>`
@@ -254,10 +257,12 @@ Notes:
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
 - `pm reload <name|all>` performs a rolling stop/start across each matched instance and waits for the replacement to return `online` before continuing.
+- `pm reload <name|all>` is still a stop/start cycle for single-instance apps that bind the public port directly; the readiness wait mainly protects multi-instance groups and externally fronted HTTP processes.
 - `pm scale <name> <count>` changes the number of managed instances for a process group.
 - `pm reset <name|all>` clears restart counters plus saved exit/error metadata.
 - `pm send-signal <signal> <name|all>` forwards a signal like `SIGUSR2` or `TERM` to the current managed child process.
-- `maxMemory` accepts raw bytes or size strings like `256M`, `cronRestart` accepts a 5-field cron string or `@every 30s`, and `expBackoffRestartDelay` doubles unstable restart delays up to `15000ms`.
+- `maxMemory` accepts raw bytes or size strings like `256M`; `memoryAction` decides whether that threshold restarts or stops the process.
+- `cronRestart` accepts a 5-field cron string or `@every 30s`, `expBackoffRestartDelay` doubles unstable restart delays, `expBackoffRestartMaxDelay` caps them, and `restartWindow` resets stale restart counters before they count toward `maxRestarts` again.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
 - `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.

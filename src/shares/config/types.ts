@@ -23,6 +23,7 @@ export type MobileMode = 'native' | 'hybrid';
 export type DesktopMode = 'native' | 'hybrid';
 export type PmRuntimeName = 'node' | 'bun' | 'deno';
 export type PmRestartPolicy = 'always' | 'on-failure' | 'never';
+export type PmMemoryAction = 'restart' | 'stop';
 
 export interface PmHealthCheckConfig {
     /** HTTP endpoint polled while the process is online */
@@ -70,10 +71,16 @@ export interface PmAppConfig {
     restartPolicy?: PmRestartPolicy;
     /** Restart the process when it uses more than this many bytes, or a size string like 256M */
     maxMemory?: number | string;
+    /** Action taken when maxMemory is exceeded */
+    memoryAction?: PmMemoryAction;
     /** Restart schedule using a cron expression or @every <duration> */
     cronRestart?: string;
     /** Exponential restart backoff base delay in milliseconds for unstable restarts */
     expBackoffRestartDelay?: number;
+    /** Maximum exponential restart backoff delay in milliseconds */
+    expBackoffRestartMaxDelay?: number;
+    /** Rolling window used when counting restart attempts against maxRestarts */
+    restartWindow?: number;
     /** Wait for the health check to succeed before marking the process online */
     waitReady?: boolean;
     /** Maximum startup wait time in milliseconds when waitReady is enabled */
