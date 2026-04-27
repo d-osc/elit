@@ -185,8 +185,11 @@ pm: {
     {
       name: 'api',
       script: 'npm start',
+      instances: 2,
       runtime: 'node',
       restartPolicy: 'on-failure',
+      waitReady: true,
+      listenTimeout: 5000,
       killTimeout: 12000,
       minUptime: 5000,
       watch: true,
@@ -253,6 +256,8 @@ Notes:
 - `pm.apps[].wapkRun.file` or `pm.apps[].wapkRun.googleDrive.fileId` can define the WAPK archive source even when `wapk` is omitted.
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
+- `instances` starts multiple managed children for one app name, and `elit pm scale <name> <count>` updates that count later.
+- `waitReady` keeps the app in `starting` until its `healthCheck` succeeds, while `listenTimeout` caps how long startup may wait.
 - `killTimeout` sets the per-app grace window before Elit forcefully terminates a stop or restart.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.

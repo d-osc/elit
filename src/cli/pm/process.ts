@@ -201,6 +201,9 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
     return {
         id,
         name: definition.name,
+        baseName: definition.baseName,
+        instanceIndex: definition.instanceIndex,
+        instances: definition.instances,
         type: definition.type,
         source: definition.source,
         cwd: definition.cwd,
@@ -216,6 +219,8 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         maxRestarts: definition.maxRestarts,
         password: definition.password,
         restartPolicy: definition.restartPolicy,
+        waitReady: definition.waitReady,
+        listenTimeout: definition.listenTimeout,
         minUptime: definition.minUptime,
         watch: definition.watch,
         watchPaths: definition.watchPaths,
@@ -257,6 +262,17 @@ export function terminateProcessTree(pid: number, options?: { force?: boolean })
 
     try {
         process.kill(pid, options?.force ? 'SIGKILL' : 'SIGTERM');
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ESRCH') {
+            throw error;
+        }
+    }
+}
+
+export function sendPmSignal(pid: number, signal: NodeJS.Signals): void {
+    try {
+        process.kill(pid, signal);
     } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code !== 'ESRCH') {

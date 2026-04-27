@@ -24,8 +24,18 @@ import {
 } from './records';
 import { buildPmCommand, isPmOnlineWapkRecord, terminateProcessTree } from './process';
 
-function writePmLog(stream: { write: (value: string) => unknown }, message: string): void {
-    stream.write(`[elit pm] ${new Date().toISOString()} ${message}${EOL}`);
+function writePmLog(stream: { write: (value: string) => unknown; writableEnded?: boolean; destroyed?: boolean }, message: string): void {
+    if (stream.writableEnded || stream.destroyed) {
+        return;
+    }
+
+    try {
+        stream.write(`[elit pm] ${new Date().toISOString()} ${message}${EOL}`);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ERR_STREAM_WRITE_AFTER_END') {
+            throw error;
+        }
+    }
 }
 
 function waitForExit(code: number | null, signal: string | null): number {
@@ -42,6 +52,94 @@ function waitForExit(code: number | null, signal: string | null): number {
 
 async function delay(milliseconds: number): Promise<void> {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+}
+
+function createPmReadinessMonitor(
+    record: PmRecord,
+    onReady: (message: string) => void,
+    onFailure: (message: string) => void,
+) {
+    if (!record.waitReady || !record.healthCheck) {
+        return {
+            stop() {},
+        };
+    }
+
+    const healthCheck = record.healthCheck;
+    const pollInterval = Math.max(50, Math.min(healthCheck.interval, 250));
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight = false;
+
+    const clearTimers = (): void => {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+        if (timeoutTimer) {
+            clearTimeout(timeoutTimer);
+            timeoutTimer = null;
+        }
+    };
+
+    const runHealthCheck = async (): Promise<void> => {
+        if (stopped || inFlight) {
+            return;
+        }
+
+        inFlight = true;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), healthCheck.timeout);
+        timeoutId.unref?.();
+
+        try {
+            const response = await fetch(healthCheck.url, {
+                method: 'GET',
+                signal: controller.signal,
+            });
+
+            if (stopped) {
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`health check returned ${response.status}`);
+            }
+
+            stopped = true;
+            clearTimers();
+            onReady(`readiness check passed: ${healthCheck.url}`);
+        } catch {
+        } finally {
+            clearTimeout(timeoutId);
+            inFlight = false;
+        }
+    };
+
+    timeoutTimer = setTimeout(() => {
+        if (stopped) {
+            return;
+        }
+
+        stopped = true;
+        clearTimers();
+        onFailure(`listen timeout reached after ${record.listenTimeout}ms while waiting for ${healthCheck.url}`);
+    }, record.listenTimeout);
+    timeoutTimer.unref?.();
+
+    void runHealthCheck();
+    timer = setInterval(() => {
+        void runHealthCheck();
+    }, pollInterval);
+    timer.unref?.();
+
+    return {
+        stop() {
+            stopped = true;
+            clearTimers();
+        },
+    };
 }
 
 function resolvePmStopTimeout(record: PmRecord): number {
@@ -171,12 +269,20 @@ function createPmHealthMonitor(
                 signal: controller.signal,
             });
 
+            if (stopped) {
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(`health check returned ${response.status}`);
             }
 
             failureCount = 0;
         } catch (error) {
+            if (stopped) {
+                return;
+            }
+
             failureCount += 1;
             const message = error instanceof Error ? error.message : String(error);
             onLog(`health check failed (${failureCount}/${healthCheck.maxFailures}): ${message}`);
@@ -364,9 +470,10 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             }
 
             const startedAt = new Date().toISOString();
+            const waitingForReady = latest.waitReady;
             persist((current) => ({
                 ...current,
-                status: 'online',
+                status: waitingForReady ? 'starting' : 'online',
                 commandPreview: command.preview,
                 runtime: command.runtime ?? current.runtime,
                 runnerPid: process.pid,
@@ -378,13 +485,13 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             }));
             writePmLog(stdoutLog, `started ${command.preview}${child.pid ? ` (pid ${child.pid})` : ''}`);
 
-            const requestPlannedRestart = (kind: 'watch' | 'health', detail: string): void => {
+            const requestPlannedRestart = (kind: 'watch' | 'health' | 'startup', detail: string): void => {
                 if (stopRequested || restartState.request) {
                     return;
                 }
 
                 restartState.request = { kind, detail };
-                writePmLog(kind === 'health' ? stderrLog : stdoutLog, `${kind} restart requested: ${detail}`);
+                writePmLog(kind === 'watch' ? stdoutLog : stderrLog, `${kind} restart requested: ${detail}`);
                 persist((current) => ({
                     ...current,
                     status: 'restarting',
@@ -393,16 +500,41 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 stopActiveChild();
             };
 
+            let healthMonitor = {
+                stop() {},
+            };
+
+            const startHealthMonitor = (): void => {
+                healthMonitor = createPmHealthMonitor(
+                    latest,
+                    (message) => requestPlannedRestart('health', message),
+                    (message) => writePmLog(stdoutLog, message),
+                );
+            };
+
+            const readinessMonitor = createPmReadinessMonitor(
+                latest,
+                (message) => {
+                    const readyAt = new Date().toISOString();
+                    persist((current) => ({
+                        ...current,
+                        status: 'online',
+                        updatedAt: readyAt,
+                    }));
+                    writePmLog(stdoutLog, message);
+                    startHealthMonitor();
+                },
+                (message) => requestPlannedRestart('startup', message),
+            );
+
             const watchController = await createPmWatchController(
                 latest,
                 (changedPath) => requestPlannedRestart('watch', changedPath),
                 (message) => writePmLog(stderrLog, `watch error: ${message}`),
             );
-            const healthMonitor = createPmHealthMonitor(
-                latest,
-                (message) => requestPlannedRestart('health', message),
-                (message) => writePmLog(stdoutLog, message),
-            );
+            if (!waitingForReady) {
+                startHealthMonitor();
+            }
 
             const desiredStatePoller = setInterval(() => {
                 const latestRecord = readLatestPmRecord(filePath, record);
@@ -415,6 +547,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             const exitResult: any = await waitForManagedChildExit(child);
             clearInterval(desiredStatePoller);
             await watchController.close();
+            readinessMonitor.stop();
             healthMonitor.stop();
             clearActiveChildStopTimer();
 

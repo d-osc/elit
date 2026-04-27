@@ -202,6 +202,10 @@ Forms:
 - `elit pm describe <name> --json`
 - `elit pm stop <name|all>`
 - `elit pm restart <name|all>`
+- `elit pm reload <name|all>`
+- `elit pm scale <name> <count>`
+- `elit pm reset <name|all>`
+- `elit pm send-signal <signal> <name|all>`
 - `elit pm delete <name|all>`
 - `elit pm save`
 - `elit pm resurrect`
@@ -210,6 +214,7 @@ Forms:
 Useful options:
 
 - `--runtime node|bun|deno`
+- `--instances <count>`
 - `--cwd <dir>`
 - `--env KEY=VALUE`
 - `--password <value>` for locked WAPK apps
@@ -224,6 +229,8 @@ Useful options:
 - `--archive-watch` and `--no-archive-watch` for WAPK archive pull sync
 - `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
+- `--wait-ready`
+- `--listen-timeout <ms>`
 - `--min-uptime <ms>`
 - `--watch`
 - `--watch-path <path>`
@@ -243,11 +250,17 @@ Notes:
 
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
+- `pm reload <name|all>` performs a rolling stop/start across each matched instance.
+- `pm scale <name> <count>` changes the number of managed instances for a process group.
+- `pm reset <name|all>` clears restart counters plus saved exit/error metadata.
+- `pm send-signal <signal> <name|all>` forwards a signal like `SIGUSR2` or `TERM` to the current managed child process.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
 - `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.
 - `pm list --json` and `pm jlist` return machine-readable process records for tooling and CI, including `liveMetrics` when the child process is running.
 - `pm show <name>` prints the stored runtime metadata for one process, and `pm describe <name> --json` exposes the same record plus `liveMetrics` as JSON.
+- `waitReady` keeps the process in `starting` until its health check succeeds; `listenTimeout` caps that startup window.
+- `instances` creates named groups such as `api`, `api:2`, and `api:3`; inspect a specific instance name when a group has more than one child.
 - `killTimeout` controls how long PM waits before escalating a stop or restart to forceful termination.
 - PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
 - `pm stop`, `pm restart`, and `pm delete` close PM-managed online WAPK share sessions before the process exits.

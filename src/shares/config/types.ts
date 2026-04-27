@@ -52,6 +52,8 @@ export interface PmAppConfig {
     cwd?: string;
     /** Extra environment variables injected into the process */
     env?: Record<string, string | number | boolean>;
+    /** Number of managed instances to start for this app */
+    instances?: number;
     /** Disable automatic restart when the process exits */
     autorestart?: boolean;
     /** Delay between restart attempts in milliseconds */
@@ -66,6 +68,10 @@ export interface PmAppConfig {
     wapkRun?: WapkRunConfig;
     /** Restart strategy used after the child process exits */
     restartPolicy?: PmRestartPolicy;
+    /** Wait for the health check to succeed before marking the process online */
+    waitReady?: boolean;
+    /** Maximum startup wait time in milliseconds when waitReady is enabled */
+    listenTimeout?: number;
     /** Minimum healthy uptime before restart attempt counters reset */
     minUptime?: number;
     /** Restart the process when watched files change */

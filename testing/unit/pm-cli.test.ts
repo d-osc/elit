@@ -1,15 +1,25 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildPmCommand, runPmCommand, parsePmStartArgs, resolvePmStartDefinitions } from '../../src/pm';
+import {
+    buildPmCommand,
+    runManagedProcessLoop,
+    runPmCommand,
+    parsePmStartArgs,
+    resolvePmStartDefinitions,
+    sanitizePmProcessName,
+} from '../../src/pm';
 
 function createWapkPmRecord(overrides = {}) {
     return {
         id: 'drive-app',
         name: 'drive-app',
+        baseName: 'drive-app',
+        instanceIndex: 1,
+        instances: 1,
         type: 'wapk',
         source: 'cli',
         cwd: process.cwd(),
@@ -36,6 +46,8 @@ function createWapkPmRecord(overrides = {}) {
         maxRestarts: 10,
         password: 'secret-123',
         restartPolicy: 'always',
+        waitReady: false,
+        listenTimeout: 3000,
         minUptime: 0,
         watch: false,
         watchPaths: [],
@@ -60,6 +72,9 @@ function createManagedPmRecord(workspaceRoot, overrides = {}) {
     return {
         id: 'api',
         name: 'api',
+        baseName: 'api',
+        instanceIndex: 1,
+        instances: 1,
         type: 'script',
         source: 'config',
         cwd: workspaceRoot,
@@ -78,6 +93,8 @@ function createManagedPmRecord(workspaceRoot, overrides = {}) {
         maxRestarts: 5,
         password: undefined,
         restartPolicy: 'on-failure',
+        waitReady: false,
+        listenTimeout: 3000,
         minUptime: 5000,
         watch: true,
         watchPaths: [join(workspaceRoot, 'src')],
@@ -117,6 +134,71 @@ function createPmWorkspace(recordOverrides = {}) {
     const record = createManagedPmRecord(workspaceRoot, recordOverrides);
     writeFileSync(join(appsDir, `${record.id}.json`), JSON.stringify(record, null, 2));
     return { workspaceRoot, record };
+}
+
+function readWorkspacePmRecord(workspaceRoot, id = 'api') {
+    return JSON.parse(readFileSync(join(workspaceRoot, '.elit', 'pm', 'apps', `${id}.json`), 'utf8'));
+}
+
+async function removeWorkspace(workspaceRoot, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    let lastError;
+
+    while (Date.now() < deadline) {
+        try {
+            rmSync(workspaceRoot, { recursive: true, force: true });
+            if (!existsSync(workspaceRoot)) {
+                return;
+            }
+        } catch (error) {
+            lastError = error;
+        }
+
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+    }
+
+    if (existsSync(workspaceRoot)) {
+        throw lastError ?? new Error(`Failed to remove workspace: ${workspaceRoot}`);
+    }
+}
+
+async function waitForRecord(workspaceRoot, predicate, id = 'api', timeoutMs = 2000) {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        const record = readWorkspacePmRecord(workspaceRoot, id);
+        if (predicate(record)) {
+            return record;
+        }
+
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+    }
+
+    throw new Error(`Timed out waiting for PM record ${id}`);
+}
+
+function createPmInstanceRecord(workspaceRoot, baseName, instanceIndex, instances, overrides = {}) {
+    const name = instanceIndex === 1 ? baseName : `${baseName}:${instanceIndex}`;
+    const id = sanitizePmProcessName(name);
+    return createManagedPmRecord(workspaceRoot, {
+        id,
+        name,
+        baseName,
+        instanceIndex,
+        instances,
+        logFiles: {
+            out: join(workspaceRoot, '.elit', 'pm', 'logs', `${id}.out.log`),
+            err: join(workspaceRoot, '.elit', 'pm', 'logs', `${id}.err.log`),
+        },
+        childPid: undefined,
+        runnerPid: undefined,
+        restartCount: 0,
+        lastExitCode: undefined,
+        error: undefined,
+        status: 'online',
+        desiredState: 'running',
+        ...overrides,
+    });
 }
 
 describe('pm cli wapk support', () => {
@@ -293,6 +375,74 @@ describe('pm cli wapk support', () => {
 });
 
 describe('pm cli process inspection', () => {
+    it('expands pm start definitions for multiple instances', () => {
+        const definitions = resolvePmStartDefinitions(
+            parsePmStartArgs([
+                '--script', 'npm run api',
+                '--name', 'api',
+                '--instances', '3',
+            ]),
+            null,
+            process.cwd(),
+        );
+
+        expect(definitions).toHaveLength(3);
+        expect(definitions[0]?.name).toBe('api');
+        expect(definitions[0]?.baseName).toBe('api');
+        expect(definitions[0]?.instanceIndex).toBe(1);
+        expect(definitions[1]?.name).toBe('api:2');
+        expect(definitions[1]?.instanceIndex).toBe(2);
+        expect(definitions[2]?.name).toBe('api:3');
+        expect(definitions[2]?.instances).toBe(3);
+    });
+
+    it('resolves waitReady and listenTimeout from pm start arguments and config definitions', () => {
+        const workspaceRoot = join(process.cwd(), 'pm-wait-ready-config');
+        const cliDefinitions = resolvePmStartDefinitions(
+            parsePmStartArgs([
+                '--script', 'npm run api',
+                '--name', 'api',
+                '--wait-ready',
+                '--health-url', 'http://127.0.0.1:3000/health',
+                '--listen-timeout', '4500',
+            ]),
+            null,
+            workspaceRoot,
+        );
+        const configDefinitions = resolvePmStartDefinitions(
+            {
+                name: 'worker',
+                env: {},
+                watchPaths: [],
+                watchIgnore: [],
+            },
+            {
+                pm: {
+                    apps: [
+                        {
+                            name: 'worker',
+                            file: './src/worker.ts',
+                            runtime: 'bun',
+                            waitReady: true,
+                            listenTimeout: 7000,
+                            healthCheck: {
+                                url: 'http://127.0.0.1:4000/health',
+                            },
+                        },
+                    ],
+                },
+            },
+            workspaceRoot,
+        );
+
+        expect(cliDefinitions).toHaveLength(1);
+        expect(cliDefinitions[0]?.waitReady).toBe(true);
+        expect(cliDefinitions[0]?.listenTimeout).toBe(4500);
+        expect(configDefinitions).toHaveLength(1);
+        expect(configDefinitions[0]?.waitReady).toBe(true);
+        expect(configDefinitions[0]?.listenTimeout).toBe(7000);
+    });
+
     it('resolves killTimeout from pm start arguments and config definitions', () => {
         const workspaceRoot = join(process.cwd(), 'pm-kill-timeout-config');
         const cliDefinitions = resolvePmStartDefinitions(
@@ -359,6 +509,8 @@ describe('pm cli process inspection', () => {
             expect(parsed[0]?.commandPreview).toBe(record.commandPreview);
             expect(parsed[0]?.restartPolicy).toBe(record.restartPolicy);
             expect(parsed[0]?.killTimeout).toBe(record.killTimeout);
+            expect(parsed[0]?.waitReady).toBe(record.waitReady);
+            expect(parsed[0]?.listenTimeout).toBe(record.listenTimeout);
             expect(parsed[0]?.liveMetrics?.uptimeMs).toBeGreaterThan(0);
         } finally {
             process.chdir(originalCwd);
@@ -388,6 +540,8 @@ describe('pm cli process inspection', () => {
             expect(output).toContain('uptime:');
             expect(output).toContain('command:');
             expect(output).toContain(record.commandPreview);
+            expect(output).toContain('wait ready:');
+            expect(output).toContain('disabled');
             expect(output).toContain('kill timeout:');
             expect(output).toContain('12s');
             expect(output).toContain('watch paths:');
@@ -424,10 +578,346 @@ describe('pm cli process inspection', () => {
             expect(parsed?.lastExitCode).toBe(record.lastExitCode);
             expect(parsed?.error).toBe(record.error);
             expect(parsed?.killTimeout).toBe(record.killTimeout);
+            expect(parsed?.waitReady).toBe(record.waitReady);
+            expect(parsed?.listenTimeout).toBe(record.listenTimeout);
             expect(parsed?.liveMetrics?.uptimeMs).toBeGreaterThan(0);
         } finally {
             process.chdir(originalCwd);
             logSpy.restore();
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    });
+});
+
+describe('pm scaling', () => {
+    it('scales down a managed process group by removing the highest instances first', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-scale-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        mkdirSync(appsDir, { recursive: true });
+
+        const records = [
+            createPmInstanceRecord(workspaceRoot, 'api', 1, 3),
+            createPmInstanceRecord(workspaceRoot, 'api', 2, 3),
+            createPmInstanceRecord(workspaceRoot, 'api', 3, 3),
+        ];
+        for (const record of records) {
+            writeFileSync(join(appsDir, `${record.id}.json`), JSON.stringify(record, null, 2));
+        }
+
+        const originalCwd = process.cwd();
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        process.chdir(workspaceRoot);
+
+        try {
+            await runPmCommand(['scale', 'api', '1']);
+
+            expect(logSpy._calls.length).toBe(1);
+            expect(String(logSpy._calls[0]?.[0] ?? '')).toContain('scaled api to 1 instance');
+
+            const remainingEntries = readdirSync(appsDir).filter((entry) => entry.endsWith('.json'));
+            expect(remainingEntries).toHaveLength(1);
+
+            const remainingRecord = readWorkspacePmRecord(workspaceRoot, 'api');
+            expect(remainingRecord.name).toBe('api');
+            expect(remainingRecord.instances).toBe(1);
+        } finally {
+            process.chdir(originalCwd);
+            logSpy.restore();
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    });
+});
+
+describe('pm control commands', () => {
+    it('resets restart metadata for a managed process group', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-reset-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        mkdirSync(appsDir, { recursive: true });
+
+        const records = [
+            createPmInstanceRecord(workspaceRoot, 'api', 1, 2, {
+                restartCount: 4,
+                lastExitCode: 1,
+                error: 'boom',
+            }),
+            createPmInstanceRecord(workspaceRoot, 'api', 2, 2, {
+                restartCount: 2,
+                lastExitCode: 137,
+                error: 'second boom',
+            }),
+        ];
+        for (const record of records) {
+            writeFileSync(join(appsDir, `${record.id}.json`), JSON.stringify(record, null, 2));
+        }
+
+        const originalCwd = process.cwd();
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        process.chdir(workspaceRoot);
+
+        try {
+            await runPmCommand(['reset', 'api']);
+
+            expect(logSpy._calls.length).toBe(1);
+            expect(String(logSpy._calls[0]?.[0] ?? '')).toContain('reset 2 processes');
+
+            const baseRecord = readWorkspacePmRecord(workspaceRoot, 'api');
+            const secondRecord = readWorkspacePmRecord(workspaceRoot, sanitizePmProcessName('api:2'));
+
+            expect(baseRecord.restartCount).toBe(0);
+            expect(baseRecord.lastExitCode).toBeUndefined();
+            expect(baseRecord.error).toBeUndefined();
+            expect(secondRecord.restartCount).toBe(0);
+            expect(secondRecord.lastExitCode).toBeUndefined();
+            expect(secondRecord.error).toBeUndefined();
+        } finally {
+            process.chdir(originalCwd);
+            logSpy.restore();
+            rmSync(workspaceRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('sends a signal to every process in a managed group', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-signal-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        mkdirSync(appsDir, { recursive: true });
+
+        const records = [
+            createPmInstanceRecord(workspaceRoot, 'api', 1, 2, { childPid: 4321 }),
+            createPmInstanceRecord(workspaceRoot, 'api', 2, 2, { childPid: 4322 }),
+        ];
+        for (const record of records) {
+            writeFileSync(join(appsDir, `${record.id}.json`), JSON.stringify(record, null, 2));
+        }
+
+        const originalCwd = process.cwd();
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+        process.chdir(workspaceRoot);
+
+        try {
+            await runPmCommand(['send-signal', 'usr2', 'api']);
+
+            expect(logSpy._calls.length).toBe(1);
+            expect(String(logSpy._calls[0]?.[0] ?? '')).toContain('sent SIGUSR2 to 2 processes');
+
+            const signalCalls = killSpy._calls.filter((call) => call[1] === 'SIGUSR2');
+            expect(signalCalls).toHaveLength(2);
+            expect(signalCalls[0]?.[0]).toBe(4321);
+            expect(signalCalls[1]?.[0]).toBe(4322);
+        } finally {
+            process.chdir(originalCwd);
+            killSpy.restore();
+            logSpy.restore();
+            rmSync(workspaceRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('reloads every instance in a managed process group', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-reload-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const entryFile = join(workspaceRoot, 'reload-app.js');
+        mkdirSync(appsDir, { recursive: true });
+        writeFileSync(entryFile, [
+            'setInterval(() => {}, 1000);',
+            'const shutdown = () => process.exit(0);',
+            'process.on("SIGTERM", shutdown);',
+            'process.on("SIGINT", shutdown);',
+        ].join('\n'));
+
+        const records = [
+            createPmInstanceRecord(workspaceRoot, 'api', 1, 2, {
+                type: 'file',
+                runtime: 'node',
+                script: undefined,
+                file: entryFile,
+                commandPreview: `node ${entryFile}`,
+                restartPolicy: 'never',
+                maxRestarts: 0,
+                minUptime: 0,
+                watch: false,
+                watchPaths: [],
+                watchIgnore: [],
+            }),
+            createPmInstanceRecord(workspaceRoot, 'api', 2, 2, {
+                type: 'file',
+                runtime: 'node',
+                script: undefined,
+                file: entryFile,
+                commandPreview: `node ${entryFile}`,
+                restartPolicy: 'never',
+                maxRestarts: 0,
+                minUptime: 0,
+                watch: false,
+                watchPaths: [],
+                watchIgnore: [],
+            }),
+        ];
+        for (const record of records) {
+            writeFileSync(join(appsDir, `${record.id}.json`), JSON.stringify(record, null, 2));
+        }
+
+        const originalCwd = process.cwd();
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        process.chdir(workspaceRoot);
+
+        try {
+            await runPmCommand(['reload', 'api']);
+
+            const baseRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'api', 5000);
+            const secondRecord = await waitForRecord(
+                workspaceRoot,
+                (current) => current.status === 'online' && Boolean(current.childPid),
+                sanitizePmProcessName('api:2'),
+                5000,
+            );
+
+            expect(logSpy._calls.length).toBe(1);
+            expect(String(logSpy._calls[0]?.[0] ?? '')).toContain('reloaded api, api:2');
+            expect(baseRecord.name).toBe('api');
+            expect(baseRecord.instances).toBe(2);
+            expect(secondRecord.name).toBe('api:2');
+            expect(secondRecord.instances).toBe(2);
+
+            await runPmCommand(['stop', 'api']);
+        } finally {
+            process.chdir(originalCwd);
+            logSpy.restore();
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 12000);
+});
+
+describe('pm runner readiness', () => {
+    it('waits for health readiness before marking a process online', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-ready-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const port = 43150 + Math.floor(Math.random() * 200);
+        const entryFile = join(workspaceRoot, 'ready-server.js');
+        writeFileSync(entryFile, [
+            'const http = require("node:http");',
+            'let server;',
+            'setTimeout(() => {',
+            `  server = http.createServer((req, res) => { res.statusCode = req.url === "/health" ? 200 : 404; res.end("ok"); });`,
+            `  server.listen(${port}, "127.0.0.1");`,
+            '}, 150);',
+            'const shutdown = () => {',
+            '  if (server) { server.close(() => process.exit(0)); return; }',
+            '  process.exit(0);',
+            '};',
+            'process.on("SIGTERM", shutdown);',
+            'process.on("SIGINT", shutdown);',
+        ].join('\n'));
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'ready-app',
+            name: 'ready-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 1200,
+            minUptime: 0,
+            maxRestarts: 1,
+            healthCheck: {
+                url: `http://127.0.0.1:${port}/health`,
+                gracePeriod: 0,
+                interval: 100,
+                timeout: 100,
+                maxFailures: 2,
+            },
+            logFiles: {
+                out: join(logsDir, 'ready-app.out.log'),
+                err: join(logsDir, 'ready-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'ready-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        const loopPromise = runManagedProcessLoop(recordPath, record);
+
+        try {
+            const startingRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'starting', 'ready-app', 400);
+            expect(startingRecord.waitReady).toBe(true);
+
+            const onlineRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'ready-app', 2000);
+            expect(onlineRecord.listenTimeout).toBe(1200);
+
+            writeFileSync(recordPath, JSON.stringify({ ...onlineRecord, desiredState: 'stopped' }, null, 2));
+            await loopPromise;
+
+            const finalRecord = readWorkspacePmRecord(workspaceRoot, 'ready-app');
+            expect(finalRecord.status).toBe('stopped');
+        } finally {
+            rmSync(workspaceRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('errors when waitReady exceeds listenTimeout', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-ready-timeout-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+
+        const port = 43450 + Math.floor(Math.random() * 200);
+        const entryFile = join(workspaceRoot, 'idle-process.js');
+        writeFileSync(entryFile, [
+            'setInterval(() => {}, 1000);',
+            'process.on("SIGTERM", () => process.exit(0));',
+            'process.on("SIGINT", () => process.exit(0));',
+        ].join('\n'));
+
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'timeout-app',
+            name: 'timeout-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 200,
+            minUptime: 0,
+            maxRestarts: 0,
+            healthCheck: {
+                url: `http://127.0.0.1:${port}/health`,
+                gracePeriod: 0,
+                interval: 50,
+                timeout: 50,
+                maxFailures: 1,
+            },
+            logFiles: {
+                out: join(logsDir, 'timeout-app.out.log'),
+                err: join(logsDir, 'timeout-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'timeout-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        try {
+            await runManagedProcessLoop(recordPath, record);
+            const finalRecord = readWorkspacePmRecord(workspaceRoot, 'timeout-app');
+            expect(finalRecord.status).toBe('errored');
+            expect(finalRecord.error).toContain('startup');
+        } finally {
             rmSync(workspaceRoot, { recursive: true, force: true });
         }
     });

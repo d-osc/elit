@@ -3,7 +3,13 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { EOL } from 'node:os';
 
 import { loadConfig } from '../../shares/config';
-import { printPmHelp, parsePmStartArgs, resolvePmAppDefinition, resolvePmStartDefinitions } from './config';
+import {
+    expandPmInstanceDefinitions,
+    printPmHelp,
+    parsePmStartArgs,
+    resolvePmAppDefinition,
+    resolvePmStartDefinitions,
+} from './config';
 import {
     DEFAULT_LOG_LINES,
     type PmPaths,
@@ -14,17 +20,57 @@ import { normalizeIntegerOption, readRequiredValue } from './helpers';
 import {
     ensurePmDirectories,
     findPmRecordMatch,
+    findPmGroupMatches,
     listPmRecordMatches,
     readPmDumpFile,
     resolvePmPaths,
     syncPmRecordLiveness,
+    writePmRecord,
     toPmAppConfig,
     toSavedAppDefinition,
     toSavedPmAppConfig,
     writePmDumpFile,
 } from './records';
-import { startManagedProcess } from './process';
+import { sendPmSignal, startManagedProcess } from './process';
 import { runPmRunner, stopPmMatches } from './runner';
+
+const PM_SIGNAL_NAMES = new Set<NodeJS.Signals>([
+    'SIGABRT',
+    'SIGALRM',
+    'SIGBREAK',
+    'SIGBUS',
+    'SIGCHLD',
+    'SIGCONT',
+    'SIGFPE',
+    'SIGHUP',
+    'SIGILL',
+    'SIGINT',
+    'SIGIO',
+    'SIGIOT',
+    'SIGKILL',
+    'SIGPIPE',
+    'SIGPOLL',
+    'SIGPROF',
+    'SIGPWR',
+    'SIGQUIT',
+    'SIGSEGV',
+    'SIGSTKFLT',
+    'SIGSTOP',
+    'SIGSYS',
+    'SIGTERM',
+    'SIGTRAP',
+    'SIGTSTP',
+    'SIGTTIN',
+    'SIGTTOU',
+    'SIGUNUSED',
+    'SIGURG',
+    'SIGUSR1',
+    'SIGUSR2',
+    'SIGVTALRM',
+    'SIGWINCH',
+    'SIGXCPU',
+    'SIGXFSZ',
+]);
 
 async function runPmStart(args: string[]): Promise<void> {
     const parsed = parsePmStartArgs(args);
@@ -63,8 +109,130 @@ function resolveNamedMatches(paths: PmPaths, value: string): PmRecordMatch[] {
         return listPmRecordMatches(paths).map(syncPmRecordLiveness);
     }
 
+    const groupMatches = findPmGroupMatches(paths, value);
+    if (groupMatches.length > 0) {
+        return groupMatches.map(syncPmRecordLiveness);
+    }
+
     const match = findPmRecordMatch(paths, value);
     return match ? [syncPmRecordLiveness(match)] : [];
+}
+
+function sortPmMatchesByInstance(matches: PmRecordMatch[]): PmRecordMatch[] {
+    return [...matches].sort((left, right) => left.record.instanceIndex - right.record.instanceIndex);
+}
+
+function resolveInspectableMatch(paths: PmPaths, value: string): PmRecordMatch | undefined {
+    const exactMatch = findPmRecordMatch(paths, value);
+    const groupMatches = findPmGroupMatches(paths, value).map(syncPmRecordLiveness);
+
+    if (groupMatches.length > 1 && exactMatch?.record.baseName === value && exactMatch.record.name === value) {
+        throw new Error(`Multiple managed processes found for: ${value}. Use a specific instance name such as ${groupMatches[0]?.record.name} or ${groupMatches[1]?.record.name}.`);
+    }
+
+    if (exactMatch) {
+        return syncPmRecordLiveness(exactMatch);
+    }
+
+    return groupMatches[0];
+}
+
+function rebuildPmRecordDefinition(record: PmRecord, targetInstances = record.instances) {
+    const definition = resolvePmAppDefinition(
+        toPmAppConfig(record),
+        { name: record.baseName, env: {}, watchPaths: [], watchIgnore: [], instances: targetInstances },
+        process.cwd(),
+        record.source,
+    );
+
+    return {
+        ...definition,
+        name: record.name,
+        baseName: record.baseName,
+        instanceIndex: record.instanceIndex,
+        instances: targetInstances,
+    };
+}
+
+function rebuildPmSavedDefinition(app: ReturnType<typeof toSavedAppDefinition>) {
+    const definition = resolvePmAppDefinition(
+        toSavedPmAppConfig(app),
+        { name: app.baseName, env: {}, watchPaths: [], watchIgnore: [], instances: app.instances },
+        process.cwd(),
+        'cli',
+    );
+
+    return {
+        ...definition,
+        name: app.name,
+        baseName: app.baseName,
+        instanceIndex: app.instanceIndex,
+        instances: app.instances,
+    };
+}
+
+function deletePmMatches(matches: PmRecordMatch[]): void {
+    for (const match of matches) {
+        if (existsSync(match.record.logFiles.out)) {
+            rmSync(match.record.logFiles.out, { force: true });
+        }
+        if (existsSync(match.record.logFiles.err)) {
+            rmSync(match.record.logFiles.err, { force: true });
+        }
+        rmSync(match.filePath, { force: true });
+    }
+}
+
+function updatePmInstanceCount(matches: PmRecordMatch[], instances: number): void {
+    const now = new Date().toISOString();
+    for (const match of matches) {
+        writePmRecord(match.filePath, {
+            ...match.record,
+            instances,
+            updatedAt: now,
+        });
+    }
+}
+
+function normalizePmSignalName(value: string): NodeJS.Signals {
+    const trimmed = value.trim().toUpperCase();
+    const signalName = (trimmed.startsWith('SIG') ? trimmed : `SIG${trimmed}`) as NodeJS.Signals;
+
+    if (!PM_SIGNAL_NAMES.has(signalName)) {
+        throw new Error(`Unsupported pm signal: ${value}`);
+    }
+
+    return signalName;
+}
+
+function resolveSignalablePid(record: PmRecord): number | undefined {
+    if (record.childPid && record.childPid > 0) {
+        return record.childPid;
+    }
+
+    if (record.runnerPid && record.runnerPid > 0) {
+        return record.runnerPid;
+    }
+
+    return undefined;
+}
+
+function groupPmMatchesByBaseName(matches: PmRecordMatch[]): PmRecordMatch[][] {
+    const grouped = new Map<string, PmRecordMatch[]>();
+
+    for (const match of matches) {
+        const group = grouped.get(match.record.baseName);
+        if (group) {
+            group.push(match);
+            continue;
+        }
+
+        grouped.set(match.record.baseName, [match]);
+    }
+
+    return [...grouped.entries()]
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .map(([, group]) => sortPmMatchesByInstance(group));
 }
 
 function padCell(value: string, width: number): string {
@@ -399,6 +567,7 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'id', record.id);
     pushPmDetail(lines, 'status', record.status);
     pushPmDetail(lines, 'desired state', record.desiredState);
+    pushPmDetail(lines, 'instance', `${record.instanceIndex}/${record.instances}`);
     pushPmDetail(lines, 'cpu', formatPmCpuPercent(liveMetrics.cpuPercent));
     pushPmDetail(lines, 'memory', formatPmMemory(liveMetrics.memoryRssBytes));
     pushPmDetail(lines, 'uptime', formatPmUptime(liveMetrics.uptimeMs));
@@ -412,6 +581,8 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'child pid', record.childPid ? String(record.childPid) : '-');
     pushPmDetail(lines, 'restart count', `${record.restartCount}/${record.maxRestarts}`);
     pushPmDetail(lines, 'restart policy', record.restartPolicy);
+    pushPmDetail(lines, 'wait ready', record.waitReady ? 'enabled' : 'disabled');
+    pushPmDetail(lines, 'listen timeout', record.waitReady ? formatPmDuration(record.listenTimeout) : '-');
     pushPmDetail(lines, 'restart delay', formatPmDuration(record.restartDelay));
     pushPmDetail(lines, 'kill timeout', formatPmDuration(record.killTimeout));
     pushPmDetail(lines, 'min uptime', formatPmDuration(record.minUptime));
@@ -494,7 +665,7 @@ async function runPmList(args: string[]): Promise<void> {
 async function runPmShow(args: string[]): Promise<void> {
     const options = parsePmShowArgs(args);
     const { paths } = await loadPmContext();
-    const match = findPmRecordMatch(paths, options.name);
+    const match = resolveInspectableMatch(paths, options.name);
 
     if (!match) {
         throw new Error(`No managed process found for: ${options.name}`);
@@ -541,18 +712,49 @@ async function runPmRestart(args: string[]): Promise<void> {
 
     const restarted: string[] = [];
     for (const match of matches) {
-        const definition = resolvePmAppDefinition(
-            toPmAppConfig(match.record),
-            { name: match.record.name, env: {}, watchPaths: [], watchIgnore: [] },
-            process.cwd(),
-            match.record.source,
-        );
+        const definition = rebuildPmRecordDefinition(match.record);
 
         await startManagedProcess(definition, paths);
         restarted.push(match.record.name);
     }
 
     console.log(`[pm] restarted ${restarted.join(', ')}`);
+}
+
+async function runPmReload(args: string[]): Promise<void> {
+    const target = args[0];
+    if (!target) {
+        throw new Error('Usage: elit pm reload <name|all>');
+    }
+
+    const { paths } = await loadPmContext();
+    const matches = resolveNamedMatches(paths, target);
+    if (matches.length === 0) {
+        throw new Error(`No managed process found for: ${target}`);
+    }
+
+    const reloaded: string[] = [];
+    const errors: string[] = [];
+
+    for (const group of groupPmMatchesByBaseName(matches)) {
+        for (const match of group) {
+            try {
+                await stopPmMatches([match]);
+                const definition = rebuildPmRecordDefinition(match.record);
+                await startManagedProcess(definition, paths);
+                reloaded.push(match.record.name);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                errors.push(`[pm] ${match.record.name}: ${message}`);
+            }
+        }
+    }
+
+    if (errors.length > 0) {
+        throw new Error([`[pm] reloaded ${reloaded.length} process${reloaded.length === 1 ? '' : 'es'}`, ...errors].join(EOL));
+    }
+
+    console.log(`[pm] reloaded ${reloaded.join(', ')}`);
 }
 
 async function runPmSave(): Promise<void> {
@@ -588,12 +790,7 @@ async function runPmResurrect(): Promise<void> {
     let restored = 0;
     for (const app of dump.apps) {
         try {
-            const definition = resolvePmAppDefinition(
-                toSavedPmAppConfig(app),
-                { name: app.name, env: {}, watchPaths: [], watchIgnore: [] },
-                process.cwd(),
-                'cli',
-            );
+            const definition = rebuildPmSavedDefinition(app);
             await startManagedProcess(definition, paths);
             restored += 1;
         } catch (error) {
@@ -622,18 +819,156 @@ async function runPmDelete(args: string[]): Promise<void> {
     }
 
     await stopPmMatches(matches);
-
-    for (const match of matches) {
-        if (existsSync(match.record.logFiles.out)) {
-            rmSync(match.record.logFiles.out, { force: true });
-        }
-        if (existsSync(match.record.logFiles.err)) {
-            rmSync(match.record.logFiles.err, { force: true });
-        }
-        rmSync(match.filePath, { force: true });
-    }
+    deletePmMatches(matches);
 
     console.log(`[pm] deleted ${matches.length} process${matches.length === 1 ? '' : 'es'}`);
+}
+
+async function runPmScale(args: string[]): Promise<void> {
+    const target = args[0];
+    const countArg = args[1];
+    if (!target || countArg === undefined || args.length > 2) {
+        throw new Error('Usage: elit pm scale <name> <count>');
+    }
+
+    const desiredCount = normalizeIntegerOption(countArg, 'pm scale <count>', 0);
+    const { config, paths } = await loadPmContext();
+    const exactMatch = findPmRecordMatch(paths, target);
+    const currentMatches = sortPmMatchesByInstance(resolveNamedMatches(paths, exactMatch?.record.baseName ?? target));
+
+    if (currentMatches.length === 0) {
+        if (desiredCount === 0) {
+            console.log(`[pm] ${target} already scaled to 0 instances`);
+            return;
+        }
+
+        const definitions = resolvePmStartDefinitions(
+            { name: target, env: {}, watchPaths: [], watchIgnore: [], instances: desiredCount },
+            config,
+            process.cwd(),
+        );
+
+        for (const definition of definitions) {
+            await startManagedProcess(definition, paths);
+        }
+
+        console.log(`[pm] scaled ${target} to ${desiredCount} instance${desiredCount === 1 ? '' : 's'}`);
+        return;
+    }
+
+    const baseName = currentMatches[0]?.record.baseName ?? target;
+    if (desiredCount === currentMatches.length) {
+        console.log(`[pm] ${baseName} already scaled to ${desiredCount} instance${desiredCount === 1 ? '' : 's'}`);
+        return;
+    }
+
+    if (desiredCount === 0) {
+        await stopPmMatches(currentMatches);
+        deletePmMatches(currentMatches);
+        console.log(`[pm] scaled ${baseName} to 0 instances`);
+        return;
+    }
+
+    if (desiredCount < currentMatches.length) {
+        const toRemove = [...currentMatches]
+            .sort((left, right) => right.record.instanceIndex - left.record.instanceIndex)
+            .slice(0, currentMatches.length - desiredCount);
+        const remaining = currentMatches.filter((match) => !toRemove.some((removal) => removal.record.id === match.record.id));
+
+        await stopPmMatches(toRemove);
+        deletePmMatches(toRemove);
+        updatePmInstanceCount(remaining, desiredCount);
+        console.log(`[pm] scaled ${baseName} to ${desiredCount} instance${desiredCount === 1 ? '' : 's'}`);
+        return;
+    }
+
+    updatePmInstanceCount(currentMatches, desiredCount);
+    const baseRecord = currentMatches[0]?.record;
+    if (!baseRecord) {
+        throw new Error(`No managed process found for: ${target}`);
+    }
+
+    const baseDefinition = rebuildPmRecordDefinition(baseRecord, desiredCount);
+    const expandedDefinitions = expandPmInstanceDefinitions(baseDefinition, desiredCount);
+    const existingNames = new Set(currentMatches.map((match) => match.record.name));
+
+    for (const definition of expandedDefinitions) {
+        if (existingNames.has(definition.name)) {
+            continue;
+        }
+
+        await startManagedProcess(definition, paths);
+    }
+
+    console.log(`[pm] scaled ${baseName} to ${desiredCount} instance${desiredCount === 1 ? '' : 's'}`);
+}
+
+async function runPmSendSignal(args: string[]): Promise<void> {
+    const signalArg = args[0];
+    const target = args[1];
+    if (!signalArg || !target || args.length > 2) {
+        throw new Error('Usage: elit pm send-signal <signal> <name|all>');
+    }
+
+    const signalName = normalizePmSignalName(signalArg);
+    const { paths } = await loadPmContext();
+    const matches = resolveNamedMatches(paths, target);
+    if (matches.length === 0) {
+        throw new Error(`No managed process found for: ${target}`);
+    }
+
+    let signaled = 0;
+    const errors: string[] = [];
+    for (const match of matches) {
+        const pid = resolveSignalablePid(match.record);
+        if (!pid) {
+            continue;
+        }
+
+        try {
+            sendPmSignal(pid, signalName);
+            signaled += 1;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            errors.push(`[pm] ${match.record.name}: ${message}`);
+        }
+    }
+
+    if (errors.length > 0) {
+        throw new Error([`[pm] sent ${signalName} to ${signaled} process${signaled === 1 ? '' : 'es'}`, ...errors].join(EOL));
+    }
+
+    if (signaled === 0) {
+        throw new Error(`No running managed process found for: ${target}`);
+    }
+
+    console.log(`[pm] sent ${signalName} to ${signaled} process${signaled === 1 ? '' : 'es'}`);
+}
+
+async function runPmReset(args: string[]): Promise<void> {
+    const target = args[0];
+    if (!target) {
+        throw new Error('Usage: elit pm reset <name|all>');
+    }
+
+    const { paths } = await loadPmContext();
+    const matches = resolveNamedMatches(paths, target);
+    if (matches.length === 0) {
+        throw new Error(`No managed process found for: ${target}`);
+    }
+
+    const now = new Date().toISOString();
+    for (const match of matches) {
+        writePmRecord(match.filePath, {
+            ...match.record,
+            restartCount: 0,
+            lastExitCode: undefined,
+            error: undefined,
+            updatedAt: now,
+        });
+    }
+
+    console.log(`[pm] reset ${matches.length} process${matches.length === 1 ? '' : 'es'}`);
 }
 
 async function runPmLogs(args: string[]): Promise<void> {
@@ -671,7 +1006,7 @@ async function runPmLogs(args: string[]): Promise<void> {
     }
 
     const { paths } = await loadPmContext();
-    const match = findPmRecordMatch(paths, name);
+    const match = resolveInspectableMatch(paths, name);
     if (!match) {
         throw new Error(`No managed process found for: ${name}`);
     }
@@ -716,6 +1051,20 @@ export async function runPmCommand(args: string[]): Promise<void> {
             return;
         case 'restart':
             await runPmRestart(args.slice(1));
+            return;
+        case 'reload':
+            await runPmReload(args.slice(1));
+            return;
+        case 'scale':
+            await runPmScale(args.slice(1));
+            return;
+        case 'send-signal':
+        case 'signal':
+        case 'sendSignal':
+            await runPmSendSignal(args.slice(1));
+            return;
+        case 'reset':
+            await runPmReset(args.slice(1));
             return;
         case 'delete':
         case 'remove':

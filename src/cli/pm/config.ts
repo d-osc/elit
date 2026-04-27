@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import type { ElitConfig, PmAppConfig } from '../../shares/config';
 import {
+    DEFAULT_PM_LISTEN_TIMEOUT,
     DEFAULT_PM_KILL_TIMEOUT,
     DEFAULT_MAX_RESTARTS,
     DEFAULT_MIN_UPTIME,
@@ -90,6 +91,22 @@ function defaultProcessName(base: { script?: string; file?: string; wapk?: strin
     return 'process';
 }
 
+export function formatPmInstanceName(baseName: string, instanceIndex: number): string {
+    return instanceIndex <= 1 ? baseName : `${baseName}:${instanceIndex}`;
+}
+
+export function expandPmInstanceDefinitions(definition: ResolvedPmAppDefinition, targetInstances = definition.instances): ResolvedPmAppDefinition[] {
+    return Array.from({ length: targetInstances }, (_, index) => {
+        const instanceIndex = index + 1;
+        return {
+            ...definition,
+            name: formatPmInstanceName(definition.baseName, instanceIndex),
+            instanceIndex,
+            instances: targetInstances,
+        };
+    });
+}
+
 function countDefinedTargets(app: Pick<PmAppConfig, 'script' | 'file' | 'wapk'>): number {
     return [app.script, app.file, app.wapk].filter(Boolean).length;
 }
@@ -143,6 +160,11 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
     }
 
     const name = defaultProcessName({ script, file, wapk }, parsed.name ?? base?.name);
+    const instances = parsed.instances ?? base?.instances ?? 1;
+    if (!Number.isInteger(instances) || instances < 1) {
+        throw new Error('pm instances must be a number >= 1.');
+    }
+
     const mergedWapkRun = mergePmWapkRunConfig(base?.wapkRun, parsed.wapkRun);
     const runtime = normalizePmRuntime(parsed.runtime ?? mergedWapkRun?.runtime ?? base?.runtime, '--runtime');
 
@@ -170,6 +192,7 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
             maxFailures: parsed.healthCheckMaxFailures,
         }
         : base?.healthCheck);
+    const waitReady = parsed.waitReady ?? base?.waitReady ?? false;
 
     const password = parsed.password ?? mergedWapkRun?.password ?? base?.password;
     const wapkRun = stripPmWapkSourceFromRunConfig(mergedWapkRun);
@@ -182,8 +205,15 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         throw new Error('WAPK run options are only supported when starting a WAPK app.');
     }
 
+    if (waitReady && !healthCheck) {
+        throw new Error('--wait-ready requires --health-url or pm.apps[].healthCheck.');
+    }
+
     return {
-        name,
+        name: formatPmInstanceName(name, 1),
+        baseName: name,
+        instanceIndex: 1,
+        instances,
         type: script ? 'script' : wapk ? 'wapk' : 'file',
         source,
         cwd: resolvedCwd,
@@ -202,6 +232,8 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         maxRestarts: parsed.maxRestarts ?? base?.maxRestarts ?? DEFAULT_MAX_RESTARTS,
         password,
         restartPolicy,
+        waitReady,
+        listenTimeout: parsed.listenTimeout ?? base?.listenTimeout ?? DEFAULT_PM_LISTEN_TIMEOUT,
         minUptime: parsed.minUptime ?? base?.minUptime ?? DEFAULT_MIN_UPTIME,
         watch,
         watchPaths: watch ? normalizeResolvedWatchPaths(configuredWatchPaths, resolvedCwd, script ? 'script' : wapk ? 'wapk' : 'file', file, wapk) : [],
@@ -214,20 +246,21 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
 export function resolvePmStartDefinitions(parsed: ParsedPmStartArgs, config: ElitConfig | null, workspaceRoot: string): ResolvedPmAppDefinition[] {
     const configApps = getConfiguredPmApps(config);
     const selection = resolveStartSelection(configApps, parsed, workspaceRoot);
+    const expandDefinitions = (definitions: ResolvedPmAppDefinition[]) => definitions.flatMap((definition) => expandPmInstanceDefinitions(definition));
 
     if (selection.startAll) {
         if (configApps.length === 0) {
             throw new Error('No pm apps configured in elit.config.* and no start target was provided.');
         }
 
-        return configApps.map((app) => resolvePmAppDefinition(app, { ...parsed, name: app.name }, workspaceRoot, 'config'));
+        return expandDefinitions(configApps.map((app) => resolvePmAppDefinition(app, { ...parsed, name: app.name }, workspaceRoot, 'config')));
     }
 
     if (selection.selected) {
-        return [resolvePmAppDefinition(selection.selected, parsed, workspaceRoot, 'config')];
+        return expandDefinitions([resolvePmAppDefinition(selection.selected, parsed, workspaceRoot, 'config')]);
     }
 
-    return [resolvePmAppDefinition(undefined, parsed, workspaceRoot, 'cli')];
+    return expandDefinitions([resolvePmAppDefinition(undefined, parsed, workspaceRoot, 'cli')]);
 }
 
 export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
@@ -303,6 +336,9 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
                 parsed.env[key] = value;
                 break;
             }
+            case '--instances':
+                parsed.instances = normalizeIntegerOption(readRequiredValue(args, ++index, '--instances'), '--instances', 1);
+                break;
             case '--password':
                 parsed.password = readRequiredValue(args, ++index, '--password');
                 break;
@@ -352,6 +388,12 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
                 break;
             case '--restart-policy':
                 parsed.restartPolicy = normalizePmRestartPolicy(readRequiredValue(args, ++index, '--restart-policy'));
+                break;
+            case '--wait-ready':
+                parsed.waitReady = true;
+                break;
+            case '--listen-timeout':
+                parsed.listenTimeout = normalizeIntegerOption(readRequiredValue(args, ++index, '--listen-timeout'), '--listen-timeout', 1);
                 break;
             case '--min-uptime':
                 parsed.minUptime = normalizeIntegerOption(readRequiredValue(args, ++index, '--min-uptime'), '--min-uptime');
@@ -448,6 +490,10 @@ export function printPmHelp(): void {
         '  elit pm describe <name> --json',
         '  elit pm stop <name|all>',
         '  elit pm restart <name|all>',
+        '  elit pm reload <name|all>',
+        '  elit pm scale <name> <count>',
+        '  elit pm reset <name|all>',
+        '  elit pm send-signal <signal> <name|all>',
         '  elit pm delete <name|all>',
         '  elit pm save',
         '  elit pm resurrect',
@@ -463,6 +509,7 @@ export function printPmHelp(): void {
         '  --google-drive-shared-drive Forward supportsAllDrives=true for shared drives',
         '  --runtime, -r <name>        Runtime override: node, bun, deno',
         '  --name, -n <name>           Process name used by list/stop/restart',
+        '  --instances <count>         Start multiple managed instances for the same app name',
         '  --cwd <dir>                 Working directory for the managed process',
         '  --env KEY=VALUE             Add or override an environment variable',
         '  --password <value>          Password for locked WAPK archives',
@@ -474,6 +521,8 @@ export function printPmHelp(): void {
         '  --no-archive-watch          Disable archive-source read sync for WAPK apps',
         '  --archive-sync-interval <ms>  Forward WAPK archive read-sync interval (>= 50ms)',
         '  --restart-policy <mode>     Restart policy: always, on-failure, never',
+        '  --wait-ready                Keep the process in starting state until its health check succeeds',
+        '  --listen-timeout <ms>       Startup wait limit when --wait-ready is enabled (default 3000)',
         '  --min-uptime <ms>           Reset crash counter after this healthy uptime',
         '  --watch                     Restart when watched files change',
         '  --watch-path <path>         Add a file or directory to watch',
@@ -510,7 +559,12 @@ export function printPmHelp(): void {
         '  - elit pm save persists running apps to pm.dumpFile or ./.elit/pm/dump.json.',
         '  - elit pm resurrect restarts whatever was last saved by elit pm save.',
         '  - elit pm start <name> starts a configured app by name.',
+        '  - elit pm reload <name|all> performs a rolling stop/start across each matched instance.',
+        '  - elit pm scale <name> <count> changes the number of managed instances for a running app group.',
+        '  - elit pm reset <name|all> clears restart count, last exit code, and saved error metadata.',
+        '  - elit pm send-signal <signal> <name|all> forwards a POSIX-style signal such as SIGUSR2 or TERM.',
         '  - killTimeout controls how long PM waits before force-killing an app that ignores stop or restart requests.',
+        '  - waitReady uses the configured health check as a startup gate and errors if it never becomes healthy within listenTimeout.',
         '  - elit pm list shows live cpu, memory, and uptime columns when the child process is running.',
         '  - elit pm list --json and elit pm jlist print machine-readable process state.',
         '  - elit pm list --json, elit pm show --json, and elit pm describe --json include liveMetrics when available.',

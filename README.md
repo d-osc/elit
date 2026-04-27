@@ -263,6 +263,8 @@ Useful flags:
 - `elit native generate ir ./src/native-screen.ts --platform android --export screen`
 - `elit pm start --script "npm start" --name my-app --runtime node`
 - `elit pm start --script "npm start" --name my-app --kill-timeout 12000`
+- `elit pm start --script "npm start" --name my-app --wait-ready --health-url http://127.0.0.1:3000/health --listen-timeout 5000`
+- `elit pm start --script "npm start" --name my-app --instances 3`
 - `elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure`
 - `elit pm start ./src/worker.ts --name worker --runtime bun`
 - `elit pm start --wapk ./app.wapk --name packaged-app`
@@ -272,6 +274,7 @@ Useful flags:
 - `elit pm list --json`
 - `elit pm show my-app`
 - `elit pm describe my-app --json`
+- `elit pm scale my-app 4`
 - `elit pm save`
 - `elit pm resurrect`
 - `elit pm logs my-app --lines 100`
@@ -346,8 +349,13 @@ PM mode notes:
 - `elit pm start --script "npm start"`, `elit pm start --file ./app.ts`, and `elit pm start --wapk ./app.wapk` all run through the same detached process manager.
 - WAPK PM targets can also point at `gdrive://<fileId>` or use `pm.apps[].wapkRun.googleDrive` plus forwarded WAPK run flags like `online`, `onlineUrl`, `syncInterval`, `watcher`, and `watchArchive`.
 - `elit pm start` boots every app from `pm.apps[]`, and `elit pm start <name>` starts one configured app by name.
+- `waitReady` uses the configured health check as a startup gate, and `listenTimeout` decides how long PM can stay in `starting` before it treats startup as failed.
+- `instances` starts a process group like `api`, `api:2`, `api:3`, and `elit pm scale <name> <count>` grows or shrinks that group later.
 - `killTimeout` gives each PM app its own grace window before Elit escalates stop or restart to a forceful kill.
-- Use `elit pm list`, `elit pm list --json`, `elit pm show`, `elit pm describe --json`, `elit pm stop`, `elit pm restart`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
+- `elit pm reload <name|all>` now performs a rolling stop/start across each matched instance in a process group.
+- `elit pm reset <name|all>` clears restart counters and saved exit metadata without deleting the process record.
+- `elit pm send-signal <signal> <name|all>` forwards a signal such as `SIGUSR2` or `TERM` to the active managed child process.
+- Use `elit pm list`, `elit pm list --json`, `elit pm show`, `elit pm describe --json`, `elit pm stop`, `elit pm restart`, `elit pm reload`, `elit pm reset`, `elit pm send-signal`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
 - PM-managed WAPK online hosts close their Elit Run shared session when you use `elit pm stop`, `elit pm restart`, or `elit pm delete`.
 - Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.
 - Use `--watch`, `--watch-path`, `--watch-ignore`, and `--watch-debounce` when the process should restart after source changes.

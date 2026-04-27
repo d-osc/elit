@@ -8,6 +8,7 @@ export const DEFAULT_RESTART_DELAY = 1000;
 export const DEFAULT_MAX_RESTARTS = 10;
 export const DEFAULT_WATCH_DEBOUNCE = 250;
 export const DEFAULT_MIN_UPTIME = 0;
+export const DEFAULT_PM_LISTEN_TIMEOUT = 3000;
 export const DEFAULT_HEALTHCHECK_GRACE_PERIOD = 5000;
 export const DEFAULT_HEALTHCHECK_INTERVAL = 10000;
 export const DEFAULT_HEALTHCHECK_TIMEOUT = 3000;
@@ -43,6 +44,9 @@ export interface PmDumpFile {
 
 export interface PmSavedAppDefinition {
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     cwd: string;
     runtime?: PmRuntimeName;
@@ -53,6 +57,8 @@ export interface PmSavedAppDefinition {
     password?: string;
     wapkRun?: WapkRunConfig;
     restartPolicy: PmRestartPolicy;
+    waitReady: boolean;
+    listenTimeout: number;
     autorestart: boolean;
     restartDelay: number;
     killTimeout: number;
@@ -75,12 +81,15 @@ export interface ParsedPmStartArgs {
     runtime?: PmRuntimeName;
     cwd?: string;
     env: Record<string, string>;
+    instances?: number;
     autorestart?: boolean;
     restartDelay?: number;
     killTimeout?: number;
     maxRestarts?: number;
     password?: string;
     restartPolicy?: PmRestartPolicy;
+    waitReady?: boolean;
+    listenTimeout?: number;
     minUptime?: number;
     watch?: boolean;
     watchPaths: string[];
@@ -95,6 +104,9 @@ export interface ParsedPmStartArgs {
 
 export interface ResolvedPmAppDefinition {
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     source: 'cli' | 'config';
     cwd: string;
@@ -110,6 +122,8 @@ export interface ResolvedPmAppDefinition {
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    waitReady: boolean;
+    listenTimeout: number;
     minUptime: number;
     watch: boolean;
     watchPaths: string[];
@@ -121,6 +135,9 @@ export interface ResolvedPmAppDefinition {
 export interface PmRecord {
     id: string;
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     source: 'cli' | 'config';
     cwd: string;
@@ -136,6 +153,8 @@ export interface PmRecord {
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    waitReady: boolean;
+    listenTimeout: number;
     minUptime: number;
     watch: boolean;
     watchPaths: string[];
@@ -187,6 +206,6 @@ export interface ParsedPmRunnerArgs {
 }
 
 export interface PmRestartRequest {
-    kind: 'watch' | 'health';
+    kind: 'watch' | 'health' | 'startup';
     detail: string;
 }
