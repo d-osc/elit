@@ -265,6 +265,10 @@ function resolvePmReloadReadyTimeout(record: Pick<PmRecord, 'waitReady' | 'liste
         : Math.max(record.restartDelay + 1000, 2000);
 }
 
+function supportsPmProxyReload(record: Pick<PmRecord, 'proxy' | 'instances' | 'runnerPid'>): boolean {
+    return Boolean(record.proxy) && record.instances === 1 && Boolean(record.runnerPid);
+}
+
 function padCell(value: string, width: number): string {
     return value.length >= width ? value : `${value}${' '.repeat(width - value.length)}`;
 }
@@ -550,6 +554,12 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'child pid', record.childPid ? String(record.childPid) : '-');
     pushPmDetail(lines, 'restart count', `${record.restartCount}/${record.maxRestarts}`);
     pushPmDetail(lines, 'restart policy', record.restartPolicy);
+    pushPmDetail(lines, 'proxy', record.proxy
+        ? `http://${record.proxy.host ?? '0.0.0.0'}:${record.proxy.port}`
+        : '-');
+    pushPmDetail(lines, 'proxy target', record.proxy && record.proxyTargetPort
+        ? `${record.proxy.targetHost ?? '127.0.0.1'}:${record.proxyTargetPort}`
+        : '-');
     pushPmDetail(lines, 'max memory', record.maxMemoryBytes ? formatPmMemory(record.maxMemoryBytes) : '-');
     pushPmDetail(lines, 'memory action', record.memoryAction ?? '-');
     pushPmDetail(lines, 'cron restart', record.cronRestart ?? '-');
@@ -714,6 +724,23 @@ async function runPmReload(args: string[]): Promise<void> {
     for (const group of groupPmMatchesByBaseName(matches)) {
         for (const match of group) {
             try {
+                if (supportsPmProxyReload(match.record)) {
+                    const reloadRequestedAt = new Date().toISOString();
+                    writePmRecord(match.filePath, {
+                        ...match.record,
+                        status: 'restarting',
+                        reloadRequestedAt,
+                        updatedAt: reloadRequestedAt,
+                        error: undefined,
+                    });
+                    await waitForPmRecordOnline(
+                        getPmRecordPath(paths, match.record.id),
+                        resolvePmReloadReadyTimeout(match.record),
+                    );
+                    reloaded.push(match.record.name);
+                    continue;
+                }
+
                 await stopPmMatches([match]);
                 const definition = rebuildPmRecordDefinition(match.record);
                 const startedRecord = await startManagedProcess(definition, paths);

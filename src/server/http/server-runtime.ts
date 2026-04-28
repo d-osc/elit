@@ -5,7 +5,7 @@ import { isBun, isDeno, isNode } from '../../shares/runtime';
 import { http } from './node-modules';
 import { IncomingMessage } from './incoming-message';
 import { ServerResponse } from './response';
-import type { RequestListener, ServerOptions } from './types';
+import type { RequestListener, ServerListenOptions, ServerOptions } from './types';
 import {
   closeAndEmit,
   createAddress,
@@ -37,13 +37,37 @@ export class Server extends EventEmitter {
     this._bunWebSocketServers.delete(wsServer);
   }
 
+  private resolvePmInheritedFd(explicitPort?: number, explicitFd?: number): number | undefined {
+    if (typeof explicitFd === 'number' && Number.isInteger(explicitFd) && explicitFd >= 0) {
+      return explicitFd;
+    }
+
+    const fdValue = process.env.ELIT_PM_LISTEN_FD;
+    if (!fdValue) {
+      return undefined;
+    }
+
+    const parsedFd = Number.parseInt(fdValue, 10);
+    if (!Number.isInteger(parsedFd) || parsedFd < 0) {
+      return undefined;
+    }
+
+    const publicPort = Number.parseInt(process.env.ELIT_PM_PUBLIC_PORT ?? process.env.ELIT_PM_PORT ?? '', 10);
+    if (Number.isInteger(explicitPort) && Number.isInteger(publicPort) && explicitPort !== publicPort) {
+      return undefined;
+    }
+
+    return parsedFd;
+  }
+
   listen(port?: number, hostname?: string, backlog?: number, listeningListener?: () => void): this;
   listen(port?: number, hostname?: string, listeningListener?: () => void): this;
   listen(port?: number, listeningListener?: () => void): this;
-  listen(options?: { port?: number; hostname?: string; backlog?: number }, listeningListener?: () => void): this;
+  listen(options?: ServerListenOptions, listeningListener?: () => void): this;
   listen(...args: any[]): this {
     let port = 3000;
     let hostname = '0.0.0.0';
+    let fd: number | undefined;
     let callback: (() => void) | undefined;
 
     const firstArg = args[0];
@@ -59,8 +83,11 @@ export class Server extends EventEmitter {
     } else if (firstArg && typeof firstArg === 'object') {
       port = firstArg.port || 3000;
       hostname = firstArg.hostname || '0.0.0.0';
+      fd = typeof firstArg.fd === 'number' ? firstArg.fd : undefined;
       callback = args[1];
     }
+
+    fd = this.resolvePmInheritedFd(firstArg && typeof firstArg === 'object' ? firstArg.port : port, fd);
 
     const self = this;
 
@@ -80,11 +107,19 @@ export class Server extends EventEmitter {
         self.emit('upgrade', req, socket, head);
       });
 
-      this.nativeServer.listen(port, hostname, () => {
-        this._listening = true;
-        this.emit('listening');
-        if (callback) callback();
-      });
+      if (fd !== undefined) {
+        this.nativeServer.listen({ fd, exclusive: false }, () => {
+          this._listening = true;
+          this.emit('listening');
+          if (callback) callback();
+        });
+      } else {
+        this.nativeServer.listen(port, hostname, () => {
+          this._listening = true;
+          this.emit('listening');
+          if (callback) callback();
+        });
+      }
 
       this.nativeServer.on('error', (err: Error) => this.emit('error', err));
       this.nativeServer.on('close', () => {
@@ -221,7 +256,6 @@ export class Server extends EventEmitter {
                 this.writeHead(statusCode);
               }
               responseReady = true;
-              return this;
             },
           };
 
@@ -231,57 +265,168 @@ export class Server extends EventEmitter {
             self.emit('request', incomingMessage, serverResponse);
           }
 
-          if (responseReady) {
-            return new Response(body, {
-              status: statusCode,
-              statusText: statusMessage,
-              headers: headers as HeadersInit,
-            });
+          if (!responseReady) {
+            serverResponse.end();
           }
 
-          return new Promise<Response>((resolve) => {
-            serverResponse.end = (chunk?: any) => {
-              if (chunk !== undefined) {
-                body += chunk;
-              }
-              resolve(new Response(body, {
-                status: statusCode,
-                statusText: statusMessage,
-                headers: headers as HeadersInit,
-              }));
-            };
+          return new Response(body, {
+            status: statusCode,
+            statusText: statusMessage,
+            headers,
           });
         },
-        error: createErrorResponse,
-      });
-
-      emitListeningWithCallback(this, callback);
-    } else if (isDeno) {
-      // @ts-ignore
-      this.nativeServer = Deno.serve({
-        port,
-        hostname,
-        handler: (req: Request) => {
-          return new Promise<Response>((resolve) => {
-            const incomingMessage = new IncomingMessage(req);
-            const serverResponse = new ServerResponse();
-
-            serverResponse._setResolver(resolve);
-
-            if (self.requestListener) {
-              self.requestListener(incomingMessage, serverResponse);
-            } else {
-              self.emit('request', incomingMessage, serverResponse);
-            }
-          });
-        },
-        onError: (error: Error) => {
-          this.emit('error', error);
+        error: (err: Error) => {
+          this.emit('error', err);
           return createErrorResponse();
         },
       });
 
+      this._listening = true;
       emitListeningWithCallback(this, callback);
+
+      this.nativeServer.stop = this.nativeServer.stop || this.nativeServer.close;
+      this.nativeServer.close = this.nativeServer.close || this.nativeServer.stop;
+
+      this.nativeServer.on?.('close', () => {
+        this._listening = false;
+        this.emit('close');
+      });
+    } else if (isDeno) {
+      const server = this;
+      // @ts-ignore
+      this.nativeServer = Deno.serve({
+        port,
+        hostname,
+      }, async (req: Request) => {
+        const urlObj = new URL(req.url);
+        const requestUrl = urlObj.pathname + urlObj.search;
+        const incomingHeaders = headersToRecord(req.headers);
+        const rawHeaders = headersToRawHeaders(req.headers);
+
+        const bodyChunks: Uint8Array[] = [];
+        const responseHeaders = new Headers();
+        let statusCode = 200;
+        let statusText = 'OK';
+        let responseClosed = false;
+
+        const incomingMessage: any = {
+          method: req.method,
+          url: requestUrl,
+          headers: incomingHeaders,
+          httpVersion: '1.1',
+          rawHeaders,
+          _req: req,
+          text: () => req.text(),
+          json: () => req.json(),
+        };
+
+        const serverResponse: any = {
+          statusCode: 200,
+          statusMessage: 'OK',
+          headersSent: false,
+
+          setHeader(name: string, value: string | string[] | number) {
+            responseHeaders.set(name, Array.isArray(value) ? value.join(', ') : String(value));
+            return this;
+          },
+
+          getHeader(name: string) {
+            return responseHeaders.get(name) ?? undefined;
+          },
+
+          getHeaders() {
+            const headers: Record<string, string> = {};
+            responseHeaders.forEach((value, key) => {
+              headers[key] = value;
+            });
+            return headers;
+          },
+
+          writeHead(status: number, arg2?: any, arg3?: any) {
+            statusCode = status;
+            this.statusCode = status;
+            this.headersSent = true;
+
+            if (typeof arg2 === 'string') {
+              statusText = arg2;
+              this.statusMessage = arg2;
+              if (arg3) {
+                Object.entries(arg3).forEach(([key, value]) => {
+                  responseHeaders.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+                });
+              }
+            } else if (arg2) {
+              Object.entries(arg2).forEach(([key, value]) => {
+                responseHeaders.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+              });
+            }
+            return this;
+          },
+
+          write(chunk: any) {
+            if (!this.headersSent) {
+              this.writeHead(statusCode);
+            }
+
+            if (typeof chunk === 'string') {
+              bodyChunks.push(new TextEncoder().encode(chunk));
+            } else if (chunk instanceof Uint8Array) {
+              bodyChunks.push(chunk);
+            } else if (chunk !== undefined && chunk !== null) {
+              bodyChunks.push(new TextEncoder().encode(String(chunk)));
+            }
+
+            return true;
+          },
+
+          end(chunk?: any) {
+            if (chunk !== undefined) {
+              this.write(chunk);
+            }
+            if (!this.headersSent) {
+              this.writeHead(statusCode);
+            }
+            responseClosed = true;
+          },
+        };
+
+        if (server.requestListener) {
+          server.requestListener(incomingMessage, serverResponse);
+        } else {
+          server.emit('request', incomingMessage, serverResponse);
+        }
+
+        if (!responseClosed) {
+          serverResponse.end();
+        }
+
+        const body = bodyChunks.length === 0
+          ? undefined
+          : (() => {
+              const totalLength = bodyChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+              const output = new ArrayBuffer(totalLength);
+              const combined = new Uint8Array(output);
+              let offset = 0;
+              for (const chunk of bodyChunks) {
+                combined.set(chunk, offset);
+                offset += chunk.length;
+              }
+              return output;
+            })();
+
+        return new Response(body, {
+          status: statusCode,
+          statusText,
+          headers: responseHeaders,
+        });
+      });
+
+      this._listening = true;
+      emitListeningWithCallback(this, callback);
+
+      (this.nativeServer.finished as Promise<void>)
+        .then(() => closeAndEmit(this))
+        .catch((err: Error) => this.emit('error', err));
     }
 
     return this;
@@ -337,14 +482,12 @@ export class Server extends EventEmitter {
   }
 }
 
-/**
- * Create HTTP server
- */
 export function createServer(requestListener?: RequestListener): Server;
 export function createServer(options: ServerOptions, requestListener?: RequestListener): Server;
 export function createServer(
-  optionsOrListener?: ServerOptions | RequestListener,
-  requestListener?: RequestListener
+  arg1?: ServerOptions | RequestListener,
+  arg2?: RequestListener,
 ): Server {
-  return new Server(typeof optionsOrListener === 'function' ? optionsOrListener : requestListener);
+  const requestListener = typeof arg1 === 'function' ? arg1 : arg2;
+  return new Server(requestListener);
 }

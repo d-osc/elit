@@ -19,6 +19,7 @@ import {
     normalizeEnvMap,
     normalizePmMemoryLimit,
     normalizePmMemoryAction,
+    normalizePmProxyConfig,
     normalizeHealthCheckConfig,
     normalizeIntegerOption,
     normalizePmRestartPolicy,
@@ -167,6 +168,13 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
     if (!Number.isInteger(instances) || instances < 1) {
         throw new Error('pm instances must be a number >= 1.');
     }
+    const proxy = normalizePmProxyConfig(
+        parsed.proxy ? { ...(base?.proxy ?? {}), ...parsed.proxy } : base?.proxy,
+        parsed.proxy ? 'pm proxy' : 'pm.apps[].proxy',
+    );
+    if (proxy && instances > 1) {
+        throw new Error('pm proxy currently supports only one managed instance per app.');
+    }
 
     const mergedWapkRun = mergePmWapkRunConfig(base?.wapkRun, parsed.wapkRun);
     const runtime = normalizePmRuntime(parsed.runtime ?? mergedWapkRun?.runtime ?? base?.runtime, '--runtime');
@@ -246,6 +254,7 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         wapkRun,
         autorestart,
         restartDelay: parsed.restartDelay ?? base?.restartDelay ?? DEFAULT_RESTART_DELAY,
+        proxy,
         killTimeout: parsed.killTimeout ?? base?.killTimeout ?? DEFAULT_PM_KILL_TIMEOUT,
         maxRestarts: parsed.maxRestarts ?? base?.maxRestarts ?? DEFAULT_MAX_RESTARTS,
         password,
@@ -362,6 +371,30 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
             }
             case '--instances':
                 parsed.instances = normalizeIntegerOption(readRequiredValue(args, ++index, '--instances'), '--instances', 1);
+                break;
+            case '--proxy-port':
+                parsed.proxy = {
+                    ...parsed.proxy,
+                    port: normalizeIntegerOption(readRequiredValue(args, ++index, '--proxy-port'), '--proxy-port', 1),
+                };
+                break;
+            case '--proxy-host':
+                parsed.proxy = {
+                    ...parsed.proxy,
+                    host: readRequiredValue(args, ++index, '--proxy-host'),
+                };
+                break;
+            case '--proxy-target-host':
+                parsed.proxy = {
+                    ...parsed.proxy,
+                    targetHost: readRequiredValue(args, ++index, '--proxy-target-host'),
+                };
+                break;
+            case '--proxy-env':
+                parsed.proxy = {
+                    ...parsed.proxy,
+                    envVar: readRequiredValue(args, ++index, '--proxy-env'),
+                };
                 break;
             case '--password':
                 parsed.password = readRequiredValue(args, ++index, '--password');
@@ -552,6 +585,10 @@ export function printPmHelp(): void {
         '  --runtime, -r <name>        Runtime override: node, bun, deno',
         '  --name, -n <name>           Process name used by list/stop/restart',
         '  --instances <count>         Start multiple managed instances for the same app name',
+        '  --proxy-port <port>         Own a public HTTP port through a PM proxy for single-instance reload handoff',
+        '  --proxy-host <host>         Public host bound by the PM proxy (default: 0.0.0.0)',
+        '  --proxy-target-host <host>  Internal host used for upstream child traffic (default: 127.0.0.1)',
+        '  --proxy-env <name>          Env var populated with the child private port (default: PORT)',
         '  --cwd <dir>                 Working directory for the managed process',
         '  --env KEY=VALUE             Add or override an environment variable',
         '  --password <value>          Password for locked WAPK archives',

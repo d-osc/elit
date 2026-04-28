@@ -4,6 +4,7 @@ import { extname, join, resolve } from 'node:path';
 import type {
     PmHealthCheckConfig,
     PmMemoryAction,
+    PmProxyConfig,
     PmRestartPolicy,
     PmRuntimeName,
     WapkGoogleDriveConfig,
@@ -503,4 +504,39 @@ export function readRequiredValue(args: string[], index: number, optionName: str
         throw new Error(`${optionName} requires a value.`);
     }
     return value;
+}
+
+export function normalizePmProxyConfig(value: unknown, optionName = 'pm proxy'): PmProxyConfig | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value !== 'object') {
+        throw new Error(`${optionName} must be an object with at least a port.`);
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const hasAnyValue = candidate.port !== undefined
+        || candidate.host !== undefined
+        || candidate.targetHost !== undefined
+        || candidate.envVar !== undefined;
+
+    if (!hasAnyValue) {
+        return undefined;
+    }
+
+    if (candidate.port === undefined || candidate.port === null || candidate.port === '') {
+        throw new Error(`${optionName}.port is required.`);
+    }
+
+    const port = typeof candidate.port === 'number'
+        ? normalizeIntegerOption(String(Math.trunc(candidate.port)), `${optionName}.port`, 1)
+        : normalizeIntegerOption(String(candidate.port), `${optionName}.port`, 1);
+
+    return {
+        port,
+        host: normalizeNonEmptyString(candidate.host),
+        targetHost: normalizeNonEmptyString(candidate.targetHost),
+        envVar: normalizeNonEmptyString(candidate.envVar),
+    };
 }

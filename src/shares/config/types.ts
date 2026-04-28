@@ -25,6 +25,17 @@ export type PmRuntimeName = 'node' | 'bun' | 'deno';
 export type PmRestartPolicy = 'always' | 'on-failure' | 'never';
 export type PmMemoryAction = 'restart' | 'stop';
 
+export interface PmProxyConfig {
+    /** Public port owned by the PM proxy process */
+    port: number;
+    /** Public host bound by the PM proxy process */
+    host?: string;
+    /** Internal host used for upstream child traffic */
+    targetHost?: string;
+    /** Environment variable populated with the child private port */
+    envVar?: string;
+}
+
 export interface PmHealthCheckConfig {
     /** HTTP endpoint polled while the process is online */
     url?: string;
@@ -59,6 +70,8 @@ export interface PmAppConfig {
     autorestart?: boolean;
     /** Delay between restart attempts in milliseconds */
     restartDelay?: number;
+    /** Enable a PM-managed public HTTP proxy for single-instance zero-downtime reloads */
+    proxy?: PmProxyConfig;
     /** Grace period before a stop or restart escalates to forceful termination */
     killTimeout?: number;
     /** Maximum restart attempts before marking the process as errored */

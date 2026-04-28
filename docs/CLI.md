@@ -229,6 +229,10 @@ Useful options:
 - `--archive-watch` and `--no-archive-watch` for WAPK archive pull sync
 - `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
+- `--proxy-port <port>`
+- `--proxy-host <host>`
+- `--proxy-target-host <host>`
+- `--proxy-env <name>`
 - `--max-memory <bytes|size>`
 - `--memory-action restart|stop`
 - `--cron-restart <expr>`
@@ -257,12 +261,15 @@ Notes:
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
 - `pm reload <name|all>` performs a rolling stop/start across each matched instance and waits for the replacement to return `online` before continuing.
-- `pm reload <name|all>` is still a stop/start cycle for single-instance apps that bind the public port directly; the readiness wait mainly protects multi-instance groups and externally fronted HTTP processes.
+- `pm reload <name|all>` can hand off a single-instance HTTP app without dropping the public endpoint when `--proxy-port` or `pm.apps[].proxy` is enabled; PM owns the public port and injects a private upstream port into the child env.
+- Proxy mode currently supports one managed instance per app. Multi-instance groups still use the rolling replacement path.
+- `pm reload <name|all>` is still a stop/start cycle for single-instance apps that bind the public port directly.
 - `pm scale <name> <count>` changes the number of managed instances for a process group.
 - `pm reset <name|all>` clears restart counters plus saved exit/error metadata.
 - `pm send-signal <signal> <name|all>` forwards a signal like `SIGUSR2` or `TERM` to the current managed child process.
 - `maxMemory` accepts raw bytes or size strings like `256M`; `memoryAction` decides whether that threshold restarts or stops the process.
 - `cronRestart` accepts a 5-field cron string or `@every 30s`, `expBackoffRestartDelay` doubles unstable restart delays, `expBackoffRestartMaxDelay` caps them, and `restartWindow` resets stale restart counters before they count toward `maxRestarts` again.
+- `--proxy-host` defaults to `0.0.0.0`, `--proxy-target-host` defaults to `127.0.0.1`, and `--proxy-env` defaults to `PORT`.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
 - `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.

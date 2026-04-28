@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { PmMemoryAction, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
+import type { PmMemoryAction, PmProxyConfig, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
 
 export const DEFAULT_PM_DATA_DIR = join('.elit', 'pm');
 export const DEFAULT_PM_DUMP_FILE = 'dump.json';
@@ -70,6 +70,7 @@ export interface PmSavedAppDefinition {
     listenTimeout: number;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
     killTimeout: number;
     maxRestarts: number;
     minUptime: number;
@@ -91,6 +92,7 @@ export interface ParsedPmStartArgs {
     cwd?: string;
     env: Record<string, string>;
     instances?: number;
+    proxy?: Partial<PmProxyConfig>;
     autorestart?: boolean;
     restartDelay?: number;
     killTimeout?: number;
@@ -133,6 +135,7 @@ export interface ResolvedPmAppDefinition {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
     killTimeout: number;
     maxRestarts: number;
     password?: string;
@@ -170,6 +173,8 @@ export interface PmRecord {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
+    proxyTargetPort?: number;
     killTimeout: number;
     maxRestarts: number;
     password?: string;
@@ -198,6 +203,7 @@ export interface PmRecord {
     runnerPid?: number;
     childPid?: number;
     restartCount: number;
+    reloadRequestedAt?: string;
     lastRestartAt?: string;
     lastExitCode?: number;
     error?: string;

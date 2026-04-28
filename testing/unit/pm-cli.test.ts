@@ -449,6 +449,10 @@ describe('pm cli process inspection', () => {
             parsePmStartArgs([
                 '--script', 'npm run api',
                 '--name', 'api',
+                '--proxy-port', '3010',
+                '--proxy-host', '127.0.0.1',
+                '--proxy-target-host', '127.0.0.1',
+                '--proxy-env', 'APP_PORT',
                 '--max-memory', '128M',
                 '--memory-action', 'stop',
                 '--cron-restart', '@every 1s',
@@ -473,6 +477,12 @@ describe('pm cli process inspection', () => {
                             name: 'worker',
                             file: './src/worker.ts',
                             runtime: 'bun',
+                            proxy: {
+                                port: 4010,
+                                host: '127.0.0.1',
+                                targetHost: '127.0.0.1',
+                                envVar: 'APP_PORT',
+                            },
                             maxMemory: '256M',
                             memoryAction: 'stop',
                             cronRestart: '*/5 * * * *',
@@ -488,6 +498,10 @@ describe('pm cli process inspection', () => {
 
         expect(cliDefinitions).toHaveLength(1);
         expect(cliDefinitions[0]?.maxMemoryBytes).toBe(128 * 1024 * 1024);
+    expect(cliDefinitions[0]?.proxy?.port).toBe(3010);
+    expect(cliDefinitions[0]?.proxy?.host).toBe('127.0.0.1');
+    expect(cliDefinitions[0]?.proxy?.targetHost).toBe('127.0.0.1');
+    expect(cliDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
         expect(cliDefinitions[0]?.memoryAction).toBe('stop');
         expect(cliDefinitions[0]?.cronRestart).toBe('@every 1s');
         expect(cliDefinitions[0]?.expBackoffRestartDelay).toBe(250);
@@ -495,6 +509,8 @@ describe('pm cli process inspection', () => {
         expect(cliDefinitions[0]?.restartWindow).toBe(1500);
         expect(configDefinitions).toHaveLength(1);
         expect(configDefinitions[0]?.maxMemoryBytes).toBe(256 * 1024 * 1024);
+    expect(configDefinitions[0]?.proxy?.port).toBe(4010);
+    expect(configDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
         expect(configDefinitions[0]?.memoryAction).toBe('stop');
         expect(configDefinitions[0]?.cronRestart).toBe('*/5 * * * *');
         expect(configDefinitions[0]?.expBackoffRestartDelay).toBe(400);
@@ -579,7 +595,15 @@ describe('pm cli process inspection', () => {
     });
 
     it('prints detailed process metadata for pm show', async () => {
-        const { workspaceRoot, record } = createPmWorkspace();
+        const { workspaceRoot, record } = createPmWorkspace({
+            proxy: {
+                port: 3010,
+                host: '127.0.0.1',
+                targetHost: '127.0.0.1',
+                envVar: 'PORT',
+            },
+            proxyTargetPort: 44010,
+        });
         const originalCwd = process.cwd();
         const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -603,6 +627,10 @@ describe('pm cli process inspection', () => {
             expect(output).toContain('disabled');
             expect(output).toContain('memory action:');
             expect(output).toContain('restart');
+            expect(output).toContain('proxy:');
+            expect(output).toContain('http://127.0.0.1:3010');
+            expect(output).toContain('proxy target:');
+            expect(output).toContain('127.0.0.1:44010');
             expect(output).toContain('kill timeout:');
             expect(output).toContain('12s');
             expect(output).toContain('watch paths:');
@@ -883,6 +911,119 @@ describe('pm control commands', () => {
             await removeWorkspace(workspaceRoot).catch(() => undefined);
         }
     }, 12000);
+
+    it('reloads a proxy-managed single instance without dropping the public endpoint', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-proxy-reload-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        const entryFile = join(workspaceRoot, 'proxy-app.js');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+        writeFileSync(entryFile, [
+            'const http = require("node:http");',
+            'const version = `${process.pid}:${Date.now()}`;',
+            'let server;',
+            'setTimeout(() => {',
+            '  server = http.createServer((req, res) => {',
+            '    if (req.url === "/health") { res.statusCode = 200; res.end("ok"); return; }',
+            '    res.statusCode = 200;',
+            '    res.end(version);',
+            '  });',
+            '  server.listen(Number(process.env.PORT), "127.0.0.1");',
+            '}, 120);',
+            'const shutdown = () => {',
+            '  if (server) { server.close(() => process.exit(0)); return; }',
+            '  process.exit(0);',
+            '};',
+            'process.on("SIGTERM", shutdown);',
+            'process.on("SIGINT", shutdown);',
+        ].join('\n'));
+
+        const publicPort = 43800 + Math.floor(Math.random() * 200);
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'proxy-app',
+            name: 'proxy-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            env: {},
+            proxy: {
+                port: publicPort,
+                host: '127.0.0.1',
+                targetHost: '127.0.0.1',
+                envVar: 'PORT',
+            },
+            restartPolicy: 'never',
+            maxRestarts: 0,
+            minUptime: 0,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 2000,
+            healthCheck: {
+                url: `http://127.0.0.1:${publicPort}/health`,
+                gracePeriod: 0,
+                interval: 100,
+                timeout: 100,
+                maxFailures: 1,
+            },
+            logFiles: {
+                out: join(logsDir, 'proxy-app.out.log'),
+                err: join(logsDir, 'proxy-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'proxy-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        const loopPromise = runManagedProcessLoop(recordPath, record);
+        const originalCwd = process.cwd();
+        process.chdir(workspaceRoot);
+
+        try {
+            const initialRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'proxy-app', 4000);
+            const firstResponse = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+
+            let reloadFinished = false;
+            let requestFailures = 0;
+            const seenResponses = new Set([firstResponse]);
+            const poller = (async () => {
+                while (!reloadFinished) {
+                    try {
+                        const body = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+                        seenResponses.add(body);
+                    } catch {
+                        requestFailures += 1;
+                    }
+
+                    await new Promise((resolvePromise) => setTimeout(resolvePromise, 40));
+                }
+            })();
+
+            await runPmCommand(['reload', 'proxy-app']);
+            reloadFinished = true;
+            await poller;
+
+            const reloadedRecord = readWorkspacePmRecord(workspaceRoot, 'proxy-app');
+            const secondResponse = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+            seenResponses.add(secondResponse);
+
+            expect(requestFailures).toBe(0);
+            expect(initialRecord.childPid).not.toBe(reloadedRecord.childPid);
+            expect(initialRecord.proxyTargetPort).not.toBe(reloadedRecord.proxyTargetPort);
+            expect(seenResponses.size).toBeGreaterThan(1);
+            expect(reloadedRecord.status).toBe('online');
+            expect(reloadedRecord.reloadRequestedAt).toBeUndefined();
+
+            writeFileSync(recordPath, JSON.stringify({ ...reloadedRecord, desiredState: 'stopped' }, null, 2));
+            await loopPromise;
+        } finally {
+            process.chdir(originalCwd);
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 20000);
 });
 
 describe('pm runner readiness', () => {

@@ -354,9 +354,11 @@ PM mode notes:
 - `maxMemory` works with `memoryAction=restart|stop`, `cronRestart` accepts cron expressions or `@every 30s` shorthand, `expBackoffRestartDelay` adds PM2-style unstable restart backoff, `expBackoffRestartMaxDelay` caps that delay, and `restartWindow` limits how long restart attempts keep counting toward `maxRestarts`.
 - `killTimeout` gives each PM app its own grace window before Elit escalates stop or restart to a forceful kill.
 - `elit pm reload <name|all>` now performs a rolling stop/start across each matched instance in a process group and waits for each replacement to become `online` before it moves on.
-- Single-instance apps that bind the public port directly still incur a restart gap on `reload`; true shadow handoff needs a PM-managed front proxy layer that is not part of the current PM model yet.
+- `pm.apps[].proxy` or `elit pm start --proxy-port <port>` lets PM own the public HTTP port for a single-instance app, inject a private child port through the configured env var, and hand off `reload` without dropping the public endpoint.
+- Single-instance apps that bind the public port directly still incur a restart gap on `reload`; proxy mode is the current zero-downtime path.
 - `elit pm reset <name|all>` clears restart counters and saved exit metadata without deleting the process record.
 - `elit pm send-signal <signal> <name|all>` forwards a signal such as `SIGUSR2` or `TERM` to the active managed child process.
+- On Node.js, `elit/http` and `elit/https` also accept `listen({ fd })` and can reuse `ELIT_PM_LISTEN_FD` plus `ELIT_PM_PUBLIC_PORT` automatically when an app opts into inherited-listener startup.
 - Use `elit pm list`, `elit pm list --json`, `elit pm show`, `elit pm describe --json`, `elit pm stop`, `elit pm restart`, `elit pm reload`, `elit pm reset`, `elit pm send-signal`, `elit pm delete`, `elit pm save`, `elit pm resurrect`, and `elit pm logs` to manage long-running processes.
 - PM-managed WAPK online hosts close their Elit Run shared session when you use `elit pm stop`, `elit pm restart`, or `elit pm delete`.
 - Use `--restart-policy always|on-failure|never` plus `--min-uptime <ms>` when you want tighter restart-loop control.

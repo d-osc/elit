@@ -220,6 +220,26 @@ pm: {
       restartDelay: 500,
     },
     {
+      name: 'edge-api',
+      file: './src/edge-api.ts',
+      runtime: 'node',
+      proxy: {
+        port: 3000,
+        host: '0.0.0.0',
+        targetHost: '127.0.0.1',
+        envVar: 'PORT',
+      },
+      waitReady: true,
+      listenTimeout: 5000,
+      healthCheck: {
+        url: 'http://127.0.0.1:3000/health',
+        gracePeriod: 1000,
+        interval: 1000,
+        timeout: 500,
+        maxFailures: 2,
+      },
+    },
+    {
       name: 'archive-app',
       wapk: './dist/app.wapk',
       runtime: 'node',
@@ -263,10 +283,11 @@ Notes:
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
 - `instances` starts multiple managed children for one app name, and `elit pm scale <name> <count>` updates that count later.
+- `pm.apps[].proxy` lets PM own the public HTTP port for a single-instance app, route traffic to a private child port, and hand off `elit pm reload <name>` without a public restart gap.
 - `maxMemory` accepts raw bytes or strings like `256M`, `memoryAction` decides whether that threshold restarts or stops the app, `cronRestart` accepts a cron string or `@every 30s`, `expBackoffRestartDelay` doubles unstable restart delays, `expBackoffRestartMaxDelay` caps them, and `restartWindow` resets stale restart counters before they keep counting toward `maxRestarts`.
 - `waitReady` keeps the app in `starting` until its `healthCheck` succeeds, while `listenTimeout` caps how long startup may wait.
 - `elit pm reload <name>` now waits for each replacement instance to become `online` before moving to the next one, so readiness-aware HTTP groups can roll with less disruption.
-- Single-instance apps that bind their public port directly still restart in place; zero-downtime handoff would require a PM-managed front proxy or another socket-sharing layer.
+- Proxy mode currently supports one managed instance per app. Single-instance apps that bind their public port directly still restart in place.
 - `killTimeout` sets the per-app grace window before Elit forcefully terminates a stop or restart.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.

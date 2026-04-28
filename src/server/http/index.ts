@@ -25,6 +25,7 @@ export type {
   OutgoingHttpHeaders,
   RequestListener,
   RequestOptions,
+  ServerListenOptions,
   ServerOptions,
 } from './types';
 
