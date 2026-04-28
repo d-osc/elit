@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createServer as createHttpServer } from 'node:http';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { EOL } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -8,6 +9,7 @@ import {
     DEFAULT_PM_DUMP_FILE,
     DEFAULT_PM_EXP_BACKOFF_MAX_DELAY,
     DEFAULT_PM_MEMORY_CHECK_INTERVAL,
+    DEFAULT_PM_PROXY_STRATEGY,
     DEFAULT_PM_STOP_POLL_MS,
     PM_WAPK_ONLINE_SHUTDOWN_COMMAND,
     PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS,
@@ -21,6 +23,7 @@ import { isIgnoredWatchPath, readRequiredValue } from './helpers';
 import {
     findPmRecordMatch,
     isProcessAlive,
+    listPmRecordMatches,
     readLatestPmRecord,
     writePmRecord,
 } from './records';
@@ -29,6 +32,7 @@ import {
     buildPmProxyTargetUrl,
     createPmProxyController,
     resolvePmProxyEnvVar,
+    resolvePmProxyHost,
     resolvePmProxyTargetHost,
     rewritePmProxyHealthCheckUrl,
     type PmProxyController,
@@ -66,11 +70,181 @@ async function delay(milliseconds: number): Promise<void> {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 }
 
+function resolveRunnerPathsFromRecordFile(filePath: string): PmPaths {
+    const appsDir = dirname(filePath);
+    const dataDir = dirname(appsDir);
+    return {
+        dataDir,
+        appsDir,
+        logsDir: join(dataDir, 'logs'),
+        dumpFile: join(dataDir, DEFAULT_PM_DUMP_FILE),
+    };
+}
+
+function usesPmProxyController(record: Pick<PmRecord, 'proxy'>): boolean {
+    return Boolean(record.proxy) && (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'proxy';
+}
+
+function usesPmInheritedListener(record: Pick<PmRecord, 'proxy'>): boolean {
+    return Boolean(record.proxy) && (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit';
+}
+
+function isPmProxyOwner(record: Pick<PmRecord, 'proxy' | 'instanceIndex'>): boolean {
+    return usesPmProxyController(record) && record.instanceIndex === 1;
+}
+
+function resolvePmProxyTargetUrls(paths: PmPaths, baseName: string): string[] {
+    return listPmRecordMatches(paths)
+        .filter((match) => match.record.baseName === baseName)
+        .filter((match) => usesPmProxyController(match.record))
+    .filter((match) => match.record.desiredState === 'running' && Boolean(match.record.proxyReadyAt))
+        .filter((match) => typeof match.record.proxyTargetPort === 'number' && match.record.proxyTargetPort > 0)
+        .sort((left, right) => left.record.instanceIndex - right.record.instanceIndex)
+        .map((match) => buildPmProxyTargetUrl(match.record.proxy!, match.record.proxyTargetPort!));
+}
+
+async function createPmInheritedListener(proxy: NonNullable<PmRecord['proxy']>): Promise<ReturnType<typeof createHttpServer>> {
+    const server = createHttpServer();
+    await new Promise<void>((resolvePromise, reject) => {
+        server.once('error', reject);
+        server.listen(proxy.port, resolvePmProxyHost(proxy), () => resolvePromise());
+    });
+    return server;
+}
+
+interface PmChildIpcState {
+    bootstrapReady: boolean;
+    listenerReady: boolean;
+    stop(): void;
+}
+
+function createPmChildIpcState(
+    child: ReturnType<typeof spawn>,
+    sharedListener: ReturnType<typeof createHttpServer> | null,
+): PmChildIpcState {
+    let bootstrapReady = false;
+    let listenerReady = false;
+    let sharedHandleSent = false;
+
+    const sendSharedHandle = (): void => {
+        if (!sharedListener || !bootstrapReady || sharedHandleSent || !child.connected) {
+            return;
+        }
+
+        sharedHandleSent = true;
+        child.send?.({ type: 'elit:pm:listen-handle' }, sharedListener);
+    };
+
+    const onMessage = (message: any): void => {
+        if (!message || typeof message !== 'object') {
+            return;
+        }
+
+        if (message.type === 'elit:pm:bootstrap-ready') {
+            bootstrapReady = true;
+            sendSharedHandle();
+            return;
+        }
+
+        if (message.type === 'elit:pm:listener-ready') {
+            listenerReady = true;
+        }
+    };
+
+    child.on('message', onMessage);
+
+    return {
+        get bootstrapReady() {
+            return bootstrapReady;
+        },
+        get listenerReady() {
+            return listenerReady;
+        },
+        stop() {
+            child.off('message', onMessage);
+        },
+    };
+}
+
+function buildPmChildEnv(record: PmRecord, command: ReturnType<typeof buildPmCommand>, targetPort?: number): NodeJS.ProcessEnv {
+    return {
+        ...process.env,
+        ...record.env,
+        ...command.env,
+        ...(usesPmProxyController(record) && targetPort
+            ? {
+                [resolvePmProxyEnvVar(record.proxy!)]: String(targetPort),
+                ELIT_PM_PUBLIC_PORT: String(record.proxy!.port),
+            }
+            : {}),
+        ELIT_PM_NAME: record.name,
+        ELIT_PM_ID: record.id,
+    };
+}
+
+function buildPmChildStdio(command: ReturnType<typeof buildPmCommand>, onlineStdinShutdownEnabled: boolean): Array<'pipe' | 'ignore' | 'ipc'> {
+    return [
+        onlineStdinShutdownEnabled ? 'pipe' : 'ignore',
+        'pipe',
+        'pipe',
+        ...(command.ipc ? ['ipc' as const] : []),
+    ];
+}
+
 function createPmReadinessMonitor(
     record: PmRecord,
     onReady: (message: string) => void,
     onFailure: (message: string) => void,
+    options?: { ipcController?: PmChildIpcState },
 ) {
+    if (options?.ipcController) {
+        let stopped = false;
+        let timer: ReturnType<typeof setInterval> | null = null;
+        let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const clearTimers = (): void => {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
+            }
+        };
+
+        const host = record.proxy?.host ?? '0.0.0.0';
+        const port = record.proxy?.port ?? 0;
+        timer = setInterval(() => {
+            if (stopped || !options.ipcController?.listenerReady) {
+                return;
+            }
+
+            stopped = true;
+            clearTimers();
+            onReady(`shared listener ready on ${host}:${port}`);
+        }, 25);
+        timer.unref?.();
+
+        timeoutTimer = setTimeout(() => {
+            if (stopped) {
+                return;
+            }
+
+            stopped = true;
+            clearTimers();
+            onFailure(`listen timeout reached after ${record.listenTimeout}ms while waiting for shared listener ${host}:${port}`);
+        }, record.listenTimeout);
+        timeoutTimer.unref?.();
+
+        return {
+            stop() {
+                stopped = true;
+                clearTimers();
+            },
+        };
+    }
+
     if (!record.waitReady || !record.healthCheck) {
         return {
             stop() {},
@@ -233,7 +407,7 @@ async function createPmChildControllers(
     stderrLog: { write: (value: string) => unknown; writableEnded?: boolean; destroyed?: boolean },
     requestPlannedRestart: (kind: PmRestartRequest['kind'], detail: string) => void,
     onReady: (message: string) => void,
-    options?: { ready?: boolean },
+    options?: { ready?: boolean; ipcController?: PmChildIpcState },
 ): Promise<PmChildControllers> {
     let healthMonitor = {
         stop() {},
@@ -253,7 +427,8 @@ async function createPmChildControllers(
         );
     };
 
-    const readinessMonitor = options?.ready || !record.waitReady
+    const needsReadySignal = Boolean(options?.ipcController) || record.waitReady;
+    const readinessMonitor = options?.ready || !needsReadySignal
         ? { stop() {} }
         : createPmReadinessMonitor(
             record,
@@ -262,6 +437,7 @@ async function createPmChildControllers(
                 startHealthMonitor();
             },
             (message) => requestPlannedRestart('startup', message),
+            { ipcController: options?.ipcController },
         );
 
     const watchController = await createPmWatchController(
@@ -280,7 +456,7 @@ async function createPmChildControllers(
         (message) => writePmLog(stdoutLog, message),
     );
 
-    if (options?.ready || !record.waitReady) {
+    if (options?.ready || !needsReadySignal) {
         startHealthMonitor();
     }
 
@@ -295,8 +471,12 @@ async function createPmChildControllers(
     };
 }
 
-async function waitForPmChildReady(record: PmRecord, child: ReturnType<typeof spawn>): Promise<{ ready: boolean; message?: string; exitResult?: any }> {
-    if (!record.waitReady || !record.healthCheck) {
+async function waitForPmChildReady(
+    record: PmRecord,
+    child: ReturnType<typeof spawn>,
+    ipcController?: PmChildIpcState,
+): Promise<{ ready: boolean; message?: string; exitResult?: any }> {
+    if (!ipcController && (!record.waitReady || !record.healthCheck)) {
         return { ready: true };
     }
 
@@ -311,6 +491,7 @@ async function waitForPmChildReady(record: PmRecord, child: ReturnType<typeof sp
         (message) => {
             failureMessage = message;
         },
+        { ipcController },
     );
     void waitForManagedChildExit(child).then((result) => {
         exitResult = result;
@@ -607,6 +788,17 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
     const stdoutLog = createWriteStream(initialRecord.logFiles.out, { flags: 'a' });
     const stderrLog = createWriteStream(initialRecord.logFiles.err, { flags: 'a' });
     let proxyController: PmProxyController | null = null;
+    let proxyTargetSyncTimer: ReturnType<typeof setInterval> | null = null;
+    let inheritedListener: ReturnType<typeof createHttpServer> | null = null;
+    const runnerPaths = resolveRunnerPathsFromRecordFile(filePath);
+
+    const syncOwnedProxyTargets = (baseName: string): void => {
+        if (!proxyController) {
+            return;
+        }
+
+        proxyController.setTargets(resolvePmProxyTargetUrls(runnerPaths, baseName));
+    };
 
     const persist = (mutator: (current: PmRecord) => PmRecord): PmRecord => {
         const current = readLatestPmRecord(filePath, record);
@@ -702,8 +894,16 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             let command;
             try {
                 command = buildPmCommand(latest);
-                if (latest.proxy && !proxyController) {
+                if (latest.proxy && isPmProxyOwner(latest) && !proxyController) {
                     proxyController = await createPmProxyController(latest.proxy);
+                    syncOwnedProxyTargets(latest.baseName);
+                    if (!proxyTargetSyncTimer) {
+                        proxyTargetSyncTimer = setInterval(() => syncOwnedProxyTargets(latest.baseName), 50);
+                        proxyTargetSyncTimer.unref?.();
+                    }
+                }
+                if (latest.proxy && usesPmInheritedListener(latest) && !inheritedListener) {
+                    inheritedListener = await createPmInheritedListener(latest.proxy);
                 }
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -715,36 +915,26 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     runnerPid: undefined,
                     childPid: undefined,
                     proxyTargetPort: undefined,
+                    proxyReadyAt: undefined,
                     updatedAt: new Date().toISOString(),
                 }));
                 return;
             }
 
             const onlineStdinShutdownEnabled = isPmOnlineWapkRecord(latest);
-            const initialTargetPort = latest.proxy
-                ? await allocatePmProxyTargetPort(resolvePmProxyTargetHost(latest.proxy))
+            const initialTargetPort = usesPmProxyController(latest)
+                ? await allocatePmProxyTargetPort(resolvePmProxyTargetHost(latest.proxy!))
                 : undefined;
             const monitorRecord = buildPmMonitorRecord(latest, initialTargetPort);
             let child = spawn(command.command, command.args, {
                 cwd: latest.cwd,
-                env: {
-                    ...process.env,
-                    ...latest.env,
-                    ...command.env,
-                    ...(latest.proxy && initialTargetPort
-                        ? {
-                            [resolvePmProxyEnvVar(latest.proxy)]: String(initialTargetPort),
-                            ELIT_PM_PUBLIC_PORT: String(latest.proxy.port),
-                        }
-                        : {}),
-                    ELIT_PM_NAME: latest.name,
-                    ELIT_PM_ID: latest.id,
-                },
-                stdio: [onlineStdinShutdownEnabled ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+                env: buildPmChildEnv(latest, command, initialTargetPort),
+                stdio: buildPmChildStdio(command, onlineStdinShutdownEnabled),
                 windowsHide: true,
                 shell: command.shell,
             });
             let childStartedAt = Date.now();
+            let childIpcState = command.ipc ? createPmChildIpcState(child, inheritedListener) : undefined;
 
             activeChild = child;
             if (child.stdout) {
@@ -761,7 +951,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             });
 
             const startedAt = new Date().toISOString();
-            const waitingForReady = latest.waitReady;
+            const waitingForReady = latest.waitReady || Boolean(childIpcState);
             persist((current) => ({
                 ...current,
                 status: waitingForReady ? 'starting' : 'online',
@@ -770,6 +960,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 runnerPid: process.pid,
                 childPid: child.pid,
                 proxyTargetPort: initialTargetPort,
+                proxyReadyAt: !waitingForReady && usesPmProxyController(latest) ? startedAt : undefined,
                 startedAt,
                 stoppedAt: undefined,
                 reloadRequestedAt: undefined,
@@ -777,8 +968,8 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 updatedAt: startedAt,
             }));
             writePmLog(stdoutLog, `started ${command.preview}${child.pid ? ` (pid ${child.pid})` : ''}`);
-            if (latest.proxy && initialTargetPort && !waitingForReady) {
-                proxyController?.setTarget(buildPmProxyTargetUrl(latest.proxy, initialTargetPort));
+            if (isPmProxyOwner(latest) && !waitingForReady) {
+                syncOwnedProxyTargets(latest.baseName);
             }
 
             const requestPlannedRestart = (kind: PmRestartRequest['kind'], detail: string): void => {
@@ -803,18 +994,19 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 requestPlannedRestart,
                 (message) => {
                     const readyAt = new Date().toISOString();
-                    if (latest.proxy && initialTargetPort) {
-                        proxyController?.setTarget(buildPmProxyTargetUrl(latest.proxy, initialTargetPort));
+                    if (isPmProxyOwner(latest)) {
+                        syncOwnedProxyTargets(latest.baseName);
                     }
                     persist((current) => ({
                         ...current,
                         status: 'online',
                         proxyTargetPort: initialTargetPort,
+                        proxyReadyAt: readyAt,
                         updatedAt: readyAt,
                     }));
                     writePmLog(stdoutLog, message);
                 },
-                { ready: !waitingForReady },
+                { ready: !waitingForReady, ipcController: childIpcState },
             );
 
             let handledReloadAt = latest.reloadRequestedAt;
@@ -827,23 +1019,18 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 const reloadRequestedAt = latestRecord.reloadRequestedAt;
                 if (!stopRequested && supportsPmProxyReload(latestRecord) && reloadRequestedAt && reloadRequestedAt !== handledReloadAt && latestRecord.proxy) {
                     handledReloadAt = reloadRequestedAt;
-                    const replacementTargetPort = await allocatePmProxyTargetPort(resolvePmProxyTargetHost(latestRecord.proxy));
+                    const replacementTargetPort = usesPmProxyController(latestRecord)
+                        ? await allocatePmProxyTargetPort(resolvePmProxyTargetHost(latestRecord.proxy))
+                        : undefined;
                     const replacementMonitorRecord = buildPmMonitorRecord(latestRecord, replacementTargetPort);
                     const replacementChild = spawn(command.command, command.args, {
                         cwd: latestRecord.cwd,
-                        env: {
-                            ...process.env,
-                            ...latestRecord.env,
-                            ...command.env,
-                            [resolvePmProxyEnvVar(latestRecord.proxy)]: String(replacementTargetPort),
-                            ELIT_PM_PUBLIC_PORT: String(latestRecord.proxy.port),
-                            ELIT_PM_NAME: latestRecord.name,
-                            ELIT_PM_ID: latestRecord.id,
-                        },
-                        stdio: [onlineStdinShutdownEnabled ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+                        env: buildPmChildEnv(latestRecord, command, replacementTargetPort),
+                        stdio: buildPmChildStdio(command, onlineStdinShutdownEnabled),
                         windowsHide: true,
                         shell: command.shell,
                     });
+                    const replacementIpcState = command.ipc ? createPmChildIpcState(replacementChild, inheritedListener) : undefined;
 
                     if (replacementChild.stdout) {
                         replacementChild.stdout.pipe(stdoutLog, { end: false });
@@ -852,14 +1039,16 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                         replacementChild.stderr.pipe(stderrLog, { end: false });
                     }
 
-                    writePmLog(stdoutLog, `starting proxy handoff replacement${replacementChild.pid ? ` (pid ${replacementChild.pid})` : ''}`);
-                    const readyResult = await waitForPmChildReady(replacementMonitorRecord, replacementChild);
+                    writePmLog(stdoutLog, `starting ${usesPmInheritedListener(latestRecord) ? 'shared-listener' : 'proxy handoff'} replacement${replacementChild.pid ? ` (pid ${replacementChild.pid})` : ''}`);
+                    const readyResult = await waitForPmChildReady(replacementMonitorRecord, replacementChild, replacementIpcState);
                     if (!readyResult.ready) {
-                        writePmLog(stderrLog, readyResult.message ?? 'proxy handoff replacement exited before becoming ready');
+                        writePmLog(stderrLog, readyResult.message ?? 'replacement exited before becoming ready');
+                        replacementIpcState?.stop();
                         await stopProxyManagedChild(replacementChild, latestRecord, stderrLog);
                         persist((current) => ({
                             ...current,
                             status: 'online',
+                            proxyReadyAt: current.proxyReadyAt,
                             reloadRequestedAt: undefined,
                             updatedAt: new Date().toISOString(),
                         }));
@@ -868,13 +1057,17 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
 
                     const previousChild = child;
                     const previousControllers = controllers;
+                    const previousIpcState = childIpcState;
                     const handoffAt = new Date().toISOString();
-                    proxyController?.setTarget(buildPmProxyTargetUrl(latestRecord.proxy, replacementTargetPort));
+                    if (usesPmProxyController(latestRecord) && replacementTargetPort) {
+                        proxyController?.setTarget(buildPmProxyTargetUrl(latestRecord.proxy, replacementTargetPort));
+                    }
                     persist((current) => ({
                         ...current,
                         status: 'online',
                         childPid: replacementChild.pid,
                         proxyTargetPort: replacementTargetPort,
+                        proxyReadyAt: handoffAt,
                         startedAt: handoffAt,
                         reloadRequestedAt: undefined,
                         error: undefined,
@@ -883,9 +1076,10 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     if (readyResult.message) {
                         writePmLog(stdoutLog, readyResult.message);
                     }
-                    writePmLog(stdoutLog, `proxy handoff activated on ${latestRecord.proxy.host ?? '0.0.0.0'}:${latestRecord.proxy.port}`);
+                    writePmLog(stdoutLog, `${usesPmInheritedListener(latestRecord) ? 'shared listener' : 'proxy handoff'} activated on ${latestRecord.proxy.host ?? '0.0.0.0'}:${latestRecord.proxy.port}`);
 
                     child = replacementChild;
+                    childIpcState = replacementIpcState;
                     childStartedAt = Date.now();
                     activeChild = replacementChild;
                     childWaitState = { settled: false, result: undefined };
@@ -900,12 +1094,17 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                         stderrLog,
                         requestPlannedRestart,
                         () => {},
-                        { ready: true },
+                        { ready: true, ipcController: replacementIpcState },
                     );
 
+                    await delay(250);
                     await previousControllers.stop();
+                    previousIpcState?.stop();
                     await stopProxyManagedChild(previousChild, latestRecord, stderrLog);
                     clearActiveChildStopTimer();
+                    if (isPmProxyOwner(latestRecord)) {
+                        syncOwnedProxyTargets(latestRecord.baseName);
+                    }
                     continue;
                 }
 
@@ -914,10 +1113,10 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
 
             const exitResult: any = childWaitState.result;
             await controllers.stop();
+            childIpcState?.stop();
             clearActiveChildStopTimer();
 
             activeChild = null;
-            proxyController?.setTarget(undefined);
             const exitCode = waitForExit(exitResult.code, exitResult.signal);
             const current = readLatestPmRecord(filePath, record);
             const plannedRestart = readPlannedRestartRequest(restartState);
@@ -952,6 +1151,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                         : exitCode === 0 && !exitResult.error ? 'exited' : 'errored',
                     childPid: undefined,
                     proxyTargetPort: undefined,
+                    proxyReadyAt: undefined,
                     runnerPid: undefined,
                     lastExitCode: exitCode,
                     reloadRequestedAt: undefined,
@@ -961,6 +1161,9 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     stoppedAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 }));
+                if (isPmProxyOwner(current)) {
+                    syncOwnedProxyTargets(current.baseName);
+                }
                 return;
             }
 
@@ -973,6 +1176,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     status: 'errored',
                     childPid: undefined,
                     proxyTargetPort: undefined,
+                    proxyReadyAt: undefined,
                     runnerPid: undefined,
                     restartCount: nextRestartCount,
                     lastRestartAt: new Date().toISOString(),
@@ -985,6 +1189,9 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                     updatedAt: new Date().toISOString(),
                 }));
                 writePmLog(stderrLog, `max restart attempts reached (${current.maxRestarts})`);
+                if (isPmProxyOwner(current)) {
+                    syncOwnedProxyTargets(current.baseName);
+                }
                 return;
             }
 
@@ -992,14 +1199,18 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
                 ...latestRecord,
                 status: 'restarting',
                 childPid: undefined,
-                    proxyTargetPort: undefined,
+                proxyTargetPort: undefined,
+                proxyReadyAt: undefined,
                 lastExitCode: exitCode,
                 restartCount: nextRestartCount,
                 lastRestartAt: new Date().toISOString(),
-                    reloadRequestedAt: undefined,
+                reloadRequestedAt: undefined,
                 error: undefined,
                 updatedAt: new Date().toISOString(),
             }));
+            if (isPmProxyOwner(current)) {
+                syncOwnedProxyTargets(current.baseName);
+            }
             const resolvedRestartDelay = resolvePmRestartDelay(current, nextRestartCount, shouldCountRestart && !wasStable && plannedRestart?.kind !== 'watch');
             if (plannedRestart) {
                 writePmLog(
@@ -1029,6 +1240,7 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
             runnerPid: undefined,
             childPid: undefined,
             proxyTargetPort: undefined,
+            proxyReadyAt: undefined,
             reloadRequestedAt: undefined,
             stoppedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -1037,9 +1249,18 @@ export async function runManagedProcessLoop(filePath: string, initialRecord: PmR
         process.off('SIGINT', handleStopSignal);
         process.off('SIGTERM', handleStopSignal);
 
+        if (proxyTargetSyncTimer) {
+            clearInterval(proxyTargetSyncTimer);
+            proxyTargetSyncTimer = null;
+        }
+
         if (proxyController) {
             await proxyController.close().catch(() => undefined);
             proxyController = null;
+        }
+        if (inheritedListener) {
+            await new Promise<void>((resolvePromise) => inheritedListener?.close(() => resolvePromise()));
+            inheritedListener = null;
         }
 
         await new Promise<void>((resolvePromise) => stdoutLog.end(resolvePromise));

@@ -5,6 +5,7 @@ import type {
     PmHealthCheckConfig,
     PmMemoryAction,
     PmProxyConfig,
+    PmProxyStrategy,
     PmRestartPolicy,
     PmRuntimeName,
     WapkGoogleDriveConfig,
@@ -15,6 +16,7 @@ import {
     DEFAULT_HEALTHCHECK_INTERVAL,
     DEFAULT_HEALTHCHECK_MAX_FAILURES,
     DEFAULT_HEALTHCHECK_TIMEOUT,
+    DEFAULT_PM_PROXY_STRATEGY,
     SIMPLE_PREVIEW_SEGMENT,
     SUPPORTED_FILE_EXTENSIONS,
     type PmResolvedHealthCheck,
@@ -69,6 +71,23 @@ export function normalizePmMemoryAction(value: unknown, optionName = '--memory-a
     }
 
     throw new Error(`${optionName} must be one of: restart, stop`);
+}
+
+export function normalizePmProxyStrategy(value: unknown, optionName = '--proxy-strategy'): PmProxyStrategy | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be one of: proxy, inherit`);
+    }
+
+    const strategy = value.trim().toLowerCase();
+    if (strategy === 'proxy' || strategy === 'inherit') {
+        return strategy;
+    }
+
+    throw new Error(`${optionName} must be one of: proxy, inherit`);
 }
 
 export function normalizeIntegerOption(value: string, optionName: string, min = 0): number {
@@ -535,6 +554,7 @@ export function normalizePmProxyConfig(value: unknown, optionName = 'pm proxy'):
 
     return {
         port,
+        strategy: normalizePmProxyStrategy(candidate.strategy, `${optionName}.strategy`) ?? DEFAULT_PM_PROXY_STRATEGY,
         host: normalizeNonEmptyString(candidate.host),
         targetHost: normalizeNonEmptyString(candidate.targetHost),
         envVar: normalizeNonEmptyString(candidate.envVar),

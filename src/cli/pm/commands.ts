@@ -259,8 +259,8 @@ async function waitForPmRecordOnline(filePath: string, timeoutMs: number): Promi
     throw new Error(`Timed out waiting for the reloaded process to become online after ${timeoutMs}ms.`);
 }
 
-function resolvePmReloadReadyTimeout(record: Pick<PmRecord, 'waitReady' | 'listenTimeout' | 'restartDelay'>): number {
-    return record.waitReady
+function resolvePmReloadReadyTimeout(record: Pick<PmRecord, 'waitReady' | 'listenTimeout' | 'restartDelay' | 'proxy'>): number {
+    return record.waitReady || record.proxy?.strategy === 'inherit'
         ? Math.max(record.listenTimeout + 1000, 2000)
         : Math.max(record.restartDelay + 1000, 2000);
 }
@@ -557,6 +557,7 @@ function formatPmRecordDetails(record: PmRecord, liveMetrics: PmLiveMetrics): st
     pushPmDetail(lines, 'proxy', record.proxy
         ? `http://${record.proxy.host ?? '0.0.0.0'}:${record.proxy.port}`
         : '-');
+    pushPmDetail(lines, 'proxy strategy', record.proxy?.strategy ?? '-');
     pushPmDetail(lines, 'proxy target', record.proxy && record.proxyTargetPort
         ? `${record.proxy.targetHost ?? '127.0.0.1'}:${record.proxyTargetPort}`
         : '-');

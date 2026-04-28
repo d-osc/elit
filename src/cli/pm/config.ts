@@ -20,6 +20,7 @@ import {
     normalizePmMemoryLimit,
     normalizePmMemoryAction,
     normalizePmProxyConfig,
+    normalizePmProxyStrategy,
     normalizeHealthCheckConfig,
     normalizeIntegerOption,
     normalizePmRestartPolicy,
@@ -172,8 +173,8 @@ export function resolvePmAppDefinition(base: PmAppConfig | undefined, parsed: Pa
         parsed.proxy ? { ...(base?.proxy ?? {}), ...parsed.proxy } : base?.proxy,
         parsed.proxy ? 'pm proxy' : 'pm.apps[].proxy',
     );
-    if (proxy && instances > 1) {
-        throw new Error('pm proxy currently supports only one managed instance per app.');
+    if (proxy?.strategy === 'inherit' && instances > 1) {
+        throw new Error('pm proxy strategy "inherit" currently supports only one managed instance per app.');
     }
 
     const mergedWapkRun = mergePmWapkRunConfig(base?.wapkRun, parsed.wapkRun);
@@ -376,6 +377,12 @@ export function parsePmStartArgs(args: string[]): ParsedPmStartArgs {
                 parsed.proxy = {
                     ...parsed.proxy,
                     port: normalizeIntegerOption(readRequiredValue(args, ++index, '--proxy-port'), '--proxy-port', 1),
+                };
+                break;
+            case '--proxy-strategy':
+                parsed.proxy = {
+                    ...parsed.proxy,
+                    strategy: normalizePmProxyStrategy(readRequiredValue(args, ++index, '--proxy-strategy'), '--proxy-strategy'),
                 };
                 break;
             case '--proxy-host':
@@ -586,6 +593,7 @@ export function printPmHelp(): void {
         '  --name, -n <name>           Process name used by list/stop/restart',
         '  --instances <count>         Start multiple managed instances for the same app name',
         '  --proxy-port <port>         Own a public HTTP port through a PM proxy for single-instance reload handoff',
+        '  --proxy-strategy <mode>     Public socket mode: proxy or inherit (default: proxy)',
         '  --proxy-host <host>         Public host bound by the PM proxy (default: 0.0.0.0)',
         '  --proxy-target-host <host>  Internal host used for upstream child traffic (default: 127.0.0.1)',
         '  --proxy-env <name>          Env var populated with the child private port (default: PORT)',

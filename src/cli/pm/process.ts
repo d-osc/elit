@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import type { PmRuntimeName } from '../../shares/config';
 import {
+    DEFAULT_PM_PROXY_STRATEGY,
     PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV,
     type BuiltPmCommand,
     type PmPaths,
@@ -84,6 +85,38 @@ function resolveTsxExecutable(cwd: string): string | undefined {
     return commandExists(globalCommand) ? globalCommand : undefined;
 }
 
+function resolvePmNodeSharedListenerBootstrapPath(): string | undefined {
+    const cliEntry = process.argv[1];
+    const candidates = [
+        join(__dirname, 'node-shared-listener-bootstrap.cjs'),
+        join(__dirname, '..', '..', '..', 'dist', 'pm-node-shared-listener-bootstrap.cjs'),
+    ];
+
+    if (cliEntry) {
+        const resolvedCliEntry = resolve(cliEntry);
+        const baseDir = dirname(resolvedCliEntry);
+        candidates.push(
+            join(baseDir, 'cli', 'pm', 'node-shared-listener-bootstrap.cjs'),
+            join(baseDir, 'pm-node-shared-listener-bootstrap.cjs'),
+        );
+    }
+
+    return candidates.find((candidate) => existsSync(candidate));
+}
+
+function appendNodeOption(existing: string | undefined, option: string): string {
+    return existing && existing.trim().length > 0
+        ? `${existing.trim()} ${option}`
+        : option;
+}
+
+function supportsPmInheritedListener(record: PmRecord, runtime: PmRuntimeName): boolean {
+    return (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit'
+        && record.type === 'file'
+        && runtime === 'node'
+        && !isTypescriptFile(record.file!);
+}
+
 function inferRuntimeFromFile(filePath: string): PmRuntimeName {
     if (isTypescriptFile(filePath) && commandExists('bun')) {
         return 'bun';
@@ -162,6 +195,10 @@ export function isPmOnlineWapkRecord(record: Pick<PmRecord, 'type' | 'wapkRun'>)
 }
 
 export function buildPmCommand(record: PmRecord): BuiltPmCommand {
+    if ((record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit' && record.type !== 'file') {
+        throw new Error('pm proxy strategy "inherit" currently supports only Node .js/.mjs/.cjs file targets.');
+    }
+
     if (record.type === 'script') {
         return {
             command: record.script!,
@@ -245,9 +282,26 @@ export function buildPmCommand(record: PmRecord): BuiltPmCommand {
 
     const executable = preferCurrentExecutable('node');
     ensureCommandAvailable(executable, 'Node.js runtime');
+    const wantsInheritedListener = (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit';
+    if (wantsInheritedListener && !supportsPmInheritedListener(record, runtime)) {
+        throw new Error('pm proxy strategy "inherit" currently supports only Node .js/.mjs/.cjs file targets.');
+    }
+
+    const bootstrapPath = wantsInheritedListener ? resolvePmNodeSharedListenerBootstrapPath() : undefined;
+    if (wantsInheritedListener && !bootstrapPath) {
+        throw new Error('Unable to resolve the PM shared-listener bootstrap module.');
+    }
     return {
         command: executable,
         args: [record.file!],
+        env: bootstrapPath
+            ? {
+                NODE_OPTIONS: appendNodeOption(process.env.NODE_OPTIONS, `--require=${bootstrapPath}`),
+                ELIT_PM_LISTEN_MODE: 'ipc',
+                ELIT_PM_PUBLIC_PORT: String(record.proxy?.port ?? record.env.PORT ?? ''),
+            }
+            : undefined,
+        ipc: Boolean(bootstrapPath),
         runtime,
         preview: `${basename(executable)} ${quoteCommandSegment(record.file!)}`,
     };
@@ -314,6 +368,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         lastRestartAt: existing?.lastRestartAt,
         lastExitCode: existing?.lastExitCode,
         error: undefined,
+        proxyReadyAt: undefined,
         logFiles: existing?.logFiles ?? {
             out: join(paths.logsDir, `${id}.out.log`),
             err: join(paths.logsDir, `${id}.err.log`),

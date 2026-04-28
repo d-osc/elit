@@ -24,10 +24,13 @@ export type DesktopMode = 'native' | 'hybrid';
 export type PmRuntimeName = 'node' | 'bun' | 'deno';
 export type PmRestartPolicy = 'always' | 'on-failure' | 'never';
 export type PmMemoryAction = 'restart' | 'stop';
+export type PmProxyStrategy = 'proxy' | 'inherit';
 
 export interface PmProxyConfig {
     /** Public port owned by the PM proxy process */
     port: number;
+    /** Public socket handoff mode: proxy forwards traffic, inherit shares the listener directly on Node */
+    strategy?: PmProxyStrategy;
     /** Public host bound by the PM proxy process */
     host?: string;
     /** Internal host used for upstream child traffic */

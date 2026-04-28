@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { PmMemoryAction, PmProxyConfig, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
+import type { PmMemoryAction, PmProxyConfig, PmProxyStrategy, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
 
 export const DEFAULT_PM_DATA_DIR = join('.elit', 'pm');
 export const DEFAULT_PM_DUMP_FILE = 'dump.json';
@@ -20,6 +20,7 @@ export const DEFAULT_PM_KILL_TIMEOUT = DEFAULT_PM_STOP_GRACE_PERIOD_MS;
 export const DEFAULT_PM_EXP_BACKOFF_MAX_DELAY = 15000;
 export const DEFAULT_PM_MEMORY_CHECK_INTERVAL = 500;
 export const DEFAULT_PM_RESTART_WINDOW = 0;
+export const DEFAULT_PM_PROXY_STRATEGY: PmProxyStrategy = 'proxy';
 export const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
 export const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
 export const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
@@ -207,6 +208,7 @@ export interface PmRecord {
     lastRestartAt?: string;
     lastExitCode?: number;
     error?: string;
+    proxyReadyAt?: string;
     logFiles: {
         out: string;
         err: string;
@@ -225,6 +227,7 @@ export interface BuiltPmCommand {
     args: string[];
     env?: Record<string, string>;
     shell?: boolean;
+    ipc?: boolean;
     runtime?: PmRuntimeName;
     preview: string;
 }

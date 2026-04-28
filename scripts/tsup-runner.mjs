@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +79,14 @@ child.on('exit', (code, signal) => {
     writeFileSync(cliWrapperPath, cliWrapperSource, { mode: 0o755 });
 }
 
+function copyPmNodeBootstrap() {
+    mkdirSync(resolve(repoRoot, 'dist'), { recursive: true });
+    copyFileSync(
+        resolve(repoRoot, 'src', 'cli', 'pm', 'node-shared-listener-bootstrap.cjs'),
+        resolve(repoRoot, 'dist', 'pm-node-shared-listener-bootstrap.cjs'),
+    );
+}
+
 async function runBuild() {
     cleanDist();
 
@@ -87,11 +95,13 @@ async function runBuild() {
     }
 
     writeCliCompatWrapper();
+    copyPmNodeBootstrap();
 }
 
 function runWatch() {
     cleanDist();
     writeCliCompatWrapper();
+    copyPmNodeBootstrap();
 
     const children = configFiles.map((configFile) => ({
         configFile,

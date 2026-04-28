@@ -1,6 +1,7 @@
 /// <reference path="../../src/test-globals.d.ts" />
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +12,7 @@ import {
     parsePmStartArgs,
     resolvePmStartDefinitions,
     sanitizePmProcessName,
+    terminateProcessTree,
 } from '../../src/pm';
 
 function createWapkPmRecord(overrides = {}) {
@@ -175,6 +177,53 @@ async function waitForRecord(workspaceRoot, predicate, id = 'api', timeoutMs = 2
     }
 
     throw new Error(`Timed out waiting for PM record ${id}`);
+}
+
+async function requestUpgradePayload(port) {
+    return await new Promise((resolve, reject) => {
+        const request = httpRequest({
+            host: '127.0.0.1',
+            port,
+            path: '/ws',
+            headers: {
+                Connection: 'Upgrade',
+                Upgrade: 'websocket',
+            },
+        });
+
+        request.on('upgrade', (_response, socket, head) => {
+            const chunks = [];
+            if (head.length > 0) {
+                chunks.push(Buffer.from(head));
+            }
+
+            socket.on('data', (chunk) => {
+                chunks.push(Buffer.from(chunk));
+            });
+            socket.on('error', reject);
+            socket.on('close', () => {
+                resolve(Buffer.concat(chunks).toString('utf8'));
+            });
+        });
+
+        request.on('response', (response) => {
+            const chunks = [];
+            response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+            response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        });
+        request.on('error', reject);
+        request.end();
+    });
+}
+
+async function fetchPmText(url) {
+    const response = await fetch(url, {
+        headers: {
+            Connection: 'close',
+        },
+    });
+
+    return await response.text();
 }
 
 function createPmInstanceRecord(workspaceRoot, baseName, instanceIndex, instances, overrides = {}) {
@@ -450,6 +499,7 @@ describe('pm cli process inspection', () => {
                 '--script', 'npm run api',
                 '--name', 'api',
                 '--proxy-port', '3010',
+                '--proxy-strategy', 'inherit',
                 '--proxy-host', '127.0.0.1',
                 '--proxy-target-host', '127.0.0.1',
                 '--proxy-env', 'APP_PORT',
@@ -498,10 +548,11 @@ describe('pm cli process inspection', () => {
 
         expect(cliDefinitions).toHaveLength(1);
         expect(cliDefinitions[0]?.maxMemoryBytes).toBe(128 * 1024 * 1024);
-    expect(cliDefinitions[0]?.proxy?.port).toBe(3010);
-    expect(cliDefinitions[0]?.proxy?.host).toBe('127.0.0.1');
-    expect(cliDefinitions[0]?.proxy?.targetHost).toBe('127.0.0.1');
-    expect(cliDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
+        expect(cliDefinitions[0]?.proxy?.port).toBe(3010);
+        expect(cliDefinitions[0]?.proxy?.strategy).toBe('inherit');
+        expect(cliDefinitions[0]?.proxy?.host).toBe('127.0.0.1');
+        expect(cliDefinitions[0]?.proxy?.targetHost).toBe('127.0.0.1');
+        expect(cliDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
         expect(cliDefinitions[0]?.memoryAction).toBe('stop');
         expect(cliDefinitions[0]?.cronRestart).toBe('@every 1s');
         expect(cliDefinitions[0]?.expBackoffRestartDelay).toBe(250);
@@ -509,8 +560,9 @@ describe('pm cli process inspection', () => {
         expect(cliDefinitions[0]?.restartWindow).toBe(1500);
         expect(configDefinitions).toHaveLength(1);
         expect(configDefinitions[0]?.maxMemoryBytes).toBe(256 * 1024 * 1024);
-    expect(configDefinitions[0]?.proxy?.port).toBe(4010);
-    expect(configDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
+        expect(configDefinitions[0]?.proxy?.port).toBe(4010);
+        expect(configDefinitions[0]?.proxy?.strategy).toBe('proxy');
+        expect(configDefinitions[0]?.proxy?.envVar).toBe('APP_PORT');
         expect(configDefinitions[0]?.memoryAction).toBe('stop');
         expect(configDefinitions[0]?.cronRestart).toBe('*/5 * * * *');
         expect(configDefinitions[0]?.expBackoffRestartDelay).toBe(400);
@@ -629,6 +681,8 @@ describe('pm cli process inspection', () => {
             expect(output).toContain('restart');
             expect(output).toContain('proxy:');
             expect(output).toContain('http://127.0.0.1:3010');
+            expect(output).toContain('proxy strategy:');
+            expect(output).toContain('proxy');
             expect(output).toContain('proxy target:');
             expect(output).toContain('127.0.0.1:44010');
             expect(output).toContain('kill timeout:');
@@ -984,7 +1038,7 @@ describe('pm control commands', () => {
 
         try {
             const initialRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'proxy-app', 4000);
-            const firstResponse = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+            const firstResponse = await fetch(`http://127.0.0.1:${publicPort}/?r=${Date.now()}`, { cache: 'no-store' }).then((response) => response.text());
 
             let reloadFinished = false;
             let requestFailures = 0;
@@ -992,7 +1046,7 @@ describe('pm control commands', () => {
             const poller = (async () => {
                 while (!reloadFinished) {
                     try {
-                        const body = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+                        const body = await fetch(`http://127.0.0.1:${publicPort}/?r=${Date.now()}`, { cache: 'no-store' }).then((response) => response.text());
                         seenResponses.add(body);
                     } catch {
                         requestFailures += 1;
@@ -1007,7 +1061,12 @@ describe('pm control commands', () => {
             await poller;
 
             const reloadedRecord = readWorkspacePmRecord(workspaceRoot, 'proxy-app');
-            const secondResponse = await fetch(`http://127.0.0.1:${publicPort}/`).then((response) => response.text());
+            let secondResponse = firstResponse;
+            const changeDeadline = Date.now() + 3000;
+            while (secondResponse === firstResponse && Date.now() < changeDeadline) {
+                secondResponse = await fetch(`http://127.0.0.1:${publicPort}/?r=${Date.now()}`, { cache: 'no-store' }).then((response) => response.text());
+                await new Promise((resolvePromise) => setTimeout(resolvePromise, 40));
+            }
             seenResponses.add(secondResponse);
 
             expect(requestFailures).toBe(0);
@@ -1021,6 +1080,251 @@ describe('pm control commands', () => {
             await loopPromise;
         } finally {
             process.chdir(originalCwd);
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 20000);
+
+    it('reloads an inherit-managed single instance and keeps the public endpoint reachable', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-inherit-reload-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        const entryFile = join(workspaceRoot, 'inherit-app.js');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+        writeFileSync(entryFile, [
+            'const http = require("node:http");',
+            'const version = `${process.pid}:${Date.now()}`;',
+            'let server;',
+            'setTimeout(() => {',
+            '  server = http.createServer((req, res) => {',
+            '    if (req.url === "/health") { res.statusCode = 200; res.end("ok"); return; }',
+            '    res.statusCode = 200;',
+            '    res.end(version);',
+            '  });',
+            '  server.listen(Number(process.env.PORT), "127.0.0.1");',
+            '}, 120);',
+            'const shutdown = () => {',
+            '  if (server) { server.close(() => process.exit(0)); return; }',
+            '  process.exit(0);',
+            '};',
+            'process.on("SIGTERM", shutdown);',
+            'process.on("SIGINT", shutdown);',
+        ].join('\n'));
+
+        const publicPort = 44000 + Math.floor(Math.random() * 200);
+        const record = createManagedPmRecord(workspaceRoot, {
+            id: 'inherit-app',
+            name: 'inherit-app',
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            env: {
+                PORT: String(publicPort),
+            },
+            proxy: {
+                port: publicPort,
+                host: '127.0.0.1',
+                strategy: 'inherit',
+            },
+            restartPolicy: 'never',
+            maxRestarts: 0,
+            minUptime: 0,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 2000,
+            healthCheck: {
+                url: `http://127.0.0.1:${publicPort}/health`,
+                gracePeriod: 0,
+                interval: 100,
+                timeout: 100,
+                maxFailures: 1,
+            },
+            logFiles: {
+                out: join(logsDir, 'inherit-app.out.log'),
+                err: join(logsDir, 'inherit-app.err.log'),
+            },
+        });
+        const recordPath = join(appsDir, 'inherit-app.json');
+        writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+        const loopPromise = runManagedProcessLoop(recordPath, record);
+        const originalCwd = process.cwd();
+        process.chdir(workspaceRoot);
+
+        try {
+            const fetchInheritedText = async () => {
+                return await fetch(`http://127.0.0.1:${publicPort}/?r=${Date.now()}`, {
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(1500),
+                }).then((response) => response.text());
+            };
+
+            const initialRecord = await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), 'inherit-app', 5000);
+            const firstResponse = await fetchInheritedText();
+
+            await runPmCommand(['reload', 'inherit-app']);
+
+            const reloadedRecord = readWorkspacePmRecord(workspaceRoot, 'inherit-app');
+            let secondResponse = '';
+            let lastError;
+            const responseDeadline = Date.now() + 3000;
+            while (!secondResponse && Date.now() < responseDeadline) {
+                try {
+                    secondResponse = await fetchInheritedText();
+                } catch (error) {
+                    lastError = error;
+                    await new Promise((resolvePromise) => setTimeout(resolvePromise, 40));
+                }
+            }
+
+            if (!secondResponse) {
+                throw lastError ?? new Error('inherit reload did not restore the public endpoint');
+            }
+            expect(initialRecord.childPid).not.toBe(reloadedRecord.childPid);
+            expect(reloadedRecord.proxyTargetPort).toBeUndefined();
+            expect(secondResponse.length).toBeGreaterThan(0);
+            expect(reloadedRecord.status).toBe('online');
+            expect(reloadedRecord.reloadRequestedAt).toBeUndefined();
+
+            if (reloadedRecord.childPid) {
+                terminateProcessTree(reloadedRecord.childPid, { force: true });
+            }
+            await Promise.race([
+                loopPromise.catch(() => undefined),
+                new Promise((resolvePromise) => setTimeout(resolvePromise, 1000)),
+            ]);
+        } finally {
+            process.chdir(originalCwd);
+            await removeWorkspace(workspaceRoot).catch(() => undefined);
+        }
+    }, 20000);
+
+    it('load balances and forwards upgrades through a proxy-managed multi-instance group', async () => {
+        const workspaceRoot = mkdtempSync(join(tmpdir(), 'elit-pm-proxy-group-'));
+        const appsDir = join(workspaceRoot, '.elit', 'pm', 'apps');
+        const logsDir = join(workspaceRoot, '.elit', 'pm', 'logs');
+        const entryFile = join(workspaceRoot, 'proxy-group-app.js');
+        mkdirSync(appsDir, { recursive: true });
+        mkdirSync(logsDir, { recursive: true });
+        writeFileSync(entryFile, [
+            'const http = require("node:http");',
+            'const version = process.env.INSTANCE_NAME;',
+            'const server = http.createServer((req, res) => {',
+            '  if (req.url === "/health") { res.statusCode = 200; res.end("ok"); return; }',
+            '  res.statusCode = 200;',
+            '  res.end(version);',
+            '});',
+            'server.on("upgrade", (_req, socket) => {',
+            '  socket.write("HTTP/1.1 101 Switching Protocols\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\n\\r\\n");',
+            '  socket.end(version);',
+            '});',
+            'server.listen(Number(process.env.APP_PORT), "127.0.0.1");',
+            'const shutdown = () => server.close(() => process.exit(0));',
+            'process.on("SIGTERM", shutdown);',
+            'process.on("SIGINT", shutdown);',
+        ].join('\n'));
+
+        const publicPort = 44200 + Math.floor(Math.random() * 200);
+        const proxy = {
+            port: publicPort,
+            host: '127.0.0.1',
+            targetHost: '127.0.0.1',
+            envVar: 'APP_PORT',
+        };
+        const firstRecord = createPmInstanceRecord(workspaceRoot, 'cluster-app', 1, 2, {
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            env: { INSTANCE_NAME: 'one' },
+            proxy,
+            restartPolicy: 'never',
+            maxRestarts: 0,
+            minUptime: 0,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 2000,
+            healthCheck: {
+                url: `http://127.0.0.1:${publicPort}/health`,
+                gracePeriod: 0,
+                interval: 100,
+                timeout: 100,
+                maxFailures: 1,
+            },
+            logFiles: {
+                out: join(logsDir, 'cluster-app.out.log'),
+                err: join(logsDir, 'cluster-app.err.log'),
+            },
+        });
+        const secondRecord = createPmInstanceRecord(workspaceRoot, 'cluster-app', 2, 2, {
+            type: 'file',
+            runtime: 'node',
+            script: undefined,
+            file: entryFile,
+            commandPreview: `node ${entryFile}`,
+            env: { INSTANCE_NAME: 'two' },
+            proxy,
+            restartPolicy: 'never',
+            maxRestarts: 0,
+            minUptime: 0,
+            watch: false,
+            watchPaths: [],
+            watchIgnore: [],
+            waitReady: true,
+            listenTimeout: 2000,
+            healthCheck: {
+                url: `http://127.0.0.1:${publicPort}/health`,
+                gracePeriod: 0,
+                interval: 100,
+                timeout: 100,
+                maxFailures: 1,
+            },
+            logFiles: {
+                out: join(logsDir, 'cluster-app-2.out.log'),
+                err: join(logsDir, 'cluster-app-2.err.log'),
+            },
+        });
+        const firstPath = join(appsDir, `${firstRecord.id}.json`);
+        const secondPath = join(appsDir, `${secondRecord.id}.json`);
+        writeFileSync(firstPath, JSON.stringify(firstRecord, null, 2));
+        writeFileSync(secondPath, JSON.stringify(secondRecord, null, 2));
+
+        const firstLoop = runManagedProcessLoop(firstPath, firstRecord);
+        let secondLoop;
+
+        try {
+            await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), firstRecord.id, 4000);
+            secondLoop = runManagedProcessLoop(secondPath, secondRecord);
+            await waitForRecord(workspaceRoot, (current) => current.status === 'online' && Boolean(current.childPid), secondRecord.id, 4000);
+
+            const seenResponses = new Set();
+            const deadline = Date.now() + 3000;
+            while (seenResponses.size < 2 && Date.now() < deadline) {
+                const body = await fetchPmText(`http://127.0.0.1:${publicPort}/`);
+                seenResponses.add(body);
+                await new Promise((resolvePromise) => setTimeout(resolvePromise, 40));
+            }
+
+            const upgradePayload = String(await requestUpgradePayload(publicPort)).trim();
+
+            expect(Array.from(seenResponses)).toContain('one');
+            expect(Array.from(seenResponses)).toContain('two');
+            expect(['one', 'two']).toContain(upgradePayload);
+
+            writeFileSync(firstPath, JSON.stringify({ ...readWorkspacePmRecord(workspaceRoot, firstRecord.id), desiredState: 'stopped' }, null, 2));
+            writeFileSync(secondPath, JSON.stringify({ ...readWorkspacePmRecord(workspaceRoot, secondRecord.id), desiredState: 'stopped' }, null, 2));
+            await Promise.all([firstLoop, secondLoop]);
+        } finally {
+            if (secondLoop) {
+                await Promise.resolve(secondLoop).catch(() => undefined);
+            }
             await removeWorkspace(workspaceRoot).catch(() => undefined);
         }
     }, 20000);
