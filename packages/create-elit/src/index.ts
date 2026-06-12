@@ -14,6 +14,8 @@ const hiddenTemplateFiles: Record<string, string> = {
   wapkpatch: '.wapkpatch'
 };
 
+const sharedAppAiProfileTemplateId = '_shared-ai-profile';
+
 interface TemplateDefinition {
   id: string;
   aliases: string[];
@@ -208,6 +210,28 @@ async function copyAndReplaceFile(
   await writeFile(finalDest, content, 'utf-8');
 }
 
+async function copySharedAppAiProfile(
+  projectPath: string,
+  replacements: Record<string, string>
+): Promise<void> {
+  const profilePath = resolve(__dirname, 'templates', sharedAppAiProfileTemplateId);
+
+  if (!existsSync(profilePath)) {
+    return;
+  }
+
+  await copyDirectory(profilePath, projectPath, replacements);
+
+  const githubSkillsPath = join(profilePath, '.github', 'skills');
+
+  if (!existsSync(githubSkillsPath)) {
+    return;
+  }
+
+  await copyDirectory(githubSkillsPath, join(projectPath, '.claude', 'skills'), replacements);
+  await copyDirectory(githubSkillsPath, join(projectPath, '.agents', 'skills'), replacements);
+}
+
 async function createProject(projectName: string, templateName: string) {
   const projectPath = resolve(process.cwd(), projectName);
   const templatesPath = resolve(__dirname, 'templates', templateName);
@@ -238,6 +262,7 @@ async function createProject(projectName: string, templateName: string) {
 
   // Copy the selected template directory and replace placeholders
   await copyDirectory(templatesPath, projectPath, replacements);
+  await copySharedAppAiProfile(projectPath, replacements);
 
   log('\nSuccess! Created ' + projectName, 'green');
   log('\nInside that directory, you can run several commands:', 'dim');

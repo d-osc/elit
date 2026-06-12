@@ -55,6 +55,8 @@ CLI flags:
 - `package.json` with Elit scripts
 - `elit.config.ts` for dev, build, preview, mobile, desktop, and WAPK flows
 - Auto-generated hidden files such as `.gitignore`, `.wapkignore`, and `.wapkpatch`
+- Shared AI guidance files such as `AGENTS.md` and Elit app skills for `.github/skills`, `.claude/skills`, and `.agents/skills`
+- Template-specific AI instructions for the selected starter under `.github/instructions`
 - A ready-to-run README tailored to the selected starter
 
 ## Example

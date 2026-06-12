@@ -22,6 +22,13 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+export interface ServerListenOptions {
+  port?: number;
+  hostname?: string;
+  backlog?: number;
+  fd?: number;
+}
+
 /**
  * Server options
  */

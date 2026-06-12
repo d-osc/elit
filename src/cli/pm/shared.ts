@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
+import type { PmMemoryAction, PmProxyConfig, PmProxyStrategy, PmRestartPolicy, PmRuntimeName, WapkRunConfig } from '../../shares/config';
 
 export const DEFAULT_PM_DATA_DIR = join('.elit', 'pm');
 export const DEFAULT_PM_DUMP_FILE = 'dump.json';
@@ -8,6 +8,7 @@ export const DEFAULT_RESTART_DELAY = 1000;
 export const DEFAULT_MAX_RESTARTS = 10;
 export const DEFAULT_WATCH_DEBOUNCE = 250;
 export const DEFAULT_MIN_UPTIME = 0;
+export const DEFAULT_PM_LISTEN_TIMEOUT = 3000;
 export const DEFAULT_HEALTHCHECK_GRACE_PERIOD = 5000;
 export const DEFAULT_HEALTHCHECK_INTERVAL = 10000;
 export const DEFAULT_HEALTHCHECK_TIMEOUT = 3000;
@@ -15,6 +16,11 @@ export const DEFAULT_HEALTHCHECK_MAX_FAILURES = 3;
 export const DEFAULT_LOG_LINES = 40;
 export const DEFAULT_PM_STOP_POLL_MS = 100;
 export const DEFAULT_PM_STOP_GRACE_PERIOD_MS = 5000;
+export const DEFAULT_PM_KILL_TIMEOUT = DEFAULT_PM_STOP_GRACE_PERIOD_MS;
+export const DEFAULT_PM_EXP_BACKOFF_MAX_DELAY = 15000;
+export const DEFAULT_PM_MEMORY_CHECK_INTERVAL = 500;
+export const DEFAULT_PM_RESTART_WINDOW = 0;
+export const DEFAULT_PM_PROXY_STRATEGY: PmProxyStrategy = 'proxy';
 export const PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV = 'ELIT_PM_WAPK_ONLINE_STDIN_SHUTDOWN';
 export const PM_WAPK_ONLINE_SHUTDOWN_COMMAND = '__ELIT_PM_WAPK_ONLINE_SHUTDOWN__';
 export const PM_WAPK_ONLINE_SHUTDOWN_TIMEOUT_MS = 8000;
@@ -42,6 +48,9 @@ export interface PmDumpFile {
 
 export interface PmSavedAppDefinition {
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     cwd: string;
     runtime?: PmRuntimeName;
@@ -52,8 +61,18 @@ export interface PmSavedAppDefinition {
     password?: string;
     wapkRun?: WapkRunConfig;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
+    waitReady: boolean;
+    listenTimeout: number;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
+    killTimeout: number;
     maxRestarts: number;
     minUptime: number;
     watch: boolean;
@@ -73,11 +92,22 @@ export interface ParsedPmStartArgs {
     runtime?: PmRuntimeName;
     cwd?: string;
     env: Record<string, string>;
+    instances?: number;
+    proxy?: Partial<PmProxyConfig>;
     autorestart?: boolean;
     restartDelay?: number;
+    killTimeout?: number;
     maxRestarts?: number;
     password?: string;
     restartPolicy?: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
+    waitReady?: boolean;
+    listenTimeout?: number;
     minUptime?: number;
     watch?: boolean;
     watchPaths: string[];
@@ -92,6 +122,9 @@ export interface ParsedPmStartArgs {
 
 export interface ResolvedPmAppDefinition {
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     source: 'cli' | 'config';
     cwd: string;
@@ -103,9 +136,19 @@ export interface ResolvedPmAppDefinition {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
+    killTimeout: number;
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
+    waitReady: boolean;
+    listenTimeout: number;
     minUptime: number;
     watch: boolean;
     watchPaths: string[];
@@ -117,6 +160,9 @@ export interface ResolvedPmAppDefinition {
 export interface PmRecord {
     id: string;
     name: string;
+    baseName: string;
+    instanceIndex: number;
+    instances: number;
     type: PmTargetType;
     source: 'cli' | 'config';
     cwd: string;
@@ -128,9 +174,20 @@ export interface PmRecord {
     wapkRun?: WapkRunConfig;
     autorestart: boolean;
     restartDelay: number;
+    proxy?: PmProxyConfig;
+    proxyTargetPort?: number;
+    killTimeout: number;
     maxRestarts: number;
     password?: string;
     restartPolicy: PmRestartPolicy;
+    maxMemoryBytes?: number;
+    memoryAction?: PmMemoryAction;
+    cronRestart?: string;
+    expBackoffRestartDelay?: number;
+    expBackoffRestartMaxDelay?: number;
+    restartWindow?: number;
+    waitReady: boolean;
+    listenTimeout: number;
     minUptime: number;
     watch: boolean;
     watchPaths: string[];
@@ -147,8 +204,11 @@ export interface PmRecord {
     runnerPid?: number;
     childPid?: number;
     restartCount: number;
+    reloadRequestedAt?: string;
+    lastRestartAt?: string;
     lastExitCode?: number;
     error?: string;
+    proxyReadyAt?: string;
     logFiles: {
         out: string;
         err: string;
@@ -167,6 +227,7 @@ export interface BuiltPmCommand {
     args: string[];
     env?: Record<string, string>;
     shell?: boolean;
+    ipc?: boolean;
     runtime?: PmRuntimeName;
     preview: string;
 }
@@ -182,6 +243,6 @@ export interface ParsedPmRunnerArgs {
 }
 
 export interface PmRestartRequest {
-    kind: 'watch' | 'health';
+    kind: 'watch' | 'health' | 'startup' | 'memory' | 'memory-stop' | 'cron';
     detail: string;
 }

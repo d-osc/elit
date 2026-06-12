@@ -96,6 +96,9 @@ PM Options:
   elit pm start                                   Start all pm.apps[] entries from elit.config.*
   elit pm start my-app                            Start one configured app by name
   elit pm list                                    Show managed process status
+  elit pm list --json                             Show managed process status as JSON
+  elit pm show <name>                             Show full metadata for one managed process
+  elit pm describe <name> --json                  Show one managed process as JSON
   elit pm stop <name|all>                         Stop one or all managed processes
   elit pm restart <name|all>                      Restart one or all managed processes
   elit pm delete <name|all>                       Remove process metadata and logs

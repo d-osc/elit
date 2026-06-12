@@ -23,6 +23,21 @@ export type MobileMode = 'native' | 'hybrid';
 export type DesktopMode = 'native' | 'hybrid';
 export type PmRuntimeName = 'node' | 'bun' | 'deno';
 export type PmRestartPolicy = 'always' | 'on-failure' | 'never';
+export type PmMemoryAction = 'restart' | 'stop';
+export type PmProxyStrategy = 'proxy' | 'inherit';
+
+export interface PmProxyConfig {
+    /** Public port owned by the PM proxy process */
+    port: number;
+    /** Public socket handoff mode: proxy forwards traffic, inherit shares the listener directly on Node */
+    strategy?: PmProxyStrategy;
+    /** Public host bound by the PM proxy process */
+    host?: string;
+    /** Internal host used for upstream child traffic */
+    targetHost?: string;
+    /** Environment variable populated with the child private port */
+    envVar?: string;
+}
 
 export interface PmHealthCheckConfig {
     /** HTTP endpoint polled while the process is online */
@@ -52,10 +67,16 @@ export interface PmAppConfig {
     cwd?: string;
     /** Extra environment variables injected into the process */
     env?: Record<string, string | number | boolean>;
+    /** Number of managed instances to start for this app */
+    instances?: number;
     /** Disable automatic restart when the process exits */
     autorestart?: boolean;
     /** Delay between restart attempts in milliseconds */
     restartDelay?: number;
+    /** Enable a PM-managed public HTTP proxy for single-instance zero-downtime reloads */
+    proxy?: PmProxyConfig;
+    /** Grace period before a stop or restart escalates to forceful termination */
+    killTimeout?: number;
     /** Maximum restart attempts before marking the process as errored */
     maxRestarts?: number;
     /** Password forwarded to elit wapk run for locked archives */
@@ -64,6 +85,22 @@ export interface PmAppConfig {
     wapkRun?: WapkRunConfig;
     /** Restart strategy used after the child process exits */
     restartPolicy?: PmRestartPolicy;
+    /** Restart the process when it uses more than this many bytes, or a size string like 256M */
+    maxMemory?: number | string;
+    /** Action taken when maxMemory is exceeded */
+    memoryAction?: PmMemoryAction;
+    /** Restart schedule using a cron expression or @every <duration> */
+    cronRestart?: string;
+    /** Exponential restart backoff base delay in milliseconds for unstable restarts */
+    expBackoffRestartDelay?: number;
+    /** Maximum exponential restart backoff delay in milliseconds */
+    expBackoffRestartMaxDelay?: number;
+    /** Rolling window used when counting restart attempts against maxRestarts */
+    restartWindow?: number;
+    /** Wait for the health check to succeed before marking the process online */
+    waitReady?: boolean;
+    /** Maximum startup wait time in milliseconds when waitReady is enabled */
+    listenTimeout?: number;
     /** Minimum healthy uptime before restart attempt counters reset */
     minUptime?: number;
     /** Restart the process when watched files change */

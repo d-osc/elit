@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from '../http';
 
-export type { RequestListener, RequestOptions } from '../http';
+export type { RequestListener, RequestOptions, ServerListenOptions } from '../http';
 
 /**
  * HTTPS Server options

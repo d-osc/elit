@@ -45,6 +45,8 @@ get('https://example.com', {}, (res) => {
 - `createServer(options, requestListener?)`
 - `request(url, options?, callback?)`
 - `get(url, options?, callback?)`
+
+On Node.js, `listen({ fd })` is also supported for inherited listener handoff. When `ELIT_PM_LISTEN_FD` plus `ELIT_PM_PUBLIC_PORT` are present, `listen(port)` or `listen({ port })` that targets that public port will reuse the inherited listener automatically instead of binding a new socket.
 - `Server`
 - `ClientRequest`
 - `Agent`

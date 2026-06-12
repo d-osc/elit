@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import type { PmRuntimeName } from '../../shares/config';
 import {
+    DEFAULT_PM_PROXY_STRATEGY,
     PM_WAPK_ONLINE_STDIN_SHUTDOWN_ENV,
     type BuiltPmCommand,
     type PmPaths,
@@ -84,6 +85,38 @@ function resolveTsxExecutable(cwd: string): string | undefined {
     return commandExists(globalCommand) ? globalCommand : undefined;
 }
 
+function resolvePmNodeSharedListenerBootstrapPath(): string | undefined {
+    const cliEntry = process.argv[1];
+    const candidates = [
+        join(__dirname, 'node-shared-listener-bootstrap.cjs'),
+        join(__dirname, '..', '..', '..', 'dist', 'pm-node-shared-listener-bootstrap.cjs'),
+    ];
+
+    if (cliEntry) {
+        const resolvedCliEntry = resolve(cliEntry);
+        const baseDir = dirname(resolvedCliEntry);
+        candidates.push(
+            join(baseDir, 'cli', 'pm', 'node-shared-listener-bootstrap.cjs'),
+            join(baseDir, 'pm-node-shared-listener-bootstrap.cjs'),
+        );
+    }
+
+    return candidates.find((candidate) => existsSync(candidate));
+}
+
+function appendNodeOption(existing: string | undefined, option: string): string {
+    return existing && existing.trim().length > 0
+        ? `${existing.trim()} ${option}`
+        : option;
+}
+
+function supportsPmInheritedListener(record: PmRecord, runtime: PmRuntimeName): boolean {
+    return (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit'
+        && record.type === 'file'
+        && runtime === 'node'
+        && !isTypescriptFile(record.file!);
+}
+
 function inferRuntimeFromFile(filePath: string): PmRuntimeName {
     if (isTypescriptFile(filePath) && commandExists('bun')) {
         return 'bun';
@@ -92,11 +125,80 @@ function inferRuntimeFromFile(filePath: string): PmRuntimeName {
     return 'node';
 }
 
+function sampleWindowsPmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    const script = [
+        '$ErrorActionPreference = "Stop"',
+        `$sample = Get-CimInstance -ClassName Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess = ${pid}" | Select-Object -First 1`,
+        'if (-not $sample) { exit 2 }',
+        '$cpu = [double]$sample.PercentProcessorTime',
+        `$memory = if ($sample.PSObject.Properties.Match('WorkingSetPrivate').Count -gt 0) { [int64]$sample.WorkingSetPrivate } else { [int64](Get-Process -Id ${pid} -ErrorAction Stop).WorkingSet64 }`,
+        'Write-Output ($cpu.ToString([System.Globalization.CultureInfo]::InvariantCulture) + "," + $memory)',
+    ].join('; ');
+
+    const result = spawnSync(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+        {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        },
+    );
+
+    if (result.error || result.status !== 0) {
+        return {};
+    }
+
+    const [cpuText, memoryText] = result.stdout.trim().split(',');
+    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
+    const memoryRssBytes = Number.parseInt(memoryText ?? '', 10);
+
+    return {
+        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
+        memoryRssBytes: Number.isFinite(memoryRssBytes) ? memoryRssBytes : undefined,
+    };
+}
+
+function samplePosixPmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    const result = spawnSync(
+        'ps',
+        ['-p', String(pid), '-o', '%cpu=', '-o', 'rss='],
+        {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        },
+    );
+
+    if (result.error || result.status !== 0) {
+        return {};
+    }
+
+    const [cpuText, memoryText] = result.stdout.trim().split(/\s+/, 2);
+    const cpuPercent = Number.parseFloat((cpuText ?? '').replace(',', '.'));
+    const rssKilobytes = Number.parseInt(memoryText ?? '', 10);
+
+    return {
+        cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : undefined,
+        memoryRssBytes: Number.isFinite(rssKilobytes) ? rssKilobytes * 1024 : undefined,
+    };
+}
+
+export function samplePmProcessMetrics(pid: number): { cpuPercent?: number; memoryRssBytes?: number } {
+    return process.platform === 'win32'
+        ? sampleWindowsPmProcessMetrics(pid)
+        : samplePosixPmProcessMetrics(pid);
+}
+
 export function isPmOnlineWapkRecord(record: Pick<PmRecord, 'type' | 'wapkRun'>): boolean {
     return record.type === 'wapk' && isPmWapkOnlineRunConfig(record.wapkRun);
 }
 
 export function buildPmCommand(record: PmRecord): BuiltPmCommand {
+    if ((record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit' && record.type !== 'file') {
+        throw new Error('pm proxy strategy "inherit" currently supports only Node .js/.mjs/.cjs file targets.');
+    }
+
     if (record.type === 'script') {
         return {
             command: record.script!,
@@ -180,9 +282,26 @@ export function buildPmCommand(record: PmRecord): BuiltPmCommand {
 
     const executable = preferCurrentExecutable('node');
     ensureCommandAvailable(executable, 'Node.js runtime');
+    const wantsInheritedListener = (record.proxy?.strategy ?? DEFAULT_PM_PROXY_STRATEGY) === 'inherit';
+    if (wantsInheritedListener && !supportsPmInheritedListener(record, runtime)) {
+        throw new Error('pm proxy strategy "inherit" currently supports only Node .js/.mjs/.cjs file targets.');
+    }
+
+    const bootstrapPath = wantsInheritedListener ? resolvePmNodeSharedListenerBootstrapPath() : undefined;
+    if (wantsInheritedListener && !bootstrapPath) {
+        throw new Error('Unable to resolve the PM shared-listener bootstrap module.');
+    }
     return {
         command: executable,
         args: [record.file!],
+        env: bootstrapPath
+            ? {
+                NODE_OPTIONS: appendNodeOption(process.env.NODE_OPTIONS, `--require=${bootstrapPath}`),
+                ELIT_PM_LISTEN_MODE: 'ipc',
+                ELIT_PM_PUBLIC_PORT: String(record.proxy?.port ?? record.env.PORT ?? ''),
+            }
+            : undefined,
+        ipc: Boolean(bootstrapPath),
         runtime,
         preview: `${basename(executable)} ${quoteCommandSegment(record.file!)}`,
     };
@@ -201,20 +320,33 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
     return {
         id,
         name: definition.name,
+        baseName: definition.baseName,
+        instanceIndex: definition.instanceIndex,
+        instances: definition.instances,
         type: definition.type,
         source: definition.source,
         cwd: definition.cwd,
         runtime: definition.runtime,
         env: definition.env,
+        proxy: definition.proxy,
         script: definition.script,
         file: definition.file,
         wapk: definition.wapk,
         wapkRun: definition.wapkRun,
         autorestart: definition.autorestart,
         restartDelay: definition.restartDelay,
+        killTimeout: definition.killTimeout,
         maxRestarts: definition.maxRestarts,
         password: definition.password,
         restartPolicy: definition.restartPolicy,
+        maxMemoryBytes: definition.maxMemoryBytes,
+        memoryAction: definition.memoryAction,
+        cronRestart: definition.cronRestart,
+        expBackoffRestartDelay: definition.expBackoffRestartDelay,
+        expBackoffRestartMaxDelay: definition.expBackoffRestartMaxDelay,
+        restartWindow: definition.restartWindow,
+        waitReady: definition.waitReady,
+        listenTimeout: definition.listenTimeout,
         minUptime: definition.minUptime,
         watch: definition.watch,
         watchPaths: definition.watchPaths,
@@ -230,9 +362,13 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
         stoppedAt: undefined,
         runnerPid: undefined,
         childPid: undefined,
+        proxyTargetPort: undefined,
         restartCount: existing?.restartCount ?? 0,
+        reloadRequestedAt: undefined,
+        lastRestartAt: existing?.lastRestartAt,
         lastExitCode: existing?.lastExitCode,
         error: undefined,
+        proxyReadyAt: undefined,
         logFiles: existing?.logFiles ?? {
             out: join(paths.logsDir, `${id}.out.log`),
             err: join(paths.logsDir, `${id}.err.log`),
@@ -240,7 +376,7 @@ function createRecordFromDefinition(definition: ResolvedPmAppDefinition, paths: 
     };
 }
 
-export function terminateProcessTree(pid: number): void {
+export function terminateProcessTree(pid: number, options?: { force?: boolean }): void {
     if (process.platform === 'win32') {
         const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
             stdio: 'ignore',
@@ -255,7 +391,18 @@ export function terminateProcessTree(pid: number): void {
     }
 
     try {
-        process.kill(pid, 'SIGTERM');
+        process.kill(pid, options?.force ? 'SIGKILL' : 'SIGTERM');
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ESRCH') {
+            throw error;
+        }
+    }
+}
+
+export function sendPmSignal(pid: number, signal: NodeJS.Signals): void {
+    try {
+        process.kill(pid, signal);
     } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code !== 'ESRCH') {

@@ -65,8 +65,42 @@ interface ElitConfig {
 - `worker` for worker script registration
 - `ssr` for string or VNode server rendering
 - `env` for environment injection
+- `blockFiles` for blocking sensitive files from being served
 
 `preview` is not a static-file-only mode in Elit. It supports `clients`, `api`, `ws`, `proxy`, `worker`, and `ssr` in the same shape as `dev`.
+
+### Block Files
+
+`blockFiles` prevents sensitive files from being served over HTTP. When `root` points to the project root (e.g. `.`), dotfiles like `.env` would otherwise be accessible at `http://localhost:<port>/.env`.
+
+Default patterns (applied when `blockFiles` is not explicitly set):
+
+```text
+.env, .env.*, *.pem, *.key, *.p12, *.pfx, .git/**, .htaccess, docker-compose.yml, docker-compose.yaml, Dockerfile
+```
+
+Override with your own list:
+
+```typescript
+export default defineConfig({
+  dev: {
+    root: '.',
+    blockFiles: ['.env', '.env.*', '*.key', 'secrets/**'],
+  },
+  preview: {
+    root: 'dist',
+    blockFiles: ['.env', '.env.*'],
+  },
+});
+```
+
+Set to an empty array to disable blocking:
+
+```typescript
+blockFiles: [],
+```
+
+Patterns support `*` (any non-slash characters), `**` (any path depth), and `?` (single character). Requests matching a blocked pattern receive a `403 Forbidden` response.
 
 ### WebSocket Endpoint Shape
 
@@ -185,8 +219,18 @@ pm: {
     {
       name: 'api',
       script: 'npm start',
+      instances: 2,
       runtime: 'node',
       restartPolicy: 'on-failure',
+      maxMemory: '256M',
+      memoryAction: 'restart',
+      cronRestart: '0 4 * * *',
+      expBackoffRestartDelay: 200,
+      expBackoffRestartMaxDelay: 1500,
+      restartWindow: 10000,
+      waitReady: true,
+      listenTimeout: 5000,
+      killTimeout: 12000,
       minUptime: 5000,
       watch: true,
       watchPaths: ['./src', './package.json'],
@@ -208,6 +252,27 @@ pm: {
       file: './src/worker.ts',
       runtime: 'bun',
       restartDelay: 500,
+    },
+    {
+      name: 'edge-api',
+      file: './src/edge-api.ts',
+      runtime: 'node',
+      proxy: {
+        port: 3000,
+        strategy: 'proxy',
+        host: '0.0.0.0',
+        targetHost: '127.0.0.1',
+        envVar: 'PORT',
+      },
+      waitReady: true,
+      listenTimeout: 5000,
+      healthCheck: {
+        url: 'http://127.0.0.1:3000/health',
+        gracePeriod: 1000,
+        interval: 1000,
+        timeout: 500,
+        maxFailures: 2,
+      },
     },
     {
       name: 'archive-app',
@@ -252,6 +317,13 @@ Notes:
 - `pm.apps[].wapkRun.file` or `pm.apps[].wapkRun.googleDrive.fileId` can define the WAPK archive source even when `wapk` is omitted.
 - `pm.dataDir` changes where Elit stores process records and log files.
 - `pm.dumpFile` changes where `elit pm save` and `elit pm resurrect` read and write the saved app list.
+- `instances` starts multiple managed children for one app name, and `elit pm scale <name> <count>` updates that count later.
+- `pm.apps[].proxy` lets PM own the public HTTP port. `strategy: 'proxy'` routes to private child ports, supports multi-instance groups, and forwards websocket upgrades. `strategy: 'inherit'` shares the public listener directly with a Node `.js`/`.mjs`/`.cjs` file target and currently stays single-instance.
+- `maxMemory` accepts raw bytes or strings like `256M`, `memoryAction` decides whether that threshold restarts or stops the app, `cronRestart` accepts a cron string or `@every 30s`, `expBackoffRestartDelay` doubles unstable restart delays, `expBackoffRestartMaxDelay` caps them, and `restartWindow` resets stale restart counters before they keep counting toward `maxRestarts`.
+- `waitReady` keeps the app in `starting` until its `healthCheck` succeeds, while `listenTimeout` caps how long startup may wait.
+- `elit pm reload <name>` now waits for each replacement instance to become `online` before moving to the next one, so readiness-aware HTTP groups can roll with less disruption.
+- Single-instance apps that bind the public port directly still restart in place unless they opt into `pm.apps[].proxy` or `elit pm start --proxy-port ...`.
+- `killTimeout` sets the per-app grace window before Elit forcefully terminates a stop or restart.
 - `restartPolicy` accepts `always`, `on-failure`, or `never`. `minUptime` resets restart counters after a healthy run.
 - `watch`, `watchPaths`, `watchIgnore`, and `watchDebounce` control file-triggered restarts.
 - `online` and `onlineUrl` inside `wapkRun` turn a PM-managed WAPK app into an Elit Run host instead of a local runtime.

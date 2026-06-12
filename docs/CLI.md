@@ -197,8 +197,15 @@ Forms:
 - `elit pm start`
 - `elit pm start my-app`
 - `elit pm list`
+- `elit pm list --json`
+- `elit pm show <name>`
+- `elit pm describe <name> --json`
 - `elit pm stop <name|all>`
 - `elit pm restart <name|all>`
+- `elit pm reload <name|all>`
+- `elit pm scale <name> <count>`
+- `elit pm reset <name|all>`
+- `elit pm send-signal <signal> <name|all>`
 - `elit pm delete <name|all>`
 - `elit pm save`
 - `elit pm resurrect`
@@ -207,6 +214,7 @@ Forms:
 Useful options:
 
 - `--runtime node|bun|deno`
+- `--instances <count>`
 - `--cwd <dir>`
 - `--env KEY=VALUE`
 - `--password <value>` for locked WAPK apps
@@ -221,6 +229,19 @@ Useful options:
 - `--archive-watch` and `--no-archive-watch` for WAPK archive pull sync
 - `--archive-sync-interval <ms>` for WAPK archive polling
 - `--restart-policy always|on-failure|never`
+- `--proxy-port <port>`
+- `--proxy-strategy <proxy|inherit>`
+- `--proxy-host <host>`
+- `--proxy-target-host <host>`
+- `--proxy-env <name>`
+- `--max-memory <bytes|size>`
+- `--memory-action restart|stop`
+- `--cron-restart <expr>`
+- `--exp-backoff-restart-delay <ms>`
+- `--exp-backoff-restart-max-delay <ms>`
+- `--restart-window <ms>`
+- `--wait-ready`
+- `--listen-timeout <ms>`
 - `--min-uptime <ms>`
 - `--watch`
 - `--watch-path <path>`
@@ -233,14 +254,32 @@ Useful options:
 - `--health-max-failures <count>`
 - `--no-autorestart`
 - `--restart-delay <ms>`
+- `--kill-timeout <ms>`
 - `--max-restarts <count>`
 
 Notes:
 
 - `pm start` without a target starts every app from `pm.apps[]` in `elit.config.*`.
 - `pm start <name>` resolves one configured app by name.
+- `pm reload <name|all>` performs a rolling stop/start across each matched instance and waits for the replacement to return `online` before continuing.
+- `pm reload <name|all>` can hand off a single-instance HTTP app without dropping the public endpoint when `--proxy-port` or `pm.apps[].proxy` is enabled. `proxy` mode keeps PM on the public port and routes to private child ports; `inherit` shares the public listener directly with a Node child.
+- `--proxy-strategy proxy` is the default and now supports multi-instance groups plus websocket upgrades on the public port.
+- `--proxy-strategy inherit` is currently limited to single-instance Node `.js`, `.mjs`, and `.cjs` file targets.
+- `pm reload <name|all>` is still a stop/start cycle for single-instance apps that bind the public port directly.
+- `pm scale <name> <count>` changes the number of managed instances for a process group.
+- `pm reset <name|all>` clears restart counters plus saved exit/error metadata.
+- `pm send-signal <signal> <name|all>` forwards a signal like `SIGUSR2` or `TERM` to the current managed child process.
+- `maxMemory` accepts raw bytes or size strings like `256M`; `memoryAction` decides whether that threshold restarts or stops the process.
+- `cronRestart` accepts a 5-field cron string or `@every 30s`, `expBackoffRestartDelay` doubles unstable restart delays, `expBackoffRestartMaxDelay` caps them, and `restartWindow` resets stale restart counters before they count toward `maxRestarts` again.
+- `--proxy-strategy` defaults to `proxy`, `--proxy-host` defaults to `0.0.0.0`, `--proxy-target-host` defaults to `127.0.0.1`, and `--proxy-env` defaults to `PORT`.
 - WAPK apps can use local `.wapk` files, `gdrive://<fileId>`, or `pm.apps[].wapkRun.googleDrive`.
 - PM-managed WAPK online hosts can also forward `--online` and `--online-url <url>` into `elit wapk run`.
+- `pm list` now includes live `cpu`, `memory`, and `uptime` columns for running processes.
+- `pm list --json` and `pm jlist` return machine-readable process records for tooling and CI, including `liveMetrics` when the child process is running.
+- `pm show <name>` prints the stored runtime metadata for one process, and `pm describe <name> --json` exposes the same record plus `liveMetrics` as JSON.
+- `waitReady` keeps the process in `starting` until its health check succeeds; `listenTimeout` caps that startup window.
+- `instances` creates named groups such as `api`, `api:2`, and `api:3`; inspect a specific instance name when a group has more than one child.
+- `killTimeout` controls how long PM waits before escalating a stop or restart to forceful termination.
 - PM `--watch` restarts the managed process; WAPK `--watcher` only changes the inner WAPK live-sync mode.
 - `pm stop`, `pm restart`, and `pm delete` close PM-managed online WAPK share sessions before the process exits.
 - Watch restarts are explicit supervisor restarts; health-check failures can also trigger managed restarts.
@@ -324,6 +363,8 @@ elit pm start --script "npm start" --name my-app --runtime node
 elit pm start --script "npm start" --name my-app --watch --watch-path src --restart-policy on-failure
 elit pm start ./src/worker.ts --name worker --runtime bun
 elit pm start --wapk ./app.wapk --name packaged-app
+elit pm list --json
+elit pm show my-app
 elit pm save
 elit pm resurrect
 elit pm logs my-app --lines 100

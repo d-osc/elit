@@ -3,6 +3,9 @@ import { extname, join, resolve } from 'node:path';
 
 import type {
     PmHealthCheckConfig,
+    PmMemoryAction,
+    PmProxyConfig,
+    PmProxyStrategy,
     PmRestartPolicy,
     PmRuntimeName,
     WapkGoogleDriveConfig,
@@ -13,6 +16,7 @@ import {
     DEFAULT_HEALTHCHECK_INTERVAL,
     DEFAULT_HEALTHCHECK_MAX_FAILURES,
     DEFAULT_HEALTHCHECK_TIMEOUT,
+    DEFAULT_PM_PROXY_STRATEGY,
     SIMPLE_PREVIEW_SEGMENT,
     SUPPORTED_FILE_EXTENSIONS,
     type PmResolvedHealthCheck,
@@ -52,12 +56,85 @@ export function normalizePmRestartPolicy(value: unknown, optionName = '--restart
     throw new Error(`${optionName} must be one of: always, on-failure, never`);
 }
 
+export function normalizePmMemoryAction(value: unknown, optionName = '--memory-action'): PmMemoryAction | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be one of: restart, stop`);
+    }
+
+    const action = value.trim().toLowerCase();
+    if (action === 'restart' || action === 'stop') {
+        return action;
+    }
+
+    throw new Error(`${optionName} must be one of: restart, stop`);
+}
+
+export function normalizePmProxyStrategy(value: unknown, optionName = '--proxy-strategy'): PmProxyStrategy | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be one of: proxy, inherit`);
+    }
+
+    const strategy = value.trim().toLowerCase();
+    if (strategy === 'proxy' || strategy === 'inherit') {
+        return strategy;
+    }
+
+    throw new Error(`${optionName} must be one of: proxy, inherit`);
+}
+
 export function normalizeIntegerOption(value: string, optionName: string, min = 0): number {
     const parsed = Number.parseInt(value, 10);
     if (!Number.isFinite(parsed) || parsed < min) {
         throw new Error(`${optionName} must be a number >= ${min}`);
     }
     return parsed;
+}
+
+export function normalizePmMemoryLimit(value: unknown, optionName = '--max-memory'): number | undefined {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value === 'number') {
+        const normalized = Math.trunc(value);
+        if (!Number.isFinite(normalized) || normalized < 1) {
+            throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+        }
+
+        return normalized;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+    }
+
+    const normalized = value.trim();
+    const match = /^(\d+)(b|kb|mb|gb|tb|k|m|g|t)?$/i.exec(normalized);
+    if (!match) {
+        throw new Error(`${optionName} must be a number >= 1 or a size like 256M.`);
+    }
+
+    const amount = normalizeIntegerOption(match[1] ?? '', optionName, 1);
+    const unit = (match[2] ?? 'b').toLowerCase();
+    const multiplier = unit === 'b'
+        ? 1
+        : unit === 'k' || unit === 'kb'
+            ? 1024
+            : unit === 'm' || unit === 'mb'
+                ? 1024 ** 2
+                : unit === 'g' || unit === 'gb'
+                    ? 1024 ** 3
+                    : 1024 ** 4;
+
+    return amount * multiplier;
 }
 
 export function normalizeNonEmptyString(value: unknown): string | undefined {
@@ -446,4 +523,40 @@ export function readRequiredValue(args: string[], index: number, optionName: str
         throw new Error(`${optionName} requires a value.`);
     }
     return value;
+}
+
+export function normalizePmProxyConfig(value: unknown, optionName = 'pm proxy'): PmProxyConfig | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value !== 'object') {
+        throw new Error(`${optionName} must be an object with at least a port.`);
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const hasAnyValue = candidate.port !== undefined
+        || candidate.host !== undefined
+        || candidate.targetHost !== undefined
+        || candidate.envVar !== undefined;
+
+    if (!hasAnyValue) {
+        return undefined;
+    }
+
+    if (candidate.port === undefined || candidate.port === null || candidate.port === '') {
+        throw new Error(`${optionName}.port is required.`);
+    }
+
+    const port = typeof candidate.port === 'number'
+        ? normalizeIntegerOption(String(Math.trunc(candidate.port)), `${optionName}.port`, 1)
+        : normalizeIntegerOption(String(candidate.port), `${optionName}.port`, 1);
+
+    return {
+        port,
+        strategy: normalizePmProxyStrategy(candidate.strategy, `${optionName}.strategy`) ?? DEFAULT_PM_PROXY_STRATEGY,
+        host: normalizeNonEmptyString(candidate.host),
+        targetHost: normalizeNonEmptyString(candidate.targetHost),
+        envVar: normalizeNonEmptyString(candidate.envVar),
+    };
 }

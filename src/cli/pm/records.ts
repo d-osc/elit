@@ -56,18 +56,31 @@ export function writePmRecord(filePath: string, record: PmRecord): void {
 export function toSavedAppDefinition(record: PmRecord): PmSavedAppDefinition {
     return {
         name: record.name,
+        baseName: record.baseName,
+        instanceIndex: record.instanceIndex,
+        instances: record.instances,
         type: record.type,
         cwd: record.cwd,
         runtime: record.runtime,
         env: record.env,
+        proxy: record.proxy,
         script: record.script,
         file: record.file,
         wapk: record.wapk,
         password: record.password,
         wapkRun: record.wapkRun,
         restartPolicy: record.restartPolicy,
+        maxMemoryBytes: record.maxMemoryBytes,
+        memoryAction: record.memoryAction,
+        cronRestart: record.cronRestart,
+        expBackoffRestartDelay: record.expBackoffRestartDelay,
+        expBackoffRestartMaxDelay: record.expBackoffRestartMaxDelay,
+        restartWindow: record.restartWindow,
+        waitReady: record.waitReady,
+        listenTimeout: record.listenTimeout,
         autorestart: record.autorestart,
         restartDelay: record.restartDelay,
+        killTimeout: record.killTimeout,
         maxRestarts: record.maxRestarts,
         minUptime: record.minUptime,
         watch: record.watch,
@@ -151,6 +164,12 @@ export function findPmRecordMatch(paths: PmPaths, nameOrId: string): PmRecordMat
     return listPmRecordMatches(paths).find((match) => match.record.name === nameOrId);
 }
 
+export function findPmGroupMatches(paths: PmPaths, baseName: string): PmRecordMatch[] {
+    return listPmRecordMatches(paths)
+        .filter((match) => match.record.baseName === baseName)
+        .sort((left, right) => left.record.instanceIndex - right.record.instanceIndex);
+}
+
 export function isProcessAlive(pid: number | undefined): boolean {
     if (!pid || pid <= 0) {
         return false;
@@ -208,11 +227,22 @@ export function toPmAppConfig(record: PmRecord): PmAppConfig {
         runtime: record.runtime,
         cwd: record.cwd,
         env: record.env,
+        proxy: record.proxy,
+        instances: record.instances,
         autorestart: record.autorestart,
         restartDelay: record.restartDelay,
+        killTimeout: record.killTimeout,
         maxRestarts: record.maxRestarts,
         password: record.password,
         restartPolicy: record.restartPolicy,
+        maxMemory: record.maxMemoryBytes,
+        memoryAction: record.memoryAction,
+        cronRestart: record.cronRestart,
+        expBackoffRestartDelay: record.expBackoffRestartDelay,
+        expBackoffRestartMaxDelay: record.expBackoffRestartMaxDelay,
+        restartWindow: record.restartWindow,
+        waitReady: record.waitReady,
+        listenTimeout: record.listenTimeout,
         minUptime: record.minUptime,
         watch: record.watch,
         watchPaths: record.watchPaths,
@@ -232,11 +262,22 @@ export function toSavedPmAppConfig(app: PmSavedAppDefinition): PmAppConfig {
         runtime: app.runtime,
         cwd: app.cwd,
         env: app.env,
+        proxy: app.proxy,
+        instances: app.instances,
         autorestart: app.autorestart,
         restartDelay: app.restartDelay,
+        killTimeout: app.killTimeout,
         maxRestarts: app.maxRestarts,
         password: app.password,
         restartPolicy: app.restartPolicy,
+        maxMemory: app.maxMemoryBytes,
+        memoryAction: app.memoryAction,
+        cronRestart: app.cronRestart,
+        expBackoffRestartDelay: app.expBackoffRestartDelay,
+        expBackoffRestartMaxDelay: app.expBackoffRestartMaxDelay,
+        restartWindow: app.restartWindow,
+        waitReady: app.waitReady,
+        listenTimeout: app.listenTimeout,
         minUptime: app.minUptime,
         watch: app.watch,
         watchPaths: app.watchPaths,

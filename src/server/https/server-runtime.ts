@@ -12,7 +12,7 @@ import {
 
 import { loadHttpClasses } from './http-classes';
 import { https } from './node-modules';
-import type { RequestListener, ServerOptions } from './types';
+import type { RequestListener, ServerListenOptions, ServerOptions } from './types';
 
 /**
  * HTTPS Server - Optimized for each runtime
@@ -29,13 +29,37 @@ export class Server extends EventEmitter {
     this.requestListener = requestListener;
   }
 
+  private resolvePmInheritedFd(explicitPort?: number, explicitFd?: number): number | undefined {
+    if (typeof explicitFd === 'number' && Number.isInteger(explicitFd) && explicitFd >= 0) {
+      return explicitFd;
+    }
+
+    const fdValue = process.env.ELIT_PM_LISTEN_FD;
+    if (!fdValue) {
+      return undefined;
+    }
+
+    const parsedFd = Number.parseInt(fdValue, 10);
+    if (!Number.isInteger(parsedFd) || parsedFd < 0) {
+      return undefined;
+    }
+
+    const publicPort = Number.parseInt(process.env.ELIT_PM_PUBLIC_PORT ?? process.env.ELIT_PM_PORT ?? '', 10);
+    if (Number.isInteger(explicitPort) && Number.isInteger(publicPort) && explicitPort !== publicPort) {
+      return undefined;
+    }
+
+    return parsedFd;
+  }
+
   listen(port?: number, hostname?: string, backlog?: number, listeningListener?: () => void): this;
   listen(port?: number, hostname?: string, listeningListener?: () => void): this;
   listen(port?: number, listeningListener?: () => void): this;
-  listen(options?: { port?: number; hostname?: string; backlog?: number }, listeningListener?: () => void): this;
+  listen(options?: ServerListenOptions, listeningListener?: () => void): this;
   listen(...args: any[]): this {
     let port = 3000;
     let hostname = '0.0.0.0';
+    let fd: number | undefined;
     let callback: (() => void) | undefined;
 
     const firstArg = args[0];
@@ -51,8 +75,11 @@ export class Server extends EventEmitter {
     } else if (firstArg && typeof firstArg === 'object') {
       port = firstArg.port || 3000;
       hostname = firstArg.hostname || '0.0.0.0';
+      fd = typeof firstArg.fd === 'number' ? firstArg.fd : undefined;
       callback = args[1];
     }
+
+    fd = this.resolvePmInheritedFd(firstArg && typeof firstArg === 'object' ? firstArg.port : port, fd);
 
     const self = this;
 
@@ -70,11 +97,19 @@ export class Server extends EventEmitter {
         }
       });
 
-      this.nativeServer.listen(port, hostname, () => {
-        this._listening = true;
-        this.emit('listening');
-        if (callback) callback();
-      });
+      if (fd !== undefined) {
+        this.nativeServer.listen({ fd, exclusive: false }, () => {
+          this._listening = true;
+          this.emit('listening');
+          if (callback) callback();
+        });
+      } else {
+        this.nativeServer.listen(port, hostname, () => {
+          this._listening = true;
+          this.emit('listening');
+          if (callback) callback();
+        });
+      }
 
       this.nativeServer.on('error', (err: Error) => this.emit('error', err));
       this.nativeServer.on('close', () => {
