@@ -153,14 +153,33 @@ export function sanitizeProxyRequestPath(requestUrl: string): string {
     if (!requestUrl || requestUrl === '/') return '/';
 
     try {
-        const parsed = new URL(requestUrl, 'http://placeholder');
+        const normalizedInput = requestUrl.replace(/\\/g, '/');
+        const parsed = new URL(normalizedInput, 'http://placeholder');
 
         if (parsed.username || parsed.password || parsed.hostname !== 'placeholder' || parsed.port) {
             return '/';
         }
 
-        const sanitized = parsed.pathname + parsed.search;
-        return sanitized || '/';
+        const pathname = parsed.pathname || '/';
+        let decodedPathname = pathname;
+        try {
+            decodedPathname = decodeURIComponent(pathname);
+        } catch {
+            return '/';
+        }
+
+        const lowerPath = pathname.toLowerCase();
+        if (lowerPath.includes('%2f') || lowerPath.includes('%5c') || lowerPath.includes('%40') || lowerPath.includes('%00')) {
+            return '/';
+        }
+
+        const segments = decodedPathname.split('/');
+        if (segments.some((segment) => segment === '.' || segment === '..')) {
+            return '/';
+        }
+
+        const sanitized = pathname + parsed.search;
+        return sanitized.startsWith('/') ? (sanitized || '/') : `/${sanitized}`;
     } catch {
         return '/';
     }
@@ -297,18 +316,20 @@ export async function createPmProxyController(proxy: PmProxyConfig): Promise<PmP
 
         const sanitizedPath = sanitizeProxyRequestPath(req.url || '/');
         const requestLib = target.protocol === 'https:' ? httpsRequest : httpRequest;
-        const targetUrl = new URL(sanitizedPath, target);
         const headers = buildPmProxyHeaders(req.headers, target.host);
 
-        // Reject if the constructed URL escaped to a different host or protocol.
-        if (targetUrl.hostname !== target.hostname || targetUrl.port !== target.port || !ALLOWED_PROXY_PROTOCOLS.has(targetUrl.protocol)) {
+        if (!ALLOWED_PROXY_PROTOCOLS.has(target.protocol)) {
             res.statusCode = 400;
-            res.end('PM proxy rejected unsafe request path.');
+            res.end('PM proxy rejected unsafe target protocol.');
             return;
         }
 
         validateTarget(target).then(() => {
-            const proxyReq = requestLib(targetUrl, {
+            const proxyReq = requestLib({
+                protocol: target.protocol,
+                hostname: target.hostname,
+                port: target.port || undefined,
+                path: sanitizedPath,
                 method: req.method,
                 headers,
             }, (proxyRes) => {
