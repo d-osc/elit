@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import type { WebSocketServer } from 'ws';
 
 import type { Child } from '../core/types';
+import type { ResolveConfig } from '../build/contracts';
 import type { ElitSMTPServerConfig, ElitSMTPServerHandle } from './smtp-server';
 
 export type Router = import('./server').ServerRouter;
@@ -68,10 +69,17 @@ export interface DevServerOptions {
     open?: boolean;
     watch?: string[];
     ignore?: string[];
+    /** Server-side HMR: restart dev server when server-source files change.
+     *  - `true` (default): walk dependency graph from server entries discovered in elit.config.ts
+     *  - `false`: disable server-side HMR entirely
+     *  - `string[]`: explicit glob patterns to watch (skips dep graph discovery) */
+    serverWatch?: boolean | string[];
     worker?: WorkerConfig[];
     logging?: boolean;
     /** Glob patterns for files that must never be served (e.g. ".env", ".env.*", "*.key"). Default blocks .env, .env.*, .git/**, and common secret files. */
     blockFiles?: string[];
+    /** Import-specifier alias map applied to served source files (e.g. `{ '@': './src' }`). */
+    resolve?: ResolveConfig;
     api?: Router;
     ws?: WebSocketEndpointConfig[];
     smtp?: ElitSMTPServerConfig | ElitSMTPServerConfig[];
@@ -113,6 +121,8 @@ export interface PreviewOptions {
     logging?: boolean;
     /** Glob patterns for files that must never be served (e.g. ".env", ".env.*", "*.key"). Default blocks .env, .env.*, .git/**, and common secret files. */
     blockFiles?: string[];
+    /** Import-specifier alias map applied to served source files (e.g. `{ '@': './src' }`). */
+    resolve?: ResolveConfig;
     api?: Router;
     ws?: WebSocketEndpointConfig[];
     smtp?: ElitSMTPServerConfig | ElitSMTPServerConfig[];

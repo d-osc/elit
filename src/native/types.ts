@@ -52,7 +52,7 @@ export interface SwiftUIOptions {
     includePreview?: boolean;
 }
 
-export type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler' | 'downloadHandler' | 'bridge' | 'webViewSurface' | 'mediaSurface' | 'interactivePressState' | 'backgroundImage';
+export type NativeHelperFlag = 'imagePlaceholder' | 'unsupportedPlaceholder' | 'uriHandler' | 'openUrlHandler' | 'downloadHandler' | 'bridge' | 'webViewSurface' | 'mediaSurface' | 'interactivePressState' | 'backgroundImage' | 'screenRoot';
 export type NativeResolvedStyleMap = WeakMap<NativeElementNode, Record<string, NativePropValue>>;
 export interface NativeStyleContextEntry {
     scope: NativeStyleScope;

@@ -53,8 +53,17 @@ export function buildComposeChunkedRowArguments(
     return args.join(', ');
 }
 
-export function buildComposeChunkedTrackModifier(baseModifier: string, row: NativeChunkedRow): string {
+export function buildComposeChunkedTrackModifier(
+    baseModifier: string,
+    row: NativeChunkedRow,
+    options: { fillWidth?: boolean } = {},
+): string {
+    const fillWidth = options.fillWidth ?? true;
     let modifier = baseModifier;
+
+    if (row.trackWeight !== undefined) {
+        modifier = appendComposeModifierCall(modifier, `weight(${formatFloat(row.trackWeight)}f, fill = true)`);
+    }
 
     if (row.height !== undefined) {
         modifier = appendComposeModifierCall(modifier, `height(${formatFloat(row.height)}.dp)`);
@@ -69,9 +78,7 @@ export function buildComposeChunkedTrackModifier(baseModifier: string, row: Nati
         modifier = appendComposeModifierCall(modifier, `heightIn(${heightInArgs.join(', ')})`);
     }
 
-    return row.trackWeight !== undefined
-        ? appendComposeModifierCall(modifier, `weight(${formatFloat(row.trackWeight)}f, fill = true)`)
-        : modifier;
+    return fillWidth ? appendComposeModifierCall(modifier, 'fillMaxWidth()') : modifier;
 }
 
 export function buildComposeChunkedColumnArrangement(layout: NativeChunkedLayout): string | undefined {

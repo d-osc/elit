@@ -3,6 +3,7 @@ import { lookup } from '../../shares/mime-types';
 import { isBun, isDeno } from '../../shares/runtime';
 import type { VNode } from '../../core/types';
 import type { DevServer, DevServerOptions, HMRMessage } from '../types';
+import packageJson from '../../../package.json';
 
 import { watch } from '../chokidar';
 import { readFile, realpath, stat } from '../fs';
@@ -17,6 +18,7 @@ import { createProxyHandler } from './proxy';
 import { send403, send404, send500 } from './responses';
 import { StateManager } from './state';
 import { transpileNodeBrowserModule } from './transpile';
+import { rewriteModuleSpecifiers } from './ast-rewriter';
 import {
   assertUniqueSmtpServerBindings,
   collectSmtpServerConfigs,
@@ -36,6 +38,7 @@ import {
   parseRequestQuery,
   requestAcceptsGzip,
   resolveClientPathFromBaseDir,
+  rewriteAliasSpecifiers,
   rewriteRelativePaths,
   shouldUseClientFallbackRoot,
   shouldBlockFile,
@@ -43,6 +46,8 @@ import {
   type NormalizedClient,
   type TransformCacheEntry,
 } from './utils';
+
+const ELIT_VERSION_META = `<meta name="generator" content="Elit ${packageJson.version}">`;
 
 export function createDevServer(options: DevServerOptions): DevServer {
   const config = { ...defaultOptions, ...options };
@@ -415,10 +420,24 @@ export default css;
                 });
               }
 
-              transpiled = transpiled.replace(/from\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `from "${importPath}.js${tsx}"`);
-              transpiled = transpiled.replace(/import\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `import "${importPath}.js${tsx}"`);
-              transpiled = transpiled.replace(/import\s+["']([^"']+\.css)["']/g, (_, importPath) => `import "${importPath}?inline"`);
-              transpiled = transpiled.replace(/from\s+["']([^"']+\.css)["']/g, (_, importPath) => `from "${importPath}?inline"`);
+              const rewritten = rewriteModuleSpecifiers(transpiled, {
+                importerPath: resolvedPath,
+                clientRoot: rootDir,
+                alias: config.resolve?.alias,
+              });
+              if (rewritten.changed) {
+                transpiled = rewritten.code;
+              } else if (rewritten.parseFailed) {
+                if (config.logging && config.mode !== 'preview') {
+                  console.warn('[AST] rewriteModuleSpecifiers parse failed, using regex fallback');
+                }
+                let fallback = rewriteAliasSpecifiers(transpiled, resolvedPath, rootDir, config.resolve?.alias);
+                fallback = fallback.replace(/from\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `from "${importPath}.js${tsx}"`);
+                fallback = fallback.replace(/import\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `import "${importPath}.js${tsx}"`);
+                fallback = fallback.replace(/import\s+["']([^"']+\.css)["']/g, (_, importPath) => `import "${importPath}?inline"`);
+                fallback = fallback.replace(/from\s+["']([^"']+\.css)["']/g, (_, importPath) => `from "${importPath}?inline"`);
+                transpiled = fallback;
+              }
 
               content = Buffer.from(transpiled);
               mimeType = 'application/javascript';
@@ -482,7 +501,7 @@ export default css;
 
         const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
         const modeScript = config.mode === 'preview' ? '<script>window.__ELIT_MODE__=\'preview\';</script>' : '';
-        const headInjection = `${modeScript}${ssrStyles ? `\n${ssrStyles}` : ''}\n${elitImportMap}`;
+        const headInjection = `${ELIT_VERSION_META}\n${modeScript}${ssrStyles ? `\n${ssrStyles}` : ''}\n${elitImportMap}`;
         html = html.includes('</head>') ? html.replace('</head>', `${headInjection}</head>`) : html;
         html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
         content = Buffer.from(html);
@@ -555,7 +574,7 @@ export default css;
       const hmrScript = config.mode !== 'preview' ? createHMRScript(config.port) : '';
       const elitImportMap = await createElitImportMap(client.root, basePath, client.mode);
       const modeScript = config.mode === 'preview' ? '<script>window.__ELIT_MODE__=\'preview\';</script>\n' : '';
-      html = html.includes('</head>') ? html.replace('</head>', `${modeScript}${elitImportMap}</head>`) : html;
+      html = html.includes('</head>') ? html.replace('</head>', `${ELIT_VERSION_META}\n${modeScript}${elitImportMap}</head>`) : html;
       html = html.includes('</body>') ? html.replace('</body>', `${hmrScript}</body>`) : html + hmrScript;
 
       res.writeHead(200, {

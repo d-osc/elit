@@ -144,7 +144,7 @@ export function renderComposeChunkedLayout(
 
     if (layout.kind === 'grid' && layout.rows.length === 1 && !usesSingleRowGridStackAlignment) {
         const [row] = layout.rows;
-        const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier(modifier, row), layout.columnGap, context.styleResolveOptions)}) {`];
+        const lines = [`${indent(level)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier(modifier, row, { fillWidth: false }), layout.columnGap, context.styleResolveOptions)}) {`];
         const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
@@ -183,7 +183,7 @@ export function renderComposeChunkedLayout(
     const lines = [`${indent(level)}Column(modifier = ${modifier}${outerGap ? `, verticalArrangement = ${outerGap}` : ''}) {`];
     for (const row of layout.rows) {
         const totalWeight = row.weights ? row.weights.reduce<number>((sum, entry) => sum + (entry ?? 0), 0) : undefined;
-        lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier('Modifier.fillMaxWidth()', row), layout.columnGap, context.styleResolveOptions)}) {`);
+        lines.push(`${indent(level + 1)}Row(${buildComposeChunkedRowArguments(style, buildComposeChunkedTrackModifier('Modifier', row), layout.columnGap, context.styleResolveOptions)}) {`);
         row.items.forEach((child, index) => {
             const weight = row.weights?.[index];
             const columnSize = row.columnSizes?.[index];
