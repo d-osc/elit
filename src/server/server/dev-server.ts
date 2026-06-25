@@ -17,6 +17,7 @@ import { createProxyHandler } from './proxy';
 import { send403, send404, send500 } from './responses';
 import { StateManager } from './state';
 import { transpileNodeBrowserModule } from './transpile';
+import { rewriteModuleSpecifiers } from './ast-rewriter';
 import {
   assertUniqueSmtpServerBindings,
   collectSmtpServerConfigs,
@@ -416,16 +417,24 @@ export default css;
                 });
               }
 
-              transpiled = rewriteAliasSpecifiers(
-                transpiled,
-                resolvedPath,
-                rootDir,
-                config.resolve?.alias,
-              );
-              transpiled = transpiled.replace(/from\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `from "${importPath}.js${tsx}"`);
-              transpiled = transpiled.replace(/import\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `import "${importPath}.js${tsx}"`);
-              transpiled = transpiled.replace(/import\s+["']([^"']+\.css)["']/g, (_, importPath) => `import "${importPath}?inline"`);
-              transpiled = transpiled.replace(/from\s+["']([^"']+\.css)["']/g, (_, importPath) => `from "${importPath}?inline"`);
+              const rewritten = rewriteModuleSpecifiers(transpiled, {
+                importerPath: resolvedPath,
+                clientRoot: rootDir,
+                alias: config.resolve?.alias,
+              });
+              if (rewritten.changed) {
+                transpiled = rewritten.code;
+              } else if (rewritten.parseFailed) {
+                if (config.logging && config.mode !== 'preview') {
+                  console.warn('[AST] rewriteModuleSpecifiers parse failed, using regex fallback');
+                }
+                let fallback = rewriteAliasSpecifiers(transpiled, resolvedPath, rootDir, config.resolve?.alias);
+                fallback = fallback.replace(/from\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `from "${importPath}.js${tsx}"`);
+                fallback = fallback.replace(/import\s+["']([^"']+)\.ts(x?)["']/g, (_, importPath, tsx) => `import "${importPath}.js${tsx}"`);
+                fallback = fallback.replace(/import\s+["']([^"']+\.css)["']/g, (_, importPath) => `import "${importPath}?inline"`);
+                fallback = fallback.replace(/from\s+["']([^"']+\.css)["']/g, (_, importPath) => `from "${importPath}?inline"`);
+                transpiled = fallback;
+              }
 
               content = Buffer.from(transpiled);
               mimeType = 'application/javascript';
