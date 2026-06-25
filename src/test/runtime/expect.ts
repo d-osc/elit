@@ -267,6 +267,27 @@ class Expect implements TestMatchers<any> {
         }
     }
 
+    toMatchObject(properties: Record<string, any>) {
+        const stack = new Error().stack;
+        this.expected = properties;
+        const checkSubset = (actual: any, expected: Record<string, any>, path: string): boolean => {
+            if (actual == null || typeof actual !== 'object') return false;
+            for (const key of Object.keys(expected)) {
+                const expectedValue = expected[key];
+                const actualValue = actual[key];
+                const fieldPath = `${path}${key}`;
+                if (expectedValue !== null && typeof expectedValue === 'object' && !Array.isArray(expectedValue)) {
+                    if (!checkSubset(actualValue, expectedValue, `${fieldPath}.`)) return false;
+                } else if (!this.deepEqual(actualValue, expectedValue)) {
+                    this.assertCondition(false, `Expected property "${fieldPath}" to equal ${this.stringify(expectedValue)}`, false, undefined, stack);
+                    return false;
+                }
+            }
+            return true;
+        };
+        this.assertCondition(checkSubset(this.actual, properties, ''), 'Expected object to match subset', false, undefined, stack);
+    }
+
     toBeCalled() {
         this.assertCondition(this.actual._isMock && this.actual._calls.length > 0, 'Expected mock function to have been called');
     }

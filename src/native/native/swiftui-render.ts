@@ -120,6 +120,26 @@ function renderSwiftUIContainerNode(
     return [...baseLines, ...appendSwiftUIOverlays(contentLines, overlays, level)];
 }
 
+function renderSwiftUnsupportedFallback(
+    node: NativeElementNode,
+    level: number,
+    context: SwiftUIContext,
+    baseLines: string[],
+    modifiers: string[],
+    label: string,
+): string[] {
+    context.helperFlags.add('unsupportedPlaceholder');
+    const sourceTag = node.sourceTag ?? node.component.toLowerCase();
+    return appendSwiftUIModifiers(
+        [
+            ...baseLines,
+            `${indent(level)}elitUnsupportedPlaceholder(label: ${quoteSwiftString(label)}, sourceTag: ${quoteSwiftString(sourceTag)})`,
+        ],
+        modifiers,
+        level,
+    );
+}
+
 function renderSwiftUINode(
     node: NativeNode,
     level: number,
@@ -164,10 +184,21 @@ function renderSwiftUINode(
         const imageStyle = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
         const objectFit = resolveNativeObjectFitStyle(imageStyle);
         const objectPosition = resolveNativeObjectPositionStyle(imageStyle);
+        const imageArgs = [
+            `source: ${quoteSwiftString(source)}`,
+            `label: ${quoteSwiftString(fallbackLabel)}`,
+            `alt: ${alt ? quoteSwiftString(alt) : 'nil'}`,
+        ];
+        if (objectFit !== 'cover') {
+            imageArgs.push(`objectFit: ${quoteSwiftString(objectFit)}`);
+        }
+        if (objectPosition !== 'center') {
+            imageArgs.push(`objectPosition: ${quoteSwiftString(objectPosition)}`);
+        }
         return appendSwiftUIModifiers(
             [
                 ...baseLines,
-                `${indent(level)}elitImageSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(fallbackLabel)}, alt: ${alt ? quoteSwiftString(alt) : 'nil'}, objectFit: ${quoteSwiftString(objectFit)}, objectPosition: ${quoteSwiftString(objectPosition)})`,
+                `${indent(level)}elitImageSurface(${imageArgs.join(', ')})`,
             ],
             modifiers,
             level,
@@ -205,13 +236,16 @@ function renderSwiftUINode(
     }
 
     if (node.component === 'WebView') {
+        const source = resolveNativeSurfaceSource(node);
+        if (!source) {
+            return renderSwiftUnsupportedFallback(node, level, context, baseLines, modifiers, 'WebView');
+        }
         context.helperFlags.add('webViewSurface');
-        const source = resolveNativeSurfaceSource(node) ?? '';
         const label = resolveNativeAccessibilityLabel(node) ?? 'Web content';
         return appendSwiftUIModifiers(
             [
                 ...baseLines,
-                `${indent(level)}elitWebViewSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(label)})`,
+                `${indent(level)}ElitWebViewSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(label)})`,
             ],
             modifiers,
             level,
@@ -219,21 +253,23 @@ function renderSwiftUINode(
     }
 
     if (node.component === 'Media') {
+        const source = resolveNativeSurfaceSource(node);
+        if (!source) {
+            return renderSwiftUnsupportedFallback(node, level, context, baseLines, modifiers, 'Media');
+        }
         context.helperFlags.add('mediaSurface');
-        const source = resolveNativeSurfaceSource(node) ?? '';
         const label = resolveNativeMediaLabel(node);
         const style = getStyleObject(node, context.resolvedStyles, context.styleResolveOptions);
         const objectFit = resolveNativeObjectFitStyle(style);
         const objectPosition = resolveNativeObjectPositionStyle(style);
         const autoPlay = toNativeBoolean(node.props.autoPlay ?? node.props.autoplay);
-        const loop = toNativeBoolean(node.props.loop);
         const muted = isNativeMuted(node);
 
         if (node.sourceTag === 'audio') {
             return appendSwiftUIModifiers(
                 [
                     ...baseLines,
-                    `${indent(level)}ElitAudioSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(label)}, autoPlay: ${autoPlay ? 'true' : 'false'}, loop: ${loop ? 'true' : 'false'}, muted: ${muted ? 'true' : 'false'})`,
+                    `${indent(level)}ElitAudioSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(label)}, autoPlay: ${autoPlay ? 'true' : 'false'}, muted: ${muted ? 'true' : 'false'})`,
                 ],
                 modifiers,
                 level,
@@ -243,14 +279,33 @@ function renderSwiftUINode(
         const poster = resolveNativeVideoPoster(node);
         const controls = shouldNativeShowVideoControls(node);
         const playsInline = shouldNativePlayInline(node);
+        const videoArgs = [
+            `source: ${quoteSwiftString(source)}`,
+            `label: ${quoteSwiftString(label)}`,
+            `autoPlay: ${autoPlay ? 'true' : 'false'}`,
+            `muted: ${muted ? 'true' : 'false'}`,
+            `controls: ${controls ? 'true' : 'false'}`,
+            `poster: ${poster ? quoteSwiftString(poster) : 'nil'}`,
+            `playsInline: ${playsInline ? 'true' : 'false'}`,
+        ];
+        if (objectFit !== 'cover') {
+            videoArgs.push(`posterFit: ${quoteSwiftString(objectFit)}`);
+        }
+        if (objectPosition !== 'center') {
+            videoArgs.push(`posterPosition: ${quoteSwiftString(objectPosition)}`);
+        }
         return appendSwiftUIModifiers(
             [
                 ...baseLines,
-                `${indent(level)}ElitVideoSurface(source: ${quoteSwiftString(source)}, label: ${quoteSwiftString(label)}, autoPlay: ${autoPlay ? 'true' : 'false'}, loop: ${loop ? 'true' : 'false'}, muted: ${muted ? 'true' : 'false'}, controls: ${controls ? 'true' : 'false'}, playsInline: ${playsInline ? 'true' : 'false'}${poster ? `, poster: ${quoteSwiftString(poster)}` : ''}, posterFit: ${quoteSwiftString(objectFit)}, posterPosition: ${quoteSwiftString(objectPosition)})`,
+                `${indent(level)}ElitVideoSurface(${videoArgs.join(', ')})`,
             ],
             modifiers,
             level,
         );
+    }
+
+    if (node.component === 'Math') {
+        return renderSwiftUnsupportedFallback(node, level, context, baseLines, modifiers, 'Math');
     }
 
     if (node.component === 'Cell') {
@@ -282,6 +337,8 @@ function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
     if (context.helperFlags.has('bridge')) {
         helpers.push('');
         helpers.push('private enum ElitNativeBridge {');
+        helpers.push('    static var onAction: ((String, String?, String?) -> Void)?');
+        helpers.push('    static var onNavigate: ((String) -> Void)?');
         helpers.push('    static func dispatch(action: String? = nil, route: String? = nil, payloadJson: String? = nil) {');
         helpers.push('        print("ElitNativeBridge", action ?? "", route ?? "", payloadJson ?? "")');
         helpers.push('    }');
@@ -310,14 +367,19 @@ function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
     if (context.helperFlags.has('backgroundImage') || context.helperFlags.has('imagePlaceholder')) {
         helpers.push('');
         helpers.push('@ViewBuilder');
+        helpers.push('private func elitBackgroundImage(_ image: Image, backgroundSize: String = "cover", backgroundPosition: String = "center", backgroundRepeat: String = "no-repeat") -> some View {');
+        helpers.push('    image');
+        helpers.push('        .resizable()');
+        helpers.push('        .scaledToFill()');
+        helpers.push('}');
+        helpers.push('');
+        helpers.push('@ViewBuilder');
         helpers.push('private func elitBackgroundImageSurface(source: String, objectFit: String = "cover", objectPosition: String = "center") -> some View {');
         helpers.push('    if let url = URL(string: source), !source.isEmpty {');
         helpers.push('        AsyncImage(url: url) { phase in');
         helpers.push('            switch phase {');
         helpers.push('            case .success(let image):');
-        helpers.push('                image');
-        helpers.push('                    .resizable()');
-        helpers.push('                    .scaledToFill()');
+        helpers.push('                elitBackgroundImage(image, backgroundSize: objectFit, backgroundPosition: objectPosition, backgroundRepeat: "no-repeat")');
         helpers.push('            default:');
         helpers.push('                Color.clear');
         helpers.push('            }');
@@ -328,7 +390,7 @@ function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
         helpers.push('}');
         helpers.push('');
         helpers.push('@ViewBuilder');
-        helpers.push('private func elitImageSurface(source: String, label: String, alt: String? = nil, objectFit: String = "cover", objectPosition: String = "center") -> some View {');
+        helpers.push('private func elitImageSurface(source: String, label: String, alt: String?, objectFit: String = "cover", objectPosition: String = "center") -> some View {');
         helpers.push('    if source.isEmpty {');
         helpers.push('        Text(alt ?? label)');
         helpers.push('            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)');
@@ -340,32 +402,133 @@ function buildSwiftUIHelpers(context: SwiftUIContext): string[] {
 
     if (context.helperFlags.has('webViewSurface')) {
         helpers.push('');
-        helpers.push('@ViewBuilder');
-        helpers.push('private func elitWebViewSurface(source: String, label: String) -> some View {');
-        helpers.push('    VStack(alignment: .leading, spacing: 8) {');
-        helpers.push('        Text(label)');
-        helpers.push('        Text(source)');
-        helpers.push('            .font(.caption)');
-        helpers.push('            .foregroundStyle(.secondary)');
+        helpers.push('struct ElitWebViewSurface: UIViewRepresentable {');
+        helpers.push('    let source: String');
+        helpers.push('    let label: String?');
+        helpers.push('');
+        helpers.push('    func makeUIView(context: Context) -> WKWebView {');
+        helpers.push('        let webView = WKWebView()');
+        helpers.push('        webView.accessibilityLabel = label');
+        helpers.push('        if let url = URL(string: source), !source.isEmpty { webView.load(URLRequest(url: url)) }');
+        helpers.push('        return webView');
         helpers.push('    }');
+        helpers.push('');
+        helpers.push('    func updateUIView(_ uiView: WKWebView, context: Context) {}');
         helpers.push('}');
     }
 
     if (context.helperFlags.has('mediaSurface')) {
         helpers.push('');
-        helpers.push('@ViewBuilder');
-        helpers.push('private func ElitVideoSurface(source: String, label: String, autoPlay: Bool, loop: Bool, muted: Bool, controls: Bool, playsInline: Bool, poster: String? = nil, posterFit: String = "cover", posterPosition: String = "center") -> some View {');
-        helpers.push('    VStack(alignment: .leading, spacing: 8) {');
-        helpers.push('        if let poster, !poster.isEmpty {');
-        helpers.push('            elitBackgroundImageSurface(source: poster, objectFit: posterFit, objectPosition: posterPosition)');
-        helpers.push('        }');
-        helpers.push('        Text(label)');
+        helpers.push('private func elitPosterAlignment(_ posterPosition: String) -> Alignment {');
+        helpers.push('    switch posterPosition.lowercased() {');
+        helpers.push('    case "top", "leading", "top-leading":');
+        helpers.push('        return .topLeading');
+        helpers.push('    case "bottom", "trailing", "bottom-trailing":');
+        helpers.push('        return .bottomTrailing');
+        helpers.push('    case "center":');
+        helpers.push('        return .center');
+        helpers.push('    default:');
+        helpers.push('        return .center');
         helpers.push('    }');
         helpers.push('}');
         helpers.push('');
         helpers.push('@ViewBuilder');
-        helpers.push('private func ElitAudioSurface(source: String, label: String, autoPlay: Bool, loop: Bool, muted: Bool) -> some View {');
-        helpers.push('    Label(label, systemImage: "waveform")');
+        helpers.push('private func elitPosterImage(_ image: Image, posterFit: String, posterPosition: String) -> some View {');
+        helpers.push('    let resizable = image.resizable()');
+        helpers.push('    switch posterFit.lowercased() {');
+        helpers.push('    case "contain":');
+        helpers.push('        return AnyView(resizable.scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: elitPosterAlignment(posterPosition)))');
+        helpers.push('    case "fill", "cover":');
+        helpers.push('        return AnyView(resizable.scaledToFill().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: elitPosterAlignment(posterPosition)))');
+        helpers.push('    default:');
+        helpers.push('        return AnyView(resizable.scaledToFill())');
+        helpers.push('    }');
+        helpers.push('}');
+        helpers.push('');
+        helpers.push('struct ElitVideoPlayerController: UIViewControllerRepresentable {');
+        helpers.push('    let source: String');
+        helpers.push('    let autoPlay: Bool');
+        helpers.push('    let muted: Bool');
+        helpers.push('    let controls: Bool');
+        helpers.push('    let playsInline: Bool');
+        helpers.push('');
+        helpers.push('    func makeUIViewController(context: Context) -> AVPlayerViewController {');
+        helpers.push('        let controller = AVPlayerViewController()');
+        helpers.push('        if let url = URL(string: source) {');
+        helpers.push('            let player = AVPlayer(url: url)');
+        helpers.push('            let resolvedPlayer = player');
+        helpers.push('            resolvedPlayer.isMuted = muted');
+        helpers.push('            controller.player = resolvedPlayer');
+        helpers.push('            if autoPlay { resolvedPlayer.play() }');
+        helpers.push('        }');
+        helpers.push('        controller.showsPlaybackControls = controls');
+        helpers.push('        controller.entersFullScreenWhenPlaybackBegins = !playsInline');
+        helpers.push('        return controller');
+        helpers.push('    }');
+        helpers.push('');
+        helpers.push('    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {}');
+        helpers.push('}');
+        helpers.push('');
+        helpers.push('struct ElitVideoSurface: View {');
+        helpers.push('    let source: String');
+        helpers.push('    let label: String');
+        helpers.push('    let autoPlay: Bool');
+        helpers.push('    let muted: Bool');
+        helpers.push('    let controls: Bool');
+        helpers.push('    let poster: String?');
+        helpers.push('    let playsInline: Bool');
+        helpers.push('    let posterFit: String');
+        helpers.push('    let posterPosition: String');
+        helpers.push('');
+        helpers.push('    var body: some View {');
+        helpers.push('        ZStack {');
+        helpers.push('            if let poster, !poster.isEmpty, let posterURL = URL(string: poster) {');
+        helpers.push('                AsyncImage(url: posterURL) { phase in');
+        helpers.push('                    switch phase {');
+        helpers.push('                    case .success(let image):');
+        helpers.push('                        elitPosterImage(image, posterFit: posterFit, posterPosition: posterPosition)');
+        helpers.push('                    default:');
+        helpers.push('                        Color.clear');
+        helpers.push('                    }');
+        helpers.push('                }');
+        helpers.push('            }');
+        helpers.push('            ElitVideoPlayerController(source: source, autoPlay: autoPlay, muted: muted, controls: controls, playsInline: playsInline)');
+        helpers.push('                .accessibilityLabel(label)');
+        helpers.push('        }');
+        helpers.push('    }');
+        helpers.push('}');
+        helpers.push('');
+        helpers.push('struct ElitAudioSurface: View {');
+        helpers.push('    let source: String');
+        helpers.push('    let label: String');
+        helpers.push('    let autoPlay: Bool');
+        helpers.push('    let muted: Bool');
+        helpers.push('');
+        helpers.push('    var body: some View {');
+        helpers.push('        VStack {');
+        helpers.push('            if let url = URL(string: source), !source.isEmpty {');
+        helpers.push('                AVPlayer(url: url).let { resolvedPlayer in');
+        helpers.push('                    resolvedPlayer.isMuted = muted');
+        helpers.push('                    if autoPlay { resolvedPlayer.play() }');
+        helpers.push('                }');
+        helpers.push('            }');
+        helpers.push('            Label(label, systemImage: "waveform")');
+        helpers.push('                .accessibilityLabel(label)');
+        helpers.push('        }');
+        helpers.push('    }');
+        helpers.push('}');
+    }
+
+    if (context.helperFlags.has('unsupportedPlaceholder')) {
+        helpers.push('');
+        helpers.push('@ViewBuilder');
+        helpers.push('private func elitUnsupportedPlaceholder(label: String, sourceTag: String) -> some View {');
+        helpers.push('    VStack(spacing: 8) {');
+        helpers.push('        Text(label)');
+        helpers.push('        Text(sourceTag)');
+        helpers.push('            .font(.caption)');
+        helpers.push('            .foregroundStyle(.secondary)');
+        helpers.push('    }');
         helpers.push('}');
     }
 
@@ -401,7 +564,11 @@ export function renderSwiftUI(input: Child | NativeTree, options: SwiftUIOptions
         styleContexts: styleData.styleContexts,
     };
 
-    const bodyLines = tree.roots.length === 1
+    const singleRoot = tree.roots.length === 1 ? tree.roots[0] : null;
+    const isSingleScreenRoot = singleRoot !== null
+        && singleRoot.kind === 'element'
+        && singleRoot.component === 'Screen';
+    const innerLines = tree.roots.length === 1
         ? renderSwiftUINode(tree.roots[0], 2, context, { availableWidth: styleResolveOptions.viewportWidth, availableHeight: styleResolveOptions.viewportHeight })
         : [
             '        VStack(alignment: .leading, spacing: 0) {',
@@ -409,12 +576,26 @@ export function renderSwiftUI(input: Child | NativeTree, options: SwiftUIOptions
             '        }',
         ];
 
+    const bodyLines = isSingleScreenRoot
+        ? [
+            '        ScrollView {',
+            ...innerLines.map((line) => '    ' + line),
+            '        }',
+        ]
+        : innerLines;
+
     const lines: string[] = [];
 
     if (resolvedOptions.includeImports) {
         lines.push('import SwiftUI');
         if (context.helperFlags.has('backgroundImage') || context.helperFlags.has('imagePlaceholder') || context.helperFlags.has('openUrlHandler')) {
             lines.push('import Foundation');
+        }
+        if (context.helperFlags.has('webViewSurface')) {
+            lines.push('import WebKit');
+        }
+        if (context.helperFlags.has('mediaSurface')) {
+            lines.push('import AVKit');
         }
         lines.push('');
     }
