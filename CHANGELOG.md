@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-06-26
+
+### Added
+- **Server-side HMR** (`dev.serverWatch`) - the dev server now automatically restarts when server-side source files change
+  - `serverWatch: true` (default) walks the dependency graph from server entries discovered in `elit.config.ts` and watches every transitively-imported local `.ts/.tsx/.js/.jsx/.mjs/.cjs` file
+  - `serverWatch: false` disables server HMR entirely
+  - `serverWatch: ['src/server/**/*', 'shared/**/*']` accepts explicit glob patterns and skips graph discovery
+  - Honors `resolve.alias` when traversing the graph
+  - Static `import`/`require()` are followed; dynamic `import()`, CSS, JSON, and assets are skipped
+  - Capped at 5000 files to bound large projects
+  - Override per-run via `elit dev --no-server-watch`
+- **Top-level `resolve.alias`** - project-wide import aliasing that's inherited by `dev`, `preview`, and `build`
+  - Longest-key-wins resolution (`@app` checked before `@`)
+  - Per-target `resolve.alias` extends and overrides the inherited map
+  - Bare `node_modules` imports pass through untouched
+  - Backed by a new AST rewriter that rewrites specifiers in bundled output
+- **Comprehensive subpath documentation** - reference docs published for `elit/test`, `elit/database`, `elit/http`, `elit/server`, `elit/smtp-server`, and `elit/ws`
+
+### Changed
+- **Version metadata refresh** - release-facing version references across `package.json`, `Cargo.toml`, docs UI badges, and `create-elit` templates now track `v3.7.0`
+- **esbuild** bumped to `0.28.1` with overrides applied across the workspace
+- **CLI documentation** expanded to cover every command and flag
+
 ## [3.6.9] - 2026-06-12
 
 ### Added
