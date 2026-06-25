@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "elit": "file:../..",
-    "lodash-es": "^4.17.22"
+    "lodash-es": "^4.18.1"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
